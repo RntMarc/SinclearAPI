@@ -14,7 +14,6 @@ final class SensitiveFields
         'code',
         'publicKey',
         'challenge',
-        'token_hash',
         'tokenHash',
         'p256dh',
         'auth',

@@ -95,20 +95,20 @@ final class TokenService
             throw HttpException::unauthorized('invalid_refresh_token');
         }
 
-        if ($stored['revoked_at'] !== null) {
-            $this->familyRepository->revoke((string) $stored['family_id']);
-            $this->refreshTokenRepository->revokeAllForFamily((string) $stored['family_id']);
+        if ($stored['revokedAt'] !== null) {
+            $this->familyRepository->revoke((string) $stored['familyId']);
+            $this->refreshTokenRepository->revokeAllForFamily((string) $stored['familyId']);
             throw HttpException::unauthorized('refresh_token_reuse_detected');
         }
 
-        if (strtotime((string) $stored['expires_at']) < time()) {
+        if (strtotime((string) $stored['expiresAt']) < time()) {
             throw HttpException::unauthorized('refresh_token_expired');
         }
 
         $this->refreshTokenRepository->revoke((string) $stored['id']);
 
-        $userId = (string) $stored['user_id'];
-        $familyId = (string) $stored['family_id'];
+        $userId = (string) $stored['userId'];
+        $familyId = (string) $stored['familyId'];
         $newRefresh = $this->generateRefreshToken();
         $refreshTtl = (int) $this->settings->get('jwt.refresh_ttl', 7776000);
 
@@ -140,7 +140,7 @@ final class TokenService
 
         if ($stored !== null) {
             $this->refreshTokenRepository->revoke((string) $stored['id']);
-            $this->familyRepository->revoke((string) $stored['family_id']);
+            $this->familyRepository->revoke((string) $stored['familyId']);
         }
 
         if ($user !== null && $user->jti !== '') {

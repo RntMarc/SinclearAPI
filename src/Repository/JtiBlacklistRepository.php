@@ -11,12 +11,12 @@ final class JtiBlacklistRepository extends AbstractRepository
 {
     protected function table(): string
     {
-        return 'jti_blacklist';
+        return 'JtiBlacklist';
     }
 
     protected function columns(): array
     {
-        return ['id', 'jti', 'expires_at', 'created_at'];
+        return ['id', 'jti', 'expiresAt', 'createdAt'];
     }
 
     public function add(string $jti, string $expiresAt): void
@@ -24,15 +24,15 @@ final class JtiBlacklistRepository extends AbstractRepository
         $this->create([
             'id' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
             'jti' => $jti,
-            'expires_at' => $expiresAt,
-            'created_at' => date('Y-m-d H:i:s'),
+            'expiresAt' => $expiresAt,
+            'createdAt' => date('Y-m-d H:i:s'),
         ]);
     }
 
     public function isBlacklisted(string $jti): bool
     {
         $stmt = $this->pdo->prepare(
-            'SELECT 1 FROM `jti_blacklist` WHERE `jti` = :jti AND `expires_at` > NOW() LIMIT 1'
+            'SELECT 1 FROM `JtiBlacklist` WHERE `jti` = :jti AND `expiresAt` > NOW() LIMIT 1'
         );
         $stmt->execute(['jti' => $jti]);
         return $stmt->fetchColumn() !== false;
@@ -40,7 +40,7 @@ final class JtiBlacklistRepository extends AbstractRepository
 
     public function purgeExpired(): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM `jti_blacklist` WHERE `expires_at` < NOW()');
+        $stmt = $this->pdo->prepare('DELETE FROM `JtiBlacklist` WHERE `expiresAt` < NOW()');
         $stmt->execute();
     }
 }

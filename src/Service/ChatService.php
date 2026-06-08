@@ -99,22 +99,22 @@ final class ChatService
     {
         $this->assertChatAccess($user, $chatId, $chatType);
 
-        $repo = new GenericRepository($this->pdo, 'chat_read_receipts', []);
+        $repo = new GenericRepository($this->pdo, 'ChatReadReceipt', []);
         $stmt = $this->pdo->prepare(
-            'SELECT id FROM `chat_read_receipts` WHERE user_id = :userId AND chat_id = :chatId AND chat_type = :chatType LIMIT 1'
+            'SELECT id FROM `ChatReadReceipt` WHERE userId = :userId AND chatId = :chatId AND chatType = :chatType LIMIT 1'
         );
         $stmt->execute(['userId' => $user->id, 'chatId' => $chatId, 'chatType' => $chatType]);
         $existing = $stmt->fetch();
 
         if ($existing) {
-            $repo->update((string) $existing['id'], ['last_read_at' => date('Y-m-d H:i:s')]);
+            $repo->update((string) $existing['id'], ['lastReadAt' => date('Y-m-d H:i:s')]);
         } else {
             $repo->create([
                 'id' => Uuid::uuid4()->toString(),
-                'user_id' => $user->id,
-                'chat_id' => $chatId,
-                'chat_type' => $chatType,
-                'last_read_at' => date('Y-m-d H:i:s'),
+                'userId' => $user->id,
+                'chatId' => $chatId,
+                'chatType' => $chatType,
+                'lastReadAt' => date('Y-m-d H:i:s'),
             ]);
         }
     }
@@ -127,10 +127,10 @@ final class ChatService
         $stmt = $this->pdo->prepare(
             'SELECT m.chat_id, m.chat_type, COUNT(*) as cnt
              FROM `ChatMessages` m
-             LEFT JOIN `chat_read_receipts` r
-               ON r.user_id = :userId AND r.chat_id = m.chat_id AND r.chat_type = m.chat_type
+             LEFT JOIN `ChatReadReceipt` r
+               ON r.userId = :userId AND r.chatId = m.chat_id AND r.chatType = m.chat_type
              WHERE m.user_id != :userId2
-               AND m.created_at > COALESCE(r.last_read_at, "1970-01-01")
+               AND m.created_at > COALESCE(r.lastReadAt, "1970-01-01")
              GROUP BY m.chat_id, m.chat_type'
         );
         $stmt->execute(['userId' => $user->id, 'userId2' => $user->id]);
@@ -149,7 +149,7 @@ final class ChatService
         $b = max($user->id, $otherUserId);
 
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM `direct_chats` WHERE user_a_id = :a AND user_b_id = :b LIMIT 1'
+            'SELECT * FROM `DirectChat` WHERE userAId = :a AND userBId = :b LIMIT 1'
         );
         $stmt->execute(['a' => $a, 'b' => $b]);
         $existing = $stmt->fetch();
@@ -157,26 +157,26 @@ final class ChatService
             return $existing;
         }
 
-        $repo = new GenericRepository($this->pdo, 'direct_chats', []);
+        $repo = new GenericRepository($this->pdo, 'DirectChat', []);
         return $repo->create([
             'id' => Uuid::uuid4()->toString(),
-            'user_a_id' => $a,
-            'user_b_id' => $b,
-            'created_at' => date('Y-m-d H:i:s'),
+            'userAId' => $a,
+            'userBId' => $b,
+            'createdAt' => date('Y-m-d H:i:s'),
         ]);
     }
 
     public function updatePresence(AuthenticatedUser $user, string $status): array
     {
-        $repo = new GenericRepository($this->pdo, 'user_presence', [], 'user_id');
+        $repo = new GenericRepository($this->pdo, 'UserPresence', [], 'userId');
         $existing = $repo->findById($user->id);
-        $data = ['status' => $status, 'last_seen_at' => date('Y-m-d H:i:s')];
+        $data = ['status' => $status, 'lastSeenAt' => date('Y-m-d H:i:s')];
 
         if ($existing) {
             return $repo->update($user->id, $data) ?? $existing;
         }
 
-        return $repo->create(array_merge(['user_id' => $user->id], $data));
+        return $repo->create(array_merge(['userId' => $user->id], $data));
     }
 
     /**
@@ -185,8 +185,8 @@ final class ChatService
     public function fetchPendingSseEvents(AuthenticatedUser $user, int $limit = 50): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM `sse_events` WHERE user_id = :userId AND delivered_at IS NULL
-             ORDER BY created_at ASC LIMIT :limit'
+            'SELECT * FROM `SseEvent` WHERE userId = :userId AND deliveredAt IS NULL
+             ORDER BY createdAt ASC LIMIT :limit'
         );
         $stmt->bindValue(':userId', $user->id);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
@@ -197,7 +197,7 @@ final class ChatService
             $ids = array_column($events, 'id');
             $placeholders = implode(',', array_fill(0, count($ids), '?'));
             $mark = $this->pdo->prepare(
-                "UPDATE `sse_events` SET delivered_at = NOW() WHERE id IN ({$placeholders})"
+                "UPDATE `SseEvent` SET deliveredAt = NOW() WHERE id IN ({$placeholders})"
             );
             $mark->execute($ids);
         }
@@ -210,14 +210,14 @@ final class ChatService
      */
     private function enqueueSseEvent(string $userId, string $type, array $payload): void
     {
-        $repo = new GenericRepository($this->pdo, 'sse_events', []);
+        $repo = new GenericRepository($this->pdo, 'SseEvent', []);
         $repo->create([
             'id' => Uuid::uuid4()->toString(),
-            'user_id' => $userId,
-            'event_type' => $type,
+            'userId' => $userId,
+            'eventType' => $type,
             'payload' => json_encode($payload),
-            'delivered_at' => null,
-            'created_at' => date('Y-m-d H:i:s'),
+            'deliveredAt' => null,
+            'createdAt' => date('Y-m-d H:i:s'),
         ]);
     }
 
@@ -239,8 +239,8 @@ final class ChatService
         }
 
         $stmt = $this->pdo->prepare(
-            'SELECT 1 FROM `direct_chats` WHERE id = :chatId
-             AND (user_a_id = :userId OR user_b_id = :userId2) LIMIT 1'
+            'SELECT 1 FROM `DirectChat` WHERE id = :chatId
+             AND (userAId = :userId OR userBId = :userId2) LIMIT 1'
         );
         $stmt->execute(['chatId' => $chatId, 'userId' => $user->id, 'userId2' => $user->id]);
         if ($stmt->fetchColumn() === false) {

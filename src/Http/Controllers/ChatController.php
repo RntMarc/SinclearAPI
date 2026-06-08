@@ -99,7 +99,7 @@ final class ChatController
 
         $body = '';
         foreach ($events as $event) {
-            $body .= 'event: ' . $event['event_type'] . "\n";
+            $body .= 'event: ' . $event['eventType'] . "\n";
             $body .= 'data: ' . (string) $event['payload'] . "\n\n";
         }
         if ($body === '') {
