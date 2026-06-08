@@ -11,12 +11,12 @@ final class RefreshTokenRepository extends AbstractRepository
 {
     protected function table(): string
     {
-        return 'refresh_tokens';
+        return 'RefreshToken';
     }
 
     protected function columns(): array
     {
-        return ['id', 'family_id', 'user_id', 'token_hash', 'expires_at', 'revoked_at', 'created_at'];
+        return ['id', 'familyId', 'userId', 'tokenHash', 'expiresAt', 'revokedAt', 'createdAt'];
     }
 
     /**
@@ -26,12 +26,12 @@ final class RefreshTokenRepository extends AbstractRepository
     {
         return $this->create([
             'id' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
-            'family_id' => $familyId,
-            'user_id' => $userId,
-            'token_hash' => $tokenHash,
-            'expires_at' => $expiresAt,
-            'revoked_at' => null,
-            'created_at' => date('Y-m-d H:i:s'),
+            'familyId' => $familyId,
+            'userId' => $userId,
+            'tokenHash' => $tokenHash,
+            'expiresAt' => $expiresAt,
+            'revokedAt' => null,
+            'createdAt' => date('Y-m-d H:i:s'),
         ]);
     }
 
@@ -41,7 +41,7 @@ final class RefreshTokenRepository extends AbstractRepository
     public function findByHash(string $tokenHash): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM `refresh_tokens` WHERE `token_hash` = :hash LIMIT 1'
+            'SELECT * FROM `RefreshToken` WHERE `tokenHash` = :hash LIMIT 1'
         );
         $stmt->execute(['hash' => $tokenHash]);
         $row = $stmt->fetch();
@@ -51,7 +51,7 @@ final class RefreshTokenRepository extends AbstractRepository
     public function revoke(string $id): void
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE `refresh_tokens` SET `revoked_at` = NOW() WHERE `id` = :id'
+            'UPDATE `RefreshToken` SET `revokedAt` = NOW() WHERE `id` = :id'
         );
         $stmt->execute(['id' => $id]);
     }
@@ -59,7 +59,7 @@ final class RefreshTokenRepository extends AbstractRepository
     public function revokeAllForFamily(string $familyId): void
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE `refresh_tokens` SET `revoked_at` = NOW() WHERE `family_id` = :familyId AND `revoked_at` IS NULL'
+            'UPDATE `RefreshToken` SET `revokedAt` = NOW() WHERE `familyId` = :familyId AND `revokedAt` IS NULL'
         );
         $stmt->execute(['familyId' => $familyId]);
     }

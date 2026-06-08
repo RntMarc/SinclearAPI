@@ -11,12 +11,12 @@ final class RefreshTokenFamilyRepository extends AbstractRepository
 {
     protected function table(): string
     {
-        return 'refresh_token_families';
+        return 'RefreshTokenFamily';
     }
 
     protected function columns(): array
     {
-        return ['id', 'user_id', 'created_at', 'revoked_at'];
+        return ['id', 'userId', 'createdAt', 'revokedAt'];
     }
 
     /**
@@ -26,16 +26,16 @@ final class RefreshTokenFamilyRepository extends AbstractRepository
     {
         return $this->create([
             'id' => \Ramsey\Uuid\Uuid::uuid4()->toString(),
-            'user_id' => $userId,
-            'created_at' => date('Y-m-d H:i:s'),
-            'revoked_at' => null,
+            'userId' => $userId,
+            'createdAt' => date('Y-m-d H:i:s'),
+            'revokedAt' => null,
         ]);
     }
 
     public function revoke(string $familyId): void
     {
         $stmt = $this->pdo->prepare(
-            'UPDATE `refresh_token_families` SET `revoked_at` = NOW() WHERE `id` = :id'
+            'UPDATE `RefreshTokenFamily` SET `revokedAt` = NOW() WHERE `id` = :id'
         );
         $stmt->execute(['id' => $familyId]);
     }

@@ -14,8 +14,8 @@ final class DirectChatPolicy extends AbstractPolicy
     public function canView(AuthenticatedUser $user, array $resource): bool
     {
         return $user->isAdmin
-            || (string) ($resource['user_a_id'] ?? '') === $user->id
-            || (string) ($resource['user_b_id'] ?? '') === $user->id;
+            || (string) ($resource['userAId'] ?? '') === $user->id
+            || (string) ($resource['userBId'] ?? '') === $user->id;
     }
 
     public function listFilters(AuthenticatedUser $user): array
