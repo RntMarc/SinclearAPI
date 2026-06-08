@@ -1,0 +1,483 @@
+openapi: 3.1.0
+info:
+  title: Sinclear Beyond API
+  version: 1.0.0
+  description: Zentrale REST-API für Sinclear Beyond
+servers:
+  - url: /api/v1
+    description: API v1
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    PaginationMeta:
+      type: object
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+
+    TokenResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer }
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string }
+        displayName: { type: string }
+        isAdmin: { type: boolean }
+        onboardingCompleted: { type: boolean }
+        image: { type: string, nullable: true }
+
+    OtpRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+
+    OtpVerify:
+      type: object
+      required: [email, code]
+      properties:
+        email: { type: string, format: email }
+        code: { type: string, minLength: 6, maxLength: 6 }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+
+    PollVoteRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId: { type: string }
+              optionId: { type: string }
+              availability: { type: string, enum: [yes, maybe, no] }
+              textValue: { type: string }
+
+    ChatMessageRequest:
+      type: object
+      required: [chat_id, body]
+      properties:
+        chat_id: { type: string }
+        chat_type: { type: string, enum: [direct, group], default: direct }
+        body: { type: string }
+        attachment_type: { type: string, nullable: true }
+        attachment_body: { type: string, nullable: true }
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1, minimum: 1 }
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 25, minimum: 1, maximum: 100 }
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/otp/request:
+    post:
+      security: []
+      tags: [Auth]
+      summary: OTP per E-Mail anfordern
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpRequest' }
+      responses:
+        '200': { description: OTP gesendet }
+        '400': { description: Fehler, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '429': { description: Rate Limit }
+
+  /auth/otp/verify:
+    post:
+      security: []
+      tags: [Auth]
+      summary: OTP verifizieren und einloggen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OtpVerify' }
+      responses:
+        '200':
+          description: Login erfolgreich
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+
+  /auth/passkey/login/begin:
+    post:
+      security: []
+      tags: [Auth]
+      summary: Passkey-Login starten
+      responses:
+        '200': { description: WebAuthn Options }
+
+  /auth/passkey/login/finish:
+    post:
+      security: []
+      tags: [Auth]
+      summary: Passkey-Login abschließen
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+
+  /auth/passkey/register/begin:
+    post:
+      tags: [Auth]
+      summary: Passkey registrieren (begin)
+      responses:
+        '200': { description: WebAuthn Options }
+
+  /auth/passkey/register/finish:
+    post:
+      tags: [Auth]
+      summary: Passkey registrieren (finish)
+      responses:
+        '200': { description: Erfolg }
+
+  /auth/passkey/{id}:
+    delete:
+      tags: [Auth]
+      summary: Passkey löschen
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: Gelöscht }
+
+  /auth/discord/start:
+    get:
+      security: []
+      tags: [Auth]
+      summary: Discord OAuth2 starten
+      responses:
+        '302': { description: Redirect zu Discord }
+
+  /auth/discord/callback:
+    get:
+      security: []
+      tags: [Auth]
+      summary: Discord OAuth2 Callback
+      parameters:
+        - name: code
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+
+  /auth/refresh:
+    post:
+      security: []
+      tags: [Auth]
+      summary: Access Token erneuern
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200': { description: Neue Tokens }
+
+  /auth/logout:
+    post:
+      security: []
+      tags: [Auth]
+      summary: Ausloggen (Refresh Token invalidieren)
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200': { description: Erfolg }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Aktuellen Nutzer abrufen
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Nutzer listen (Admin)
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200': { description: Paginierte Liste }
+    post:
+      tags: [Users]
+      summary: Nutzer anlegen (Admin)
+      responses:
+        '201': { description: Erstellt }
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Nutzer abrufen
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Nutzer }
+    put:
+      tags: [Users]
+      summary: Nutzer aktualisieren
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Aktualisiert }
+    delete:
+      tags: [Users]
+      summary: Nutzer löschen (Admin)
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '204': { description: Gelöscht }
+
+  /users/{id}/export:
+    get:
+      tags: [Users]
+      summary: DSGVO-Datenexport
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Exportdaten }
+
+  /events:
+    get:
+      tags: [Events]
+      summary: Events listen
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200': { description: Paginierte Events }
+    post:
+      tags: [Events]
+      summary: Event erstellen
+      responses:
+        '201': { description: Erstellt }
+
+  /events/{id}:
+    get:
+      tags: [Events]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Event }
+    put:
+      tags: [Events]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Aktualisiert }
+    delete:
+      tags: [Events]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '204': { description: Gelöscht }
+
+  /polls/{id}/votes:
+    post:
+      tags: [Polls]
+      summary: In Umfrage abstimmen
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PollVoteRequest' }
+      responses:
+        '200': { description: Erfolg }
+
+  /polls/{id}/counter-proposals:
+    post:
+      tags: [Polls]
+      summary: Gegenvorschlag einreichen
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '201': { description: Erstellt }
+
+  /polls/{id}/finalize:
+    post:
+      tags: [Polls]
+      summary: Umfrage finalisieren
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Finalisiert }
+
+  /calendar/combined:
+    get:
+      tags: [Calendar]
+      summary: Kombinierter Kalender (Events + Travel)
+      responses:
+        '200': { description: Aggregierte Daten }
+
+  /notifications/badges:
+    get:
+      tags: [Notifications]
+      summary: Badge-Zähler
+      responses:
+        '200': { description: Badge-Counts }
+
+  /chat/rooms:
+    get:
+      tags: [Chat]
+      summary: Chat-Räume des Nutzers
+      responses:
+        '200': { description: Räume }
+
+  /chat/messages:
+    get:
+      tags: [Chat]
+      summary: Nachrichten abrufen
+      parameters:
+        - name: chat_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: chat_type
+          in: query
+          schema: { type: string, enum: [direct, group] }
+      responses:
+        '200': { description: Nachrichten }
+    post:
+      tags: [Chat]
+      summary: Nachricht senden
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatMessageRequest' }
+      responses:
+        '201': { description: Gesendet }
+
+  /chat/read:
+    post:
+      tags: [Chat]
+      summary: Als gelesen markieren
+      responses:
+        '200': { description: Erfolg }
+
+  /chat/unread:
+    get:
+      tags: [Chat]
+      summary: Ungelesene Zähler
+      responses:
+        '200': { description: Counts }
+
+  /chat/direct:
+    get:
+      tags: [Chat]
+      summary: Direktchat abrufen/erstellen
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Direct Chat }
+
+  /chat/presence:
+    get:
+      tags: [Chat]
+      summary: Präsenz abrufen
+      responses:
+        '200': { description: Präsenz }
+    patch:
+      tags: [Chat]
+      summary: Präsenz aktualisieren
+      responses:
+        '200': { description: Aktualisiert }
+
+  /chat/events/stream:
+    get:
+      tags: [Chat]
+      summary: SSE Event-Stream
+      responses:
+        '200':
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health Check
+      responses:
+        '200': { description: OK }
+
+  # Generisches CRUD-Muster für weitere Ressourcen:
+  # GET/POST /{resource}
+  # GET/PUT/PATCH/DELETE /{resource}/{id}
+  # Ressourcen: user-preferences, contact-info, social-info, close-friends,
+  # event-permissions, event-relations, forums, forum-members, posts, post-votes,
+  # polls, poll-questions, poll-options, poll-invites, poll-votes, recipes,
+  # recipe-ingredients, recipe-steps, recipe-reviews, recipe-bookmarks,
+  # media-items, media-reviews, series-episodes, episode-reviews, album-tracks,
+  # discover-places, discover-gastronomy, discover-reviews, discover-bookmarks,
+  # feedback-suggestions, feedback-votes, news-articles, news-upvotes,
+  # rss-sources, subscriptions, subscription-relations, office-documents,
+  # office-versions, office-collaborators, notifications, push-subscriptions,
+  # changelog, travel-trips, travel-events, travel-accommodations,
+  # travel-relations, travel-event-tickets, chat-rooms, chat-room-members,
+  # chat-messages, direct-chats, chat-read-receipts, user-presence,
+  # user-devices, sse-events, passkeys
+
+tags:
+  - name: Auth
+  - name: Users
+  - name: Events
+  - name: Polls
+  - name: Calendar
+  - name: Notifications
+  - name: Chat
+  - name: System
