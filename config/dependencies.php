@@ -13,11 +13,15 @@ use Sinclear\Api\Http\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Http\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Http\Middleware\RequestSizeLimitMiddleware;
 use Sinclear\Api\Http\Middleware\SecurityHeadersMiddleware;
+use Sinclear\Api\Repository\CloseFriendRepository;
+use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\PasskeyRepository;
 use Sinclear\Api\Repository\RefreshTokenFamilyRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
+use Sinclear\Api\Repository\SocialInfoRepository;
+use Sinclear\Api\Repository\UserPreferencesRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\WebauthnChallengeRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
@@ -74,6 +78,10 @@ return [
     DiscordOAuthService::class => DI\autowire(),
 
     UserRepository::class => DI\autowire(),
+    UserPreferencesRepository::class => DI\autowire(),
+    ContactInfoRepository::class => DI\autowire(),
+    SocialInfoRepository::class => DI\autowire(),
+    CloseFriendRepository::class => DI\autowire(),
     OtpTokenRepository::class => DI\autowire(),
     PasskeyRepository::class => DI\autowire(),
     WebauthnChallengeRepository::class => DI\autowire(),
@@ -93,6 +101,7 @@ return [
     },
 
     AuthController::class => DI\autowire(),
+    UserController::class => DI\autowire(),
     PollService::class => DI\autowire(),
     ChatService::class => DI\autowire(),
     CalendarService::class => DI\autowire(),

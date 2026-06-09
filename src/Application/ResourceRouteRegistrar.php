@@ -26,10 +26,18 @@ final class ResourceRouteRegistrar
         $pdo = $container->get(\PDO::class);
         $authMiddleware = $container->get(AuthenticationMiddleware::class);
 
-        $app->group('', function (RouteCollectorProxy $group) use ($registry, $pdo, $settings): void {
+        $app->group('', function (RouteCollectorProxy $group) use ($registry, $pdo, $settings, $container): void {
             foreach ($registry as $resource) {
                 $pk = $resource['pk'] ?? 'id';
-                $repository = new GenericRepository($pdo, $resource['table'], [], $pk);
+
+                // Try to find a specialized repository in the container, otherwise use GenericRepository
+                $repoClass = 'Sinclear\Api\Repository\\' . $resource['table'] . 'Repository';
+                if ($container->has($repoClass)) {
+                    $repository = $container->get($repoClass);
+                } else {
+                    $repository = new GenericRepository($pdo, $resource['table'], [], $pk);
+                }
+
                 $policy = new ($resource['policy'])();
                 $mapper = $resource['mapper'] ?? null;
                 $service = new ResourceService($repository, $policy, $mapper);
