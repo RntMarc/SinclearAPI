@@ -29,6 +29,7 @@ return static function (App $app): void {
 
     // Public auth routes
     $app->group('/auth', function ($group) use ($authController): void {
+        $group->post('/login', [$authController, 'login']);
         $group->post('/otp/request', [$authController, 'otpRequest']);
         $group->post('/otp/verify', [$authController, 'otpVerify']);
         $group->post('/passkey/login/begin', [$authController, 'passkeyLoginBegin']);
@@ -52,7 +53,7 @@ return static function (App $app): void {
     $chatController = new ChatController($container->get(ChatService::class));
     $calendarController = new CalendarController($container->get(CalendarService::class));
     $notificationController = new NotificationController($container->get(NotificationService::class));
-    $userController = new UserController($container->get(UserExportService::class));
+    $userController = $container->get(UserController::class);
 
     $app->group('', function ($group) use (
         $pollController,
@@ -79,6 +80,7 @@ return static function (App $app): void {
         $group->get('/calendar/combined', [$calendarController, 'combined']);
         $group->get('/notifications/badges', [$notificationController, 'badges']);
         $group->get('/users/{id}/export', [$userController, 'export']);
+        $group->get('/close-friends/{userId}/{friendId}', [$userController, 'isCloseFriend']);
     })->add($authMiddleware);
 
     // Generic CRUD for all registered resources

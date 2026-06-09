@@ -48,6 +48,21 @@ components:
         isAdmin: { type: boolean }
         onboardingCompleted: { type: boolean }
         image: { type: string, nullable: true }
+        preferences:
+          type: object
+          nullable: true
+          properties:
+            theme: { type: string }
+            language: { type: string }
+            primaryColor: { type: string, nullable: true }
+            timezone: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
 
     OtpRequest:
       type: object
@@ -111,6 +126,24 @@ security:
   - bearerAuth: []
 
 paths:
+  /auth/login:
+    post:
+      security: []
+      tags: [Auth]
+      summary: Login mit E-Mail und Passwort
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Login erfolgreich
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '400': { description: Ungültige Zugangsdaten }
+
   /auth/otp/request:
     post:
       security: []
@@ -293,6 +326,85 @@ paths:
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
         '200': { description: Exportdaten }
+
+  /close-friends/{userId}/{friendId}:
+    get:
+      tags: [Users]
+      summary: Prüfen ob ein Nutzer ein enger Freund ist
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: friendId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isCloseFriend: { type: boolean }
+
+  /user-preferences/{id}:
+    get:
+      tags: [Users]
+      summary: Nutzereinstellungen abrufen
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [Users]
+      summary: Nutzereinstellungen aktualisieren
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Users]
+      summary: Nutzereinstellungen erstellen
+      responses:
+        '201': { description: OK }
+
+  /contact-info/{id}:
+    get:
+      tags: [Users]
+      summary: Kontaktinfo abrufen
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [Users]
+      summary: Kontaktinfo aktualisieren
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Users]
+      summary: Kontaktinfo erstellen
+      responses:
+        '201': { description: OK }
+
+  /social-info/{id}:
+    get:
+      tags: [Users]
+      summary: Social Info abrufen
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [Users]
+      summary: Social Info aktualisieren
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Users]
+      summary: Social Info erstellen
+      responses:
+        '201': { description: OK }
 
   /events:
     get:
