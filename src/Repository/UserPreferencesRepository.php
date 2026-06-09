@@ -16,7 +16,7 @@ final class UserPreferencesRepository extends AbstractRepository
 
     protected function columns(): array
     {
-        return ['id', 'userId', 'theme', 'language', 'primaryColor', 'timezone', 'updatedAt', 'createdAt'];
+        return ['id', 'userId', 'language', 'theme', 'primaryColor', 'timezone'];
     }
 
     /**

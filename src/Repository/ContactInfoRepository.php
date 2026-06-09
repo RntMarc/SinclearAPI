@@ -16,6 +16,11 @@ final class ContactInfoRepository extends AbstractRepository
 
     protected function columns(): array
     {
-        return ['id', 'userId', 'phone', 'address', 'updatedAt', 'createdAt'];
+        return [
+            'id', 'userId', 'discordHandle', 'fluxerHandle', 'signalNumber',
+            'whatsappNumber', 'discordVisibility', 'fluxerVisibility',
+            'matrixVisibility', 'signalVisibility', 'whatsappVisibility',
+            'matrixUser', 'matrixHomeserver'
+        ];
     }
 }

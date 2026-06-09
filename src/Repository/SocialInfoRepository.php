@@ -16,6 +16,12 @@ final class SocialInfoRepository extends AbstractRepository
 
     protected function columns(): array
     {
-        return ['id', 'userId', 'twitter', 'instagram', 'linkedin', 'github', 'updatedAt', 'createdAt'];
+        return [
+            'id', 'userId', 'unsplashHandle', 'instagramHandle', 'mastodonHandle',
+            'pixelfedHandle', 'blueskyHandle', 'youtubeHandle', 'twitchHandle',
+            'unsplashVisibility', 'instagramVisibility', 'mastodonVisibility',
+            'pixelfedVisibility', 'blueskyVisibility', 'youtubeVisibility',
+            'twitchVisibility'
+        ];
     }
 }

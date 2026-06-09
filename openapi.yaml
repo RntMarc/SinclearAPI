@@ -52,10 +52,10 @@ components:
           type: object
           nullable: true
           properties:
-            theme: { type: string }
+            theme: { type: string, enum: [light, dark] }
             language: { type: string }
-            primaryColor: { type: string, nullable: true }
-            timezone: { type: string }
+            primaryColor: { type: string }
+            timezone: { type: string, nullable: true }
 
     LoginRequest:
       type: object
