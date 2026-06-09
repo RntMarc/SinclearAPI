@@ -10,6 +10,8 @@ use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Exception\HttpException;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Service\UserExportService;
+use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Repository\CloseFriendRepository;
 
 /**
  * User-specific endpoints beyond CRUD.
@@ -17,7 +19,8 @@ use Sinclear\Api\Service\UserExportService;
 final class UserController
 {
     public function __construct(
-        private readonly UserExportService $exportService
+        private readonly UserExportService $exportService,
+        private readonly CloseFriendRepository $closeFriendRepository
     ) {
     }
 
@@ -29,5 +32,24 @@ final class UserController
         }
         $data = $this->exportService->export($user, $args['id']);
         return ResponseFactory::json(['data' => $data], 200, $response);
+    }
+
+    public function isCloseFriend(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if (!$user instanceof AuthenticatedUser) {
+            throw HttpException::unauthorized();
+        }
+
+        $userId = (string) $args['userId'];
+        $friendId = (string) $args['friendId'];
+
+        if (!$user->isAdmin && $user->id !== $userId) {
+            throw HttpException::forbidden();
+        }
+
+        $exists = $this->closeFriendRepository->isCloseFriend($userId, $friendId);
+
+        return ResponseFactory::json(['isCloseFriend' => $exists], 200, $response);
     }
 }

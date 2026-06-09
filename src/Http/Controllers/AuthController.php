@@ -10,6 +10,7 @@ use Respect\Validation\Validator as v;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Dto\UserDto;
 use Sinclear\Api\Exception\HttpException;
+use Sinclear\Api\Repository\UserPreferencesRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Service\Auth\DiscordOAuthService;
@@ -27,7 +28,8 @@ final class AuthController
         private readonly PasskeyService $passkeyService,
         private readonly DiscordOAuthService $discordOAuthService,
         private readonly TokenService $tokenService,
-        private readonly UserRepository $userRepository
+        private readonly UserRepository $userRepository,
+        private readonly UserPreferencesRepository $preferencesRepository
     ) {
     }
 
@@ -122,6 +124,25 @@ final class AuthController
         return ResponseFactory::json($tokens, 200, $response);
     }
 
+    public function login(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $body = (array) ($request->getParsedBody() ?? []);
+        $email = (string) ($body['email'] ?? '');
+        $password = (string) ($body['password'] ?? '');
+
+        if (!v::email()->validate($email) || $password === '') {
+            throw HttpException::badRequest('invalid_credentials');
+        }
+
+        $user = $this->userRepository->findByEmail($email);
+        if ($user === null || !password_verify($password, (string) ($user['passwordHash'] ?? ''))) {
+            throw HttpException::badRequest('invalid_credentials');
+        }
+
+        $tokens = $this->tokenService->issueTokenPair((string) $user['id']);
+        return ResponseFactory::json($tokens, 200, $response);
+    }
+
     public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $body = (array) ($request->getParsedBody() ?? []);
@@ -138,7 +159,22 @@ final class AuthController
         if ($dbUser === null) {
             throw HttpException::notFound();
         }
-        return ResponseFactory::json(['data' => UserDto::fromRow($dbUser)], 200, $response);
+
+        $userData = UserDto::fromRow($dbUser);
+
+        $prefs = $this->preferencesRepository->findByUserId($user->id);
+        if ($prefs !== null) {
+            $userData['preferences'] = [
+                'theme' => $prefs['theme'],
+                'language' => $prefs['language'],
+                'primaryColor' => $prefs['primaryColor'],
+                'timezone' => $prefs['timezone'],
+            ];
+        } else {
+            $userData['preferences'] = null;
+        }
+
+        return ResponseFactory::json(['data' => $userData], 200, $response);
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

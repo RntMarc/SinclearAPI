@@ -24,6 +24,19 @@ final class UserRepository extends AbstractRepository
     }
 
     /**
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>|null
+     */
+    public function update(string $id, array $data): ?array
+    {
+        if (isset($data['image']) && is_string($data['image']) && str_starts_with($data['image'], 'data:image/')) {
+            // It's a base64 image, keep it as is or process if needed.
+            // For now, we assume the database can handle the string.
+        }
+        return parent::update($id, $data);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findByEmail(string $email): ?array

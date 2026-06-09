@@ -118,11 +118,19 @@ abstract class AbstractRepository
      */
     public function create(array $data): array
     {
-        if (!isset($data[$this->primaryKey()])) {
-            $data[$this->primaryKey()] = Uuid::uuid4()->toString();
+        $allowedColumns = $this->columns();
+        $filteredData = [];
+        foreach ($data as $key => $value) {
+            if ($key === $this->primaryKey() || in_array($key, $allowedColumns, true)) {
+                $filteredData[$key] = $value;
+            }
         }
 
-        $columns = array_keys($data);
+        if (!isset($filteredData[$this->primaryKey()])) {
+            $filteredData[$this->primaryKey()] = Uuid::uuid4()->toString();
+        }
+
+        $columns = array_keys($filteredData);
         $placeholders = array_map(static fn (string $c): string => ':' . $c, $columns);
         $sql = sprintf(
             'INSERT INTO `%s` (`%s`) VALUES (%s)',
@@ -131,12 +139,12 @@ abstract class AbstractRepository
             implode(', ', $placeholders)
         );
         $stmt = $this->pdo->prepare($sql);
-        foreach ($data as $key => $value) {
+        foreach ($filteredData as $key => $value) {
             $stmt->bindValue(':' . $key, $value);
         }
         $stmt->execute();
 
-        return $this->findById((string) $data[$this->primaryKey()]) ?? $data;
+        return $this->findById((string) $filteredData[$this->primaryKey()]) ?? $filteredData;
     }
 
     /**
@@ -145,12 +153,20 @@ abstract class AbstractRepository
      */
     public function update(string $id, array $data): ?array
     {
-        if ($data === []) {
+        $allowedColumns = $this->columns();
+        $filteredData = [];
+        foreach ($data as $key => $value) {
+            if (in_array($key, $allowedColumns, true)) {
+                $filteredData[$key] = $value;
+            }
+        }
+
+        if ($filteredData === []) {
             return $this->findById($id);
         }
 
         $sets = [];
-        foreach (array_keys($data) as $column) {
+        foreach (array_keys($filteredData) as $column) {
             $sets[] = sprintf('`%s` = :%s', $column, $column);
         }
 
@@ -162,7 +178,7 @@ abstract class AbstractRepository
             $pk
         );
         $stmt = $this->pdo->prepare($sql);
-        foreach ($data as $key => $value) {
+        foreach ($filteredData as $key => $value) {
             $stmt->bindValue(':' . $key, $value);
         }
         $stmt->bindValue(':pk', $id);
