@@ -12,6 +12,7 @@ use Sinclear\Api\Http\Controllers\NotificationController;
 use Sinclear\Api\Http\Controllers\PollController;
 use Sinclear\Api\Http\Controllers\UserController;
 use Sinclear\Api\Http\Middleware\AuthenticationMiddleware;
+use Sinclear\Api\Http\Middleware\OptionalAuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Service\CalendarService;
 use Sinclear\Api\Service\ChatService;
@@ -26,25 +27,28 @@ return static function (App $app): void {
     $authController = $container->get(AuthController::class);
     $loginThrottle = $container->get(LoginThrottleMiddleware::class);
     $authMiddleware = $container->get(AuthenticationMiddleware::class);
+    $optionalAuth = $container->get(OptionalAuthenticationMiddleware::class);
+
+    // Auth routes handling both guest and authenticated users
+    $app->group('/auth', function ($group) use ($authController): void {
+        $group->post('/otp/request', [$authController, 'otpRequest']);
+        $group->post('/otp/verify', [$authController, 'otpVerify']);
+        $group->post('/logout', [$authController, 'logout']);
+    })->add($optionalAuth)->add($loginThrottle);
 
     // Public auth routes
     $app->group('/auth', function ($group) use ($authController): void {
         $group->post('/login', [$authController, 'login']);
-        $group->post('/otp/request', [$authController, 'otpRequest']);
-        $group->post('/otp/verify', [$authController, 'otpVerify']);
         $group->post('/passkey/login/begin', [$authController, 'passkeyLoginBegin']);
         $group->post('/passkey/login/finish', [$authController, 'passkeyLoginFinish']);
         $group->get('/discord/start', [$authController, 'discordStart']);
         $group->get('/discord/callback', [$authController, 'discordCallback']);
         $group->post('/refresh', [$authController, 'refresh']);
-        $group->post('/logout', [$authController, 'logout']);
     })->add($loginThrottle);
 
     // Auth routes requiring access token
     $app->group('/auth', function ($group) use ($authController): void {
         $group->get('/me', [$authController, 'me']);
-        $group->post('/otp/request', [$authController, 'otpRequest']);
-        $group->post('/otp/verify', [$authController, 'otpVerify']);
         $group->post('/passkey/register/begin', [$authController, 'passkeyRegisterBegin']);
         $group->post('/passkey/register/finish', [$authController, 'passkeyRegisterFinish']);
         $group->get('/passkey/list', [$authController, 'passkeyList']);
