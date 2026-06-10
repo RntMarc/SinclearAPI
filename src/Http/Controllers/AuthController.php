@@ -101,6 +101,13 @@ final class AuthController
         return ResponseFactory::json($tokens, 200, $response);
     }
 
+    public function passkeyList(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $passkeys = $this->passkeyService->listPasskeys($user);
+        return ResponseFactory::json(['data' => $passkeys], 200, $response);
+    }
+
     public function passkeyDelete(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);
