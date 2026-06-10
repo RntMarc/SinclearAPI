@@ -8,6 +8,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Http\Middleware\AuthenticationMiddleware;
+use Sinclear\Api\Http\Middleware\OptionalAuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\CorsMiddleware;
 use Sinclear\Api\Http\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Http\Middleware\RateLimitMiddleware;
@@ -97,6 +98,7 @@ return [
     LoginThrottleMiddleware::class => DI\autowire(),
     CorsMiddleware::class => DI\autowire(),
     AuthenticationMiddleware::class => DI\autowire(),
+    OptionalAuthenticationMiddleware::class => DI\autowire(),
 
     AuthenticatedUser::class => static function (): ?AuthenticatedUser {
         return null;
