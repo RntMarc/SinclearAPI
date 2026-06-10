@@ -349,6 +349,18 @@ paths:
                 properties:
                   isCloseFriend: { type: boolean }
 
+  /subscriptions/user/{userId}:
+    get:
+      tags: [Users]
+      summary: Abonnements eines Nutzers abrufen
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Liste der Abonnements }
+
   /user-preferences/{id}:
     get:
       tags: [Users]
@@ -479,6 +491,22 @@ paths:
       summary: Badge-Zähler
       responses:
         '200': { description: Badge-Counts }
+
+  /notifications/read-type:
+    post:
+      tags: [Notifications]
+      summary: Bestimmte Benachrichtigungstypen als gelesen markieren
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200': { description: Erfolg }
 
   /chat/rooms:
     get:

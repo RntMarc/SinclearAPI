@@ -35,4 +35,22 @@ final class NotificationService
         }
         return $badges;
     }
+
+    /**
+     * @param list<string> $types
+     */
+    public function readByType(AuthenticatedUser $user, array $types): void
+    {
+        if ($types === []) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($types), '?'));
+        $sql = sprintf(
+            'DELETE FROM `Notification` WHERE userId = ? AND `type` IN (%s)',
+            $placeholders
+        );
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute(array_merge([$user->id], $types));
+    }
 }

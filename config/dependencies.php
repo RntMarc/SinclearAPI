@@ -21,6 +21,7 @@ use Sinclear\Api\Repository\PasskeyRepository;
 use Sinclear\Api\Repository\RefreshTokenFamilyRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
+use Sinclear\Api\Repository\SubscriptionRelationRepository;
 use Sinclear\Api\Repository\UserPreferencesRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\WebauthnChallengeRepository;
@@ -81,6 +82,7 @@ return [
     UserPreferencesRepository::class => DI\autowire(),
     ContactInfoRepository::class => DI\autowire(),
     SocialInfoRepository::class => DI\autowire(),
+    SubscriptionRelationRepository::class => DI\autowire(),
     CloseFriendRepository::class => DI\autowire(),
     OtpTokenRepository::class => DI\autowire(),
     PasskeyRepository::class => DI\autowire(),
