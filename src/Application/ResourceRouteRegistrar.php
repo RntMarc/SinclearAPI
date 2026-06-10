@@ -27,6 +27,10 @@ final class ResourceRouteRegistrar
         $authMiddleware = $container->get(AuthenticationMiddleware::class);
 
         $app->group('', function (RouteCollectorProxy $group) use ($registry, $pdo, $settings, $container): void {
+            // Sort registry by route length descending to ensure deeper routes (e.g. recipes/bookmarks)
+            // are registered before parent routes (e.g. recipes/{id}) to avoid shadowing issues.
+            usort($registry, static fn (array $a, array $b): int => strlen($b['route']) <=> strlen($a['route']));
+
             foreach ($registry as $resource) {
                 $pk = $resource['pk'] ?? 'id';
 
