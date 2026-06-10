@@ -47,7 +47,9 @@ return static function (App $app): void {
         $group->post('/otp/verify', [$authController, 'otpVerify']);
         $group->post('/passkey/register/begin', [$authController, 'passkeyRegisterBegin']);
         $group->post('/passkey/register/finish', [$authController, 'passkeyRegisterFinish']);
+        $group->get('/passkey/list', [$authController, 'passkeyList']);
         $group->delete('/passkey/{id}', [$authController, 'passkeyDelete']);
+        $group->delete('/passkey/delete/{id}', [$authController, 'passkeyDelete']);
     })->add($authMiddleware);
 
     // Specialized domain routes
@@ -65,6 +67,7 @@ return static function (App $app): void {
         $userController
     ): void {
         $group->post('/polls/{id}/votes', [$pollController, 'vote']);
+        $group->post('/polls/{id}/vote', [$pollController, 'vote']);
         $group->post('/polls/{id}/counter-proposals', [$pollController, 'counterProposal']);
         $group->post('/polls/{id}/finalize', [$pollController, 'finalize']);
 
