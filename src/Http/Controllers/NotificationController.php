@@ -23,14 +23,34 @@ final class NotificationController
 
     public function badges(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $user = $request->getAttribute(AuthenticatedUser::class);
-        if (!$user instanceof AuthenticatedUser) {
-            throw HttpException::unauthorized();
-        }
+        $user = $this->requireUser($request);
         return ResponseFactory::json(
             ['data' => $this->notificationService->badges($user)],
             200,
             $response
         );
+    }
+
+    public function readByType(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = (array) ($request->getParsedBody() ?? []);
+        $types = $body['type'] ?? [];
+
+        if (!is_array($types)) {
+            throw HttpException::badRequest('invalid_types');
+        }
+
+        $this->notificationService->readByType($user, array_map('strval', $types));
+        return ResponseFactory::json(['success' => true], 200, $response);
+    }
+
+    private function requireUser(ServerRequestInterface $request): AuthenticatedUser
+    {
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if (!$user instanceof AuthenticatedUser) {
+            throw HttpException::unauthorized();
+        }
+        return $user;
     }
 }

@@ -36,10 +36,24 @@ final class AuthController
     public function otpRequest(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $body = (array) ($request->getParsedBody() ?? []);
-        if (!v::email()->validate($body['email'] ?? '')) {
+        $email = (string) ($body['email'] ?? '');
+        if (!v::email()->validate($email)) {
             throw HttpException::badRequest('invalid_email');
         }
-        $this->otpService->request((string) $body['email']);
+
+        // If authenticated, we might be requesting OTP for email change
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if ($user instanceof AuthenticatedUser) {
+            // For email change, we don't check if user exists with new email
+            // (or rather, we should check it doesn't exist)
+            if ($this->userRepository->findByEmail($email) !== null) {
+                throw HttpException::badRequest('email_already_taken');
+            }
+            $this->otpService->requestForEmailChange($email);
+        } else {
+            $this->otpService->request($email);
+        }
+
         return ResponseFactory::json(['success' => true], 200, $response);
     }
 
@@ -49,7 +63,13 @@ final class AuthController
         if (!v::email()->validate($body['email'] ?? '') || !v::length(6, 6)->validate($body['code'] ?? '')) {
             throw HttpException::badRequest('invalid_credentials');
         }
-        $tokens = $this->otpService->verify((string) $body['email'], (string) $body['code']);
+
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        $tokens = $this->otpService->verify(
+            (string) $body['email'],
+            (string) $body['code'],
+            $user instanceof AuthenticatedUser ? $user : null
+        );
         return ResponseFactory::json($tokens, 200, $response);
     }
 

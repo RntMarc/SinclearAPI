@@ -43,6 +43,8 @@ return static function (App $app): void {
     // Auth routes requiring access token
     $app->group('/auth', function ($group) use ($authController): void {
         $group->get('/me', [$authController, 'me']);
+        $group->post('/otp/request', [$authController, 'otpRequest']);
+        $group->post('/otp/verify', [$authController, 'otpVerify']);
         $group->post('/passkey/register/begin', [$authController, 'passkeyRegisterBegin']);
         $group->post('/passkey/register/finish', [$authController, 'passkeyRegisterFinish']);
         $group->delete('/passkey/{id}', [$authController, 'passkeyDelete']);
@@ -79,7 +81,9 @@ return static function (App $app): void {
 
         $group->get('/calendar/combined', [$calendarController, 'combined']);
         $group->get('/notifications/badges', [$notificationController, 'badges']);
+        $group->post('/notifications/read-type', [$notificationController, 'readByType']);
         $group->get('/users/{id}/export', [$userController, 'export']);
+        $group->get('/subscriptions/user/{userId}', [$userController, 'subscriptions']);
         $group->get('/close-friends/{userId}/{friendId}', [$userController, 'isCloseFriend']);
     })->add($authMiddleware);
 
