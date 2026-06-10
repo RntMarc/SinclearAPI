@@ -126,6 +126,7 @@ security:
   - bearerAuth: []
 
 paths:
+  # --- Auth ---
   /auth/login:
     post:
       security: []
@@ -209,15 +210,41 @@ paths:
       responses:
         '200': { description: Erfolg }
 
+  /auth/passkey/list:
+    get:
+      tags: [Auth]
+      summary: Registrierte Passkeys auflisten
+      responses:
+        '200':
+          description: Liste der Passkeys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        createdAt: { type: string }
+                        lastUsedAt: { type: string, nullable: true }
+
   /auth/passkey/{id}:
     delete:
       tags: [Auth]
       summary: Passkey löschen
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '204': { description: Gelöscht }
+
+  /auth/passkey/delete/{id}:
+    delete:
+      tags: [Auth]
+      summary: Passkey löschen (Alias)
+      parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
         '204': { description: Gelöscht }
 
@@ -284,6 +311,7 @@ paths:
                 properties:
                   data: { $ref: '#/components/schemas/User' }
 
+  # --- Users ---
   /users:
     get:
       tags: [Users]
@@ -312,6 +340,12 @@ paths:
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
         '200': { description: Aktualisiert }
+    patch:
+      tags: [Users]
+      summary: Nutzer aktualisieren (Patch)
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Aktualisiert }
     delete:
       tags: [Users]
       summary: Nutzer löschen (Admin)
@@ -326,6 +360,42 @@ paths:
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
         '200': { description: Exportdaten }
+
+  /user-preferences:
+    get: { tags: [Users], summary: Alle Präferenzen }
+    post: { tags: [Users], summary: Präferenz erstellen }
+  /user-preferences/{id}:
+    get: { tags: [Users] }
+    put: { tags: [Users] }
+    patch: { tags: [Users] }
+    delete: { tags: [Users] }
+
+  /contact-info:
+    get: { tags: [Users], summary: Alle Kontaktinfos }
+    post: { tags: [Users], summary: Kontaktinfo erstellen }
+  /contact-info/{id}:
+    get: { tags: [Users] }
+    put: { tags: [Users] }
+    patch: { tags: [Users] }
+    delete: { tags: [Users] }
+
+  /social-info:
+    get: { tags: [Users], summary: Alle Social Infos }
+    post: { tags: [Users], summary: Social Info erstellen }
+  /social-info/{id}:
+    get: { tags: [Users] }
+    put: { tags: [Users] }
+    patch: { tags: [Users] }
+    delete: { tags: [Users] }
+
+  /close-friends:
+    get: { tags: [Users], summary: Alle engen Freunde }
+    post: { tags: [Users], summary: Engen Freund hinzufügen }
+  /close-friends/{id}:
+    get: { tags: [Users] }
+    put: { tags: [Users] }
+    patch: { tags: [Users] }
+    delete: { tags: [Users] }
 
   /close-friends/{userId}/{friendId}:
     get:
@@ -361,63 +431,7 @@ paths:
       responses:
         '200': { description: Liste der Abonnements }
 
-  /user-preferences/{id}:
-    get:
-      tags: [Users]
-      summary: Nutzereinstellungen abrufen
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: OK }
-    put:
-      tags: [Users]
-      summary: Nutzereinstellungen aktualisieren
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: OK }
-    post:
-      tags: [Users]
-      summary: Nutzereinstellungen erstellen
-      responses:
-        '201': { description: OK }
-
-  /contact-info/{id}:
-    get:
-      tags: [Users]
-      summary: Kontaktinfo abrufen
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: OK }
-    put:
-      tags: [Users]
-      summary: Kontaktinfo aktualisieren
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: OK }
-    post:
-      tags: [Users]
-      summary: Kontaktinfo erstellen
-      responses:
-        '201': { description: OK }
-
-  /social-info/{id}:
-    get:
-      tags: [Users]
-      summary: Social Info abrufen
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: OK }
-    put:
-      tags: [Users]
-      summary: Social Info aktualisieren
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: OK }
-    post:
-      tags: [Users]
-      summary: Social Info erstellen
-      responses:
-        '201': { description: OK }
-
+  # --- Events ---
   /events:
     get:
       tags: [Events]
@@ -444,11 +458,56 @@ paths:
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
         '200': { description: Aktualisiert }
+    patch:
+      tags: [Events]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200': { description: Aktualisiert }
     delete:
       tags: [Events]
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
         '204': { description: Gelöscht }
+
+  /event-permissions:
+    get: { tags: [Events], summary: Alle Berechtigungen }
+    post: { tags: [Events], summary: Berechtigung erstellen }
+  /event-permissions/{id}:
+    get: { tags: [Events] }
+    put: { tags: [Events] }
+    patch: { tags: [Events] }
+    delete: { tags: [Events] }
+
+  /event-relations:
+    get: { tags: [Events], summary: Alle Relationen }
+    post: { tags: [Events], summary: Relation erstellen }
+  /event-relations/{id}:
+    get: { tags: [Events] }
+    put: { tags: [Events] }
+    patch: { tags: [Events] }
+    delete: { tags: [Events] }
+
+  # --- Polls ---
+  /polls:
+    get: { tags: [Polls], summary: Umfragen listen }
+    post: { tags: [Polls], summary: Umfrage erstellen }
+  /polls/{id}:
+    get: { tags: [Polls] }
+    put: { tags: [Polls] }
+    patch: { tags: [Polls] }
+    delete: { tags: [Polls] }
+
+  /polls/{id}/vote:
+    post:
+      tags: [Polls]
+      summary: In Umfrage abstimmen (Alias)
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PollVoteRequest' }
+      responses:
+        '200': { description: Erfolg }
 
   /polls/{id}/votes:
     post:
@@ -478,36 +537,43 @@ paths:
       responses:
         '200': { description: Finalisiert }
 
-  /calendar/combined:
-    get:
-      tags: [Calendar]
-      summary: Kombinierter Kalender (Events + Travel)
-      responses:
-        '200': { description: Aggregierte Daten }
+  /poll-questions:
+    get: { tags: [Polls] }
+    post: { tags: [Polls] }
+  /poll-questions/{id}:
+    get: { tags: [Polls] }
+    put: { tags: [Polls] }
+    patch: { tags: [Polls] }
+    delete: { tags: [Polls] }
 
-  /notifications/badges:
-    get:
-      tags: [Notifications]
-      summary: Badge-Zähler
-      responses:
-        '200': { description: Badge-Counts }
+  /poll-options:
+    get: { tags: [Polls] }
+    post: { tags: [Polls] }
+  /poll-options/{id}:
+    get: { tags: [Polls] }
+    put: { tags: [Polls] }
+    patch: { tags: [Polls] }
+    delete: { tags: [Polls] }
 
-  /notifications/read-type:
-    post:
-      tags: [Notifications]
-      summary: Bestimmte Benachrichtigungstypen als gelesen markieren
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                type:
-                  type: array
-                  items: { type: string }
-      responses:
-        '200': { description: Erfolg }
+  /poll-invites:
+    get: { tags: [Polls] }
+    post: { tags: [Polls] }
+  /poll-invites/{id}:
+    get: { tags: [Polls] }
+    put: { tags: [Polls] }
+    patch: { tags: [Polls] }
+    delete: { tags: [Polls] }
 
+  /poll-votes:
+    get: { tags: [Polls] }
+    post: { tags: [Polls] }
+  /poll-votes/{id}:
+    get: { tags: [Polls] }
+    put: { tags: [Polls] }
+    patch: { tags: [Polls] }
+    delete: { tags: [Polls] }
+
+  # --- Chat ---
   /chat/rooms:
     get:
       tags: [Chat]
@@ -564,6 +630,16 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: Direct Chat }
+    post:
+      tags: [Chat]
+      summary: Direktchat erstellen
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: Erstellt }
 
   /chat/presence:
     get:
@@ -588,29 +664,480 @@ paths:
             text/event-stream:
               schema: { type: string }
 
-  /health:
-    get:
-      tags: [System]
-      summary: Health Check
-      responses:
-        '200': { description: OK }
+  # --- Recipes ---
+  /recipes:
+    get: { tags: [Recipes], summary: Rezepte listen }
+    post: { tags: [Recipes], summary: Rezept erstellen }
+  /recipes/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
 
-  # Generisches CRUD-Muster für weitere Ressourcen:
-  # GET/POST /{resource}
-  # GET/PUT/PATCH/DELETE /{resource}/{id}
-  # Ressourcen: user-preferences, contact-info, social-info, close-friends,
-  # event-permissions, event-relations, forums, forum-members, posts, post-votes,
-  # polls, poll-questions, poll-options, poll-invites, poll-votes, recipes,
-  # recipe-ingredients, recipe-steps, recipe-reviews, recipe-bookmarks,
-  # media-items, media-reviews, series-episodes, episode-reviews, album-tracks,
-  # discover-places, discover-gastronomy, discover-reviews, discover-bookmarks,
-  # feedback-suggestions, feedback-votes, news-articles, news-upvotes,
-  # rss-sources, subscriptions, subscription-relations, office-documents,
-  # office-versions, office-collaborators, notifications, push-subscriptions,
-  # changelog, travel-trips, travel-events, travel-accommodations,
-  # travel-relations, travel-event-tickets, chat-rooms, chat-room-members,
-  # chat-messages, direct-chats, chat-read-receipts, user-presence,
-  # user-devices, sse-events, passkeys
+  /recipe-ingredients:
+    get: { tags: [Recipes] }
+    post: { tags: [Recipes] }
+  /recipe-ingredients/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
+
+  /recipe-steps:
+    get: { tags: [Recipes] }
+    post: { tags: [Recipes] }
+  /recipe-steps/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
+
+  /recipe-reviews:
+    get: { tags: [Recipes] }
+    post: { tags: [Recipes] }
+  /recipe-reviews/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
+
+  /recipes/reviews:
+    get: { tags: [Recipes], summary: Alle Bewertungen }
+  /recipes/reviews/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
+
+  /recipe-bookmarks:
+    get: { tags: [Recipes] }
+    post: { tags: [Recipes] }
+  /recipe-bookmarks/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
+
+  /recipes/bookmarks:
+    get: { tags: [Recipes], summary: Alle Lesezeichen }
+  /recipes/bookmarks/{id}:
+    get: { tags: [Recipes] }
+    put: { tags: [Recipes] }
+    patch: { tags: [Recipes] }
+    delete: { tags: [Recipes] }
+
+  # --- Media ---
+  /media-items:
+    get: { tags: [Media] }
+    post: { tags: [Media] }
+  /media-items/{id}:
+    get: { tags: [Media] }
+    put: { tags: [Media] }
+    patch: { tags: [Media] }
+    delete: { tags: [Media] }
+
+  /media-reviews:
+    get: { tags: [Media] }
+    post: { tags: [Media] }
+  /media-reviews/{id}:
+    get: { tags: [Media] }
+    put: { tags: [Media] }
+    patch: { tags: [Media] }
+    delete: { tags: [Media] }
+
+  /series-episodes:
+    get: { tags: [Media] }
+    post: { tags: [Media] }
+  /series-episodes/{id}:
+    get: { tags: [Media] }
+    put: { tags: [Media] }
+    patch: { tags: [Media] }
+    delete: { tags: [Media] }
+
+  /episode-reviews:
+    get: { tags: [Media] }
+    post: { tags: [Media] }
+  /episode-reviews/{id}:
+    get: { tags: [Media] }
+    put: { tags: [Media] }
+    patch: { tags: [Media] }
+    delete: { tags: [Media] }
+
+  /album-tracks:
+    get: { tags: [Media] }
+    post: { tags: [Media] }
+  /album-tracks/{id}:
+    get: { tags: [Media] }
+    put: { tags: [Media] }
+    patch: { tags: [Media] }
+    delete: { tags: [Media] }
+
+  # --- Discover ---
+  /discover-places:
+    get: { tags: [Discover] }
+    post: { tags: [Discover] }
+  /discover-places/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  /discover/places:
+    get: { tags: [Discover], summary: Orte suchen }
+    post: { tags: [Discover], summary: Ort vorschlagen }
+  /discover/places/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  /discover-gastronomy:
+    get: { tags: [Discover] }
+    post: { tags: [Discover] }
+  /discover-gastronomy/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  /discover-reviews:
+    get: { tags: [Discover] }
+    post: { tags: [Discover] }
+  /discover-reviews/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  /discover/reviews:
+    get: { tags: [Discover] }
+  /discover/reviews/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  /discover-bookmarks:
+    get: { tags: [Discover] }
+    post: { tags: [Discover] }
+  /discover-bookmarks/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  /discover/bookmarks:
+    get: { tags: [Discover] }
+  /discover/bookmarks/{id}:
+    get: { tags: [Discover] }
+    put: { tags: [Discover] }
+    patch: { tags: [Discover] }
+    delete: { tags: [Discover] }
+
+  # --- Feedback ---
+  /feedback-suggestions:
+    get: { tags: [Feedback] }
+    post: { tags: [Feedback] }
+  /feedback-suggestions/{id}:
+    get: { tags: [Feedback] }
+    put: { tags: [Feedback] }
+    patch: { tags: [Feedback] }
+    delete: { tags: [Feedback] }
+
+  /feedback/suggestions:
+    get: { tags: [Feedback], summary: Vorschläge auflisten }
+    post: { tags: [Feedback], summary: Vorschlag einreichen }
+  /feedback/suggestions/{id}:
+    get: { tags: [Feedback] }
+    put: { tags: [Feedback] }
+    patch: { tags: [Feedback] }
+    delete: { tags: [Feedback] }
+
+  /feedback-votes:
+    get: { tags: [Feedback] }
+    post: { tags: [Feedback] }
+  /feedback-votes/{id}:
+    get: { tags: [Feedback] }
+    put: { tags: [Feedback] }
+    patch: { tags: [Feedback] }
+    delete: { tags: [Feedback] }
+
+  /feedback/votes:
+    get: { tags: [Feedback] }
+  /feedback/votes/{id}:
+    get: { tags: [Feedback] }
+    put: { tags: [Feedback] }
+    patch: { tags: [Feedback] }
+    delete: { tags: [Feedback] }
+
+  # --- News ---
+  /news-articles:
+    get: { tags: [News] }
+    post: { tags: [News] }
+  /news-articles/{id}:
+    get: { tags: [News] }
+    put: { tags: [News] }
+    patch: { tags: [News] }
+    delete: { tags: [News] }
+
+  /news-upvotes:
+    get: { tags: [News] }
+    post: { tags: [News] }
+  /news-upvotes/{id}:
+    get: { tags: [News] }
+    put: { tags: [News] }
+    patch: { tags: [News] }
+    delete: { tags: [News] }
+
+  /rss-sources:
+    get: { tags: [News] }
+    post: { tags: [News] }
+  /rss-sources/{id}:
+    get: { tags: [News] }
+    put: { tags: [News] }
+    patch: { tags: [News] }
+    delete: { tags: [News] }
+
+  # --- Notifications & Push ---
+  /notifications:
+    get: { tags: [Notifications] }
+    post: { tags: [Notifications] }
+  /notifications/{id}:
+    get: { tags: [Notifications] }
+    put: { tags: [Notifications] }
+    patch: { tags: [Notifications] }
+    delete: { tags: [Notifications] }
+
+  /notifications/badges:
+    get: { tags: [Notifications] }
+  /notifications/read-type:
+    post: { tags: [Notifications] }
+
+  /push-subscriptions:
+    get: { tags: [Notifications] }
+    post: { tags: [Notifications] }
+  /push-subscriptions/{id}:
+    get: { tags: [Notifications] }
+    put: { tags: [Notifications] }
+    patch: { tags: [Notifications] }
+    delete: { tags: [Notifications] }
+
+  /push/subscribe:
+    get: { tags: [Notifications], summary: Push-Abo abrufen }
+    post: { tags: [Notifications], summary: Push-Abo erstellen }
+  /push/subscribe/{id}:
+    get: { tags: [Notifications] }
+    put: { tags: [Notifications] }
+    patch: { tags: [Notifications] }
+    delete: { tags: [Notifications] }
+
+  # --- Travel ---
+  /travel-trips:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel-trips/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel/trips:
+    get: { tags: [Travel], summary: Reisen auflisten }
+    post: { tags: [Travel], summary: Reise anlegen }
+  /travel/trips/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel-events:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel-events/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel/events:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel/events/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel-accommodations:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel-accommodations/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel/accommodations:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel/accommodations/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel-relations:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel-relations/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  /travel-event-tickets:
+    get: { tags: [Travel] }
+    post: { tags: [Travel] }
+  /travel-event-tickets/{id}:
+    get: { tags: [Travel] }
+    put: { tags: [Travel] }
+    patch: { tags: [Travel] }
+    delete: { tags: [Travel] }
+
+  # --- Office ---
+  /office-documents:
+    get: { tags: [Office] }
+    post: { tags: [Office] }
+  /office-documents/{id}:
+    get: { tags: [Office] }
+    put: { tags: [Office] }
+    patch: { tags: [Office] }
+    delete: { tags: [Office] }
+
+  /office-versions:
+    get: { tags: [Office] }
+    post: { tags: [Office] }
+  /office-versions/{id}:
+    get: { tags: [Office] }
+    put: { tags: [Office] }
+    patch: { tags: [Office] }
+    delete: { tags: [Office] }
+
+  /office-collaborators:
+    get: { tags: [Office] }
+    post: { tags: [Office] }
+  /office-collaborators/{id}:
+    get: { tags: [Office] }
+    put: { tags: [Office] }
+    patch: { tags: [Office] }
+    delete: { tags: [Office] }
+
+  # --- Forum & Feed ---
+  /forums:
+    get: { tags: [Social] }
+    post: { tags: [Social] }
+  /forums/{id}:
+    get: { tags: [Social] }
+    put: { tags: [Social] }
+    patch: { tags: [Social] }
+    delete: { tags: [Social] }
+
+  /forum-members:
+    get: { tags: [Social] }
+    post: { tags: [Social] }
+  /forum-members/{id}:
+    get: { tags: [Social] }
+    put: { tags: [Social] }
+    patch: { tags: [Social] }
+    delete: { tags: [Social] }
+
+  /posts:
+    get: { tags: [Social] }
+    post: { tags: [Social] }
+  /posts/{id}:
+    get: { tags: [Social] }
+    put: { tags: [Social] }
+    patch: { tags: [Social] }
+    delete: { tags: [Social] }
+
+  /post-votes:
+    get: { tags: [Social] }
+    post: { tags: [Social] }
+  /post-votes/{id}:
+    get: { tags: [Social] }
+    put: { tags: [Social] }
+    patch: { tags: [Social] }
+    delete: { tags: [Social] }
+
+  # --- System ---
+  /changelog:
+    get: { tags: [System] }
+    post: { tags: [System] }
+  /changelog/{id}:
+    get: { tags: [System] }
+    put: { tags: [System] }
+    patch: { tags: [System] }
+    delete: { tags: [System] }
+
+  /health:
+    get: { tags: [System] }
+
+  /subscriptions:
+    get: { tags: [System] }
+    post: { tags: [System] }
+  /subscriptions/{id}:
+    get: { tags: [System] }
+    put: { tags: [System] }
+    patch: { tags: [System] }
+    delete: { tags: [System] }
+
+  /subscription-relations:
+    get: { tags: [System] }
+    post: { tags: [System] }
+  /subscription-relations/{id}:
+    get: { tags: [System] }
+    put: { tags: [System] }
+    patch: { tags: [System] }
+    delete: { tags: [System] }
+
+  /user-presence:
+    get: { tags: [Chat] }
+    post: { tags: [Chat] }
+  /user-presence/{id}:
+    get: { tags: [Chat] }
+    put: { tags: [Chat] }
+    patch: { tags: [Chat] }
+    delete: { tags: [Chat] }
+
+  /user-devices:
+    get: { tags: [System] }
+    post: { tags: [System] }
+  /user-devices/{id}:
+    get: { tags: [System] }
+    put: { tags: [System] }
+    patch: { tags: [System] }
+    delete: { tags: [System] }
+
+  /sse-events:
+    get: { tags: [System] }
+    post: { tags: [System] }
+  /sse-events/{id}:
+    get: { tags: [System] }
+    put: { tags: [System] }
+    patch: { tags: [System] }
+    delete: { tags: [System] }
+
+  /passkeys:
+    get: { tags: [Auth] }
+    post: { tags: [Auth] }
+  /passkeys/{id}:
+    get: { tags: [Auth] }
+    put: { tags: [Auth] }
+    patch: { tags: [Auth] }
+    delete: { tags: [Auth] }
+
+  /calendar/combined:
+    get: { tags: [Calendar] }
 
 tags:
   - name: Auth
@@ -620,4 +1147,12 @@ tags:
   - name: Calendar
   - name: Notifications
   - name: Chat
+  - name: Recipes
+  - name: Media
+  - name: Discover
+  - name: Feedback
+  - name: News
+  - name: Office
+  - name: Social
+  - name: Travel
   - name: System
