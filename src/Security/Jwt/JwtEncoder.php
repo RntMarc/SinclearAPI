@@ -75,8 +75,11 @@ final class JwtEncoder
     {
         $key = openssl_pkey_get_private($privateKey);
         if ($key === false) {
+            error_log("[JWT DEBUG] rsaSign FAILED - openssl_pkey_get_private returned false. keyPreview: " . mb_substr($privateKey, 0, 60) . '...');
             throw new \RuntimeException('Invalid private key');
         }
+        $details = openssl_pkey_get_details($key);
+        error_log("[JWT DEBUG] rsaSign OK - key type: " . ($details['type'] ?? 'unknown') . ", bits: " . ($details['bits'] ?? 'unknown'));
         $signature = '';
         openssl_sign($data, $signature, $key, OPENSSL_ALGO_SHA256);
         return $signature;
@@ -86,9 +89,17 @@ final class JwtEncoder
     {
         $key = openssl_pkey_get_public($publicKey);
         if ($key === false) {
+            error_log("[JWT DEBUG] rsaVerify FAILED - openssl_pkey_get_public returned false. keyPreview: " . mb_substr($publicKey, 0, 60) . '...');
             return false;
         }
-        return openssl_verify($data, $signature, $key, OPENSSL_ALGO_SHA256) === 1;
+        $details = openssl_pkey_get_details($key);
+        $result = openssl_verify($data, $signature, $key, OPENSSL_ALGO_SHA256);
+        if ($result !== 1) {
+            error_log("[JWT DEBUG] rsaVerify FAILED - openssl_verify returned: " . ($result === false ? 'false' : $result) . ", openssl_error: " . openssl_error_string());
+        } else {
+            error_log("[JWT DEBUG] rsaVerify OK - key type: " . ($details['type'] ?? 'unknown') . ", bits: " . ($details['bits'] ?? 'unknown'));
+        }
+        return $result === 1;
     }
 
     private static function base64UrlEncode(string $data): string
