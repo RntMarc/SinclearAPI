@@ -39,6 +39,10 @@ RedirectMatch 404 /var(/|$)
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # Authorization-Header an PHP weiterreichen (wichtig für FastCGI/FPM)
+    RewriteCond %{HTTP:Authorization} ^(.+)$
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%1]
+
     # /public direkt aufgerufen -> auf Root umleiten (verhindert Doppel-URL)
     RewriteCond %{THE_REQUEST} \s/+public/([^\s?]*) [NC]
     RewriteRule ^ /%1 [R=301,L,NE]
