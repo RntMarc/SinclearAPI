@@ -63,7 +63,14 @@ final class TokenService
     public function validateAccessToken(string $token): AuthenticatedUser
     {
         try {
-            $payload = JwtEncoder::decode($token, $this->getVerificationKey(), $this->getAlgorithm());
+            $algorithm = $this->getAlgorithm();
+            $verificationKey = $this->getVerificationKey();
+            $keyPreview = mb_substr($verificationKey, 0, 50) . '...';
+            $hasPrivateKey = $this->settings->get('jwt.private_key', '') !== '';
+            $hasPublicKeyClaim = $this->settings->get('jwt.public_key', '') !== '';
+            error_log("[TOKEN DEBUG] validateAccessToken - algorithm: {$algorithm}, hasPrivateKey: " . ($hasPrivateKey ? 'yes' : 'no') . ", hasPublicKey: " . ($hasPublicKeyClaim ? 'yes' : 'no') . ", keyPreview: {$keyPreview}");
+
+            $payload = JwtEncoder::decode($token, $verificationKey, $algorithm);
             $jti = (string) ($payload['jti'] ?? '');
 
             if ($jti !== '' && $this->jtiBlacklistRepository->isBlacklisted($jti)) {
@@ -78,7 +85,8 @@ final class TokenService
             );
         } catch (HttpException $e) {
             throw $e;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            error_log("[TOKEN DEBUG] validateAccessToken FAILED: " . $e->getMessage());
             throw HttpException::unauthorized('invalid_token');
         }
     }
@@ -172,8 +180,15 @@ final class TokenService
             'exp' => $now + $ttl,
         ];
 
+        $algorithm = $this->getAlgorithm();
+        $signingKey = $this->getSigningKey();
+        $keyPreview = mb_substr($signingKey, 0, 50) . '...';
+        $hasPrivateKey = $this->settings->get('jwt.private_key', '') !== '';
+        $hasPublicKeyClaim = $this->settings->get('jwt.public_key', '') !== '';
+        error_log("[TOKEN DEBUG] createAccessToken - algorithm: {$algorithm}, hasPrivateKey: " . ($hasPrivateKey ? 'yes' : 'no') . ", hasPublicKey: " . ($hasPublicKeyClaim ? 'yes' : 'no') . ", keyPreview: {$keyPreview}");
+
         return [
-            'token' => JwtEncoder::encode($payload, $this->getSigningKey(), $this->getAlgorithm()),
+            'token' => JwtEncoder::encode($payload, $signingKey, $algorithm),
             'jti' => $jti,
         ];
     }
