@@ -389,8 +389,28 @@ paths:
     delete: { tags: [Users] }
 
   /close-friends:
-    get: { tags: [Users], summary: Alle engen Freunde }
+    get: { tags: [Users], summary: Alle engen Freunde (die ich markiert habe) }
     post: { tags: [Users], summary: Engen Freund hinzufügen }
+  /close-friends/incoming:
+    get:
+      tags: [Users]
+      summary: Wer mich als engen Freund markiert hat
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        userId: { type: string }
+                        friendId: { type: string }
+                        createdAt: { type: string }
   /close-friends/{id}:
     get: { tags: [Users] }
     put: { tags: [Users] }
@@ -418,6 +438,36 @@ paths:
                 type: object
                 properties:
                   isCloseFriend: { type: boolean }
+    post:
+      tags: [Users]
+      summary: Engen Freund hinzufügen
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: friendId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: Freund hinzugefügt
+    delete:
+      tags: [Users]
+      summary: Engen Freund entfernen
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: friendId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Freund entfernt
 
   /subscriptions/user/{userId}:
     get:

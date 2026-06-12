@@ -70,4 +70,61 @@ final class UserController
 
         return ResponseFactory::json(['isCloseFriend' => $exists], 200, $response);
     }
+
+    public function incomingCloseFriends(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if (!$user instanceof AuthenticatedUser) {
+            throw HttpException::unauthorized();
+        }
+
+        $records = $this->closeFriendRepository->findIncoming($user->id);
+
+        return ResponseFactory::json(['data' => $records], 200, $response);
+    }
+
+    public function addCloseFriend(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if (!$user instanceof AuthenticatedUser) {
+            throw HttpException::unauthorized();
+        }
+
+        $userId = (string) $args['userId'];
+        $friendId = (string) $args['friendId'];
+
+        if (!$user->isAdmin && $user->id !== $userId) {
+            throw HttpException::forbidden();
+        }
+
+        $record = $this->closeFriendRepository->create([
+            'userId' => $userId,
+            'friendId' => $friendId,
+        ]);
+
+        return ResponseFactory::json(['data' => $record], 201, $response);
+    }
+
+    public function removeCloseFriend(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if (!$user instanceof AuthenticatedUser) {
+            throw HttpException::unauthorized();
+        }
+
+        $userId = (string) $args['userId'];
+        $friendId = (string) $args['friendId'];
+
+        if (!$user->isAdmin && $user->id !== $userId) {
+            throw HttpException::forbidden();
+        }
+
+        $records = $this->closeFriendRepository->findByUserAndFriend($userId, $friendId);
+
+        foreach ($records as $record) {
+            $this->closeFriendRepository->delete($record['id']);
+        }
+
+        return ResponseFactory::json(['ok' => true], 200, $response);
+    }
 }

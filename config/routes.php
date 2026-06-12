@@ -91,7 +91,10 @@ return static function (App $app): void {
         $group->post('/notifications/read-type', [$notificationController, 'readByType']);
         $group->get('/users/{id}/export', [$userController, 'export']);
         $group->get('/subscriptions/user/{userId}', [$userController, 'subscriptions']);
+        $group->get('/close-friends/incoming', [$userController, 'incomingCloseFriends']);
         $group->get('/close-friends/{userId}/{friendId}', [$userController, 'isCloseFriend']);
+        $group->post('/close-friends/{userId}/{friendId}', [$userController, 'addCloseFriend']);
+        $group->delete('/close-friends/{userId}/{friendId}', [$userController, 'removeCloseFriend']);
     })->add($authMiddleware);
 
     // Generic CRUD for all registered resources
