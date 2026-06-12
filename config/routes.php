@@ -10,6 +10,7 @@ use Sinclear\Api\Http\Controllers\CalendarController;
 use Sinclear\Api\Http\Controllers\ChatController;
 use Sinclear\Api\Http\Controllers\NotificationController;
 use Sinclear\Api\Http\Controllers\PollController;
+use Sinclear\Api\Http\Controllers\EventController;
 use Sinclear\Api\Http\Controllers\TravelController;
 use Sinclear\Api\Http\Controllers\UserController;
 use Sinclear\Api\Http\Middleware\AuthenticationMiddleware;
@@ -17,6 +18,7 @@ use Sinclear\Api\Http\Middleware\OptionalAuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Service\CalendarService;
 use Sinclear\Api\Service\ChatService;
+use Sinclear\Api\Service\EventService;
 use Sinclear\Api\Service\NotificationService;
 use Sinclear\Api\Service\PollService;
 use Sinclear\Api\Service\TravelService;
@@ -64,6 +66,7 @@ return static function (App $app): void {
     $calendarController = new CalendarController($container->get(CalendarService::class));
     $notificationController = new NotificationController($container->get(NotificationService::class));
     $travelController = new TravelController($container->get(TravelService::class));
+    $eventController = new EventController($container->get(EventService::class));
     $userController = $container->get(UserController::class);
 
     $app->group('', function ($group) use (
@@ -72,6 +75,7 @@ return static function (App $app): void {
         $calendarController,
         $notificationController,
         $travelController,
+        $eventController,
         $userController
     ): void {
         $group->post('/polls/{id}/votes', [$pollController, 'vote']);
@@ -91,6 +95,12 @@ return static function (App $app): void {
         $group->get('/chat/events/stream', [$chatController, 'sseStream']);
 
         $group->get('/calendar/combined', [$calendarController, 'combined']);
+        $group->post('/events', [$eventController, 'create']);
+        $group->put('/events/{id}', [$eventController, 'update']);
+        $group->patch('/events/{id}', [$eventController, 'update']);
+        $group->delete('/events/{id}', [$eventController, 'delete']);
+        $group->get('/events/{id}/permissions', [$eventController, 'listPermissions']);
+        $group->post('/events/{id}/permissions', [$eventController, 'setPermissions']);
         $group->get('/notifications/badges', [$notificationController, 'badges']);
         $group->post('/notifications/read-type', [$notificationController, 'readByType']);
         $group->get('/users/{id}/export', [$userController, 'export']);

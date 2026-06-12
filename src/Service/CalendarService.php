@@ -23,7 +23,7 @@ final class CalendarService
     public function combined(AuthenticatedUser $user): array
     {
         $events = $this->pdo->prepare(
-            'SELECT e.*, "event" as source FROM `Event` e
+            'SELECT e.*, "event" as source, COALESCE(ep.canEdit, 0) as canEdit FROM `Event` e
              LEFT JOIN `EventPermission` ep ON ep.eventId = e.id AND ep.userId = :userId
              WHERE e.isPublic = 1 OR e.creatorId = :userId2 OR (ep.canView = 1)
              ORDER BY e.startAt ASC'
