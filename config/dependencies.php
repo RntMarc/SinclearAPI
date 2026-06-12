@@ -38,6 +38,7 @@ use Sinclear\Api\Service\MailService;
 use Sinclear\Api\Service\NotificationService;
 use Sinclear\Api\Service\PollService;
 use Sinclear\Api\Service\RateLimitService;
+use Sinclear\Api\Service\TravelService;
 use Sinclear\Api\Service\UserExportService;
 
 $settings = require __DIR__ . '/settings.php';
@@ -110,5 +111,6 @@ return [
     ChatService::class => DI\autowire(),
     CalendarService::class => DI\autowire(),
     NotificationService::class => DI\autowire(),
+    TravelService::class => DI\autowire(),
     UserExportService::class => DI\autowire(),
 ];
