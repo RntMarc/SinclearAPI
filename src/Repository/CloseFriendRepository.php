@@ -27,4 +27,29 @@ final class CloseFriendRepository extends AbstractRepository
         $stmt->execute(['userId' => $userId, 'friendId' => $friendId]);
         return $stmt->fetch() !== false;
     }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function findIncoming(string $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM `CloseFriend` WHERE `friendId` = :userId'
+        );
+        $stmt->execute(['userId' => $userId]);
+        return $stmt->fetchAll();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public function findByUserAndFriend(string $userId, string $friendId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM `CloseFriend` WHERE `userId` = :userId AND `friendId` = :friendId LIMIT 1'
+        );
+        $stmt->execute(['userId' => $userId, 'friendId' => $friendId]);
+        $row = $stmt->fetch();
+        return $row === false ? [] : [$row];
+    }
 }
