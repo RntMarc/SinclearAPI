@@ -107,6 +107,19 @@ components:
         attachment_type: { type: string, nullable: true }
         attachment_body: { type: string, nullable: true }
 
+    Event:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time, nullable: true }
+        allDay: { type: integer }
+        isPublic: { type: integer }
+        createdAt: { type: string, format: date-time }
+        creatorId: { type: string }
+
   parameters:
     id:
       name: id
@@ -483,41 +496,141 @@ paths:
 
   # --- Events ---
   /events:
-    get:
-      tags: [Events]
-      summary: Events listen
-      parameters:
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/limit'
-      responses:
-        '200': { description: Paginierte Events }
     post:
       tags: [Events]
       summary: Event erstellen
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, startAt]
+              properties:
+                title: { type: string }
+                description: { type: string, nullable: true }
+                startAt: { type: string, format: date-time }
+                endAt: { type: string, format: date-time, nullable: true }
+                allDay: { type: boolean, default: false }
+                isPublic: { type: boolean, default: true }
       responses:
-        '201': { description: Erstellt }
+        '201':
+          description: Erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Event' }
 
   /events/{id}:
-    get:
-      tags: [Events]
-      parameters: [{ $ref: '#/components/parameters/id' }]
-      responses:
-        '200': { description: Event }
     put:
       tags: [Events]
       parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string, nullable: true }
+                startAt: { type: string, format: date-time }
+                endAt: { type: string, format: date-time, nullable: true }
+                allDay: { type: boolean }
+                isPublic: { type: boolean }
       responses:
-        '200': { description: Aktualisiert }
+        '200':
+          description: Aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Event' }
     patch:
       tags: [Events]
       parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string, nullable: true }
+                startAt: { type: string, format: date-time }
+                endAt: { type: string, format: date-time, nullable: true }
+                allDay: { type: boolean }
+                isPublic: { type: boolean }
       responses:
-        '200': { description: Aktualisiert }
+        '200':
+          description: Aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Event' }
     delete:
       tags: [Events]
       parameters: [{ $ref: '#/components/parameters/id' }]
       responses:
-        '204': { description: Gelöscht }
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+
+  /events/{id}/permissions:
+    get:
+      tags: [Events]
+      summary: Berechtigungen eines Events auflisten
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      responses:
+        '200':
+          description: Liste der Berechtigungen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId: { type: string }
+                    canView: { type: integer }
+                    canEdit: { type: integer }
+                    displayName: { type: string }
+                    email: { type: string }
+    post:
+      tags: [Events]
+      summary: Berechtigungen für ein Event setzen (ersetzt alle)
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      userId: { type: string }
+                      canView: { type: boolean }
+                      canEdit: { type: boolean }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
 
   /event-permissions:
     get: { tags: [Events], summary: Alle Berechtigungen }

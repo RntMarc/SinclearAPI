@@ -9,7 +9,7 @@ use Sinclear\Api\Security\Policy\AuthenticatedReadPolicy;
 use Sinclear\Api\Security\Policy\ChatMessagePolicy;
 use Sinclear\Api\Security\Policy\CreatorPolicy;
 use Sinclear\Api\Security\Policy\DirectChatPolicy;
-use Sinclear\Api\Security\Policy\EventPolicy;
+
 use Sinclear\Api\Security\Policy\OwnerPolicy;
 use Sinclear\Api\Security\Policy\SnakeOwnerPolicy;
 use Sinclear\Api\Security\Policy\PolicyInterface;
@@ -26,7 +26,7 @@ return [
     ['route' => 'contact-info', 'table' => 'ContactInfo', 'policy' => OwnerPolicy::class],
     ['route' => 'social-info', 'table' => 'SocialInfo', 'policy' => OwnerPolicy::class],
     ['route' => 'close-friends', 'table' => 'CloseFriend', 'policy' => OwnerPolicy::class],
-    ['route' => 'events', 'table' => 'Event', 'policy' => EventPolicy::class, 'mapper' => [SensitiveFields::class, 'strip']],
+    // Removed: events — handled by custom EventController
     ['route' => 'event-permissions', 'table' => 'EventPermission', 'policy' => OwnerPolicy::class],
     ['route' => 'event-relations', 'table' => 'EventRelation', 'policy' => OwnerPolicy::class],
     ['route' => 'forums', 'table' => 'Forum', 'policy' => AuthenticatedReadPolicy::class],
