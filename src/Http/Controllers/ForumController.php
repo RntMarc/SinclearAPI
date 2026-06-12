@@ -40,8 +40,6 @@ final class ForumController
              ORDER BY f.createdAt DESC"
         );
         $stmt->execute(['uid1' => $user->id, 'uid2' => $user->id]);
-        );
-        $stmt->execute(['userId' => $user->id]);
         $forums = $stmt->fetchAll();
 
         return ResponseFactory::json(['data' => $forums], 200, $response);
