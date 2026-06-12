@@ -11,8 +11,11 @@ use Sinclear\Api\Http\Controllers\ChatController;
 use Sinclear\Api\Http\Controllers\NotificationController;
 use Sinclear\Api\Http\Controllers\PollController;
 use Sinclear\Api\Http\Controllers\EventController;
+use Sinclear\Api\Http\Controllers\ForumController;
+use Sinclear\Api\Http\Controllers\SocialController;
 use Sinclear\Api\Http\Controllers\TravelController;
 use Sinclear\Api\Http\Controllers\UserController;
+use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Http\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\OptionalAuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\LoginThrottleMiddleware;
@@ -67,6 +70,8 @@ return static function (App $app): void {
     $notificationController = new NotificationController($container->get(NotificationService::class));
     $travelController = new TravelController($container->get(TravelService::class));
     $eventController = new EventController($container->get(EventService::class));
+    $forumController = new ForumController($container->get(\PDO::class));
+    $socialController = new SocialController($container->get(\PDO::class), $container->get(CloseFriendRepository::class));
     $userController = $container->get(UserController::class);
 
     $app->group('', function ($group) use (
@@ -76,6 +81,8 @@ return static function (App $app): void {
         $notificationController,
         $travelController,
         $eventController,
+        $forumController,
+        $socialController,
         $userController
     ): void {
         $group->post('/polls/{id}/votes', [$pollController, 'vote']);
@@ -118,6 +125,8 @@ return static function (App $app): void {
         $group->patch('/travel/events/{id}', [$travelController, 'updateEvent']);
         $group->delete('/travel/events/{id}', [$travelController, 'deleteEvent']);
 
+        $group->get('/forums/my', [$forumController, 'myForums']);
+        $group->get('/social-info/unsplash-visible', [$socialController, 'visibleUnsplashHandles']);
         $group->get('/close-friends/incoming', [$userController, 'incomingCloseFriends']);
         $group->get('/close-friends/{userId}/{friendId}', [$userController, 'isCloseFriend']);
         $group->post('/close-friends/{userId}/{friendId}', [$userController, 'addCloseFriend']);

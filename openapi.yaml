@@ -1309,6 +1309,36 @@ paths:
     patch: { tags: [Social] }
     delete: { tags: [Social] }
 
+  /forums/my:
+    get:
+      tags: [Social]
+      summary: Eigene Foren abrufen
+      responses:
+        '200':
+          description: Foren, in denen der Benutzer Mitglied ist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        description: { type: string, nullable: true }
+                        image: { type: string, nullable: true }
+                        createdAt: { type: string, nullable: true }
+                        updatedAt: { type: string, nullable: true }
+                        postCount:
+                          type: integer
+                          description: Anzahl der Beiträge im Forum
+                        hasUnread:
+                          type: boolean
+                          description: Ob es ungelesene Beiträge gibt
+
   /forum-members:
     get: { tags: [Social] }
     post: { tags: [Social] }
@@ -1317,6 +1347,27 @@ paths:
     put: { tags: [Social] }
     patch: { tags: [Social] }
     delete: { tags: [Social] }
+
+  /social-info/unsplash-visible:
+    get:
+      tags: [Users]
+      summary: Sichtbare Unsplash-Handles abrufen
+      responses:
+        '200':
+          description: Liste der sichtbaren Unsplash-Benutzer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        unsplashHandle: { type: string }
+                        userId: { type: string }
+                        displayName: { type: string }
 
   /posts:
     get: { tags: [Social] }
