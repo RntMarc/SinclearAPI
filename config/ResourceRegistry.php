@@ -75,8 +75,7 @@ return [
     ['route' => 'changelog', 'table' => 'ChangelogEntry', 'policy' => AuthenticatedReadPolicy::class],
     ['route' => 'travel-trips', 'table' => 'TravelTrip', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
     ['route' => 'travel/trips', 'table' => 'TravelTrip', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
-    ['route' => 'travel-events', 'table' => 'TravelEvent', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
-    ['route' => 'travel/events', 'table' => 'TravelEvent', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
+    // Removed: travel-events, travel/events — handled by custom TravelController
     ['route' => 'travel-accommodations', 'table' => 'TravelAccommodation', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
     ['route' => 'travel/accommodations', 'table' => 'TravelAccommodation', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
     ['route' => 'travel-relations', 'table' => 'TravelRelation', 'policy' => AdminOnlyPolicy::class, 'pk' => 'ID'],
