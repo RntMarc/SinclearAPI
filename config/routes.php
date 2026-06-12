@@ -19,6 +19,7 @@ use Sinclear\Api\Service\CalendarService;
 use Sinclear\Api\Service\ChatService;
 use Sinclear\Api\Service\NotificationService;
 use Sinclear\Api\Service\PollService;
+use Sinclear\Api\Service\TravelService;
 use Sinclear\Api\Service\UserExportService;
 
 return static function (App $app): void {
