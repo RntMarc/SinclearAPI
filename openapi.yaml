@@ -1054,6 +1054,110 @@ paths:
     patch: { tags: [Travel] }
     delete: { tags: [Travel] }
 
+  /travel/my-trips:
+    get:
+      tags: [Travel]
+      summary: Get current user's trips with status flags
+      responses:
+        '200':
+          description: List of trips
+  /travel/my-events:
+    get:
+      tags: [Travel]
+      summary: Get current user's travel events
+      responses:
+        '200':
+          description: List of events
+  /travel/standalone-events:
+    get:
+      tags: [Travel]
+      summary: Get standalone travel events (not tied to a trip)
+      responses:
+        '200':
+          description: List of standalone events
+  /travel/trips/{id}/details:
+    get:
+      tags: [Travel]
+      summary: Get full trip details with participants, events, accommodations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trip details
+  /travel/trips/{id}/participants:
+    get:
+      tags: [Travel]
+      summary: List trip participants with user info and accommodations
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: List of participants
+    post:
+      tags: [Travel]
+      summary: Add a participant to a trip
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string }
+      responses:
+        '201':
+          description: Participant added
+  /travel/trips/{id}/participants/{userId}:
+    patch:
+      tags: [Travel]
+      summary: Update participant's accommodation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accommodationId: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Participant updated
+    delete:
+      tags: [Travel]
+      summary: Remove a participant from a trip
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Participant removed
+
   # --- Office ---
   /office-documents:
     get: { tags: [Office] }
