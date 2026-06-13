@@ -20,7 +20,7 @@ use Sinclear\Api\Http\Controllers\NewsController;
 use Sinclear\Api\Http\Controllers\RecipeController;
 use Sinclear\Api\Http\Controllers\SocialController;
 use Sinclear\Api\Http\Controllers\TravelController;
-use Sinclear.Api\Http\Controllers\UserController;
+use Sinclear\Api\Http\Controllers\UserController;
 use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Http\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\OptionalAuthenticationMiddleware;
