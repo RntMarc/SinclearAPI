@@ -204,6 +204,27 @@ final class AuthController
         return ResponseFactory::json(['data' => $userData], 200, $response);
     }
 
+    public function discordFindUser(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $params = $request->getQueryParams();
+        $discordId = (string) ($params['discordId'] ?? '');
+        $email = (string) ($params['email'] ?? '');
+
+        $user = null;
+        if ($discordId !== '') {
+            $user = $this->userRepository->findByDiscordId($discordId);
+        }
+        if ($user === null && $email !== '') {
+            $user = $this->userRepository->findByEmail($email);
+        }
+
+        if ($user === null) {
+            return ResponseFactory::json(['data' => []], 200, $response);
+        }
+
+        return ResponseFactory::json(['data' => [UserDto::fromRow($user)]], 200, $response);
+    }
+
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser
     {
         $user = $request->getAttribute(AuthenticatedUser::class);
