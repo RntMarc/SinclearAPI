@@ -80,7 +80,7 @@ final class PasskeyService
         $options = PublicKeyCredentialCreationOptions::create(
             $rp,
             $userEntity,
-            $challenge,
+            $challengeB64,
             [PublicKeyCredentialParameters::createPk(-7), PublicKeyCredentialParameters::createPk(-257)],
             AuthenticatorSelectionCriteria::create(
                 null,
@@ -149,7 +149,7 @@ final class PasskeyService
         ]);
 
         $options = PublicKeyCredentialRequestOptions::create(
-            $challenge,
+            $challengeB64,
             (string) $this->settings->get('webauthn.rp_id', 'localhost'),
             [],
             PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED
