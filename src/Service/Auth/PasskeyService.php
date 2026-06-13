@@ -15,10 +15,7 @@ use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Webauthn\AuthenticatorSelectionCriteria;
 use Webauthn\PublicKeyCredentialCreationOptions;
 use Webauthn\PublicKeyCredentialDescriptor;
-use Webauthn\PublicKeyCredentialParameters;
 use Webauthn\PublicKeyCredentialRequestOptions;
-use Webauthn\PublicKeyCredentialRpEntity;
-use Webauthn\PublicKeyCredentialUserEntity;
 
 /**
  * WebAuthn passkey registration and authentication.
@@ -46,14 +43,6 @@ final class PasskeyService
         }
 
         $existing = $this->passkeyRepository->findByUserId($user->id);
-        $exclude = array_map(
-            static fn (array $pk): PublicKeyCredentialDescriptor => PublicKeyCredentialDescriptor::create(
-                PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
-                base64_decode(strtr($pk['credentialId'], '-_', '+/') . str_repeat('=', (4 - strlen($pk['credentialId']) % 4) % 4), true) ?: $pk['credentialId'],
-                $pk['transports'] ? json_decode((string) $pk['transports'], true) : []
-            ),
-            $existing
-        );
 
         $challenge = random_bytes(32);
         $challengeB64 = rtrim(strtr(base64_encode($challenge), '+/', '-_'), '=');
@@ -66,32 +55,36 @@ final class PasskeyService
             'createdAt' => date('Y-m-d H:i:s'),
         ]);
 
-        $rp = PublicKeyCredentialRpEntity::create(
-            (string) $this->settings->get('webauthn.rp_name', 'Sinclear Beyond'),
-            (string) $this->settings->get('webauthn.rp_id', 'localhost')
-        );
-
-        $userEntity = PublicKeyCredentialUserEntity::create(
-            (string) $dbUser['displayName'],
-            $user->id,
-            (string) $dbUser['email']
-        );
-
-        $options = PublicKeyCredentialCreationOptions::create(
-            $rp,
-            $userEntity,
-            $challengeB64,
-            [PublicKeyCredentialParameters::createPk(-7), PublicKeyCredentialParameters::createPk(-257)],
-            AuthenticatorSelectionCriteria::create(
-                null,
-                AuthenticatorSelectionCriteria::USER_VERIFICATION_REQUIREMENT_PREFERRED,
-                AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_REQUIRED
+        return [
+            'rp' => [
+                'name' => (string) $this->settings->get('webauthn.rp_name', 'Sinclear Beyond'),
+                'id' => (string) $this->settings->get('webauthn.rp_id', 'localhost'),
+            ],
+            'user' => [
+                'name' => (string) $dbUser['email'],
+                'displayName' => (string) $dbUser['displayName'],
+                'id' => rtrim(strtr(base64_encode($user->id), '+/', '-_'), '='),
+            ],
+            'challenge' => $challengeB64,
+            'pubKeyCredParams' => [
+                ['type' => 'public-key', 'alg' => -7],
+                ['type' => 'public-key', 'alg' => -257],
+            ],
+            'timeout' => 60000,
+            'excludeCredentials' => array_map(
+                static fn (array $pk): array => [
+                    'type' => PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
+                    'id' => $pk['credentialId'],
+                    'transports' => $pk['transports'] ? json_decode((string) $pk['transports'], true) : [],
+                ],
+                $existing
             ),
-            PublicKeyCredentialCreationOptions::ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
-            $exclude
-        );
-
-        return json_decode(json_encode($options), true);
+            'authenticatorSelection' => [
+                'residentKey' => AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_REQUIRED,
+                'userVerification' => AuthenticatorSelectionCriteria::USER_VERIFICATION_REQUIREMENT_PREFERRED,
+            ],
+            'attestation' => PublicKeyCredentialCreationOptions::ATTESTATION_CONVEYANCE_PREFERENCE_NONE,
+        ];
     }
 
     /**
@@ -148,14 +141,13 @@ final class PasskeyService
             'createdAt' => date('Y-m-d H:i:s'),
         ]);
 
-        $options = PublicKeyCredentialRequestOptions::create(
-            $challengeB64,
-            (string) $this->settings->get('webauthn.rp_id', 'localhost'),
-            [],
-            PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED
-        );
-
-        return json_decode(json_encode($options), true);
+        return [
+            'challenge' => $challengeB64,
+            'rpId' => (string) $this->settings->get('webauthn.rp_id', 'localhost'),
+            'allowCredentials' => [],
+            'userVerification' => PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED,
+            'timeout' => 60000,
+        ];
     }
 
     /**
