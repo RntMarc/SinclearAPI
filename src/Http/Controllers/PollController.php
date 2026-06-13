@@ -234,6 +234,30 @@ final class PollController
         ], 200, $response);
     }
 
+    /**
+     * POST /polls
+     * Create a new poll.
+     */
+    public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = (array) ($request->getParsedBody() ?? []);
+
+        $id = bin2hex(random_bytes(16));
+        $this->pdo->prepare(
+            "INSERT INTO `Poll` (id, type, title, description, allowCounterProposals, creatorId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())"
+        )->execute([
+            $id,
+            $body['type'] ?? 'appointment',
+            $body['title'] ?? '',
+            $body['description'] ?? null,
+            isset($body['allowCounterProposals']) && $body['allowCounterProposals'] ? 1 : 0,
+            $user->id,
+        ]);
+
+        return ResponseFactory::json(['data' => ['id' => $id]], 201, $response);
+    }
+
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser
     {
         $user = $request->getAttribute(AuthenticatedUser::class);
