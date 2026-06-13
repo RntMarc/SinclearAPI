@@ -144,7 +144,6 @@ final class PasskeyService
         return [
             'challenge' => $challengeB64,
             'rpId' => (string) $this->settings->get('webauthn.rp_id', 'localhost'),
-            'allowCredentials' => [],
             'userVerification' => PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_PREFERRED,
             'timeout' => 60000,
         ];
