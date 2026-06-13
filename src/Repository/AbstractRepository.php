@@ -121,7 +121,8 @@ abstract class AbstractRepository
         $allowedColumns = $this->columns();
         $filteredData = [];
         foreach ($data as $key => $value) {
-            if ($key === $this->primaryKey() || in_array($key, $allowedColumns, true)) {
+            // If column list is empty (GenericRepository), allow all columns
+            if ($allowedColumns === [] || $key === $this->primaryKey() || in_array($key, $allowedColumns, true)) {
                 $filteredData[$key] = $value;
             }
         }
@@ -156,7 +157,7 @@ abstract class AbstractRepository
         $allowedColumns = $this->columns();
         $filteredData = [];
         foreach ($data as $key => $value) {
-            if (in_array($key, $allowedColumns, true)) {
+            if ($allowedColumns === [] || in_array($key, $allowedColumns, true)) {
                 $filteredData[$key] = $value;
             }
         }

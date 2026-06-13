@@ -8,14 +8,19 @@ use Sinclear\Api\Application\ResourceRouteRegistrar;
 use Sinclear\Api\Http\Controllers\AuthController;
 use Sinclear\Api\Http\Controllers\CalendarController;
 use Sinclear\Api\Http\Controllers\ChatController;
+use Sinclear\Api\Http\Controllers\DiscoverController;
+use Sinclear\Api\Http\Controllers\FeedbackController;
 use Sinclear\Api\Http\Controllers\NotificationController;
 use Sinclear\Api\Http\Controllers\PollController;
 use Sinclear\Api\Http\Controllers\EventController;
 use Sinclear\Api\Http\Controllers\ForumController;
+use Sinclear\Api\Http\Controllers\HomeController;
+use Sinclear\Api\Http\Controllers\MediaController;
 use Sinclear\Api\Http\Controllers\NewsController;
+use Sinclear\Api\Http\Controllers\RecipeController;
 use Sinclear\Api\Http\Controllers\SocialController;
 use Sinclear\Api\Http\Controllers\TravelController;
-use Sinclear\Api\Http\Controllers\UserController;
+use Sinclear.Api\Http\Controllers\UserController;
 use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Http\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Http\Middleware\OptionalAuthenticationMiddleware;
@@ -66,15 +71,20 @@ return static function (App $app): void {
     })->add($authMiddleware);
 
     // Specialized domain routes
-    $pollController = new PollController($container->get(PollService::class));
+    $pollController = new PollController($container->get(PollService::class), $container->get(\PDO::class));
     $chatController = new ChatController($container->get(ChatService::class));
     $calendarController = new CalendarController($container->get(CalendarService::class));
     $notificationController = new NotificationController($container->get(NotificationService::class));
     $travelController = new TravelController($container->get(TravelService::class));
     $eventController = new EventController($container->get(EventService::class));
     $forumController = new ForumController($container->get(\PDO::class));
+    $homeController = new HomeController($container->get(\PDO::class));
     $newsController = new NewsController($container->get(NewsService::class));
     $socialController = new SocialController($container->get(\PDO::class), $container->get(CloseFriendRepository::class));
+    $mediaController = new MediaController($container->get(\PDO::class));
+    $discoverController = new DiscoverController($container->get(\PDO::class));
+    $recipeController = new RecipeController($container->get(\PDO::class));
+    $feedbackController = new FeedbackController($container->get(\PDO::class));
     $userController = $container->get(UserController::class);
 
     $app->group('', function ($group) use (
@@ -85,6 +95,11 @@ return static function (App $app): void {
         $travelController,
         $eventController,
         $forumController,
+        $homeController,
+        $mediaController,
+        $discoverController,
+        $recipeController,
+        $feedbackController,
         $socialController,
         $newsController,
         $userController
@@ -93,6 +108,10 @@ return static function (App $app): void {
         $group->post('/polls/{id}/vote', [$pollController, 'vote']);
         $group->post('/polls/{id}/counter-proposals', [$pollController, 'counterProposal']);
         $group->post('/polls/{id}/finalize', [$pollController, 'finalize']);
+        $group->get('/polls/list', [$pollController, 'list']);
+        $group->get('/polls/{id}/detail', [$pollController, 'detail']);
+        $group->patch('/polls/{id}', [$pollController, 'update']);
+        $group->delete('/polls/{id}', [$pollController, 'delete']);
 
         $group->get('/chat/rooms', [$chatController, 'rooms']);
         $group->get('/chat/messages', [$chatController, 'messages']);
@@ -130,6 +149,27 @@ return static function (App $app): void {
         $group->delete('/travel/events/{id}', [$travelController, 'deleteEvent']);
 
         $group->get('/forums/my', [$forumController, 'myForums']);
+        $group->get('/forums/{id}/posts', [$forumController, 'forumPosts']);
+        $group->get('/forums/{id}/detail', [$forumController, 'forumDetail']);
+        $group->get('/home/media-reviews', [$homeController, 'recentMediaReviews']);
+        $group->get('/home/discover-reviews', [$homeController, 'recentDiscoverReviews']);
+        $group->get('/home/polls', [$homeController, 'homePolls']);
+        $group->get('/home/feed-posts', [$homeController, 'homeFeedPosts']);
+        $group->get('/home/feed-posts-list', [$homeController, 'feedPostsList']);
+        $group->get('/home/birthdays', [$homeController, 'birthdays']);
+        $group->get('/media/list', [$mediaController, 'list']);
+        $group->get('/media/{id}/detail', [$mediaController, 'detail']);
+        $group->get('/media/{id}/reviews', [$mediaController, 'reviews']);
+        $group->post('/media/{id}/reviews', [$mediaController, 'upsertReview']);
+        $group->get('/discover/list', [$discoverController, 'list']);
+        $group->get('/discover/random', [$discoverController, 'random']);
+        $group->get('/discover/map', [$discoverController, 'map']);
+        $group->get('/discover/bookmarked', [$discoverController, 'bookmarked']);
+        $group->get('/discover/places-search', [$discoverController, 'search']);
+        $group->get('/discover/{id}/detail', [$discoverController, 'detail']);
+        $group->get('/recipes/list', [$recipeController, 'list']);
+        $group->get('/recipes/{id}/detail', [$recipeController, 'detail']);
+        $group->get('/feedback/list', [$feedbackController, 'list']);
         $group->get('/social-info/unsplash-visible', [$socialController, 'visibleUnsplashHandles']);
 
         $group->get('/rss-sources', [$newsController, 'listRssSources']);
