@@ -12,6 +12,7 @@ use Sinclear\Api\Http\Controllers\NotificationController;
 use Sinclear\Api\Http\Controllers\PollController;
 use Sinclear\Api\Http\Controllers\EventController;
 use Sinclear\Api\Http\Controllers\ForumController;
+use Sinclear\Api\Http\Controllers\NewsController;
 use Sinclear\Api\Http\Controllers\SocialController;
 use Sinclear\Api\Http\Controllers\TravelController;
 use Sinclear\Api\Http\Controllers\UserController;
@@ -22,6 +23,7 @@ use Sinclear\Api\Http\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Service\CalendarService;
 use Sinclear\Api\Service\ChatService;
 use Sinclear\Api\Service\EventService;
+use Sinclear\Api\Service\NewsService;
 use Sinclear\Api\Service\NotificationService;
 use Sinclear\Api\Service\PollService;
 use Sinclear\Api\Service\TravelService;
@@ -71,6 +73,7 @@ return static function (App $app): void {
     $travelController = new TravelController($container->get(TravelService::class));
     $eventController = new EventController($container->get(EventService::class));
     $forumController = new ForumController($container->get(\PDO::class));
+    $newsController = new NewsController($container->get(NewsService::class));
     $socialController = new SocialController($container->get(\PDO::class), $container->get(CloseFriendRepository::class));
     $userController = $container->get(UserController::class);
 
@@ -83,6 +86,7 @@ return static function (App $app): void {
         $eventController,
         $forumController,
         $socialController,
+        $newsController,
         $userController
     ): void {
         $group->post('/polls/{id}/votes', [$pollController, 'vote']);
@@ -127,6 +131,17 @@ return static function (App $app): void {
 
         $group->get('/forums/my', [$forumController, 'myForums']);
         $group->get('/social-info/unsplash-visible', [$socialController, 'visibleUnsplashHandles']);
+
+        $group->get('/rss-sources', [$newsController, 'listRssSources']);
+        $group->post('/rss-sources', [$newsController, 'createRssSource']);
+        $group->patch('/rss-sources/{id}', [$newsController, 'updateRssSource']);
+        $group->delete('/rss-sources/{id}', [$newsController, 'deleteRssSource']);
+        $group->get('/news/important', [$newsController, 'important']);
+        $group->get('/news/archived', [$newsController, 'archived']);
+        $group->post('/news/upvote', [$newsController, 'upvoteArticle']);
+        $group->get('/news/upvoted', [$newsController, 'upvotedUrls']);
+        $group->get('/news/upvote-counts', [$newsController, 'upvoteCounts']);
+
         $group->get('/close-friends/incoming', [$userController, 'incomingCloseFriends']);
         $group->get('/close-friends/{userId}/{friendId}', [$userController, 'isCloseFriend']);
         $group->post('/close-friends/{userId}/{friendId}', [$userController, 'addCloseFriend']);

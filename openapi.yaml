@@ -120,6 +120,17 @@ components:
         createdAt: { type: string, format: date-time }
         creatorId: { type: string }
 
+    NewsArticle:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        url: { type: string }
+        sourceName: { type: string }
+        sourceIcon: { type: string, nullable: true }
+        savedAt: { type: string, format: date-time }
+        upvoteCount: { type: integer }
+
   parameters:
     id:
       name: id
@@ -1034,32 +1045,137 @@ paths:
     delete: { tags: [Feedback] }
 
   # --- News ---
-  /news-articles:
-    get: { tags: [News] }
-    post: { tags: [News] }
-  /news-articles/{id}:
-    get: { tags: [News] }
-    put: { tags: [News] }
-    patch: { tags: [News] }
-    delete: { tags: [News] }
-
-  /news-upvotes:
-    get: { tags: [News] }
-    post: { tags: [News] }
-  /news-upvotes/{id}:
-    get: { tags: [News] }
-    put: { tags: [News] }
-    patch: { tags: [News] }
-    delete: { tags: [News] }
-
   /rss-sources:
-    get: { tags: [News] }
-    post: { tags: [News] }
+    get:
+      tags: [News]
+      summary: RSS-Quellen auflisten
+      responses:
+        '200': { description: Liste der RSS-Quellen }
+    post:
+      tags: [News]
+      summary: RSS-Quelle erstellen
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name: { type: string }
+                url: { type: string }
+                itemsPerPage: { type: integer, default: 10 }
+      responses:
+        '201': { description: Erstellt }
   /rss-sources/{id}:
-    get: { tags: [News] }
-    put: { tags: [News] }
-    patch: { tags: [News] }
-    delete: { tags: [News] }
+    patch:
+      tags: [News]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      summary: RSS-Quelle aktualisieren
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                url: { type: string }
+                itemsPerPage: { type: integer }
+      responses:
+        '200': { description: Aktualisiert }
+    delete:
+      tags: [News]
+      parameters: [{ $ref: '#/components/parameters/id' }]
+      summary: RSS-Quelle löschen
+      responses:
+        '200': { description: Gelöscht }
+
+  /news/important:
+    get:
+      tags: [News]
+      summary: Wichtige News der letzten 7 Tage
+      responses:
+        '200':
+          description: News mit Upvote-Zählern
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        title: { type: string }
+                        url: { type: string }
+                        sourceName: { type: string }
+                        sourceIcon: { type: string }
+                        savedAt: { type: string }
+                        upvoteCount: { type: integer }
+  /news/archived:
+    get:
+      tags: [News]
+      summary: Archivierte News (älter als 7 Tage)
+      responses:
+        '200':
+          description: Archivierte News
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NewsArticle'
+  /news/upvote:
+    post:
+      tags: [News]
+      summary: Artikel upvoten (erstellt ggf. neuen Article)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                link: { type: string }
+                title: { type: string }
+                sourceName: { type: string }
+                sourceIcon: { type: string }
+      responses:
+        '200': { description: Erfolg }
+  /news/upvoted:
+    get:
+      tags: [News]
+      summary: Vom Benutzer geupvotete Artikel-URLs
+      responses:
+        '200':
+          description: Liste der URLs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { type: string }
+  /news/upvote-counts:
+    get:
+      tags: [News]
+      summary: Upvote-Zählungen aller Artikel
+      responses:
+        '200':
+          description: Map von URL zu Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties:
+                      type: integer
 
   # --- Notifications & Push ---
   /notifications:

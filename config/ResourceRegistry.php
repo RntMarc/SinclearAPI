@@ -23,8 +23,10 @@ use Sinclear\Api\Security\Policy\UserListPolicy;
 return [
     ['route' => 'users', 'table' => 'User', 'policy' => UserListPolicy::class, 'mapper' => [UserDto::class, 'fromRow']],
     ['route' => 'user-preferences', 'table' => 'UserPreferences', 'policy' => OwnerPolicy::class],
-    ['route' => 'contact-info', 'table' => 'ContactInfo', 'policy' => OwnerPolicy::class],
-    ['route' => 'social-info', 'table' => 'SocialInfo', 'policy' => OwnerPolicy::class],
+    ['route' => 'contact-info', 'table' => 'ContactInfo', 'policy' => OwnerPolicy::class, 'pk' => 'userId'],
+
+    ['route' => 'social-info', 'table' => 'SocialInfo', 'policy' => OwnerPolicy::class, 'pk' => 'userId'],
+
     ['route' => 'close-friends', 'table' => 'CloseFriend', 'policy' => OwnerPolicy::class],
     // Removed: events — handled by custom EventController
     ['route' => 'event-permissions', 'table' => 'EventPermission', 'policy' => OwnerPolicy::class],
@@ -63,7 +65,9 @@ return [
     ['route' => 'feedback/votes', 'table' => 'FeedbackVote', 'policy' => OwnerPolicy::class],
     ['route' => 'news-articles', 'table' => 'NewsArticle', 'policy' => AuthenticatedReadPolicy::class],
     ['route' => 'news-upvotes', 'table' => 'NewsUpvote', 'policy' => OwnerPolicy::class],
-    ['route' => 'rss-sources', 'table' => 'RssSource', 'policy' => AdminOnlyPolicy::class],
+    // Removed: rss-sources — handled by custom NewsController
+    // Removed: news-articles — handled by custom NewsController
+    // Removed: news-upvotes — handled by custom NewsController
     ['route' => 'subscriptions', 'table' => 'Subscription', 'policy' => AdminOnlyPolicy::class],
     ['route' => 'subscription-relations', 'table' => 'SubscriptionRelation', 'policy' => OwnerPolicy::class],
     ['route' => 'office-documents', 'table' => 'OfficeDocument', 'policy' => CreatorPolicy::class],
