@@ -8,6 +8,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Respect\Validation\Validator as v;
 use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Dto\UserDto;
 use Sinclear\Api\Exception\HttpException;
 use Sinclear\Api\Repository\UserPreferencesRepository;
@@ -29,7 +30,8 @@ final class AuthController
         private readonly DiscordOAuthService $discordOAuthService,
         private readonly TokenService $tokenService,
         private readonly UserRepository $userRepository,
-        private readonly UserPreferencesRepository $preferencesRepository
+        private readonly UserPreferencesRepository $preferencesRepository,
+        private readonly Settings $settings
     ) {
     }
 
@@ -206,23 +208,46 @@ final class AuthController
 
     public function discordFindUser(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        $this->verifyInternalRequest($request);
+
         $params = $request->getQueryParams();
         $discordId = (string) ($params['discordId'] ?? '');
-        $email = (string) ($params['email'] ?? '');
 
-        $user = null;
-        if ($discordId !== '') {
-            $user = $this->userRepository->findByDiscordId($discordId);
-        }
-        if ($user === null && $email !== '') {
-            $user = $this->userRepository->findByEmail($email);
+        if ($discordId === '') {
+            return ResponseFactory::json(['data' => []], 200, $response);
         }
 
+        $user = $this->userRepository->findByDiscordId($discordId);
         if ($user === null) {
             return ResponseFactory::json(['data' => []], 200, $response);
         }
 
         return ResponseFactory::json(['data' => [UserDto::fromRow($user)]], 200, $response);
+    }
+
+    private function verifyInternalRequest(ServerRequestInterface $request): void
+    {
+        $secret = $this->settings->get('internal_api.secret', '');
+        if ($secret === '') {
+            throw HttpException::unauthorized('not_configured');
+        }
+
+        $timestamp = $request->getHeaderLine('X-Timestamp');
+        $signature = $request->getHeaderLine('X-Signature');
+
+        if ($timestamp === '' || $signature === '') {
+            throw HttpException::unauthorized();
+        }
+
+        if (abs(time() - (int) $timestamp) > 30) {
+            throw HttpException::unauthorized();
+        }
+
+        $expected = hash_hmac('sha256', $timestamp, $secret);
+
+        if (!hash_equals($expected, $signature)) {
+            throw HttpException::unauthorized();
+        }
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

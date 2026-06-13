@@ -40,6 +40,9 @@ return [
         'rp_name' => $_ENV['WEBAUTHN_RP_NAME'] ?? 'Sinclear Beyond',
         'origin' => $_ENV['WEBAUTHN_ORIGIN'] ?? 'http://localhost:8080',
     ],
+    'internal_api' => [
+        'secret' => $_ENV['AUTH_INTERNAL_SECRET'] ?? $_ENV['INTERNAL_API_SECRET'] ?? '',
+    ],
     'cors' => [
         'allowed_origins' => array_filter(array_map('trim', explode(',', $_ENV['CORS_ALLOWED_ORIGINS'] ?? '*'))),
     ],
