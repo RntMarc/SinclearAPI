@@ -36,6 +36,7 @@ use Sinclear\Api\Service\CalendarService;
 use Sinclear\Api\Service\ChatService;
 use Sinclear\Api\Service\EventService;
 use Sinclear\Api\Service\MailService;
+use Sinclear\Api\Service\NewsService;
 use Sinclear\Api\Service\NotificationService;
 use Sinclear\Api\Service\PollService;
 use Sinclear\Api\Service\RateLimitService;
@@ -112,6 +113,7 @@ return [
     ChatService::class => DI\autowire(),
     CalendarService::class => DI\autowire(),
     EventService::class => DI\autowire(),
+    NewsService::class => DI\autowire(),
     NotificationService::class => DI\autowire(),
     TravelService::class => DI\autowire(),
     UserExportService::class => DI\autowire(),
