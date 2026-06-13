@@ -52,6 +52,41 @@ final class UserExportService
             $export['related'][$table] = $stmt->fetchAll();
         }
 
+        // Discover reviews with place info
+        $drStmt = $this->pdo->prepare(
+            "SELECT dr.id, dr.rating, dr.comment, dr.createdAt,
+                    dp.name AS placeName, dp.osmId, dp.osmType, dp.category
+             FROM DiscoverReview dr
+             INNER JOIN DiscoverPlace dp ON dp.id = dr.placeId
+             WHERE dr.userId = :userId"
+        );
+        $drStmt->execute(['userId' => $targetUserId]);
+        $export['discoverReviews'] = $drStmt->fetchAll();
+
+        // Media reviews with item info
+        $mrStmt = $this->pdo->prepare(
+            "SELECT mr.id, mr.rating, mr.comment, mr.platform, mr.createdAt,
+                    mi.title AS itemTitle, mi.type AS itemType, mi.format AS itemFormat, mi.externalId AS itemExternalId
+             FROM MediaReview mr
+             INNER JOIN MediaItem mi ON mi.id = mr.itemId
+             WHERE mr.userId = :userId"
+        );
+        $mrStmt->execute(['userId' => $targetUserId]);
+        $export['mediaReviews'] = $mrStmt->fetchAll();
+
+        // Episode reviews
+        $erStmt = $this->pdo->prepare(
+            "SELECT er.id, er.rating, er.createdAt,
+                    se.title AS episodeTitle, se.seasonNumber, se.episodeNumber, se.externalId AS episodeExternalId,
+                    mi.title AS seriesTitle, mi.externalId AS seriesExternalId
+             FROM EpisodeReview er
+             INNER JOIN SeriesEpisode se ON se.id = er.episodeId
+             INNER JOIN MediaItem mi ON mi.id = se.seriesId
+             WHERE er.userId = :userId"
+        );
+        $erStmt->execute(['userId' => $targetUserId]);
+        $export['episodeReviews'] = $erStmt->fetchAll();
+
         return $export;
     }
 }
