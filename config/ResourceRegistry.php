@@ -35,7 +35,7 @@ return [
     ['route' => 'forum-members', 'table' => 'ForumMember', 'policy' => OwnerPolicy::class],
     ['route' => 'posts', 'table' => 'FeedPosts', 'policy' => CreatorPolicy::class],
     ['route' => 'post-votes', 'table' => 'FeedPostVote', 'policy' => OwnerPolicy::class],
-    ['route' => 'polls', 'table' => 'Poll', 'policy' => CreatorPolicy::class],
+    // Removed: polls — handled by custom PollController
     ['route' => 'poll-questions', 'table' => 'PollQuestion', 'policy' => AuthenticatedReadPolicy::class],
     ['route' => 'poll-options', 'table' => 'PollOption', 'policy' => AuthenticatedReadPolicy::class],
     ['route' => 'poll-invites', 'table' => 'PollInvite', 'policy' => OwnerPolicy::class],

@@ -110,6 +110,7 @@ return static function (App $app): void {
         $group->post('/polls/{id}/finalize', [$pollController, 'finalize']);
         $group->get('/polls/list', [$pollController, 'list']);
         $group->get('/polls/{id}/detail', [$pollController, 'detail']);
+        $group->post('/polls', [$pollController, 'create']);
         $group->patch('/polls/{id}', [$pollController, 'update']);
         $group->delete('/polls/{id}', [$pollController, 'delete']);
 
