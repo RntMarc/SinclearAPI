@@ -49,8 +49,9 @@ final class ForumController
      * GET /forums/{id}/posts
      * Posts for a specific forum with visibility logic and vote counts.
      */
-    public function forumPosts(ServerRequestInterface $request, ResponseInterface $response, string $forumId): ResponseInterface
+    public function forumPosts(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
+        $forumId = $args['id'];
         $user = $request->getAttribute(AuthenticatedUser::class);
         if (!$user instanceof AuthenticatedUser) {
             throw HttpException::unauthorized();
@@ -101,8 +102,9 @@ final class ForumController
      * GET /forums/{id}
      * Full forum detail: forum info, membership, members, posts.
      */
-    public function forumDetail(ServerRequestInterface $request, ResponseInterface $response, string $forumId): ResponseInterface
+    public function forumDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
+        $forumId = $args['id'];
         $user = $request->getAttribute(AuthenticatedUser::class);
         if (!$user instanceof AuthenticatedUser) {
             throw HttpException::unauthorized();

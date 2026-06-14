@@ -1419,17 +1419,17 @@ paths:
   /forums:
     get: { tags: [Social] }
     post: { tags: [Social] }
-  /forums/{forumId}:
+  /forums/{id}:
     get: { tags: [Social] }
     put: { tags: [Social] }
     patch: { tags: [Social] }
     delete: { tags: [Social] }
-  /forums/{forumId}/posts:
+  /forums/{id}/posts:
     get:
       tags: [Social]
       summary: Beiträge eines Forums mit Sichtbarkeit und Vote-Zählern
       parameters:
-        - name: forumId
+        - name: id
           in: path
           required: true
           schema: { type: string }
@@ -1459,12 +1459,12 @@ paths:
                         voteCount: { type: integer }
                         hasVoted: { type: boolean }
                         canEdit: { type: boolean }
-  /forums/{forumId}/detail:
+  /forums/{id}/detail:
     get:
       tags: [Social]
       summary: Vollständiges Forum-Detail mit Mitgliedern und Beiträgen
       parameters:
-        - name: forumId
+        - name: id
           in: path
           required: true
           schema: { type: string }

@@ -152,8 +152,8 @@ return static function (App $app): void {
         $group->delete('/travel/events/{id}', [$travelController, 'deleteEvent']);
 
         $group->get('/forums/my', [$forumController, 'myForums']);
-        $group->get('/forums/{forumId}/posts', [$forumController, 'forumPosts']);
-        $group->get('/forums/{forumId}/detail', [$forumController, 'forumDetail']);
+        $group->get('/forums/{id}/posts', [$forumController, 'forumPosts']);
+        $group->get('/forums/{id}/detail', [$forumController, 'forumDetail']);
         $group->get('/home/media-reviews', [$homeController, 'recentMediaReviews']);
         $group->get('/home/discover-reviews', [$homeController, 'recentDiscoverReviews']);
         $group->get('/home/polls', [$homeController, 'homePolls']);
