@@ -1419,11 +1419,100 @@ paths:
   /forums:
     get: { tags: [Social] }
     post: { tags: [Social] }
-  /forums/{id}:
+  /forums/{forumId}:
     get: { tags: [Social] }
     put: { tags: [Social] }
     patch: { tags: [Social] }
     delete: { tags: [Social] }
+  /forums/{forumId}/posts:
+    get:
+      tags: [Social]
+      summary: Beiträge eines Forums mit Sichtbarkeit und Vote-Zählern
+      parameters:
+        - name: forumId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Liste der Beiträge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        forumId: { type: string }
+                        userId: { type: string }
+                        category: { type: string }
+                        title: { type: string, nullable: true }
+                        content: { type: string, nullable: true }
+                        visibility: { type: integer }
+                        createdAt: { type: string }
+                        displayName: { type: string }
+                        image: { type: string, nullable: true }
+                        voteCount: { type: integer }
+                        hasVoted: { type: boolean }
+                        canEdit: { type: boolean }
+  /forums/{forumId}/detail:
+    get:
+      tags: [Social]
+      summary: Vollständiges Forum-Detail mit Mitgliedern und Beiträgen
+      parameters:
+        - name: forumId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Forum-Detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  forum:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      name: { type: string }
+                      description: { type: string, nullable: true }
+                      image: { type: string, nullable: true }
+                      createdAt: { type: string }
+                      updatedAt: { type: string }
+                  isMember:
+                    type: boolean
+                  members:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        displayName: { type: string }
+                        image: { type: string, nullable: true }
+                  posts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        forumId: { type: string }
+                        userId: { type: string }
+                        category: { type: string }
+                        title: { type: string, nullable: true }
+                        content: { type: string, nullable: true }
+                        visibility: { type: integer }
+                        createdAt: { type: string }
+                        displayName: { type: string }
+                        image: { type: string, nullable: true }
+                        voteCount: { type: integer }
+                        hasVoted: { type: boolean }
+                        canEdit: { type: boolean }
 
   /forums/my:
     get:
