@@ -58,6 +58,7 @@ return static function (App $app): void {
         $group->get('/discord/start', [$authController, 'discordStart']);
         $group->get('/discord/callback', [$authController, 'discordCallback']);
         $group->get('/discord/find-user', [$authController, 'discordFindUser']);
+        $group->post('/discord/issue-token', [$authController, 'discordIssueToken']);
         $group->post('/refresh', [$authController, 'refresh']);
     })->add($loginThrottle);
 

@@ -142,6 +142,28 @@ final class AuthController
         return ResponseFactory::json($tokens, 200, $response);
     }
 
+    public function discordIssueToken(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->verifyInternalRequest($request);
+
+        $body = (array) ($request->getParsedBody() ?? []);
+        $userId = (string) ($body['userId'] ?? '');
+
+        if ($userId === '') {
+            throw HttpException::badRequest('missing_user_id');
+        }
+
+        $user = $this->userRepository->findById($userId);
+        if ($user === null) {
+            throw HttpException::notFound('user_not_found');
+        }
+
+        $tokens = $this->tokenService->issueTokenPair($userId);
+        $tokens['user'] = UserDto::fromRow($user);
+
+        return ResponseFactory::json($tokens, 200, $response);
+    }
+
     public function refresh(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $body = (array) ($request->getParsedBody() ?? []);
