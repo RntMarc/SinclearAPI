@@ -1,11 +1,10 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-
 
 use DI\ContainerBuilder;
 use Psr\Log\LoggerInterface;
 use Slim\Factory\AppFactory;
+
+require __DIR__ . '/../vendor/autoload.php';
 
 $rootDir = dirname(__DIR__);
 
