@@ -8,6 +8,14 @@ After every change to the API (routes, controllers, DTOs, or ResourceRegistry), 
 1. Verify the accuracy and completeness of the `openapi.yaml` file.
 2. Ensure that all moment-by-moment existing API endpoints and functions are fully and correctly reflected in the specification.
 
+## Documentation
+The `docs/` directory contains developer-facing documentation for the API.
+
+**Requirement:**
+After every change to the API (routes, controllers, DTOs, or ResourceRegistry), you MUST:
+1. Update the relevant documentation files in `docs/` to reflect the changes.
+2. Ensure that all flows, endpoints, and configuration are accurately documented.
+
 ## Coding Standards
 - Use PHP 8.4 features where appropriate.
 - Follow the established CRUD pattern using `ResourceRegistry.php` for standard resources.
