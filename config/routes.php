@@ -2,6 +2,7 @@
 
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AuthController;
+use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Slim\App;
@@ -27,4 +28,13 @@ return function (App $app): void {
         $group->post('/refresh', [AuthController::class, 'refresh'])
             ->add($container->get(LoginThrottleMiddleware::class));
     });
+
+    $app->group('/explore', function (RouteCollectorProxy $group) use ($container) {
+        $group->get('/search', [ExploreController::class, 'search']);
+        $group->get('', [ExploreController::class, 'list']);
+        $group->post('', [ExploreController::class, 'create']);
+        $group->get('/{id}', [ExploreController::class, 'get']);
+        $group->put('/{id}', [ExploreController::class, 'update']);
+        $group->delete('/{id}', [ExploreController::class, 'delete']);
+    })->add($container->get(AuthenticationMiddleware::class));
 };

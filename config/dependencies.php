@@ -9,6 +9,7 @@ use PDO;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
+use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -18,11 +19,16 @@ use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
+use Sinclear\Api\Repository\DiscoverGastronomyRepository;
+use Sinclear\Api\Repository\DiscoverPlaceRepository;
+use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
+use Sinclear\Api\Services\ExploreService;
 use Sinclear\Api\Services\RateLimiter;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
@@ -106,6 +112,14 @@ return [
     DiscordOAuthService::class => autowire(),
 
     AuthController::class => autowire(),
+    ExploreController::class => autowire(),
+
+    DiscoverPlaceRepository::class => autowire(),
+    DiscoverGastronomyRepository::class => autowire(),
+    DiscoverReviewRepository::class => autowire(),
+
+    ExploreService::class => autowire(),
+    ExplorePolicy::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
     SecurityHeadersMiddleware::class => create(),

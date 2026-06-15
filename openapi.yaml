@@ -28,6 +28,23 @@ components:
           type: string
           description: Fehlerdetails (nur im Debug-Modus)
 
+    PaginationMeta:
+      type: object
+      required: [page, limit, total, totalPages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 3
+
     OtpRequest:
       type: object
       required: [email]
@@ -106,6 +123,102 @@ components:
         expires_at:
           type: integer
           description: Unix-Timestamp, wann der Refresh-Token abläuft
+
+    ExplorePlace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Restaurant Beispiel
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+          enum: [gastronomy, leisure]
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: float
+          nullable: true
+        longitude:
+          type: number
+          format: float
+          nullable: true
+        osmId:
+          type: integer
+          nullable: true
+        osmType:
+          type: string
+          enum: [N, W, R]
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        openingHours:
+          type: string
+          nullable: true
+        cuisine:
+          type: string
+          nullable: true
+          description: Nur bei Gastronomie
+        creatorId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdated:
+          type: string
+          format: date-time
+        distance:
+          type: number
+          format: float
+          nullable: true
+          description: Entfernung in Metern (nur bei Umkreissuche)
+
+    ExploreCreateRequest:
+      type: object
+      required: [osmId, osmType]
+      properties:
+        osmId:
+          type: integer
+          description: OpenStreetMap-ID des Ortes
+          example: 123456789
+        osmType:
+          type: string
+          enum: [N, W, R]
+          description: OSM-Objekttyp (Node, Way, Relation)
+          example: N
+
+    ExploreListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExplorePlace'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ExploreDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/ExplorePlace'
 
 paths:
   /auth/login/otp/request:
@@ -281,6 +394,304 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           description: Zu viele Versuche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore:
+    get:
+      summary: Orte auflisten
+      description: >
+        Gibt eine paginierte Liste aller Entdecken-Orte zurück.
+        Optional filterbar nach Kategorie.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [gastronomy, leisure]
+          description: Filter nach Kategorie
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der Orte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '400':
+          description: Ungültige Kategorie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert (fehlender oder ungültiger Token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neuen Ort anlegen
+      description: >
+        Legt einen neuen Entdecken-Ort an. Der Client übergibt die
+        OSM-ID und den OSM-Typ. Die API ruft die Detaildaten
+        von Nominatim/OpenStreetMap ab, bestimmt die Kategorie
+        automatisch und speichert den Ort.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreCreateRequest'
+      responses:
+        '201':
+          description: Ort wurde angelegt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDetailResponse'
+        '400':
+          description: Ungültige OSM-ID oder OSM-Typ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Ort existiert bereits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/search:
+    get:
+      summary: Orte durchsuchen
+      description: >
+        Durchsucht die Entdecken-Orte nach Namen, Kategorie, Küche
+        oder geografischer Lage. Die Umkreissuche verwendet die
+        Haversine-Formel. Alternativ kann ein Ortsname (`location`)
+        übergeben werden, der automatisch über Nominatim geocoded wird.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Volltextsuche im Namen
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [gastronomy, leisure]
+        - name: cuisine
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Küchen-Typ (nur bei Gastronomie)
+        - name: lat
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+          description: Breitengrad für Umkreissuche
+        - name: lon
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+          description: Längengrad für Umkreissuche
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Ortsname (wird automatisch geocoded)
+        - name: radius
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5000
+            minimum: 1
+            maximum: 50000
+          description: Radius in Metern
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Suchergebnisse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '400':
+          description: Ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/{id}:
+    get:
+      summary: Ortsdetails abrufen
+      description: >
+        Gibt die Detaildaten eines einzelnen Entdecken-Ortes zurück.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+      responses:
+        '200':
+          description: Detaildaten des Ortes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: OSM-Daten aktualisieren
+      description: >
+        Ruft die aktuellen OSM-Daten für einen Ort neu von
+        Nominatim ab und überschreibt die gespeicherten Felder.
+        Jeder authentifizierte Nutzer kann einen Refresh anstoßen.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ort wurde aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Ort löschen
+      description: >
+        Löscht einen Entdecken-Ort. Nur der Ersteller darf löschen,
+        und auch nur dann, wenn noch keine Bewertungen (Reviews)
+        zu diesem Ort existieren. Administratoren können immer löschen.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Ort wurde gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung zum Löschen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
           content:
             application/json:
               schema:
