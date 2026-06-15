@@ -114,6 +114,7 @@ return [
         $settings = $c->get(Settings::class);
         return new CorsMiddleware(
             allowedOrigins: $settings->cors['allowed_origins'],
+            logger: $c->get(LoggerInterface::class),
         );
     },
 

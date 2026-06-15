@@ -1,6 +1,10 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # CORS-Preflight (OPTIONS) direkt an PHP durchreichen, bevor Apache 405 wirft
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^ public/index.php [L]
+
     # SSL erzwingen
     RewriteCond %{HTTPS} !=on
     RewriteCond %{REQUEST_URI} !^/.well-known/
