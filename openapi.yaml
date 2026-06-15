@@ -3,6 +3,285 @@ info:
   title: Sinclear Beyond API
   version: 2.0.0
   description: Zentrale REST-API für Sinclear Beyond
+
 servers:
   - url: /api/v2
     description: API v2
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access-Token (JWT), gültig 15 Minuten
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: Fehlercode
+        message:
+          type: string
+          description: Fehlerdetails (nur im Debug-Modus)
+
+    OtpRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+
+    OtpVerifyRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: E-Mail (optional bei Discord-Pairing-Codes)
+          example: user@example.com
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: 6-stelliger Code aus E-Mail oder Discord-Callback
+          example: '482731'
+
+    DiscordStartResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Discord OAuth2 Authorize-URL mit PKCE
+          example: https://discord.com/api/oauth2/authorize?response_type=code&client_id=...
+
+    OtpSentResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          enum: [otp_sent]
+          description: Bestätigung des OTP-Versands
+
+    TokenResponse:
+      type: object
+      required: [access_token, expires_in, refresh_token, token_type]
+      properties:
+        access_token:
+          type: string
+          description: JWT Access-Token
+        expires_in:
+          type: integer
+          description: Gültigkeitsdauer in Sekunden
+          example: 900
+        refresh_token:
+          type: string
+          description: Refresh-Token für Token-Erneuerung
+        token_type:
+          type: string
+          enum: [Bearer]
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh-Token aus vorherigem Login
+
+    RefreshTokenResponse:
+      type: object
+      required: [refresh_token, expires_at]
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh-Token
+        expires_at:
+          type: integer
+          description: Unix-Timestamp, wann der Refresh-Token abläuft
+
+paths:
+  /auth/login/otp/request:
+    post:
+      summary: E-Mail-OTP anfordern
+      description: >
+        Sendet einen 6-stelligen Code per E-Mail an den Nutzer.
+        Der Nutzer muss in der Datenbank existieren. Pro E-Mail
+        sind maximal 3 Anfragen pro 60 Sekunden erlaubt.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP-Code wurde versendet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSentResponse'
+        '400':
+          description: Ungültige E-Mail-Adresse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer mit dieser E-Mail nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Anfragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login/otp/verify:
+    post:
+      summary: OTP-Code oder Discord-Pairing-Code verifizieren
+      description: >
+        Prüft den 6-stelligen Code gegen die Datenbank.
+        Bei erfolgreicher Prüfung wird ein Refresh-Token ausgestellt.
+        Der Code darf nicht älter als 10 Minuten (E-Mail-OTP) bzw.
+        2 Minuten (Discord-Pairing) sein und kann nur einmal verwendet werden.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Code gültig – Refresh-Token wird ausgestellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenResponse'
+        '400':
+          description: Ungültiger oder abgelaufener Code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Versuche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login/discord/start:
+    post:
+      summary: Discord OAuth2-Login starten
+      description: >
+        Erzeugt eine Discord OAuth2 Authorize-URL mit PKCE.
+        Der Client öffnet diese URL in einem Browser.
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Discord-URL wurde erzeugt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordStartResponse'
+
+  /auth/login/discord/callback:
+    get:
+      summary: Discord OAuth2-Callback
+      description: >
+        Wird von Discord nach erfolgreicher Autorisierung aufgerufen.
+        Die API tauscht den Authorization-Code gegen Discord-Tokens,
+        prüft die Guild-Mitgliedschaft, sucht den Nutzer in der DB
+        und zeigt einen 6-stelligen Pairing-Code an.
+        Der Nutzer kopiert diesen Code in die App und verwendet ihn
+        am Endpunkt `/auth/login/otp/verify`.
+      tags: [Authentication]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization-Code von Discord
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: State-Parameter (PKCE, Anti-CSRF)
+      responses:
+        '200':
+          description: HTML-Seite mit dem 6-stelligen Pairing-Code
+          content:
+            text/html:
+              schema:
+                type: string
+                example: "<html>..."
+        '400':
+          description: Ungültiger oder abgelaufener State / Code
+
+  /auth/refresh:
+    post:
+      summary: Access-Token erneuern
+      description: >
+        Tauscht einen gültigen Refresh-Token gegen einen neuen
+        Access-Token (JWT) und einen neuen Refresh-Token
+        (Token-Rotation). Bei Wiederverwendung eines bereits
+        rotierten Tokens wird die gesamte Token-Familie widerrufen.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Neue Tokens wurden ausgestellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: Fehlender Refresh-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Ungültiger oder abgelaufener Refresh-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Versuche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

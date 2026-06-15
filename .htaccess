@@ -1,0 +1,41 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # SSL erzwingen
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{REQUEST_URI} !^/.well-known/
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Directory Listing verhindern
+    Options -Indexes
+
+    # Server-Signatur verstecken
+    ServerSignature Off
+
+    # Sensitive Dateien blockieren
+    <FilesMatch "\.(env|log|sql|json|yaml|yml|md|lock|dist)$">
+        Require all denied
+    </FilesMatch>
+
+    <FilesMatch "^(composer\.json|composer\.lock|\.gitignore|\.gitmodules|AGENTS\.md|update\.sh)$">
+        Require all denied
+    </FilesMatch>
+
+    # Verzeichnisse blockieren
+    RewriteRule ^bin/ - [F,L]
+    RewriteRule ^config/ - [F,L]
+    RewriteRule ^events/ - [F,L]
+    RewriteRule ^src/ - [F,L]
+    RewriteRule ^vendor/ - [F,L]
+    RewriteRule ^templates/ - [F,L]
+    RewriteRule ^\.git - [F,L]
+    RewriteRule ^\.env - [F,L]
+
+    # Authorization-Header durchreichen
+    RewriteCond %{HTTP:Authorization} ^(.+)$
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Alles an public/ weiterleiten
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

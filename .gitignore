@@ -1,2 +1,16 @@
 # updater
 update.sh
+
+# environment
+.env
+
+# runtime
+/var/log/
+/var/cache/
+
+# dependencies
+/vendor/
+
+# OS files
+.DS_Store
+Thumbs.db
