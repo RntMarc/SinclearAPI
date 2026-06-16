@@ -50,8 +50,8 @@ final readonly class CorsMiddleware implements MiddlewareInterface
 
     private function isOriginAllowed(string $origin): bool
     {
-        if (empty($origin)) {
-            return false;
+        if ($origin === '') {
+            return true;
         }
 
         foreach ($this->allowedOrigins as $allowed) {
