@@ -255,6 +255,125 @@ components:
         data:
           $ref: '#/components/schemas/ExplorePlace'
 
+    NewsArticle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Neue Technologie-Trends 2026
+        url:
+          type: string
+          format: uri
+        sourceName:
+          type: string
+          example: Heise Online
+        sourceIcon:
+          type: string
+          format: uri
+          nullable: true
+        savedAt:
+          type: string
+          format: date-time
+
+    NewsListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsArticle'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    NewsVoteStatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [voted]
+          properties:
+            voted:
+              type: boolean
+
+    NewsVoteActionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [id, articleId, voted]
+          properties:
+            id:
+              type: string
+              format: uuid
+            articleId:
+              type: string
+              format: uuid
+            voted:
+              type: boolean
+
+    NewsSource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Heise Online
+        url:
+          type: string
+          format: uri
+        itemsPerPage:
+          type: integer
+          example: 10
+        createdAt:
+          type: string
+          format: date-time
+
+    NewsSourceListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewsSource'
+
+    NewsVoteRequest:
+      type: object
+      required: [url, title, sourceName]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL des Artikels
+        title:
+          type: string
+          description: Titel des Artikels
+        sourceName:
+          type: string
+          description: Name der RSS-Quelle
+        sourceIcon:
+          type: string
+          format: uri
+          nullable: true
+          description: Icon-URL der Quelle
+
+    NewsVoteDeleteRequest:
+      type: object
+      required: [articleId]
+      properties:
+        articleId:
+          type: string
+          format: uuid
+          description: ID des Artikels
+
 paths:
   /auth/login/otp/request:
     post:
@@ -284,7 +403,253 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Nutzer mit dieser E-Mail nicht gefunden
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/articles:
+    get:
+      summary: Artikel auflisten
+      description: >
+        Gibt eine paginierte Liste aller gespeicherten Artikel zurück.
+        Optional filterbar nach Quellenname. Artikel werden nur dann
+        gespeichert, wenn sie mindestens einen Upvote erhalten haben.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sourceName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter nach RSS-Quelle
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Artikelliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/articles/votes:
+    get:
+      summary: Eigene Upvotes abrufen
+      description: >
+        Gibt eine paginierte Liste aller Artikel zurück,
+        die der angemeldete Nutzer geupvotet hat.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der eigenen Upvotes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Artikel upvoten
+      description: >
+        Erstellt einen Upvote für einen Artikel. Existiert der Artikel
+        noch nicht in der Datenbank, wird er automatisch angelegt.
+        Ein bereits vorhandener Upvote führt zu 409 Conflict.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsVoteRequest'
+      responses:
+        '201':
+          description: Upvote wurde erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsVoteActionResponse'
+        '400':
+          description: Fehlende Pflichtfelder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Bereits geupvotet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Upvote entfernen
+      description: >
+        Entfernt den Upvote des angemeldeten Nutzers für einen Artikel.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewsVoteDeleteRequest'
+      responses:
+        '204':
+          description: Upvote wurde entfernt
+        '400':
+          description: Fehlende articleId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/articles/archive:
+    get:
+      summary: Artikel-Archiv abrufen
+      description: >
+        Gibt eine paginierte Liste aller Artikel zurück, die älter
+        als 7 Tage sind und mindestens einen Upvote erhalten haben.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Archiv-Liste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/articles/{id}/vote:
+    get:
+      summary: Vote-Status prüfen
+      description: >
+        Prüft, ob der angemeldete Nutzer einen bestimmten Artikel
+        geupvotet hat.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vote-Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsVoteStatusResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /news/sources:
+    get:
+      summary: RSS-Quellen auflisten
+      description: >
+        Gibt eine Liste aller konfigurierten RSS-Quellen zurück.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der RSS-Quellen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewsSourceListResponse'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

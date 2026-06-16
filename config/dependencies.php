@@ -10,6 +10,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\NewsController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -23,12 +24,16 @@ use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Repository\NewsArticleRepository;
+use Sinclear\Api\Repository\NewsUpvoteRepository;
+use Sinclear\Api\Repository\RssSourceRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
+use Sinclear\Api\Services\NewsService;
 use Sinclear\Api\Services\RateLimiter;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
@@ -121,6 +126,13 @@ return [
 
     ExploreService::class => autowire(),
     ExplorePolicy::class => autowire(),
+
+    NewsArticleRepository::class => autowire(),
+    NewsUpvoteRepository::class => autowire(),
+    RssSourceRepository::class => autowire(),
+
+    NewsService::class => autowire(),
+    NewsController::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
     SecurityHeadersMiddleware::class => create(),
