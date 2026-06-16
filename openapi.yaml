@@ -187,6 +187,41 @@ components:
           format: float
           nullable: true
           description: Entfernung in Metern (nur bei Umkreissuche)
+        avgRating:
+          type: number
+          format: float
+          nullable: true
+          description: Durchschnittsbewertung (nur bei Sortierung nach Rating)
+        bookmarkedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Zeitpunkt des Bookmarks (nur bei Bookmark-Liste)
+
+    BookmarkStatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [bookmarked]
+          properties:
+            bookmarked:
+              type: boolean
+
+    BookmarkActionResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [id, bookmarked]
+          properties:
+            id:
+              type: string
+              format: uuid
+            bookmarked:
+              type: boolean
 
     ExploreCreateRequest:
       type: object
@@ -416,6 +451,13 @@ paths:
             type: string
             enum: [gastronomy, leisure]
           description: Filter nach Kategorie
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [name_asc, name_desc, created_asc, created_desc, rating_asc, rating_desc]
+          description: Sortierung der Ergebnisse
         - name: page
           in: query
           required: false
@@ -439,7 +481,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExploreListResponse'
         '400':
-          description: Ungültige Kategorie
+          description: Ungültige Kategorie oder Sortierung
           content:
             application/json:
               schema:
@@ -580,6 +622,185 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/random:
+    get:
+      summary: Zufällige Orte abrufen
+      description: >
+        Gibt eine Liste zufälliger Entdecken-Orte zurück.
+        Optional filterbar nach Kategorie.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [gastronomy, leisure]
+          description: Filter nach Kategorie
+      responses:
+        '200':
+          description: Liste zufälliger Orte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '400':
+          description: Ungültige Kategorie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/bookmarks:
+    get:
+      summary: Eigene Lesezeichen abrufen
+      description: >
+        Gibt eine paginierte Liste aller Orte zurück,
+        die der angemeldete Nutzer als Lesezeichen gespeichert hat.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der Lesezeichen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/{id}/bookmark:
+    get:
+      summary: Lesezeichen-Status abrufen
+      description: >
+        Prüft, ob der angemeldete Nutzer einen Ort
+        als Lesezeichen gespeichert hat.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lesezeichen-Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkStatusResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Lesezeichen setzen
+      description: >
+        Speichert einen Ort als Lesezeichen für den
+        angemeldeten Nutzer.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Lesezeichen wurde gesetzt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookmarkActionResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Lesezeichen existiert bereits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Lesezeichen entfernen
+      description: >
+        Entfernt ein Lesezeichen für den angemeldeten Nutzer.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Lesezeichen wurde entfernt
         '401':
           description: Nicht autorisiert
           content:

@@ -87,23 +87,55 @@ final readonly class DiscoverPlaceRepository
         $stmt->execute([$id]);
     }
 
-    public function list(?string $category, int $page, int $limit): array
+    public function list(?string $category, int $page, int $limit, ?string $sort = null): array
     {
         $conditions = '';
         $params = [];
+        $joinReview = false;
 
         if ($category !== null) {
-            $conditions = 'WHERE category = ?';
+            $conditions = 'WHERE p.category = ?';
             $params[] = $category;
         }
 
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM DiscoverPlace $conditions");
+        $orderMap = [
+            'name_asc' => 'p.name ASC',
+            'name_desc' => 'p.name DESC',
+            'created_asc' => 'p.createdAt ASC',
+            'created_desc' => 'p.createdAt DESC',
+            'rating_asc' => 'avg_rating ASC',
+            'rating_desc' => 'avg_rating DESC',
+        ];
+
+        $select = 'p.*';
+        $from = 'FROM DiscoverPlace p';
+
+        if ($sort !== null && in_array($sort, ['rating_asc', 'rating_desc'], true)) {
+            $joinReview = true;
+            $from .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
+            $select .= ', ROUND(AVG(r.rating), 1) AS avg_rating';
+        }
+
+        $groupBy = $joinReview ? ' GROUP BY p.id' : '';
+
+        $orderBy = $sort !== null && isset($orderMap[$sort])
+            ? $orderMap[$sort]
+            : 'p.createdAt DESC';
+
+        $countFrom = 'FROM DiscoverPlace p';
+        $countSelect = 'COUNT(*)';
+        if ($joinReview) {
+            $countFrom .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
+            $countSelect = 'COUNT(DISTINCT p.id)';
+        }
+
+        $countStmt = $this->pdo->prepare("SELECT $countSelect $countFrom $conditions");
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
         $offset = ($page - 1) * $limit;
         $dataStmt = $this->pdo->prepare(
-            "SELECT * FROM DiscoverPlace $conditions ORDER BY createdAt DESC LIMIT ? OFFSET ?"
+            "SELECT $select $from $conditions $groupBy ORDER BY $orderBy LIMIT ? OFFSET ?"
         );
         $dataStmt->execute([...$params, $limit, $offset]);
         $places = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -117,6 +149,23 @@ final readonly class DiscoverPlaceRepository
                 'totalPages' => (int) ceil($total / $limit),
             ],
         ];
+    }
+
+    public function random(int $limit, ?string $category = null): array
+    {
+        $conditions = '';
+        $params = [];
+
+        if ($category !== null) {
+            $conditions = 'WHERE category = ?';
+            $params[] = $category;
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM DiscoverPlace $conditions ORDER BY RAND() LIMIT ?"
+        );
+        $stmt->execute([...$params, $limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function search(array $params): array

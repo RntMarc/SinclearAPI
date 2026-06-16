@@ -128,9 +128,61 @@ GET /explore?category=gastronomy&page=1&limit=20
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
-| `GET` | `/explore` | JWT | Paginierte Liste |
+| `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`) |
 | `POST` | `/explore` | JWT | Neuen Ort anlegen |
 | `GET` | `/explore/search` | JWT | Suche + Umkreissuche |
+| `GET` | `/explore/random` | JWT | Zufällige Orte (optional nach Kategorie) |
+| `GET` | `/explore/bookmarks` | JWT | Eigene Lesezeichen (paginated) |
 | `GET` | `/explore/{id}` | JWT | Detailansicht |
 | `PUT` | `/explore/{id}` | JWT | OSM-Refresh |
 | `DELETE` | `/explore/{id}` | JWT | Löschen (policy-gesteuert) |
+| `GET` | `/explore/{id}/bookmark` | JWT | Lesezeichen-Status prüfen |
+| `POST` | `/explore/{id}/bookmark` | JWT | Lesezeichen setzen |
+| `DELETE` | `/explore/{id}/bookmark` | JWT | Lesezeichen entfernen |
+
+## Sortierung (GET /explore)
+
+Die Liste kann mit dem Parameter `sort` sortiert werden:
+
+| Wert | Sortierung |
+|------|-----------|
+| `name_asc` | Name aufsteigend |
+| `name_desc` | Name absteigend |
+| `created_asc` | Erstellungsdatum aufsteigend |
+| `created_desc` | Erstellungsdatum absteigend |
+| `rating_asc` | Durchschnittsbewertung aufsteigend |
+| `rating_desc` | Durchschnittsbewertung absteigend |
+
+Bei Sortierung nach Rating wird die Durchschnittsbewertung aus der
+`DiscoverReview`-Tabelle berechnet und als `avgRating` im Response
+ausgeliefert. Ohne `sort` bleibt die Standard-Sortierung (`createdAt DESC`).
+
+### Beispiele
+
+```
+# Sortiert nach Bewertung (beste zuerst)
+GET /explore?sort=rating_desc&category=gastronomy
+
+# Zufällige Orte
+GET /explore/random?limit=5
+
+# Zufällige Gastronomie-Orte
+GET /explore/random?category=gastronomy&limit=3
+```
+
+## Lesezeichen (Bookmarks)
+
+Lesezeichen erlauben Nutzern, sich Orte zu merken. Die Tabelle
+`DiscoverBookmark` speichert die Zuordnung via `(userId, placeId)` mit
+einem UNIQUE-Constraint.
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `GET` | `/explore/{id}/bookmark` | Status prüfen → `{ data: { bookmarked: true/false } }` |
+| `POST` | `/explore/{id}/bookmark` | Lesezeichen setzen → `201 { data: { id, bookmarked: true } }` |
+| `DELETE` | `/explore/{id}/bookmark` | Lesezeichen entfernen → `204` |
+| `GET` | `/explore/bookmarks` | Alle eigenen Lesezeichen (paginated) |
+
+Ein bereits gesetztes Lesezeichen erneut zu setzen, gibt `409 Conflict`
+mit `bookmark_exists` zurück. Das Löschen eines nicht existierenden
+Lesezeichens ist ein No-Op und gibt ebenfalls `204` zurück.

@@ -24,12 +24,69 @@ final readonly class ExploreController
         $category = !empty($params['category']) ? $params['category'] : null;
         $page = max(1, (int) ($params['page'] ?? 1));
         $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+        $sort = !empty($params['sort']) ? $params['sort'] : null;
+
+        $validSorts = ['name_asc', 'name_desc', 'created_asc', 'created_desc', 'rating_asc', 'rating_desc'];
+        if ($sort !== null && !in_array($sort, $validSorts, true)) {
+            return ResponseFactory::json(['error' => 'invalid_sort'], 400, $response);
+        }
 
         if ($category !== null && !in_array($category, ['gastronomy', 'leisure'], true)) {
             return ResponseFactory::json(['error' => 'invalid_category'], 400, $response);
         }
 
-        $result = $this->exploreService->listPlaces($category, $page, $limit);
+        $result = $this->exploreService->listPlaces($category, $page, $limit, $sort);
+        return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    public function random(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $params = $request->getQueryParams();
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+        $category = !empty($params['category']) ? $params['category'] : null;
+
+        if ($category !== null && !in_array($category, ['gastronomy', 'leisure'], true)) {
+            return ResponseFactory::json(['error' => 'invalid_category'], 400, $response);
+        }
+
+        $places = $this->exploreService->randomPlaces($limit, $category);
+        return ResponseFactory::json(['data' => $places], 200, $response);
+    }
+
+    public function getBookmark(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $bookmarked = $this->exploreService->getBookmarkStatus($user->id, $args['id']);
+        return ResponseFactory::json(['data' => ['bookmarked' => $bookmarked]], 200, $response);
+    }
+
+    public function setBookmark(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        try {
+            $result = $this->exploreService->setBookmark($user->id, $args['id']);
+            return ResponseFactory::json(['data' => $result], 201, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'Place already bookmarked' ? 409 : 400;
+            return ResponseFactory::json(['error' => 'bookmark_exists'], $code, $response);
+        }
+    }
+
+    public function removeBookmark(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $this->exploreService->removeBookmark($user->id, $args['id']);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function listBookmarks(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        $result = $this->exploreService->listBookmarks($user->id, $page, $limit);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 

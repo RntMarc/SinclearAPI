@@ -115,6 +115,7 @@ return [
     ExploreController::class => autowire(),
 
     DiscoverPlaceRepository::class => autowire(),
+    DiscoverBookmarkRepository::class => autowire(),
     DiscoverGastronomyRepository::class => autowire(),
     DiscoverReviewRepository::class => autowire(),
 

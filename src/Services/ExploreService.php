@@ -4,6 +4,7 @@ namespace Sinclear\Api\Services;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 
@@ -32,6 +33,7 @@ final readonly class ExploreService
     public function __construct(
         private DiscoverPlaceRepository $placeRepo,
         private DiscoverGastronomyRepository $gastronomyRepo,
+        private DiscoverBookmarkRepository $bookmarkRepo,
     ) {
         $this->httpClient = new Client([
             'timeout' => 10,
@@ -241,9 +243,42 @@ final readonly class ExploreService
         return $this->formatPlace($place);
     }
 
-    public function listPlaces(?string $category, int $page, int $limit): array
+    public function listPlaces(?string $category, int $page, int $limit, ?string $sort = null): array
     {
-        $result = $this->placeRepo->list($category, $page, $limit);
+        $result = $this->placeRepo->list($category, $page, $limit, $sort);
+        $result['data'] = array_map(fn(array $p) => $this->formatPlace($p), $result['data']);
+        return $result;
+    }
+
+    public function randomPlaces(int $limit, ?string $category = null): array
+    {
+        $places = $this->placeRepo->random($limit, $category);
+        return array_map(fn(array $p) => $this->formatPlace($p), $places);
+    }
+
+    public function getBookmarkStatus(string $userId, string $placeId): bool
+    {
+        return $this->bookmarkRepo->find($userId, $placeId) !== null;
+    }
+
+    public function setBookmark(string $userId, string $placeId): array
+    {
+        $existing = $this->bookmarkRepo->find($userId, $placeId);
+        if ($existing !== null) {
+            throw new \RuntimeException('Place already bookmarked');
+        }
+        $id = $this->bookmarkRepo->create($userId, $placeId);
+        return ['id' => $id, 'bookmarked' => true];
+    }
+
+    public function removeBookmark(string $userId, string $placeId): void
+    {
+        $this->bookmarkRepo->delete($userId, $placeId);
+    }
+
+    public function listBookmarks(string $userId, int $page, int $limit): array
+    {
+        $result = $this->bookmarkRepo->listByUser($userId, $page, $limit);
         $result['data'] = array_map(fn(array $p) => $this->formatPlace($p), $result['data']);
         return $result;
     }
@@ -292,6 +327,7 @@ final readonly class ExploreService
             'creatorId' => $place['creatorId'],
             'createdAt' => $place['createdAt'],
             'lastUpdated' => $place['lastUpdated'],
+            'bookmarkedAt' => $place['bookmarkedAt'] ?? null,
         ];
 
         if ($gastronomy !== null) {
@@ -300,6 +336,10 @@ final readonly class ExploreService
 
         if (isset($place['distance'])) {
             $result['distance'] = (float) $place['distance'];
+        }
+
+        if (isset($place['avg_rating'])) {
+            $result['avgRating'] = (float) $place['avg_rating'];
         }
 
         return $result;
