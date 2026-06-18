@@ -22,7 +22,7 @@ final readonly class NewsController
         $sourceName = !empty($params['sourceName']) ? $params['sourceName'] : null;
 
         $result = $this->newsService->listArticles($page, $limit, $sourceName);
-        return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+        return ResponseFactory::json($result, 200, $response);
     }
 
     public function listUserVotes(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

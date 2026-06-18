@@ -278,6 +278,26 @@ components:
           type: string
           format: date-time
 
+    RssArticle:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Neue Technologie-Trends 2026
+        url:
+          type: string
+          format: uri
+        sourceName:
+          type: string
+          example: Heise Online
+        sourceIcon:
+          type: string
+          format: uri
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+
     NewsListResponse:
       type: object
       required: [data, meta]
@@ -286,8 +306,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NewsArticle'
+          description: Gespeicherte Artikel (aus Upvotes)
+        rss:
+          type: array
+          items:
+            $ref: '#/components/schemas/RssArticle'
+          description: Aktuelle Artikel aus RSS-Quellen (≤7 Tage)
         meta:
-          $ref: '#/components/schemas/PaginationMeta'
+          allOf:
+            - $ref: '#/components/schemas/PaginationMeta'
+            - type: object
+              properties:
+                rssCount:
+                  type: integer
+                  description: Anzahl der gelieferten RSS-Artikel
 
     NewsVoteStatusResponse:
       type: object
@@ -413,9 +445,11 @@ paths:
     get:
       summary: Artikel auflisten
       description: >
-        Gibt eine paginierte Liste aller gespeicherten Artikel zurück.
-        Optional filterbar nach Quellenname. Artikel werden nur dann
-        gespeichert, wenn sie mindestens einen Upvote erhalten haben.
+        Gibt eine paginierte Liste der gespeicherten Artikel (data) sowie
+        die aktuellsten Artikel aus den konfigurierten RSS-Quellen (rss)
+        zurück. Beide Datensätze umfassen maximal die letzten 7 Tage.
+        Optional filterbar nach Quellenname. Gespeicherte Artikel
+        entstehen durch Upvotes von Nutzern.
       tags: [News]
       security:
         - BearerAuth: []

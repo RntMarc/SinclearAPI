@@ -38,23 +38,30 @@ final readonly class NewsArticleRepository
         return $id;
     }
 
-    public function list(int $page, int $limit, ?string $sourceName = null): array
+    public function list(int $page, int $limit, ?string $sourceName = null, ?int $maxAgeDays = null): array
     {
-        $conditions = '';
+        $conditions = [];
         $params = [];
 
         if ($sourceName !== null) {
-            $conditions = 'WHERE sourceName = ?';
+            $conditions[] = 'sourceName = ?';
             $params[] = $sourceName;
         }
 
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM NewsArticle $conditions");
+        if ($maxAgeDays !== null) {
+            $conditions[] = 'savedAt >= DATE_SUB(NOW(), INTERVAL ? DAY)';
+            $params[] = $maxAgeDays;
+        }
+
+        $where = $conditions !== [] ? 'WHERE ' . implode(' AND ', $conditions) : '';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM NewsArticle $where");
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
         $offset = ($page - 1) * $limit;
         $dataStmt = $this->pdo->prepare(
-            "SELECT * FROM NewsArticle $conditions ORDER BY savedAt DESC LIMIT ? OFFSET ?"
+            "SELECT * FROM NewsArticle $where ORDER BY savedAt DESC LIMIT ? OFFSET ?"
         );
         $dataStmt->execute([...$params, $limit, $offset]);
 

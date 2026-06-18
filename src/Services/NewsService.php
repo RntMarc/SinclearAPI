@@ -12,13 +12,29 @@ final readonly class NewsService
         private NewsArticleRepository $articleRepo,
         private NewsUpvoteRepository $upvoteRepo,
         private RssSourceRepository $sourceRepo,
+        private RssFeedService $rssFeedService,
     ) {}
 
     public function listArticles(int $page, int $limit, ?string $sourceName = null): array
     {
-        $result = $this->articleRepo->list($page, $limit, $sourceName);
-        $result['data'] = array_map(fn(array $a) => $this->formatArticle($a), $result['data']);
-        return $result;
+        $dbResult = $this->articleRepo->list($page, $limit, $sourceName, maxAgeDays: 7);
+        $dbResult['data'] = array_map(fn(array $a) => $this->formatArticle($a), $dbResult['data']);
+
+        $sources = $this->sourceRepo->listAll();
+        if ($sourceName !== null) {
+            $sources = array_values(array_filter(
+                $sources,
+                fn(array $s) => $s['name'] === $sourceName,
+            ));
+        }
+
+        $rssArticles = $this->rssFeedService->fetchAll($sources);
+
+        return [
+            'data' => $dbResult['data'],
+            'rss' => $rssArticles,
+            'meta' => $dbResult['meta'] + ['rssCount' => count($rssArticles)],
+        ];
     }
 
     public function listArchive(int $page, int $limit): array

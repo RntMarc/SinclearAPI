@@ -2,6 +2,8 @@
 
 namespace Sinclear\Api\Application;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\ClientInterface;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\UidProcessor;
@@ -35,6 +37,7 @@ use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
 use Sinclear\Api\Services\NewsService;
 use Sinclear\Api\Services\RateLimiter;
+use Sinclear\Api\Services\RssFeedService;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
@@ -127,11 +130,14 @@ return [
     ExploreService::class => autowire(),
     ExplorePolicy::class => autowire(),
 
+    ClientInterface::class => fn(): ClientInterface => new Client(['timeout' => 15]),
+
     NewsArticleRepository::class => autowire(),
     NewsUpvoteRepository::class => autowire(),
     RssSourceRepository::class => autowire(),
 
     NewsService::class => autowire(),
+    RssFeedService::class => autowire(),
     NewsController::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
