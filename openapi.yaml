@@ -1586,7 +1586,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /trips/0/events:
+  /trips/standaloneevents:
     get:
       summary: Standalone-Events des Nutzers auflisten
       description: >
@@ -1626,7 +1626,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /trips/0/events/{eventId}:
+  /trips/standaloneevents/{eventId}:
     get:
       summary: Standalone-Event-Details abrufen
       description: >

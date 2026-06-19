@@ -28,8 +28,8 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 | `GET /trips/{id}/accommodations` | Nutzer muss Teilnehmer der Reise sein |
 | `GET /trips/{id}/accommodations/{accommodationId}` | Nutzer muss Teilnehmer der Reise sein |
 | `GET /trips/{id}/participants` | Nutzer muss Teilnehmer der Reise sein |
-| `GET /trips/0/events` | Nur Events, bei denen Nutzer in `EventRelation` steht |
-| `GET /trips/0/events/{eventId}` | Nutzer muss in `EventRelation` sein → sonst `404` |
+| `GET /trips/standaloneevents` | Nur Events, bei denen Nutzer in `EventRelation` steht |
+| `GET /trips/standaloneevents/{eventId}` | Nutzer muss in `EventRelation` sein → sonst `404` |
 
 Sobald die Trip-Teilnahme bestätigt ist, werden alle zugehörigen Events
 und Unterkünfte uneingeschränkt ausgegeben (nicht nur die eigenen).
@@ -80,13 +80,13 @@ Jede `TravelAccommodation` kann mehreren Nutzern zugeordnet sein (über
 | `GET` | `/trips/{id}/accommodations` | JWT | Alle Unterkünfte einer Reise (mit Nutzern) |
 | `GET` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunfts-Details (mit Nutzern) |
 | `GET` | `/trips/{id}/participants` | JWT | Alle Teilnehmer einer Reise |
-| `GET` | `/trips/0/events` | JWT | Standalone-Events des Nutzers (paginiert, mit Teilnehmern) |
-| `GET` | `/trips/0/events/{eventId}` | JWT | Standalone-Event-Details (mit Teilnehmern) |
+| `GET` | `/trips/standaloneevents` | JWT | Standalone-Events des Nutzers (paginiert, mit Teilnehmern) |
+| `GET` | `/trips/standaloneevents/{eventId}` | JWT | Standalone-Event-Details (mit Teilnehmern) |
 
 ## Standalone-Events
 
 Standalone-Events sind `TravelEvent`-Einträge ohne Reise-Bezug (`trip IS NULL`).
-Sie werden unter `/trips/0/events` abgerufen (0 = keine Reise).
+Sie werden unter `/trips/standaloneevents` abgerufen.
 
 - **Listen-Endpunkt:** Nur Events, bei denen der Nutzer via `EventRelation`
   als Teilnehmer eingetragen ist.
