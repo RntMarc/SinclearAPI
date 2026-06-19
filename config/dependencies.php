@@ -13,6 +13,7 @@ use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\NewsController;
+use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -29,7 +30,12 @@ use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\NewsArticleRepository;
 use Sinclear\Api\Repository\NewsUpvoteRepository;
 use Sinclear\Api\Repository\RssSourceRepository;
+use Sinclear\Api\Repository\TravelAccommodationRepository;
+use Sinclear\Api\Repository\TravelEventRepository;
+use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
@@ -139,6 +145,14 @@ return [
     NewsService::class => autowire(),
     RssFeedService::class => autowire(),
     NewsController::class => autowire(),
+
+    TravelTripRepository::class => autowire(),
+    TravelEventRepository::class => autowire(),
+    TravelAccommodationRepository::class => autowire(),
+    TravelRelationRepository::class => autowire(),
+
+    TravelService::class => autowire(),
+    TravelController::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
     SecurityHeadersMiddleware::class => create(),
