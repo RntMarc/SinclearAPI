@@ -48,6 +48,11 @@ return function (App $app): void {
     $app->group('/trips', function (RouteCollectorProxy $group) {
         $group->get('', [TravelController::class, 'listTrips']);
         $group->get('/{id}', [TravelController::class, 'getTrip']);
+
+        // Statische 0-Routen für Standalone-Events (vor dynamischen Routen!)
+        $group->get('/0/events', [TravelController::class, 'listStandaloneEvents']);
+        $group->get('/0/events/{eventId}', [TravelController::class, 'getStandaloneEvent']);
+
         $group->get('/{id}/events', [TravelController::class, 'listEvents']);
         $group->get('/{id}/events/{eventId}', [TravelController::class, 'getEvent']);
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);

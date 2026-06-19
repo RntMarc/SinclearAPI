@@ -44,6 +44,29 @@ final readonly class TravelController
         }
     }
 
+    public function listStandaloneEvents(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        $result = $this->travelService->listStandaloneEvents($user->id, $page, $limit);
+        return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    public function getStandaloneEvent(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $event = $this->travelService->getStandaloneEvent($args['eventId'], $user->id);
+            return ResponseFactory::json(['data' => $event], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
     public function listEvents(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);

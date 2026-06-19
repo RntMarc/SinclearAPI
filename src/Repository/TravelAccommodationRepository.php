@@ -44,4 +44,17 @@ final readonly class TravelAccommodationRepository
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
+
+    public function findUsersByAccommodation(string $accommodationId, string $tripId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT u.id, u.displayName, u.image
+             FROM TravelRelation r
+             JOIN User u ON u.id = r.userid
+             WHERE r.accommodation = ? AND r.tripid = ?
+             ORDER BY u.displayName ASC'
+        );
+        $stmt->execute([$accommodationId, $tripId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

@@ -46,7 +46,8 @@ final readonly class TravelService
             throw new \RuntimeException('Trip not found');
         }
 
-        return $this->eventRepo->findByTrip($tripId);
+        $events = $this->eventRepo->findByTrip($tripId);
+        return array_map(fn(array $e) => $this->enrichEvent($e), $events);
     }
 
     public function getEvent(string $tripId, string $eventId, string $userId): array
@@ -65,7 +66,24 @@ final readonly class TravelService
             throw new \RuntimeException('Event not found');
         }
 
-        return $event;
+        return $this->enrichEvent($event);
+    }
+
+    public function listStandaloneEvents(string $userId, int $page, int $limit): array
+    {
+        $result = $this->eventRepo->findStandaloneByParticipant($userId, $page, $limit);
+        $result['data'] = array_map(fn(array $e) => $this->enrichEvent($e), $result['data']);
+        return $result;
+    }
+
+    public function getStandaloneEvent(string $eventId, string $userId): array
+    {
+        $event = $this->eventRepo->findStandaloneByIdAndParticipant($eventId, $userId);
+        if ($event === null) {
+            throw new \RuntimeException('Event not found');
+        }
+
+        return $this->enrichEvent($event);
     }
 
     public function listAccommodations(string $tripId, string $userId): array
@@ -79,7 +97,11 @@ final readonly class TravelService
             throw new \RuntimeException('Trip not found');
         }
 
-        return $this->accommodationRepo->findByTrip($tripId);
+        $accommodations = $this->accommodationRepo->findByTrip($tripId);
+        return array_map(
+            fn(array $a) => $this->enrichAccommodation($a, $tripId),
+            $accommodations,
+        );
     }
 
     public function getAccommodation(string $tripId, string $accommodationId, string $userId): array
@@ -98,7 +120,7 @@ final readonly class TravelService
             throw new \RuntimeException('Accommodation not found');
         }
 
-        return $accommodation;
+        return $this->enrichAccommodation($accommodation, $tripId);
     }
 
     public function listParticipants(string $tripId, string $userId): array
@@ -113,5 +135,20 @@ final readonly class TravelService
         }
 
         return $this->relationRepo->findParticipantsByTrip($tripId);
+    }
+
+    private function enrichEvent(array $event): array
+    {
+        $event['participants'] = $this->eventRepo->findParticipantsByEvent($event['ID']);
+        return $event;
+    }
+
+    private function enrichAccommodation(array $accommodation, string $tripId): array
+    {
+        $accommodation['users'] = $this->accommodationRepo->findUsersByAccommodation(
+            $accommodation['ID'],
+            $tripId,
+        );
+        return $accommodation;
     }
 }
