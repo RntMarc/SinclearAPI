@@ -19,8 +19,15 @@
     RewriteRule ^src/ - [F,L]
     RewriteRule ^vendor/ - [F,L]
     RewriteRule ^templates/ - [F,L]
+    RewriteRule ^SinclearApp/ - [F,L]
+    RewriteRule ^var/ - [F,L]
+    RewriteRule ^docs/ - [F,L]
     RewriteRule ^\.git - [F,L]
     RewriteRule ^\.env - [F,L]
+
+    # Sensible Dateien blockieren
+    RewriteRule ^generate_keys\.sh$ - [F,L]
+    RewriteRule ^update\.sh$ - [F,L]
 
     # Alles an public/index.php weiterleiten (ausser existierende Dateien)
     RewriteCond %{REQUEST_FILENAME} !-f
@@ -29,10 +36,10 @@
 </IfModule>
 
 # Sensitive Dateien blockieren
-<FilesMatch "\.(env|log|sql|json|yaml|yml|md|lock|dist)$">
+<FilesMatch "\.(env|log|sql|json|yaml|yml|md|lock|dist|sh)$">
     Require all denied
 </FilesMatch>
 
-<FilesMatch "^(composer\.json|composer\.lock|\.gitignore|\.gitmodules|AGENTS\.md|update\.sh)$">
+<FilesMatch "^(composer\.json|composer\.lock|\.gitignore|\.gitmodules|AGENTS\.md|update\.sh|generate_keys\.sh)$">
     Require all denied
 </FilesMatch>

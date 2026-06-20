@@ -1,7 +1,7 @@
 # Agent Instructions for Sinclear Beyond API
 
 ## OpenAPI Documentation
-It is elementarily important for the collaboration of SinclearAPI with all clients (and especially for the migration of the existing Next.js project) that the `openapi.yaml` is always up to date.
+It is elementarily important for the collaboration of SinclearAPI with all clients that the `openapi.yaml` is always up to date.
 
 **Requirement:**
 After every change to the API (routes, controllers, DTOs, or ResourceRegistry), you MUST:
@@ -15,6 +15,14 @@ The `docs/` directory contains developer-facing documentation for the API.
 After every change to the API (routes, controllers, DTOs, or ResourceRegistry), you MUST:
 1. Update the relevant documentation files in `docs/` to reflect the changes.
 2. Ensure that all flows, endpoints, and configuration are accurately documented.
+
+## Security and File Access
+To ensure that secrets inside the .env file or log files cannot be read by anyone, a `.htaccess` is present to secure the API.
+
+**Requirement:**
+After every change to the API (routes, controllers, DTOs, or ResourceRegistry), you MUST:
+1. Verify the accuracy and completeness of the `.htaccess` file for the security of the project.
+2. Ensure that all files in the project folder have the correct access rights or denials set in the `.htaccess` file to protect the secrets of the API and it's code and config.
 
 ## Coding Standards
 - Use PHP 8.4 features where appropriate.
