@@ -47,12 +47,12 @@ return function (App $app): void {
 
     $app->group('/trips', function (RouteCollectorProxy $group) {
         $group->get('', [TravelController::class, 'listTrips']);
-        $group->get('/{id}', [TravelController::class, 'getTrip']);
 
-        // Standalone-Events (Events ohne Reise-Bezug)
+        // Standalone-Events MUST come before /{id} to avoid route capture
         $group->get('/standaloneevents', [TravelController::class, 'listStandaloneEvents']);
         $group->get('/standaloneevents/{eventId}', [TravelController::class, 'getStandaloneEvent']);
 
+        $group->get('/{id}', [TravelController::class, 'getTrip']);
         $group->get('/{id}/events', [TravelController::class, 'listEvents']);
         $group->get('/{id}/events/{eventId}', [TravelController::class, 'getEvent']);
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
