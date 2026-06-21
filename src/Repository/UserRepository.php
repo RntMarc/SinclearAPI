@@ -28,7 +28,7 @@ final readonly class UserRepository
 
     public function findById(string $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, email, displayName, discordId, isAdmin, image, createdAt FROM User WHERE id = ?');
+        $stmt = $this->pdo->prepare('SELECT id, email, displayName, discordId, isAdmin, image, createdAt, birthday, birthdayVisibility, emailVisibility, onboardingCompleted FROM User WHERE id = ?');
         $stmt->execute([$id]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;

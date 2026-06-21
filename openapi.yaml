@@ -489,6 +489,237 @@ components:
           items:
             $ref: '#/components/schemas/TravelParticipant'
 
+    UserBase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        emailVisibility:
+          type: integer
+          enum: [0, 1, 2]
+          description: Sichtbarkeit der E-Mail
+        displayName:
+          type: string
+        image:
+          type: string
+          nullable: true
+        discordId:
+          type: string
+          nullable: true
+        isAdmin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        onboardingCompleted:
+          type: boolean
+        birthday:
+          type: string
+          format: date
+          nullable: true
+        birthdayVisibility:
+          type: integer
+          enum: [0, 1, 2]
+          description: Sichtbarkeit des Geburtstags
+
+    UserSocialInfo:
+      type: object
+      properties:
+        unsplashHandle:
+          type: string
+          nullable: true
+        unsplashVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        instagramHandle:
+          type: string
+          nullable: true
+        instagramVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        mastodonHandle:
+          type: string
+          nullable: true
+        mastodonVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        pixelfedHandle:
+          type: string
+          nullable: true
+        pixelfedVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        blueskyHandle:
+          type: string
+          nullable: true
+        blueskyVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        youtubeHandle:
+          type: string
+          nullable: true
+        youtubeVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        twitchHandle:
+          type: string
+          nullable: true
+        twitchVisibility:
+          type: integer
+          enum: [0, 1, 2]
+
+    UserContactInfo:
+      type: object
+      properties:
+        discordHandle:
+          type: string
+          nullable: true
+        discordVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        fluxerHandle:
+          type: string
+          nullable: true
+        fluxerVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        signalNumber:
+          type: string
+          nullable: true
+        signalVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        whatsappNumber:
+          type: string
+          nullable: true
+        whatsappVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        matrixUser:
+          type: string
+          nullable: true
+        matrixHomeserver:
+          type: string
+          nullable: true
+        matrixVisibility:
+          type: integer
+          enum: [0, 1, 2]
+
+    UserMe:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/UserBase'
+        - type: object
+          properties:
+            social:
+              $ref: '#/components/schemas/UserSocialInfo'
+            contact:
+              $ref: '#/components/schemas/UserContactInfo'
+
+    UserBasePublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+          description: Nur sichtbar wenn der Eigentümer die Sichtbarkeit erlaubt
+        displayName:
+          type: string
+        image:
+          type: string
+          nullable: true
+        discordId:
+          type: string
+          nullable: true
+        isAdmin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        onboardingCompleted:
+          type: boolean
+        birthday:
+          type: string
+          format: date
+          nullable: true
+          description: Nur sichtbar wenn der Eigentümer die Sichtbarkeit erlaubt
+
+    UserSocialInfoPublic:
+      type: object
+      properties:
+        unsplashHandle:
+          type: string
+          nullable: true
+        instagramHandle:
+          type: string
+          nullable: true
+        mastodonHandle:
+          type: string
+          nullable: true
+        pixelfedHandle:
+          type: string
+          nullable: true
+        blueskyHandle:
+          type: string
+          nullable: true
+        youtubeHandle:
+          type: string
+          nullable: true
+        twitchHandle:
+          type: string
+          nullable: true
+
+    UserContactInfoPublic:
+      type: object
+      properties:
+        discordHandle:
+          type: string
+          nullable: true
+        fluxerHandle:
+          type: string
+          nullable: true
+        signalNumber:
+          type: string
+          nullable: true
+        whatsappNumber:
+          type: string
+          nullable: true
+        matrixUser:
+          type: string
+          nullable: true
+        matrixHomeserver:
+          type: string
+          nullable: true
+
+    UserDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/UserMe'
+
+    UserDetailPublicResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/UserBasePublic'
+            - type: object
+              properties:
+                social:
+                  $ref: '#/components/schemas/UserSocialInfoPublic'
+                contact:
+                  $ref: '#/components/schemas/UserContactInfoPublic'
+
 paths:
   /auth/login/otp/request:
     post:
@@ -657,6 +888,275 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           description: Zu viele Versuche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me:
+    get:
+      summary: Eigene Profildaten abrufen (vollständig)
+      description: >
+        Gibt die vollständigen Profildaten des angemeldeten Nutzers zurück,
+        inklusive Kontakt- und Social-Informationen mit Sichtbarkeitseinstellungen.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Vollständige Profildaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/base:
+    get:
+      summary: Eigene Basis-Profildaten abrufen
+      description: >
+        Gibt nur die Basis-Profildaten (User-Tabelle) des angemeldeten Nutzers zurück,
+        inklusive Sichtbarkeitseinstellungen.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Basis-Profildaten
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserBase'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/social:
+    get:
+      summary: Eigene Social-Informationen abrufen
+      description: >
+        Gibt die Social-Media-Handles des angemeldeten Nutzers zurück,
+        inklusive Sichtbarkeitseinstellungen.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Social-Informationen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserSocialInfo'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/contact:
+    get:
+      summary: Eigene Kontakt-Informationen abrufen
+      description: >
+        Gibt die Kontaktmöglichkeiten des angemeldeten Nutzers zurück,
+        inklusive Sichtbarkeitseinstellungen.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Kontakt-Informationen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserContactInfo'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/{userId}:
+    get:
+      summary: Benutzerprofil abrufen (öffentlich)
+      description: >
+        Gibt die Profildaten eines anderen Nutzers zurück.
+        Nicht sichtbare Felder werden weggelassen.
+        Die Sichtbarkeit richtet sich nach den Einstellungen des angefragten Nutzers
+        und der engen-Freunde-Beziehung.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des angefragten Nutzers
+      responses:
+        '200':
+          description: Öffentliche Profildaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailPublicResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/{userId}/base:
+    get:
+      summary: Basis-Profildaten eines Nutzers abrufen
+      description: >
+        Gibt die Basis-Profildaten eines anderen Nutzers zurück.
+        E-Mail und Geburtstag werden nur angezeigt, wenn die Sichtbarkeit dies erlaubt.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Öffentliche Basis-Profildaten
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserBasePublic'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/{userId}/social:
+    get:
+      summary: Social-Informationen eines Nutzers abrufen
+      description: >
+        Gibt die Social-Media-Handles eines anderen Nutzers zurück.
+        Es werden nur die Handles angezeigt, deren Sichtbarkeitseinstellung dies erlaubt.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Öffentliche Social-Informationen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserSocialInfoPublic'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/{userId}/contact:
+    get:
+      summary: Kontakt-Informationen eines Nutzers abrufen
+      description: >
+        Gibt die Kontaktmöglichkeiten eines anderen Nutzers zurück.
+        Es werden nur die Felder angezeigt, deren Sichtbarkeitseinstellung dies erlaubt.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Öffentliche Kontakt-Informationen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserContactInfoPublic'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
           content:
             application/json:
               schema:

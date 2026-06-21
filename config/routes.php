@@ -4,6 +4,7 @@ use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\TravelController;
+use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Slim\App;
@@ -42,6 +43,17 @@ return function (App $app): void {
         $group->get('/{id}/bookmark', [ExploreController::class, 'getBookmark']);
         $group->post('/{id}/bookmark', [ExploreController::class, 'setBookmark']);
         $group->delete('/{id}/bookmark', [ExploreController::class, 'removeBookmark']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/user', function (RouteCollectorProxy $group) {
+        $group->get('/me', [UserController::class, 'me']);
+        $group->get('/me/base', [UserController::class, 'meBase']);
+        $group->get('/me/social', [UserController::class, 'meSocial']);
+        $group->get('/me/contact', [UserController::class, 'meContact']);
+        $group->get('/{userId}', [UserController::class, 'get']);
+        $group->get('/{userId}/base', [UserController::class, 'getBase']);
+        $group->get('/{userId}/social', [UserController::class, 'getSocial']);
+        $group->get('/{userId}/contact', [UserController::class, 'getContact']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/trips', function (RouteCollectorProxy $group) {

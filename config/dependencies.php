@@ -13,6 +13,12 @@ use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\TravelController;
+use Sinclear\Api\Controllers\UserController;
+use Sinclear\Api\Repository\ContactInfoRepository;
+use Sinclear\Api\Repository\SocialInfoRepository;
+use Sinclear\Api\Repository\CloseFriendRepository;
+use Sinclear\Api\Security\Policy\UserPolicy;
+use Sinclear\Api\Services\UserService;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -144,6 +150,14 @@ return [
 
     TravelService::class => autowire(),
     TravelController::class => autowire(),
+
+    ContactInfoRepository::class => autowire(),
+    SocialInfoRepository::class => autowire(),
+    CloseFriendRepository::class => autowire(),
+
+    UserPolicy::class => autowire(),
+    UserService::class => autowire(),
+    UserController::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
     SecurityHeadersMiddleware::class => create(),
