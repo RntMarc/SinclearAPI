@@ -655,6 +655,76 @@ components:
             $ref: '#/components/schemas/TravelParticipant'
 
 paths:
+  /news/proxy/image:
+    get:
+      summary: Externes Bild laden (Proxy)
+      description: >
+        Lädt ein Bild von einer externen URL und gibt es als Binär-Response zurück.
+        Unterstützt zwei Modi: favicon (3s Timeout, 16KB max) und preview (8s Timeout, 2MB max).
+        Nur http/https URLs werden akzeptiert. Interne/private IP-Adressen werden blockiert.
+      tags: [News]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Die zu ladende externe URL
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [favicon, preview]
+            default: favicon
+          description: Ladetyp (favicon: 3s Timeout, 16KB max; preview: 8s Timeout, 2MB max)
+      responses:
+        '200':
+          description: Bilddatei im Original-Content-Type
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=86400
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Ungültige URL, nicht erlaubtes Schema oder keine Bilddatei
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bild nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate-Limit überschritten (max. 60 Anfragen/Minute)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Timeout oder Fehler beim externen Server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /auth/login/otp/request:
     post:
       summary: E-Mail-OTP anfordern

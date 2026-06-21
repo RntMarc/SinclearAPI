@@ -6,12 +6,14 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Services\ImageProxyService;
 use Sinclear\Api\Services\NewsService;
 
 final readonly class NewsController
 {
     public function __construct(
         private NewsService $newsService,
+        private ImageProxyService $imageProxyService,
     ) {}
 
     public function listArticles(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -94,6 +96,43 @@ final readonly class NewsController
     {
         $sources = $this->newsService->listSources();
         return ResponseFactory::json(['data' => $sources], 200, $response);
+    }
+
+    public function proxyImage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $params = $request->getQueryParams();
+        $url = trim($params['url'] ?? '');
+        $type = trim($params['type'] ?? 'favicon');
+
+        if ($url === '') {
+            return ResponseFactory::json(['error' => 'missing_url'], 400, $response);
+        }
+
+        if (!in_array($type, ['favicon', 'preview'], true)) {
+            return ResponseFactory::json(['error' => 'invalid_type'], 400, $response);
+        }
+
+        try {
+            $result = $this->imageProxyService->proxy($url, $type);
+        } catch (\InvalidArgumentException $e) {
+            $code = match ($e->getMessage()) {
+                'invalid_url', 'invalid_scheme' => 400,
+                'private_ip_not_allowed' => 400,
+                default => 400,
+            };
+            return ResponseFactory::json(['error' => $e->getMessage()], $code, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getCode() ?: 502;
+            return ResponseFactory::json(['error' => $e->getMessage()], $code, $response);
+        }
+
+        $binResponse = new \Slim\Psr7\Response();
+        $binResponse->getBody()->write($result['body']);
+
+        return $binResponse
+            ->withStatus(200)
+            ->withHeader('Content-Type', $result['contentType'])
+            ->withHeader('Cache-Control', 'public, max-age=86400');
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

@@ -42,6 +42,7 @@ Artikeln aus der Datenbank ausgeliefert.
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
+| `GET` | `/news/proxy/image` | JWT | Externes Bild laden (Proxy), Rate-Limit: 60/min |
 | `GET` | `/news/articles` | JWT | Artikelliste aus DB (`data`) + RSS (`rss`), paginiert, ≤7 Tage, optional `?sourceName=` |
 | `GET` | `/news/articles/votes` | JWT | Eigene Upvotes (paginiert) |
 | `POST` | `/news/articles/votes` | JWT | Artikel upvoten (legt Artikel ggf. an) |
@@ -122,6 +123,55 @@ Prüft, ob der angemeldete Nutzer diesen Artikel geupvotet hat.
 
 Gibt alle Artikel zurück, die älter als 7 Tage sind und mindestens einen Upvote
 besitzen (global, nicht nutzerbezogen).
+
+### GET /news/proxy/image
+
+Lädt ein Bild von einer externen URL und gibt es als Binär-Response zurück.
+Nützlich für Clients, die keinen direkten Zugriff auf externe URLs haben (z.B. CORS-Einschränkungen).
+
+**Parameter:**
+
+| Name | Typ | Pflicht | Beschreibung |
+|------|-----|----------|-------------|
+| `url` | string (uri) | Ja | Die zu ladende externe URL |
+| `type` | string | Nein | `favicon` (Default) oder `preview` |
+
+**Typ-Unterschiede:**
+
+| Typ | Timeout | Max. Größe |
+|-----|---------|-----------|
+| `favicon` | 3 Sekunden | 16 KB |
+| `preview` | 8 Sekunden | 2 MB |
+
+**Sicherheitsmaßnahmen:**
+- Nur `http`/`https` als Schema erlaubt
+- Nur MIME-Typen `image/*` werden akzeptiert
+- Interne/private IP-Adressen werden blockiert (10.x, 172.16-31.x, 192.168.x, 127.x, ::1)
+- Max. 5 Redirects werden verfolgt
+- Rate-Limit: max. 60 Anfragen pro Minute pro Nutzer
+
+**Antwort-Header:**
+- `Content-Type`: Original-Content-Type der externen Datei
+- `Cache-Control`: `public, max-age=86400` (1 Tag)
+
+**Fehlercodes:**
+
+| Code | Beschreibung |
+|------|-------------|
+| 400 | Ungültige URL, nicht erlaubtes Schema oder keine Bilddatei |
+| 401 | Nicht autorisiert |
+| 404 | Bild nicht gefunden |
+| 429 | Rate-Limit überschritten |
+| 502 | Timeout oder Fehler beim externen Server |
+
+**Beispiel:**
+
+```
+GET /api/v2/news/proxy/image?url=https://example.com/icon.png&type=favicon
+Authorization: Bearer <token>
+```
+
+Response: Binäre Bilddatei mit `Content-Type: image/png`
 
 ## Client-Integration (Empfohlen)
 

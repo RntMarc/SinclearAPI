@@ -20,6 +20,7 @@ use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
+use Sinclear\Api\Middleware\UserRateLimitMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
@@ -41,6 +42,7 @@ use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
+use Sinclear\Api\Services\ImageProxyService;
 use Sinclear\Api\Services\NewsService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\RssFeedService;
@@ -146,6 +148,8 @@ return [
     RssFeedService::class => autowire(),
     NewsController::class => autowire(),
 
+    ImageProxyService::class => autowire(),
+
     TravelTripRepository::class => autowire(),
     TravelEventRepository::class => autowire(),
     TravelAccommodationRepository::class => autowire(),
@@ -180,6 +184,14 @@ return [
             rateLimiter: $c->get(RateLimiter::class),
             maxRequests: $settings->rate_limit['auth_requests'],
             windowSeconds: $settings->rate_limit['auth_window'],
+        );
+    },
+
+    UserRateLimitMiddleware::class => function (ContainerInterface $c): UserRateLimitMiddleware {
+        return new UserRateLimitMiddleware(
+            rateLimiter: $c->get(RateLimiter::class),
+            maxRequests: 60,
+            windowSeconds: 60,
         );
     },
 
