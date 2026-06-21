@@ -274,6 +274,15 @@ components:
           type: string
           format: uri
           nullable: true
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Vorschaubild-URL (nur bei RSS-Artikeln; DB-Artikel immer null)
+        description:
+          type: string
+          nullable: true
+          description: Artikel-Beschreibung (nur bei RSS-Artikeln; DB-Artikel immer null)
         savedAt:
           type: string
           format: date-time
@@ -294,6 +303,15 @@ components:
           type: string
           format: uri
           nullable: true
+        imageUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Vorschaubild-URL aus dem RSS-Feed
+        description:
+          type: string
+          nullable: true
+          description: Artikel-Beschreibung aus dem RSS-Feed
         publishedAt:
           type: string
           format: date-time

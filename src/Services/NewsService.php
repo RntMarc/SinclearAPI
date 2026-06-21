@@ -93,6 +93,8 @@ final readonly class NewsService
             'url' => $article['url'],
             'sourceName' => $article['sourceName'],
             'sourceIcon' => $article['sourceIcon'],
+            'imageUrl' => null,
+            'description' => null,
             'savedAt' => $article['savedAt'],
         ];
     }

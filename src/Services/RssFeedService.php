@@ -83,12 +83,17 @@ final readonly class RssFeedService
                 continue;
             }
 
+            $imageUrl = $this->extractRssImage($item);
+            $description = $this->extractRssDescription($item);
+
             $articles[] = [
                 'title' => trim((string) $item->title) ?: '(kein Titel)',
                 'url' => $link,
                 'sourceName' => $source['name'],
                 'sourceIcon' => null,
                 'publishedAt' => $pubDate?->format('Y-m-d\TH:i:s.v\Z'),
+                'imageUrl' => $imageUrl,
+                'description' => $description,
             ];
         }
 
@@ -114,17 +119,35 @@ final readonly class RssFeedService
             }
 
             $link = '';
+            $imageUrl = null;
             foreach ($entry->link as $l) {
                 $attrs = $l->attributes();
-                if ((string) $attrs['rel'] === 'alternate' || (string) $attrs['rel'] === '') {
-                    $link = (string) $attrs['href'];
-                    if ($link !== '') {
-                        break;
+                $rel = (string) $attrs['rel'];
+                $href = (string) $attrs['href'];
+
+                if ($rel === 'alternate' || $rel === '') {
+                    if ($href !== '' && $link === '') {
+                        $link = $href;
+                    }
+                }
+
+                if ($rel === 'enclosure' && $imageUrl === null && str_starts_with((string) $attrs['type'], 'image/')) {
+                    if ($href !== '') {
+                        $imageUrl = $href;
                     }
                 }
             }
             if ($link === '') {
                 continue;
+            }
+
+            $description = null;
+            $summary = (string) $entry->summary;
+            if ($summary !== '') {
+                $trimmed = trim(strip_tags($summary));
+                if ($trimmed !== '') {
+                    $description = mb_substr($trimmed, 0, 500);
+                }
             }
 
             $articles[] = [
@@ -133,10 +156,63 @@ final readonly class RssFeedService
                 'sourceName' => $source['name'],
                 'sourceIcon' => null,
                 'publishedAt' => $published?->format('Y-m-d\TH:i:s.v\Z'),
+                'imageUrl' => $imageUrl,
+                'description' => $description,
             ];
         }
 
         return $articles;
+    }
+
+    private function extractRssImage(SimpleXMLElement $item): ?string
+    {
+        if (isset($item->enclosure)) {
+            foreach ($item->enclosure as $enc) {
+                $attrs = $enc->attributes();
+                if (str_starts_with((string) $attrs['type'], 'image/')) {
+                    $url = (string) $attrs['url'];
+                    if ($url !== '') {
+                        return $url;
+                    }
+                }
+            }
+        }
+
+        $media = $item->children('http://search.yahoo.com/mrss/');
+        if (isset($media->content)) {
+            foreach ($media->content as $content) {
+                $attrs = $content->attributes();
+                if ((string) $attrs['medium'] === 'image') {
+                    $url = (string) $attrs['url'];
+                    if ($url !== '') {
+                        return $url;
+                    }
+                }
+            }
+        }
+
+        if (isset($media->thumbnail)) {
+            $attrs = $media->thumbnail->attributes();
+            $url = (string) $attrs['url'];
+            if ($url !== '') {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractRssDescription(SimpleXMLElement $item): ?string
+    {
+        $desc = (string) $item->description;
+        if ($desc === '') {
+            return null;
+        }
+        $trimmed = trim(strip_tags($desc));
+        if ($trimmed === '') {
+            return null;
+        }
+        return mb_substr($trimmed, 0, 500);
     }
 
     private function parseDate(string $value): ?\DateTimeImmutable

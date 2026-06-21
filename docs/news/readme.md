@@ -61,6 +61,8 @@ Artikeln aus der Datenbank ausgeliefert.
       "url": "https://example.com/article",
       "sourceName": "Heise Online",
       "sourceIcon": null,
+      "imageUrl": null,
+      "description": null,
       "savedAt": "2026-06-17T12:00:00.000Z"
     }
   ],
@@ -70,6 +72,8 @@ Artikeln aus der Datenbank ausgeliefert.
       "url": "https://example.com/aktuell",
       "sourceName": "Heise Online",
       "sourceIcon": null,
+      "imageUrl": "https://example.com/image.jpg",
+      "description": "Eine kurze Beschreibung des Artikels...",
       "publishedAt": "2026-06-17T14:00:00.000Z"
     }
   ],
