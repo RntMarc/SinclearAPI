@@ -3,7 +3,7 @@
 namespace Sinclear\Api\Application;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\ClientInterface;
+use Psr\Http\Client\ClientInterface;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\UidProcessor;
@@ -24,6 +24,7 @@ use Sinclear\Api\Middleware\UserRateLimitMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
+use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
