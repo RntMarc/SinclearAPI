@@ -12,7 +12,6 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
-use Sinclear\Api\Controllers\NewsController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
@@ -20,7 +19,6 @@ use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
-use Sinclear\Api\Middleware\UserRateLimitMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
@@ -29,9 +27,6 @@ use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\UserRepository;
-use Sinclear\Api\Repository\NewsArticleRepository;
-use Sinclear\Api\Repository\NewsUpvoteRepository;
-use Sinclear\Api\Repository\RssSourceRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
@@ -43,12 +38,9 @@ use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
-use Sinclear\Api\Services\ImageProxyService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
-use Sinclear\Api\Services\NewsService;
 use Sinclear\Api\Services\RateLimiter;
-use Sinclear\Api\Services\RssFeedService;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
@@ -145,16 +137,6 @@ return [
 
     ClientInterface::class => fn(): ClientInterface => new Client(['timeout' => 15]),
 
-    NewsArticleRepository::class => autowire(),
-    NewsUpvoteRepository::class => autowire(),
-    RssSourceRepository::class => autowire(),
-
-    NewsService::class => autowire(),
-    RssFeedService::class => autowire(),
-    NewsController::class => autowire(),
-
-    ImageProxyService::class => autowire(),
-
     TravelTripRepository::class => autowire(),
     TravelEventRepository::class => autowire(),
     TravelAccommodationRepository::class => autowire(),
@@ -189,14 +171,6 @@ return [
             rateLimiter: $c->get(RateLimiter::class),
             maxRequests: $settings->rate_limit['auth_requests'],
             windowSeconds: $settings->rate_limit['auth_window'],
-        );
-    },
-
-    UserRateLimitMiddleware::class => function (ContainerInterface $c): UserRateLimitMiddleware {
-        return new UserRateLimitMiddleware(
-            rateLimiter: $c->get(RateLimiter::class),
-            maxRequests: 60,
-            windowSeconds: 60,
         );
     },
 

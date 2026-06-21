@@ -3,11 +3,9 @@
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
-use Sinclear\Api\Controllers\NewsController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
-use Sinclear\Api\Middleware\UserRateLimitMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -61,15 +59,4 @@ return function (App $app): void {
         $group->get('/{id}/participants', [TravelController::class, 'listParticipants']);
     })->add($container->get(AuthenticationMiddleware::class));
 
-    $app->group('/news', function (RouteCollectorProxy $group) use ($container) {
-        $group->get('/proxy/image', [NewsController::class, 'proxyImage'])
-            ->add($container->get(UserRateLimitMiddleware::class));
-        $group->get('/articles', [NewsController::class, 'listArticles']);
-        $group->get('/articles/votes', [NewsController::class, 'listUserVotes']);
-        $group->post('/articles/votes', [NewsController::class, 'createVote']);
-        $group->delete('/articles/votes', [NewsController::class, 'removeVote']);
-        $group->get('/articles/archive', [NewsController::class, 'listArchive']);
-        $group->get('/articles/{id}/vote', [NewsController::class, 'getVote']);
-        $group->get('/sources', [NewsController::class, 'listSources']);
-    })->add($container->get(AuthenticationMiddleware::class));
 };
