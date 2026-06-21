@@ -197,6 +197,10 @@ components:
           format: date-time
           nullable: true
           description: Zeitpunkt des Bookmarks (nur bei Bookmark-Liste)
+        _attribution:
+          type: string
+          description: Quellennachweis für OpenStreetMap-Daten (immer vorhanden)
+          example: "© OpenStreetMap contributors"
 
     BookmarkStatusResponse:
       type: object

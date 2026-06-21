@@ -4,6 +4,7 @@ namespace Sinclear\Api\Services;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Psr\Http\Message\ResponseInterface;
 use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
@@ -13,6 +14,10 @@ final readonly class ExploreService
     private Client $httpClient;
 
     private const string NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
+    private const string OSM_ATTRIBUTION = '© OpenStreetMap contributors';
+
+    private const int NOMINATIM_TIMEOUT = 10;
+    private const int NOMINATIM_RETRY_DELAY_US = 1_000_000;
 
     private const array GASTRONOMY_AMENITIES = [
         'restaurant', 'cafe', 'pub', 'bar', 'fast_food', 'food_court',
@@ -34,9 +39,11 @@ final readonly class ExploreService
         private DiscoverPlaceRepository $placeRepo,
         private DiscoverGastronomyRepository $gastronomyRepo,
         private DiscoverBookmarkRepository $bookmarkRepo,
+        private NominatimRateLimiter $rateLimiter,
+        private NominatimCache $nominatimCache,
     ) {
         $this->httpClient = new Client([
-            'timeout' => 10,
+            'timeout' => self::NOMINATIM_TIMEOUT,
             'headers' => [
                 'User-Agent' => 'SinclearBeyondAPI/2.0 (https://sinclear.app)',
             ],
@@ -48,52 +55,66 @@ final readonly class ExploreService
         $typeMap = ['N' => 'node', 'W' => 'way', 'R' => 'relation'];
         $type = $typeMap[$osmType] ?? throw new \InvalidArgumentException('Invalid osmType');
 
-        try {
-            $response = $this->httpClient->get(self::NOMINATIM_BASE . '/lookup', [
-                'query' => [
-                    'osm_ids' => $type[0] . $osmId,
-                    'format' => 'json',
-                    'addressdetails' => 1,
-                    'extratags' => 1,
-                ],
-            ]);
-
-            $data = json_decode((string) $response->getBody(), true);
-
-            if (!is_array($data) || empty($data)) {
-                throw new \RuntimeException('OSM object not found');
-            }
-
-            return $data[0];
-        } catch (GuzzleException $e) {
-            throw new \RuntimeException('Failed to fetch OSM data: ' . $e->getMessage());
+        $cacheKey = 'lookup|' . $type[0] . $osmId;
+        $cached = $this->nominatimCache->get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
         }
+
+        $this->rateLimiter->waitForSlot();
+
+        $response = $this->nominatimRequest('GET', self::NOMINATIM_BASE . '/lookup', [
+            'query' => [
+                'osm_ids' => $type[0] . $osmId,
+                'format' => 'json',
+                'addressdetails' => 1,
+                'extratags' => 1,
+            ],
+        ]);
+
+        $data = json_decode((string) $response->getBody(), true);
+
+        if (!is_array($data) || empty($data)) {
+            throw new \RuntimeException('OSM object not found');
+        }
+
+        $this->nominatimCache->set($cacheKey, $data[0]);
+
+        return $data[0];
     }
 
     public function geocodeLocation(string $query): ?array
     {
-        try {
-            $response = $this->httpClient->get(self::NOMINATIM_BASE . '/search', [
-                'query' => [
-                    'q' => $query,
-                    'format' => 'json',
-                    'limit' => 1,
-                ],
-            ]);
+        $cacheKey = 'search|' . $query;
+        $cached = $this->nominatimCache->get($cacheKey);
+        if ($cached !== null) {
+            return $cached;
+        }
 
-            $data = json_decode((string) $response->getBody(), true);
+        $this->rateLimiter->waitForSlot();
 
-            if (!is_array($data) || empty($data)) {
-                return null;
-            }
+        $response = $this->nominatimRequest('GET', self::NOMINATIM_BASE . '/search', [
+            'query' => [
+                'q' => $query,
+                'format' => 'json',
+                'limit' => 1,
+            ],
+        ]);
 
-            return [
-                'lat' => (float) $data[0]['lat'],
-                'lon' => (float) $data[0]['lon'],
-            ];
-        } catch (GuzzleException) {
+        $data = json_decode((string) $response->getBody(), true);
+
+        if (!is_array($data) || empty($data)) {
             return null;
         }
+
+        $result = [
+            'lat' => (float) $data[0]['lat'],
+            'lon' => (float) $data[0]['lon'],
+        ];
+
+        $this->nominatimCache->set($cacheKey, $result);
+
+        return $result;
     }
 
     public function determineCategory(array $osmData): string
@@ -304,6 +325,30 @@ final readonly class ExploreService
         $this->placeRepo->delete($id);
     }
 
+    private function nominatimRequest(string $method, string $url, array $options): ResponseInterface
+    {
+        try {
+            $response = $this->httpClient->request($method, $url, $options);
+        } catch (GuzzleException $e) {
+            throw new \RuntimeException('Failed to fetch OSM data: ' . $e->getMessage());
+        }
+
+        if ($response->getStatusCode() === 429) {
+            $retryAfter = $response->getHeaderLine('Retry-After');
+            $delay = is_numeric($retryAfter) ? (int) $retryAfter * 1_000_000 : self::NOMINATIM_RETRY_DELAY_US;
+
+            usleep($delay);
+
+            try {
+                $response = $this->httpClient->request($method, $url, $options);
+            } catch (GuzzleException $e) {
+                throw new \RuntimeException('Nominatim rate-limited despite retry: ' . $e->getMessage());
+            }
+        }
+
+        return $response;
+    }
+
     private function formatPlace(array $place): array
     {
         $gastronomy = $place['category'] === 'gastronomy'
@@ -328,6 +373,7 @@ final readonly class ExploreService
             'createdAt' => $place['createdAt'],
             'lastUpdated' => $place['lastUpdated'],
             'bookmarkedAt' => $place['bookmarkedAt'] ?? null,
+            '_attribution' => self::OSM_ATTRIBUTION,
         ];
 
         if ($gastronomy !== null) {

@@ -43,6 +43,8 @@ use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
 use Sinclear\Api\Services\ImageProxyService;
+use Sinclear\Api\Services\NominatimCache;
+use Sinclear\Api\Services\NominatimRateLimiter;
 use Sinclear\Api\Services\NewsService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\RssFeedService;
@@ -137,6 +139,8 @@ return [
 
     ExploreService::class => autowire(),
     ExplorePolicy::class => autowire(),
+    NominatimRateLimiter::class => autowire(),
+    NominatimCache::class => autowire(),
 
     ClientInterface::class => fn(): ClientInterface => new Client(['timeout' => 15]),
 

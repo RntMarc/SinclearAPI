@@ -118,11 +118,65 @@ GET /explore?category=gastronomy&page=1&limit=20
 
 ## OSM/Nominatim-Integration
 
+### Nutzung
+
 - **Endpunkt:** `https://nominatim.openstreetmap.org`
 - **Lookup:** `/lookup?osm_ids=N12345&format=json&addressdetails=1&extratags=1`
 - **Geocode:** `/search?q=Berlin&format=json&limit=1`
-- **User-Agent:** `SinclearBeyondAPI/2.0 (https://sinclear.app)` (wird von OSM verlangt)
-- **Rate-Limit:** Max. 1 Request pro Sekunde (Nominatim-Usage-Policy)
+- **User-Agent:** `SinclearBeyondAPI/2.0 (https://sinclear.app)` (von OSM vorgeschrieben)
+- **Kein Tile-Zugriff** (keine Karten-Backend-Nutzung)
+
+### Rate-Limiting
+
+Erzwungen durch `NominatimRateLimiter` (`src/Services/NominatimRateLimiter.php`):
+- **Min. 1,1 Sekunden** zwischen zwei aufeinanderfolgenden Nominatim-Requests
+- File-basierte Sperre via `flock()` in `var/cache/nominatim/ratelimit.lock`
+- Gilt für **alle** PHP-Prozesse (Shared‑Lock via Dateisystem)
+
+### Caching
+
+Verwaltet durch `NominatimCache` (`src/Services/NominatimCache.php`):
+- Nominatim-Responses werden als JSON in `var/cache/nominatim/` gespeichert
+- **TTL: 24h** (86400s) – keine unnötigen Wiederholungs-Requests
+- Cache-Key: `md5('lookup|N12345')` bzw. `md5('search|Berlin')`
+- Schreibzugriff mit `LOCK_EX` für Race‑Condition‑Schutz
+
+#### Cache-Bereinigung (Cron)
+
+```cron
+# Täglich um 03:00 Uhr abgelaufene Cache-Dateien löschen
+0 3 * * * /usr/bin/php /pfad/zum/projekt/bin/clear-nominatim-cache.php
+```
+
+Das Skript gibt die Anzahl gelöschter Dateien aus und beendet sich mit Exit‑Code 0.
+Kein Output bei leerem Cache → Cron kann stumm laufen.
+
+**Verzeichnis-Rechte:**
+- `var/cache/nominatim/`: `775` (Owner: Web-User, Gruppe: Webserver-Gruppe)
+- Dateien innerhalb: `664`
+- Der Cache-Ordner muss **schreibbar** durch den Web-Server-User sein
+- Geschützt durch `.htaccess` (obere `.htaccess` blockiert `^var/`)
+
+### Fehlerbehandlung bei 429 Too Many Requests
+
+Die private Methode `nominatimRequest()` erkennt HTTP 429:
+1. Wertet `Retry-After`-Header aus (fällt auf 1s zurück, falls fehlt/nicht numerisch)
+2. Wartet die angegebene Zeit (`usleep`)
+3. Wiederholt den Request **einmal**
+4. Schlägt der zweite Versuch fehl → `RuntimeException('Nominatim rate-limited despite retry')`
+
+### OSM-Attribution
+
+Jede Explore-API-Response enthält das Feld `_attribution`:
+
+```json
+{
+  "_attribution": "© OpenStreetMap contributors"
+}
+```
+
+Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
+(OSM-Lizenzbedingungen / Nominatim-Usage-Policy).
 
 ## API-Endpunkte
 
