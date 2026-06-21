@@ -34,6 +34,16 @@ final readonly class UserService
         private UserPolicy $policy,
     ) {}
 
+    /** @return list<array<string, mixed>> */
+    public function listAll(AuthenticatedUser $requester): array
+    {
+        $users = $this->userRepo->findAll();
+        return array_map(
+            fn(array $user) => $this->formatUserBaseFiltered($user, $requester),
+            $users,
+        );
+    }
+
     /** @return array<string, mixed>|null */
     public function getUser(string $id): ?array
     {

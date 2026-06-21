@@ -705,6 +705,15 @@ components:
         data:
           $ref: '#/components/schemas/UserMe'
 
+    UserListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserBasePublic'
+
     UserDetailPublicResponse:
       type: object
       required: [data]
@@ -888,6 +897,30 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           description: Zu viele Versuche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user:
+    get:
+      summary: Alle Benutzer des Projekts auflisten
+      description: >
+        Gibt eine Liste aller Benutzer des Projekts zurück.
+        Die Sichtbarkeit von E-Mail und Geburtstag wird
+        pro Benutzer anhand der Einstellungen des anfragenden Nutzers gefiltert.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste aller Benutzer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

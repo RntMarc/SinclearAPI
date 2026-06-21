@@ -13,6 +13,16 @@ Authorization: Bearer <access_token>
 
 ## Endpunkte
 
+### Alle Benutzer auflisten
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `GET` | `/user` | Liste aller Benutzer (gefiltert nach Sichtbarkeit) |
+
+Gibt ein Array aller Benutzer zurück. Jeder Eintrag enthält die Basis-Profildaten,
+gefiltert nach den Sichtbarkeitseinstellungen des jeweiligen Benutzers
+(siehe [Sichtbarkeitssystem](#sichtbarkeitssystem)).
+
 ### Eigene Profildaten (`/me`)
 
 | Methode | Pfad | Beschreibung |

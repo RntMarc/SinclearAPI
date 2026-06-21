@@ -33,4 +33,11 @@ final readonly class UserRepository
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
+
+    /** @return list<array<string, mixed>> */
+    public function findAll(): array
+    {
+        $stmt = $this->pdo->query('SELECT id, email, displayName, discordId, isAdmin, image, createdAt, birthday, birthdayVisibility, emailVisibility, onboardingCompleted FROM User');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

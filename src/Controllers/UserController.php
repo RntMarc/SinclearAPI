@@ -14,6 +14,13 @@ final readonly class UserController
         private UserService $userService,
     ) {}
 
+    public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $requester = $this->requireUser($request);
+        $users = $this->userService->listAll($requester);
+        return ResponseFactory::json(['data' => $users], 200, $response);
+    }
+
     public function me(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);

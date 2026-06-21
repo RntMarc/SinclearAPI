@@ -46,6 +46,7 @@ return function (App $app): void {
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/user', function (RouteCollectorProxy $group) {
+        $group->get('', [UserController::class, 'list']);
         $group->get('/me', [UserController::class, 'me']);
         $group->get('/me/base', [UserController::class, 'meBase']);
         $group->get('/me/social', [UserController::class, 'meSocial']);
