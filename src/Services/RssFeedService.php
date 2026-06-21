@@ -2,7 +2,7 @@
 
 namespace Sinclear\Api\Services;
 
-use GuzzleHttp\ClientInterface;
+use Psr\Http\Client\ClientInterface;
 use Psr\Log\LoggerInterface;
 use SimpleXMLElement;
 
