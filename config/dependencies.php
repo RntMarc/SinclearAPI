@@ -3,7 +3,8 @@
 namespace Sinclear\Api\Application;
 
 use GuzzleHttp\Client;
-use Psr\Http\Client\ClientInterface;
+use GuzzleHttp\ClientInterface;
+
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\UidProcessor;
@@ -143,7 +144,7 @@ return [
     NominatimRateLimiter::class => autowire(),
     NominatimCache::class => autowire(),
 
-    ClientInterface::class => fn(): ClientInterface => new Client(['timeout' => 15]),
+    GuzzleHttp\ClientInterface::class => fn(): ClientInterface => new Client(['timeout' => 15]),
 
     NewsArticleRepository::class => autowire(),
     NewsUpvoteRepository::class => autowire(),

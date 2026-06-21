@@ -5,7 +5,7 @@ namespace Sinclear\Api\Services;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
-use Psr\Http\Client\ClientInterface;
+use GuzzleHttp\ClientInterface;
 
 final readonly class ImageProxyService
 {
