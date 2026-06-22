@@ -1212,6 +1212,12 @@ paths:
             type: string
             enum: [gastronomy, leisure]
           description: Filter nach Kategorie
+        - name: cuisine
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter nach Küchen-Typ (nur bei Gastronomie)
         - name: sort
           in: query
           required: false
@@ -1326,6 +1332,19 @@ paths:
           schema:
             type: string
           description: Küchen-Typ (nur bei Gastronomie)
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [name_asc, name_desc, created_asc, created_desc, rating_asc, rating_desc]
+          description: Sortierung der Ergebnisse. Bei Umkreissuche primär nach Distanz, sekundär nach diesem Sortierkriterium.
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filtert nach Stadt (LIKE-Suche in der address-Spalte)
         - name: lat
           in: query
           required: false

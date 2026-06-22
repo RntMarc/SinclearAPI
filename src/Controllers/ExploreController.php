@@ -25,6 +25,7 @@ final readonly class ExploreController
         $page = max(1, (int) ($params['page'] ?? 1));
         $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
         $sort = !empty($params['sort']) ? $params['sort'] : null;
+        $cuisine = !empty($params['cuisine']) ? $params['cuisine'] : null;
 
         $validSorts = ['name_asc', 'name_desc', 'created_asc', 'created_desc', 'rating_asc', 'rating_desc'];
         if ($sort !== null && !in_array($sort, $validSorts, true)) {
@@ -35,7 +36,7 @@ final readonly class ExploreController
             return ResponseFactory::json(['error' => 'invalid_category'], 400, $response);
         }
 
-        $result = $this->exploreService->listPlaces($category, $page, $limit, $sort);
+        $result = $this->exploreService->listPlaces($category, $page, $limit, $sort, $cuisine);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 
@@ -163,6 +164,13 @@ final readonly class ExploreController
         if (!empty($params['category']) && !in_array($params['category'], ['gastronomy', 'leisure'], true)) {
             return ResponseFactory::json(['error' => 'invalid_category'], 400, $response);
         }
+
+        $sort = !empty($params['sort']) ? $params['sort'] : null;
+        $validSorts = ['name_asc', 'name_desc', 'created_asc', 'created_desc', 'rating_asc', 'rating_desc'];
+        if ($sort !== null && !in_array($sort, $validSorts, true)) {
+            return ResponseFactory::json(['error' => 'invalid_sort'], 400, $response);
+        }
+        $params['sort'] = $sort;
 
         $params['page'] = max(1, (int) ($params['page'] ?? 1));
         $params['limit'] = min(100, max(1, (int) ($params['limit'] ?? 20)));

@@ -86,12 +86,16 @@ Die Suche unterstützt mehrere Filter gleichzeitig:
 | `q` | string | Volltextsuche im Namen |
 | `category` | enum | `gastronomy` / `leisure` |
 | `cuisine` | string | Küchen-Typ (nur Gastronomie) |
+| `sort` | enum | Sortierung (`name_asc`, `name_desc`, `created_asc`, `created_desc`, `rating_asc`, `rating_desc`) |
+| `city` | string | Filtert nach Stadt (LIKE-Suche in der `address`-Spalte) |
 | `lat` + `lon` + `radius` | float + int | Umkreissuche in Metern |
 | `location` + `radius` | string + int | Ortsname (wird geocoded) + Radius |
 | `page` / `limit` | int | Paginierung |
 
 **Umkreissuche:** Verwendet die Haversine-Formel in SQL. Die Ergebnisse
-enthalten ein `distance`-Feld in Metern und sind aufsteigend sortiert.
+enthalten ein `distance`-Feld in Metern und sind primär nach Distanz
+aufsteigend sortiert. Ein zusätzlicher `sort`-Parameter wird als sekundäres
+Sortierkriterium angewandt.
 
 **Geocoding:** Wenn `location` statt `lat`/`lon` übergeben wird, löst die
 API den Ortsnamen über Nominatim in Koordinaten auf und führt dann die
@@ -103,17 +107,26 @@ Umkreissuche durch. Default-Radius: 5000m, Maximum: 50000m.
 # Alle gastronomy-Orte
 GET /explore?category=gastronomy
 
+# Gastronomie-Orte mit Küchen-Filter
+GET /explore?category=gastronomy&cuisine=italian&sort=name_asc
+
 # Umkreissuche mit Koordinaten (10km um Berlin-Mitte)
 GET /explore/search?lat=52.5200&lon=13.4050&radius=10000
 
-# Umkreissuche mit Ortsname
-GET /explore/search?location=Berlin&radius=10000&category=leisure
+# Umkreissuche mit Ortsname und Sortierung
+GET /explore/search?location=Berlin&radius=10000&category=leisure&sort=name_asc
 
 # Volltextsuche nach italienischen Restaurants
 GET /explore/search?q=pizza&cuisine=italian
 
+# Stadt-Filter (alle Orte in Berlin ohne Radius)
+GET /explore/search?city=Berlin
+
 # Paginierte Liste
 GET /explore?category=gastronomy&page=1&limit=20
+
+# Suche sortiert nach Bewertung
+GET /explore/search?cuisine=italian&sort=rating_desc
 ```
 
 ## OSM/Nominatim-Integration
@@ -182,7 +195,7 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
-| `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`) |
+| `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`, `cuisine`) |
 | `POST` | `/explore` | JWT | Neuen Ort anlegen |
 | `GET` | `/explore/search` | JWT | Suche + Umkreissuche |
 | `GET` | `/explore/random` | JWT | Zufällige Orte (optional nach Kategorie) |
@@ -194,9 +207,11 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 | `POST` | `/explore/{id}/bookmark` | JWT | Lesezeichen setzen |
 | `DELETE` | `/explore/{id}/bookmark` | JWT | Lesezeichen entfernen |
 
-## Sortierung (GET /explore)
+## Sortierung (GET /explore und GET /explore/search)
 
-Die Liste kann mit dem Parameter `sort` sortiert werden:
+Die Liste und die Suchergebnisse können mit dem Parameter `sort` sortiert werden.
+Bei der Umkreissuche in `/explore/search` wird primär nach Distanz aufsteigend
+sortiert, der `sort`-Parameter dient dann als sekundäres Kriterium.
 
 | Wert | Sortierung |
 |------|-----------|

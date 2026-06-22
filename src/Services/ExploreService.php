@@ -264,9 +264,9 @@ final readonly class ExploreService
         return $this->formatPlace($place);
     }
 
-    public function listPlaces(?string $category, int $page, int $limit, ?string $sort = null): array
+    public function listPlaces(?string $category, int $page, int $limit, ?string $sort = null, ?string $cuisine = null): array
     {
-        $result = $this->placeRepo->list($category, $page, $limit, $sort);
+        $result = $this->placeRepo->list($category, $page, $limit, $sort, $cuisine);
         $result['data'] = array_map(fn(array $p) => $this->formatPlace($p), $result['data']);
         return $result;
     }

@@ -87,7 +87,7 @@ final readonly class DiscoverPlaceRepository
         $stmt->execute([$id]);
     }
 
-    public function list(?string $category, int $page, int $limit, ?string $sort = null): array
+    public function list(?string $category, int $page, int $limit, ?string $sort = null, ?string $cuisine = null): array
     {
         $conditions = '';
         $params = [];
@@ -116,6 +116,12 @@ final readonly class DiscoverPlaceRepository
             $select .= ', ROUND(AVG(r.rating), 1) AS avg_rating';
         }
 
+        if ($cuisine !== null) {
+            $from .= ' JOIN DiscoverGastronomy g ON g.placeId = p.id';
+            $conditions .= ($conditions === '' ? 'WHERE ' : ' AND ') . 'g.cuisine = ?';
+            $params[] = $cuisine;
+        }
+
         $groupBy = $joinReview ? ' GROUP BY p.id' : '';
 
         $orderBy = $sort !== null && isset($orderMap[$sort])
@@ -127,6 +133,9 @@ final readonly class DiscoverPlaceRepository
         if ($joinReview) {
             $countFrom .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
             $countSelect = 'COUNT(DISTINCT p.id)';
+        }
+        if ($cuisine !== null) {
+            $countFrom .= ' JOIN DiscoverGastronomy g ON g.placeId = p.id';
         }
 
         $countStmt = $this->pdo->prepare("SELECT $countSelect $countFrom $conditions");
@@ -173,6 +182,7 @@ final readonly class DiscoverPlaceRepository
         $conditions = [];
         $bindings = [];
         $haversine = null;
+        $joinReview = false;
 
         if (!empty($params['q'])) {
             $conditions[] = 'p.name LIKE ?';
@@ -182,6 +192,11 @@ final readonly class DiscoverPlaceRepository
         if (!empty($params['category'])) {
             $conditions[] = 'p.category = ?';
             $bindings[] = $params['category'];
+        }
+
+        if (!empty($params['city'])) {
+            $conditions[] = 'p.address LIKE ?';
+            $bindings[] = '%' . $params['city'] . '%';
         }
 
         if (isset($params['lat']) && isset($params['lon']) && isset($params['radius'])) {
@@ -221,15 +236,44 @@ final readonly class DiscoverPlaceRepository
 
         if ($haversine !== null) {
             $select .= ", $haversine AS distance";
-            $orderBy = 'distance ASC';
         }
 
         if (!empty($params['cuisine'])) {
             $select .= ', g.cuisine';
         }
 
+        $sort = $params['sort'] ?? null;
+        $orderMap = [
+            'name_asc' => 'p.name ASC',
+            'name_desc' => 'p.name DESC',
+            'created_asc' => 'p.createdAt ASC',
+            'created_desc' => 'p.createdAt DESC',
+            'rating_asc' => 'avg_rating ASC',
+            'rating_desc' => 'avg_rating DESC',
+        ];
+
+        if ($sort !== null && in_array($sort, ['rating_asc', 'rating_desc'], true)) {
+            $joinReview = true;
+            $fromClause .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
+            $select .= ', ROUND(AVG(r.rating), 1) AS avg_rating';
+        }
+
+        $sortSql = $sort !== null && isset($orderMap[$sort])
+            ? $orderMap[$sort]
+            : ($haversine !== null ? 'distance ASC' : 'p.createdAt DESC');
+
+        if ($haversine !== null) {
+            $orderBy = $sort !== null && isset($orderMap[$sort])
+                ? "distance ASC, $sortSql"
+                : 'distance ASC';
+        } else {
+            $orderBy = $sortSql;
+        }
+
+        $groupBy = $joinReview ? ' GROUP BY p.id' : '';
+
         $dataStmt = $this->pdo->prepare(
-            "SELECT $select $fromClause $where ORDER BY $orderBy LIMIT ? OFFSET ?"
+            "SELECT $select $fromClause $where$groupBy ORDER BY $orderBy LIMIT ? OFFSET ?"
         );
         $dataStmt->execute([...$bindings, $limit, $offset]);
         $places = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
