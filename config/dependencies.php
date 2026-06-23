@@ -12,6 +12,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Repository\ContactInfoRepository;
@@ -138,6 +139,9 @@ return [
 
     ExploreService::class => autowire(),
     ExplorePolicy::class => autowire(),
+    ReviewPolicy::class => autowire(),
+    ReviewService::class => autowire(),
+    ReviewController::class => autowire(),
     NominatimRateLimiter::class => autowire(),
     NominatimCache::class => autowire(),
 

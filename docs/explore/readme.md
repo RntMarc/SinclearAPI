@@ -206,6 +206,10 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 | `GET` | `/explore/{id}/bookmark` | JWT | Lesezeichen-Status prüfen |
 | `POST` | `/explore/{id}/bookmark` | JWT | Lesezeichen setzen |
 | `DELETE` | `/explore/{id}/bookmark` | JWT | Lesezeichen entfernen |
+| `GET` | `/explore/{placeId}/reviews` | JWT | Bewertungen eines Ortes (paginated) |
+| `POST` | `/explore/{placeId}/reviews` | JWT | Bewertung erstellen |
+| `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
+| `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
 
 ## Sortierung (GET /explore und GET /explore/search)
 
@@ -255,3 +259,81 @@ einem UNIQUE-Constraint.
 Ein bereits gesetztes Lesezeichen erneut zu setzen, gibt `409 Conflict`
 mit `bookmark_exists` zurück. Das Löschen eines nicht existierenden
 Lesezeichens ist ein No-Op und gibt ebenfalls `204` zurück.
+
+## Bewertungen (Reviews)
+
+Die Bewertungs-API erlaubt das Abrufen, Erstellen, Aktualisieren und
+Löschen von Bewertungen zu Entdecken-Orten. Der Ersteller einer Bewertung
+sowie Administratoren dürfen eine Bewertung bearbeiten oder löschen.
+Ein Nutzer kann mehrere Bewertungen zu demselben Ort abgeben.
+
+### Endpunkte
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|-------------|
+| `GET` | `/explore/{placeId}/reviews` | JWT | Alle Bewertungen zu einem Ort (paginated) |
+| `POST` | `/explore/{placeId}/reviews` | JWT | Neue Bewertung erstellen |
+| `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
+| `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
+
+### Parameter
+
+| Endpunkt | Parameter | Typ | Beschreibung |
+|----------|-----------|-----|-------------|
+| `GET /explore/{placeId}/reviews` | `page` / `limit` | int | Paginierung |
+| `POST /explore/{placeId}/reviews` | `rating` | int (1-5) | **Pflicht.** Bewertung |
+| | `comment` | string | Optional. Kommentar |
+| `PUT /explore/{placeId}/reviews/{reviewId}` | `rating` | int (1-5) | Optional. Bewertung |
+| | `comment` | string/null | Optional. Kommentar (`null` löscht ihn) |
+
+### Beispiele
+
+```
+# Alle Bewertungen zu einem Ort abrufen
+GET /explore/550e8400-e29b-41d4-a716-446655440000/reviews
+
+# Neue Bewertung erstellen
+POST /explore/550e8400-e29b-41d4-a716-446655440000/reviews
+Body: { "rating": 4, "comment": "Tolles Restaurant!" }
+→ 201 { "data": { "id": "...", "rating": 4, "comment": "Tolles Restaurant!", ... } }
+
+# Bewertung aktualisieren
+PUT /explore/550e8400-e29b-41d4-a716-446655440000/reviews/660e8400-e29b-41d4-a716-446655440001
+Body: { "rating": 5 }
+→ 200 { "data": { ... } }
+
+# Bewertung löschen
+DELETE /explore/550e8400-e29b-41d4-a716-446655440000/reviews/660e8400-e29b-41d4-a716-446655440001
+→ 204
+```
+
+### Response-Format
+
+Einzelne Bewertung:
+
+```json
+{
+  "data": {
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "placeId": "550e8400-e29b-41d4-a716-446655440000",
+    "userId": "770e8400-e29b-41d4-a716-446655440002",
+    "rating": 4,
+    "comment": "Tolles Restaurant!",
+    "createdAt": "2026-06-23T12:00:00.000Z"
+  }
+}
+```
+
+Listen-Response (paginated):
+
+```json
+{
+  "data": [ ... ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 5,
+    "totalPages": 1
+  }
+}
+```

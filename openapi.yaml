@@ -259,6 +259,72 @@ components:
         data:
           $ref: '#/components/schemas/ExplorePlace'
 
+    ReviewResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [id, placeId, userId, rating, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            placeId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+            rating:
+              type: integer
+              minimum: 1
+              maximum: 5
+              description: Bewertung von 1 bis 5
+            comment:
+              type: string
+              nullable: true
+            createdAt:
+              type: string
+              format: date-time
+
+    ReviewListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewResponse/properties/data'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    CreateReviewRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Bewertung von 1 bis 5
+        comment:
+          type: string
+          description: Optionaler Kommentar zur Bewertung
+
+    UpdateReviewRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Bewertung von 1 bis 5
+        comment:
+          type: string
+          nullable: true
+          description: Kommentar (null löscht vorhandenen Kommentar)
+
     TravelTrip:
       type: object
       properties:
@@ -1693,6 +1759,207 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/{placeId}/reviews:
+    get:
+      summary: Bewertungen eines Ortes abrufen
+      description: >
+        Gibt eine paginierte Liste aller Bewertungen zu einem
+        Entdecken-Ort zurück. Authentifizierung erforderlich.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der Bewertungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Bewertung erstellen
+      description: >
+        Erstellt eine neue Bewertung für einen Entdecken-Ort.
+        Der Nutzer kann mehrere Bewertungen pro Ort abgeben.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        '201':
+          description: Bewertung wurde erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponse'
+        '400':
+          description: Ungültige Bewertung (rating 1-5 erforderlich)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/{placeId}/reviews/{reviewId}:
+    put:
+      summary: Bewertung aktualisieren
+      description: >
+        Aktualisiert eine vorhandene Bewertung. Nur der
+        Ersteller der Bewertung oder ein Admin darf diese ändern.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Bewertung
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReviewRequest'
+      responses:
+        '200':
+          description: Bewertung wurde aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponse'
+        '400':
+          description: Ungültige Bewertung (rating 1-5 erforderlich)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung (nur der Ersteller darf ändern)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bewertung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Bewertung löschen
+      description: >
+        Löscht eine vorhandene Bewertung. Nur der
+        Ersteller der Bewertung oder ein Admin darf diese löschen.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Bewertung
+      responses:
+        '204':
+          description: Bewertung wurde gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung (nur der Ersteller darf löschen)
           content:
             application/json:
               schema:

@@ -3,6 +3,7 @@
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
@@ -37,6 +38,10 @@ return function (App $app): void {
         $group->get('/bookmarks', [ExploreController::class, 'listBookmarks']);
         $group->get('', [ExploreController::class, 'list']);
         $group->post('', [ExploreController::class, 'create']);
+        $group->get('/{placeId}/reviews', [ReviewController::class, 'list']);
+        $group->post('/{placeId}/reviews', [ReviewController::class, 'create']);
+        $group->put('/{placeId}/reviews/{reviewId}', [ReviewController::class, 'update']);
+        $group->delete('/{placeId}/reviews/{reviewId}', [ReviewController::class, 'delete']);
         $group->get('/{id}', [ExploreController::class, 'get']);
         $group->put('/{id}', [ExploreController::class, 'update']);
         $group->delete('/{id}', [ExploreController::class, 'delete']);
