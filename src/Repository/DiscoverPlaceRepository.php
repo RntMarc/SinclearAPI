@@ -91,7 +91,7 @@ final readonly class DiscoverPlaceRepository
     {
         $conditions = '';
         $params = [];
-        $joinReview = false;
+        $joinCuisine = false;
 
         if ($category !== null) {
             $conditions = 'WHERE p.category = ?';
@@ -107,34 +107,25 @@ final readonly class DiscoverPlaceRepository
             'rating_desc' => 'avg_rating DESC',
         ];
 
-        $select = 'p.*';
-        $from = 'FROM DiscoverPlace p';
-
-        if ($sort !== null && in_array($sort, ['rating_asc', 'rating_desc'], true)) {
-            $joinReview = true;
-            $from .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
-            $select .= ', ROUND(AVG(r.rating), 1) AS avg_rating';
-        }
+        $select = 'p.*, ROUND(AVG(r.rating), 1) AS avg_rating';
+        $from = 'FROM DiscoverPlace p LEFT JOIN DiscoverReview r ON r.placeId = p.id';
 
         if ($cuisine !== null) {
+            $joinCuisine = true;
             $from .= ' JOIN DiscoverGastronomy g ON g.placeId = p.id';
             $conditions .= ($conditions === '' ? 'WHERE ' : ' AND ') . 'g.cuisine = ?';
             $params[] = $cuisine;
         }
 
-        $groupBy = $joinReview ? ' GROUP BY p.id' : '';
+        $groupBy = ' GROUP BY p.id';
 
         $orderBy = $sort !== null && isset($orderMap[$sort])
             ? $orderMap[$sort]
             : 'p.createdAt DESC';
 
-        $countFrom = 'FROM DiscoverPlace p';
-        $countSelect = 'COUNT(*)';
-        if ($joinReview) {
-            $countFrom .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
-            $countSelect = 'COUNT(DISTINCT p.id)';
-        }
-        if ($cuisine !== null) {
+        $countFrom = 'FROM DiscoverPlace p LEFT JOIN DiscoverReview r ON r.placeId = p.id';
+        $countSelect = 'COUNT(DISTINCT p.id)';
+        if ($joinCuisine) {
             $countFrom .= ' JOIN DiscoverGastronomy g ON g.placeId = p.id';
         }
 
@@ -214,7 +205,7 @@ final readonly class DiscoverPlaceRepository
             $bindings[] = $radius;
         }
 
-        $fromClause = 'FROM DiscoverPlace p';
+        $fromClause = 'FROM DiscoverPlace p LEFT JOIN DiscoverReview r ON r.placeId = p.id';
         if (!empty($params['cuisine'])) {
             $fromClause .= ' JOIN DiscoverGastronomy g ON g.placeId = p.id';
             $conditions[] = 'g.cuisine = ?';
@@ -223,7 +214,7 @@ final readonly class DiscoverPlaceRepository
 
         $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) $fromClause $where");
+        $countStmt = $this->pdo->prepare("SELECT COUNT(DISTINCT p.id) $fromClause $where");
         $countStmt->execute($bindings);
         $total = (int) $countStmt->fetchColumn();
 
@@ -231,7 +222,7 @@ final readonly class DiscoverPlaceRepository
         $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
         $offset = ($page - 1) * $limit;
 
-        $select = 'p.*';
+        $select = 'p.*, ROUND(AVG(r.rating), 1) AS avg_rating';
         $orderBy = 'p.createdAt DESC';
 
         if ($haversine !== null) {
@@ -252,12 +243,6 @@ final readonly class DiscoverPlaceRepository
             'rating_desc' => 'avg_rating DESC',
         ];
 
-        if ($sort !== null && in_array($sort, ['rating_asc', 'rating_desc'], true)) {
-            $joinReview = true;
-            $fromClause .= ' LEFT JOIN DiscoverReview r ON r.placeId = p.id';
-            $select .= ', ROUND(AVG(r.rating), 1) AS avg_rating';
-        }
-
         $sortSql = $sort !== null && isset($orderMap[$sort])
             ? $orderMap[$sort]
             : ($haversine !== null ? 'distance ASC' : 'p.createdAt DESC');
@@ -270,7 +255,7 @@ final readonly class DiscoverPlaceRepository
             $orderBy = $sortSql;
         }
 
-        $groupBy = $joinReview ? ' GROUP BY p.id' : '';
+        $groupBy = ' GROUP BY p.id';
 
         $dataStmt = $this->pdo->prepare(
             "SELECT $select $fromClause $where$groupBy ORDER BY $orderBy LIMIT ? OFFSET ?"

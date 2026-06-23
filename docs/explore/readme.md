@@ -226,9 +226,10 @@ sortiert, der `sort`-Parameter dient dann als sekundäres Kriterium.
 | `rating_asc` | Durchschnittsbewertung aufsteigend |
 | `rating_desc` | Durchschnittsbewertung absteigend |
 
-Bei Sortierung nach Rating wird die Durchschnittsbewertung aus der
-`DiscoverReview`-Tabelle berechnet und als `avgRating` im Response
-ausgeliefert. Ohne `sort` bleibt die Standard-Sortierung (`createdAt DESC`).
+Die Durchschnittsbewertung wird automatisch aus der `DiscoverReview`-Tabelle
+berechnet und als `avgRating` im Response ausgeliefert. Bei Orten ohne
+Bewertungen ist `avgRating` nicht im Response enthalten.
+Ohne `sort` bleibt die Standard-Sortierung (`createdAt DESC`).
 
 ### Beispiele
 

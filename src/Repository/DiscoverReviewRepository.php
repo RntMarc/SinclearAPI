@@ -84,4 +84,12 @@ final readonly class DiscoverReviewRepository
         $stmt = $this->pdo->prepare('DELETE FROM DiscoverReview WHERE id = ?');
         $stmt->execute([$id]);
     }
+
+    public function getAvgRating(string $placeId): ?float
+    {
+        $stmt = $this->pdo->prepare('SELECT ROUND(AVG(rating), 1) FROM DiscoverReview WHERE placeId = ?');
+        $stmt->execute([$placeId]);
+        $avg = $stmt->fetchColumn();
+        return $avg !== false && $avg !== null ? (float) $avg : null;
+    }
 }

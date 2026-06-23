@@ -191,7 +191,7 @@ components:
           type: number
           format: float
           nullable: true
-          description: Durchschnittsbewertung (nur bei Sortierung nach Rating)
+          description: Durchschnittsbewertung aller Nutzerreviews (null bei keinen Bewertungen)
         bookmarkedAt:
           type: string
           format: date-time

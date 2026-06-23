@@ -8,6 +8,7 @@ use Psr\Http\Message\ResponseInterface;
 use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
+use Sinclear\Api\Repository\DiscoverReviewRepository;
 
 final readonly class ExploreService
 {
@@ -39,6 +40,7 @@ final readonly class ExploreService
         private DiscoverPlaceRepository $placeRepo,
         private DiscoverGastronomyRepository $gastronomyRepo,
         private DiscoverBookmarkRepository $bookmarkRepo,
+        private DiscoverReviewRepository $reviewRepo,
         private NominatimRateLimiter $rateLimiter,
         private NominatimCache $nominatimCache,
     ) {
@@ -386,6 +388,11 @@ final readonly class ExploreService
 
         if (isset($place['avg_rating'])) {
             $result['avgRating'] = (float) $place['avg_rating'];
+        } else {
+            $avg = $this->reviewRepo->getAvgRating($place['id']);
+            if ($avg !== null) {
+                $result['avgRating'] = $avg;
+            }
         }
 
         return $result;
