@@ -13,11 +13,14 @@ final readonly class UserService
     private const array SOCIAL_FIELDS = [
         'unsplashHandle' => 'unsplashVisibility',
         'instagramHandle' => 'instagramVisibility',
-        'mastodonHandle' => 'mastodonVisibility',
-        'pixelfedHandle' => 'pixelfedVisibility',
         'blueskyHandle' => 'blueskyVisibility',
         'youtubeHandle' => 'youtubeVisibility',
         'twitchHandle' => 'twitchVisibility',
+    ];
+
+    private const array FEDIVERSE_FIELDS = [
+        'mastodonHandle' => 'mastodonVisibility',
+        'pixelfedHandle' => 'pixelfedVisibility',
     ];
 
     private const array CONTACT_FIELDS = [
@@ -112,6 +115,24 @@ final readonly class UserService
             $result[$handle] = $social[$handle] ?? null;
             $result[$visibility] = (int) ($social[$visibility] ?? 1);
         }
+
+        foreach (self::FEDIVERSE_FIELDS as $handle => $visibility) {
+            $combined = $social[$handle] ?? null;
+            $result[$visibility] = (int) ($social[$visibility] ?? 1);
+            if ($combined !== null && str_contains($combined, '@')) {
+                $parts = explode('@', $combined, 2);
+                $result[str_replace('Handle', 'User', lcfirst(ucfirst($handle)))] = $parts[0];
+                $result[str_replace('Handle', 'Server', lcfirst(ucfirst($handle)))] = $parts[1];
+            } else {
+                $fieldPrefix = match ($handle) {
+                    'mastodonHandle' => 'mastodon',
+                    'pixelfedHandle' => 'pixelfed',
+                };
+                $result[$fieldPrefix . 'User'] = null;
+                $result[$fieldPrefix . 'Server'] = null;
+            }
+        }
+
         return $result;
     }
 
@@ -129,6 +150,26 @@ final readonly class UserService
                 $result[$handle] = $social[$handle];
             }
         }
+
+        foreach (self::FEDIVERSE_FIELDS as $handle => $visibility) {
+            $visibilityLevel = (int) ($social[$visibility] ?? 1);
+            if ($this->policy->canView($requester, $targetUserId, $visibilityLevel)) {
+                $combined = $social[$handle] ?? null;
+                $fieldPrefix = match ($handle) {
+                    'mastodonHandle' => 'mastodon',
+                    'pixelfedHandle' => 'pixelfed',
+                };
+                if ($combined !== null && str_contains($combined, '@')) {
+                    $parts = explode('@', $combined, 2);
+                    $result[$fieldPrefix . 'User'] = $parts[0];
+                    $result[$fieldPrefix . 'Server'] = $parts[1];
+                } else {
+                    $result[$fieldPrefix . 'User'] = null;
+                    $result[$fieldPrefix . 'Server'] = null;
+                }
+            }
+        }
+
         return $result;
     }
 

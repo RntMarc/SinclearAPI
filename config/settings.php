@@ -28,6 +28,7 @@ $settings['discord'] = [
     'client_id' => $_ENV['DISCORD_CLIENT_ID'] ?? '',
     'client_secret' => $_ENV['DISCORD_CLIENT_SECRET'] ?? '',
     'redirect_uri' => $_ENV['DISCORD_REDIRECT_URI'] ?? '',
+    'relink_redirect_uri' => $_ENV['DISCORD_RELINK_REDIRECT_URI'] ?? $_ENV['DISCORD_REDIRECT_URI'] ?? '',
     'guild_id' => $_ENV['DISCORD_GUILD_ID'] ?? '',
 ];
 
@@ -37,6 +38,7 @@ $settings['smtp'] = [
     'user' => $_ENV['SMTP_USER'] ?? '',
     'password' => $_ENV['SMTP_PASSWORD'] ?? '',
     'from' => $_ENV['SMTP_FROM'] ?? 'noreply@sinclear.app',
+    'admin_email' => $_ENV['SMTP_ADMIN_EMAIL'] ?? '',
 ];
 
 $settings['cors'] = [

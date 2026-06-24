@@ -77,4 +77,20 @@ final readonly class RefreshTokenRepository
         $stmt->execute([$familyId]);
         return (int) $stmt->fetchColumn() > 0;
     }
+
+    public function revokeAllForUser(string $userId, DateTimeImmutable $revokedAt): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE RefreshTokenFamily SET revokedAt = ? WHERE userId = ? AND revokedAt IS NULL'
+        );
+        $stmt->execute([$revokedAt->format('Y-m-d H:i:s'), $userId]);
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE RefreshToken rt
+             JOIN RefreshTokenFamily rtf ON rtf.id = rt.familyId
+             SET rt.revokedAt = ?
+             WHERE rtf.userId = ? AND rt.revokedAt IS NULL'
+        );
+        $stmt->execute([$revokedAt->format('Y-m-d H:i:s'), $userId]);
+    }
 }

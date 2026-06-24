@@ -607,13 +607,19 @@ components:
         instagramVisibility:
           type: integer
           enum: [0, 1, 2]
-        mastodonHandle:
+        mastodonUser:
+          type: string
+          nullable: true
+        mastodonServer:
           type: string
           nullable: true
         mastodonVisibility:
           type: integer
           enum: [0, 1, 2]
-        pixelfedHandle:
+        pixelfedUser:
+          type: string
+          nullable: true
+        pixelfedServer:
           type: string
           nullable: true
         pixelfedVisibility:
@@ -726,10 +732,16 @@ components:
         instagramHandle:
           type: string
           nullable: true
-        mastodonHandle:
+        mastodonUser:
           type: string
           nullable: true
-        pixelfedHandle:
+        mastodonServer:
+          type: string
+          nullable: true
+        pixelfedUser:
+          type: string
+          nullable: true
+        pixelfedServer:
           type: string
           nullable: true
         blueskyHandle:
@@ -794,6 +806,156 @@ components:
                   $ref: '#/components/schemas/UserSocialInfoPublic'
                 contact:
                   $ref: '#/components/schemas/UserContactInfoPublic'
+
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+          description: Anzeigename
+        birthday:
+          type: string
+          format: date
+          nullable: true
+          description: Geburtstag (YYYY-MM-DD) oder null
+        discordHandle:
+          type: string
+          nullable: true
+        fluxerHandle:
+          type: string
+          nullable: true
+        signalNumber:
+          type: string
+          nullable: true
+        whatsappNumber:
+          type: string
+          nullable: true
+        matrixUser:
+          type: string
+          nullable: true
+        matrixHomeserver:
+          type: string
+          nullable: true
+        unsplashHandle:
+          type: string
+          nullable: true
+        instagramHandle:
+          type: string
+          nullable: true
+        mastodonUser:
+          type: string
+          nullable: true
+        mastodonServer:
+          type: string
+          nullable: true
+        pixelfedUser:
+          type: string
+          nullable: true
+        pixelfedServer:
+          type: string
+          nullable: true
+        blueskyHandle:
+          type: string
+          nullable: true
+        youtubeHandle:
+          type: string
+          nullable: true
+        twitchHandle:
+          type: string
+          nullable: true
+
+    VisibilityUpdateRequest:
+      type: object
+      properties:
+        emailVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        birthdayVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        discordVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        fluxerVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        matrixVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        signalVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        whatsappVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        unsplashVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        instagramVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        mastodonVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        pixelfedVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        blueskyVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        youtubeVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        twitchVisibility:
+          type: integer
+          enum: [0, 1, 2]
+
+    EmailChangeRequest:
+      type: object
+      required: [newEmail]
+      properties:
+        newEmail:
+          type: string
+          format: email
+          description: Neue E-Mail-Adresse
+
+    EmailChangeVerifyRequest:
+      type: object
+      required: [code, newEmail]
+      properties:
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: Per OTP erhaltener 6-stelliger Code
+        newEmail:
+          type: string
+          format: email
+          description: Neue E-Mail-Adresse (wie bei request)
+
+    DiscordStartResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Discord-OAuth-URL zur Autorisierung
+
+    DiscordVerifyRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: Per Discord-Callback erhaltener 6-stelliger Code
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
 
 paths:
   /auth/login/otp/request:
@@ -1256,6 +1418,249 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/profile:
+    put:
+      summary: Eigenes Profil aktualisieren
+      description: >
+        Aktualisiert beliebig viele Felder des eigenen Profils gleichzeitig.
+        Es werden nur die im Request Body gesendeten Felder aktualisiert.
+        Jedes Feld wird individuell validiert.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: Aktualisierte Profildaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/email/request:
+    post:
+      summary: E-Mail-Änderung anfordern
+      description: >
+        Sendet einen 6-stelligen OTP-Code an die neue E-Mail-Adresse.
+        Die neue Adresse darf noch nicht in der Datenbank existieren.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChangeRequest'
+      responses:
+        '200':
+          description: OTP wurde an die neue Adresse gesendet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Ungültige oder bereits vergebene E-Mail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Anfragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/email/verify:
+    post:
+      summary: E-Mail-Änderung bestätigen
+      description: >
+        Bestätigt die E-Mail-Änderung mit dem per OTP erhaltenen Code.
+        Die E-Mail wird in der Datenbank aktualisiert und alle
+        bestehenden Refresh-Tokens werden ungültig gemacht.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailChangeVerifyRequest'
+      responses:
+        '200':
+          description: E-Mail wurde aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Ungültiger oder abgelaufener Code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/discord/start:
+    post:
+      summary: Discord-Relink starten
+      description: >
+        Startet den OAuth2-Fluss zum Verknüpfen eines neuen Discord-Accounts.
+        Gibt eine Discord-Autorisierungs-URL zurück.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Discord-OAuth-URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordStartResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/discord/callback:
+    get:
+      summary: Discord-Relink-Callback
+      description: >
+        Wird von Discord nach erfolgreicher Autorisierung aufgerufen.
+        Zeigt einen 6-stelligen Pairing-Code an, der in der App eingegeben
+        werden muss. Dieser Endpunkt ist als Browser-Redirect-URL konfiguriert.
+      tags: [User]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Von Discord ausgestellter Autorisierungscode
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: State-Parameter (UUID) zur CSRF-Absicherung
+      responses:
+        '200':
+          description: HTML-Seite mit Pairing-Code
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Fehler bei der Autorisierung
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /user/me/discord/verify:
+    post:
+      summary: Discord-Relink bestätigen
+      description: >
+        Bestätigt die Discord-Verknüpfung mit dem per Callback erhaltenen
+        6-stelligen Pairing-Code. Die Discord-ID wird in der Datenbank
+        aktualisiert.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscordVerifyRequest'
+      responses:
+        '200':
+          description: Discord-Account wurde aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Ungültiger oder abgelaufener Code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/visibility:
+    put:
+      summary: Sichtbarkeitseinstellungen aktualisieren
+      description: >
+        Aktualisiert die Sichtbarkeitseinstellungen für beliebig viele
+        Profilfelder gleichzeitig. Erlaubte Werte: 0 (nur ich), 1 (alle),
+        2 (nur enge Freunde).
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisibilityUpdateRequest'
+      responses:
+        '200':
+          description: Sichtbarkeitseinstellungen aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Ungültiges Feld oder ungültiger Visibility-Wert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

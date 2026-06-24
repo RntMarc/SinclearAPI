@@ -12,6 +12,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -156,12 +157,19 @@ return [
     TravelController::class => autowire(),
 
     ContactInfoRepository::class => autowire(),
+    ContactInfoUpdateRepository::class => autowire(),
     SocialInfoRepository::class => autowire(),
+    SocialInfoUpdateRepository::class => autowire(),
     CloseFriendRepository::class => autowire(),
+
+    UserUpdateRepository::class => autowire(),
 
     UserPolicy::class => autowire(),
     UserService::class => autowire(),
     UserController::class => autowire(),
+
+    ProfileService::class => autowire(),
+    ProfileController::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
     SecurityHeadersMiddleware::class => create(),

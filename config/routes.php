@@ -3,6 +3,7 @@
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -56,6 +57,13 @@ return function (App $app): void {
         $group->get('/me/base', [UserController::class, 'meBase']);
         $group->get('/me/social', [UserController::class, 'meSocial']);
         $group->get('/me/contact', [UserController::class, 'meContact']);
+        $group->put('/me/profile', [ProfileController::class, 'update']);
+        $group->post('/me/email/request', [ProfileController::class, 'requestEmailChange']);
+        $group->post('/me/email/verify', [ProfileController::class, 'verifyEmailChange']);
+        $group->post('/me/discord/start', [ProfileController::class, 'startDiscordRelink']);
+        $group->get('/me/discord/callback', [ProfileController::class, 'discordCallback']);
+        $group->post('/me/discord/verify', [ProfileController::class, 'verifyDiscordRelink']);
+        $group->put('/me/visibility', [ProfileController::class, 'updateVisibility']);
         $group->get('/{userId}', [UserController::class, 'get']);
         $group->get('/{userId}/base', [UserController::class, 'getBase']);
         $group->get('/{userId}/social', [UserController::class, 'getSocial']);

@@ -25,18 +25,22 @@ final readonly class DiscordOAuthService
         $this->httpClient = new Client();
     }
 
-    public function generateOAuthUrl(): array
+    public function generateOAuthUrl(?string $userId = null): array
     {
         $state = Uuid::uuid7()->toString();
         $codeVerifier = $this->generateCodeVerifier();
         $codeChallenge = $this->generateCodeChallenge($codeVerifier);
 
-        $this->storeState($state, $codeVerifier);
+        $this->storeState($state, $codeVerifier, $userId);
+
+        $redirectUri = $userId !== null
+            ? ($this->settings->discord['relink_redirect_uri'] ?? $this->settings->discord['redirect_uri'])
+            : $this->settings->discord['redirect_uri'];
 
         $params = http_build_query([
             'response_type' => 'code',
             'client_id' => $this->settings->discord['client_id'],
-            'redirect_uri' => $this->settings->discord['redirect_uri'],
+            'redirect_uri' => $redirectUri,
             'scope' => 'identify email guilds',
             'state' => $state,
             'code_challenge' => $codeChallenge,
@@ -95,20 +99,20 @@ final readonly class DiscordOAuthService
         return rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
     }
 
-    private function storeState(string $state, string $codeVerifier): void
+    private function storeState(string $state, string $codeVerifier, ?string $userId = null): void
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO WebauthnChallenge (id, challenge, expiresAt, createdAt)
-             VALUES (?, ?, ?, NOW())'
+            'INSERT INTO WebauthnChallenge (id, challenge, userId, expiresAt, createdAt)
+             VALUES (?, ?, ?, ?, NOW())'
         );
         $expiresAt = new \DateTimeImmutable('+' . self::STATE_TTL . ' seconds');
-        $stmt->execute([$state, $codeVerifier, $expiresAt->format('Y-m-d H:i:s.v')]);
+        $stmt->execute([$state, $codeVerifier, $userId, $expiresAt->format('Y-m-d H:i:s.v')]);
     }
 
     private function retrieveState(string $state): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, challenge, expiresAt FROM WebauthnChallenge
+            'SELECT id, challenge, userId, expiresAt FROM WebauthnChallenge
              WHERE id = ? AND expiresAt > NOW()'
         );
         $stmt->execute([$state]);
@@ -118,6 +122,7 @@ final readonly class DiscordOAuthService
         }
         return [
             'code_verifier' => $result['challenge'],
+            'userId' => $result['userId'],
         ];
     }
 
@@ -125,6 +130,59 @@ final readonly class DiscordOAuthService
     {
         $stmt = $this->pdo->prepare('DELETE FROM WebauthnChallenge WHERE id = ?');
         $stmt->execute([$state]);
+    }
+
+    public function processRelinkCallback(string $code, string $state): array
+    {
+        $stored = $this->retrieveState($state);
+        if ($stored === null) {
+            throw new \RuntimeException('Invalid or expired state');
+        }
+
+        $codeVerifier = $stored['code_verifier'];
+        $userId = $stored['userId'];
+
+        $this->deleteState($state);
+
+        $redirectUri = $this->settings->discord['relink_redirect_uri']
+            ?? $this->settings->discord['redirect_uri'];
+
+        try {
+            $response = $this->httpClient->post('https://discord.com/api/oauth2/token', [
+                'form_params' => [
+                    'client_id' => $this->settings->discord['client_id'],
+                    'client_secret' => $this->settings->discord['client_secret'],
+                    'grant_type' => 'authorization_code',
+                    'code' => $code,
+                    'redirect_uri' => $redirectUri,
+                    'code_verifier' => $codeVerifier,
+                ],
+            ]);
+        } catch (GuzzleException $e) {
+            throw new \RuntimeException('Discord token exchange failed: ' . $e->getMessage());
+        }
+
+        $tokenData = json_decode((string) $response->getBody(), true);
+        if (!isset($tokenData['access_token'])) {
+            throw new \RuntimeException('Failed to exchange Discord code');
+        }
+
+        $discordUser = $this->getUserInfo($tokenData['access_token']);
+        $this->checkGuildMembership($tokenData['access_token'], $discordUser['id']);
+
+        $pairingCode = $this->generatePairingCode();
+        $expiresAt = new \DateTimeImmutable('+' . self::PAIRING_CODE_TTL . ' seconds');
+
+        $metadata = json_encode([
+            'type' => 'discord_relink',
+            'userId' => $userId,
+            'newDiscordId' => $discordUser['id'],
+        ]);
+        $this->otpTokenRepo->create($metadata, $pairingCode, $expiresAt);
+
+        return [
+            'pairing_code' => $pairingCode,
+        ];
     }
 
     private function exchangeCode(string $code, string $codeVerifier): array
