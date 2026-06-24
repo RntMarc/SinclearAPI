@@ -80,7 +80,7 @@ Nicht sichtbare Felder werden komplett weggelassen (nicht als `null` gesendet).
 Der Request Body kann eine beliebige Kombination der folgenden Felder enthalten.
 Nur die gesendeten Felder werden aktualisiert.
 
-**User-Felder:** `displayName`, `birthday`
+**User-Felder:** `displayName`, `birthday`, `image`
 
 **ContactInfo-Felder:** `discordHandle`, `fluxerHandle`, `signalNumber`, `whatsappNumber`, `matrixUser`, `matrixHomeserver`
 
@@ -92,6 +92,7 @@ Nur die gesendeten Felder werden aktualisiert.
 |------|-------|
 | `displayName` | Darf nicht leer sein |
 | `birthday` | `YYYY-MM-DD` oder `null` |
+| `image` | Base64-codiertes Bild, `null` zum Entfernen (siehe [Profilbild](#profilbild)) |
 | `signalNumber` | Format `username.00` (Punkt + 2 Ziffern am Ende) |
 | `whatsappNumber` | Beginnt mit `+`, gefolgt von Ziffern |
 | `matrixUser` | Kein `@`, kein `:` |
@@ -143,6 +144,44 @@ Nur die gesendeten Felder werden aktualisiert.
 
 **Hinweis:** Die Redirect-URI `/api/v2/user/me/discord/callback` muss im Discord Developer Portal
 als zusätzliche Redirect-URI eingetragen werden (neben der Login-URI).
+
+### Profilbild
+
+Das Profilbild wird als Base64-codierter String über das `image` Feld im `PUT /user/me/endpoint` übermittelt.
+
+**Anforderungen:**
+
+| Eigenschaft | Limit |
+|-------------|-------|
+| Dateigröße (Base64-decodiert) | Max. 200 KB |
+| Erlaubte Formate | JPEG, PNG, WebP |
+| Max. Breite | 1000 Pixel |
+| Max. Höhe | 1000 Pixel |
+
+**Beispiel-Request:**
+```json
+{
+  "image": "/9j/4AAQSkZJRgABAQEASABIAAD..."
+}
+```
+
+**Profilbild entfernen:**
+```json
+{
+  "image": null
+}
+```
+
+**Fehlercodes:**
+
+| Code | Beschreibung |
+|------|-------------|
+| `invalid_image` | Ungültiges Bild oder leerer String |
+| `invalid_image_encoding` | Base64-Dekodierung fehlgeschlagen |
+| `image_too_large` | Dateigröße überschreitet 200 KB |
+| `invalid_image_format` | Datei ist kein gültiges Bild |
+| `unsupported_image_format` | Format nicht erlaubt (nur JPEG, PNG, WebP) |
+| `image_dimensions_too_large` | Abmessungen überschreiten 1000x1000 Pixel |
 
 ## Sichtbarkeitssystem
 

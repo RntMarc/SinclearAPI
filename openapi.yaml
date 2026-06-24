@@ -810,6 +810,13 @@ components:
     ProfileUpdateRequest:
       type: object
       properties:
+        image:
+          type: string
+          nullable: true
+          description: >-
+            Profilbild als Base64-codierter String. Erlaubte Formate: JPEG, PNG,
+            WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel. Setze null
+            um das Profilbild zu entfernen.
         displayName:
           type: string
           description: Anzeigename

@@ -34,10 +34,16 @@ final readonly class UserUpdateRepository
         $stmt->execute([$discordId, $userId]);
     }
 
+    public function updateImage(string $userId, ?string $image): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE User SET image = ? WHERE id = ?');
+        $stmt->execute([$image, $userId]);
+    }
+
     /** @param string|int $value */
     public function updateField(string $userId, string $field, mixed $value): void
     {
-        $allowed = ['displayName', 'birthday', 'email', 'discordId', 'emailVisibility', 'birthdayVisibility'];
+        $allowed = ['displayName', 'birthday', 'email', 'discordId', 'emailVisibility', 'birthdayVisibility', 'image'];
         if (!in_array($field, $allowed, true)) {
             throw new \InvalidArgumentException("Invalid field: $field");
         }

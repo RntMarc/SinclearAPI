@@ -21,6 +21,11 @@ use Symfony\Component\Mime\Email;
 
 final readonly class ProfileService
 {
+    private const int MAX_IMAGE_SIZE_BYTES = 200 * 1024; // 200 KB
+    private const int MAX_IMAGE_WIDTH = 1000;
+    private const int MAX_IMAGE_HEIGHT = 1000;
+    private const array ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
     private const array CONTACT_FIELDS = [
         'discordHandle' => 'validateNoAt',
         'fluxerHandle' => 'validateNoAt',
@@ -85,6 +90,15 @@ final readonly class ProfileService
             $userUpdates['birthday'] = $birthday;
         }
 
+        if (array_key_exists('image', $data)) {
+            $imageValue = $data['image'];
+            if ($imageValue === null || $imageValue === '') {
+                $userUpdates['image'] = null;
+            } else {
+                $userUpdates['image'] = $this->validateProfileImage((string) $imageValue);
+            }
+        }
+
         foreach (self::CONTACT_FIELDS as $field => $validator) {
             if (array_key_exists($field, $data)) {
                 $value = $data[$field];
@@ -128,6 +142,7 @@ final readonly class ProfileService
                 match ($field) {
                     'displayName' => $this->userUpdateRepo->updateDisplayName($user->id, $value),
                     'birthday' => $this->userUpdateRepo->updateBirthday($user->id, $value),
+                    'image' => $this->userUpdateRepo->updateImage($user->id, $value),
                 };
             }
         }
@@ -486,5 +501,40 @@ final readonly class ProfileService
         if (!preg_match('/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)+$/', $value)) {
             throw new \InvalidArgumentException('invalid_handle_format');
         }
+    }
+
+    private function validateProfileImage(string $imageData): string
+    {
+        if (!is_string($imageData) || $imageData === '') {
+            throw new \InvalidArgumentException('invalid_image');
+        }
+
+        $decoded = base64_decode($imageData, true);
+        if ($decoded === false) {
+            throw new \InvalidArgumentException('invalid_image_encoding');
+        }
+
+        if (strlen($decoded) > self::MAX_IMAGE_SIZE_BYTES) {
+            throw new \InvalidArgumentException('image_too_large');
+        }
+
+        $imageInfo = @getimagesizefromstring($decoded);
+        if ($imageInfo === false) {
+            throw new \InvalidArgumentException('invalid_image_format');
+        }
+
+        $mimeType = $imageInfo['mime'];
+        if (!in_array($mimeType, self::ALLOWED_IMAGE_MIME_TYPES, true)) {
+            throw new \InvalidArgumentException('unsupported_image_format');
+        }
+
+        $width = $imageInfo[0];
+        $height = $imageInfo[1];
+
+        if ($width > self::MAX_IMAGE_WIDTH || $height > self::MAX_IMAGE_HEIGHT) {
+            throw new \InvalidArgumentException('image_dimensions_too_large');
+        }
+
+        return $imageData;
     }
 }
