@@ -12,6 +12,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
@@ -28,12 +29,14 @@ use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
+use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
 use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
+use Sinclear\Api\Repository\UserDeviceRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
@@ -42,12 +45,15 @@ use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
+use Sinclear\Api\Security\Policy\NotificationPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
+use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\PushService;
 use Sinclear\Api\Services\RateLimiter;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
@@ -216,4 +222,23 @@ return [
     },
 
     AuthenticatedUser::class => null,
+
+    NotificationRepository::class => autowire(),
+    UserDeviceRepository::class => autowire(),
+
+    NotificationPolicy::class => autowire(),
+
+    PushService::class => function (ContainerInterface $c): PushService {
+        $settings = $c->get(Settings::class);
+        return new PushService(
+            deviceRepo: $c->get(UserDeviceRepository::class),
+            logger: $c->get(LoggerInterface::class),
+            projectId: $settings->fcm['project_id'],
+            clientEmail: $settings->fcm['client_email'],
+            privateKey: $settings->fcm['private_key'],
+        );
+    },
+
+    NotificationService::class => autowire(),
+    NotificationController::class => autowire(),
 ];

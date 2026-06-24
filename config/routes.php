@@ -3,6 +3,7 @@
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
@@ -83,6 +84,17 @@ return function (App $app): void {
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
         $group->get('/{id}/accommodations/{accommodationId}', [TravelController::class, 'getAccommodation']);
         $group->get('/{id}/participants', [TravelController::class, 'listParticipants']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/notifications', function (RouteCollectorProxy $group) {
+        $group->get('', [NotificationController::class, 'list']);
+        $group->delete('', [NotificationController::class, 'markAllRead']);
+        $group->get('/{id}', [NotificationController::class, 'get']);
+        $group->delete('/{id}', [NotificationController::class, 'markRead']);
+
+        $group->get('/devices', [NotificationController::class, 'listDevices']);
+        $group->post('/devices', [NotificationController::class, 'registerDevice']);
+        $group->delete('/devices/{deviceId}', [NotificationController::class, 'unregisterDevice']);
     })->add($container->get(AuthenticationMiddleware::class));
 
 };

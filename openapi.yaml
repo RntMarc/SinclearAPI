@@ -964,6 +964,125 @@ components:
         message:
           type: string
 
+    Notification:
+      type: object
+      required: [id, type, entityId, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Benachrichtigungs-ID
+        type:
+          type: string
+          description: Benachrichtigungstyp (wird vom Client zur Anzeige verwendet)
+          example: recipe_review
+        entityId:
+          type: string
+          format: uuid
+          description: ID der zugehörigen Entität
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt (ISO 8601)
+
+    NotificationListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        meta:
+          type: object
+          required: [unreadCount]
+          properties:
+            unreadCount:
+              type: integer
+              description: Anzahl ungelesener Benachrichtigungen
+
+    NotificationDeleteResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [deleted]
+          properties:
+            deleted:
+              type: integer
+              description: Anzahl gelöschter Benachrichtigungen
+
+    DeviceRegisterRequest:
+      type: object
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          description: FCM Registration Token
+        platform:
+          type: string
+          enum: [android, web, ios, linux, windows]
+          description: Plattform des Geräts
+        deviceName:
+          type: string
+          description: Optionale Bezeichnung des Geräts
+          example: Mein Android Handy
+
+    DeviceRegisterResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [id, platform, pushEnabled]
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Geräte-ID
+            platform:
+              type: string
+              description: Plattform des Geräts
+            pushEnabled:
+              type: boolean
+              description: Push-Benachrichtigungen aktiviert
+
+    Device:
+      type: object
+      required: [id, platform, pushEnabled, lastActiveAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Geräte-ID
+        deviceName:
+          type: string
+          description: Optionale Bezeichnung des Geräts
+        platform:
+          type: string
+          description: Plattform des Geräts
+        pushEnabled:
+          type: boolean
+          description: Push-Benachrichtigungen aktiviert
+        lastActiveAt:
+          type: string
+          format: date-time
+          description: Letzte Aktivität
+        createdAt:
+          type: string
+          format: date-time
+          description: Registrierungszeitpunkt
+
+    DeviceListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Device'
+
 paths:
   /auth/login/otp/request:
     post:
@@ -2332,7 +2451,225 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Bewertung nicht gefunden
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications:
+    get:
+      summary: Benachrichtigungen abrufen
+      description: >
+        Gibt alle Benachrichtigungen des authentifizierten Nutzers zurück.
+        Unterstützt Polling über den `since`-Parameter.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: ISO 8601 Zeitstempel - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximale Anzahl an Benachrichtigungen
+      responses:
+        '200':
+          description: Liste der Benachrichtigungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Alle Benachrichtigungen als gelesen markieren
+      description: >
+        Löscht alle Benachrichtigungen des authentifizierten Nutzers.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Anzahl gelöschter Benachrichtigungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationDeleteResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/{id}:
+    get:
+      summary: Einzelne Benachrichtigung abrufen
+      description: >
+        Gibt eine einzelne Benachrichtigung anhand ihrer ID zurück.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Benachrichtigungs-ID
+      responses:
+        '200':
+          description: Benachrichtigung
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Notification'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Benachrichtigung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Benachrichtigung als gelesen markieren
+      description: >
+        Löscht eine einzelne Benachrichtigung (markiert als gelesen).
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Benachrichtigungs-ID
+      responses:
+        '204':
+          description: Benachrichtigung gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Benachrichtigung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/devices:
+    get:
+      summary: Registrierte Geräte auflisten
+      description: >
+        Gibt alle Geräte des authentifizierten Nutzers zurück,
+        die für Push-Benachrichtigungen registriert sind.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der Geräte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Gerät für Push-Benachrichtigungen registrieren
+      description: >
+        Registriert ein Gerät für FCM-Push-Benachrichtigungen.
+        Wenn das Gerät bereits existiert (gleicher Token), wird die letzte Aktivität aktualisiert.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRegisterRequest'
+      responses:
+        '201':
+          description: Gerät registriert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceRegisterResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/devices/{deviceId}:
+    delete:
+      summary: Gerät deregistrieren
+      description: >
+        Entfernt ein Gerät aus der Liste der Push-Empfänger.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Geräte-ID
+      responses:
+        '204':
+          description: Gerät deregistriert
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Gerät nicht gefunden
           content:
             application/json:
               schema:

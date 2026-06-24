@@ -1,0 +1,165 @@
+<?php
+
+namespace Sinclear\Api\Services;
+
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
+use Psr\Log\LoggerInterface;
+use Sinclear\Api\Repository\UserDeviceRepository;
+
+final readonly class PushService
+{
+    private Client $httpClient;
+
+    private const string TOKEN_URL = 'https://oauth2.googleapis.com/token';
+    private const string FCM_SEND_URL = 'https://fcm.googleapis.com/v1/projects/%s/messages:send';
+    private const string FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+    private const int TOKEN_LIFETIME = 3600;
+
+    private ?string $cachedAccessToken = null;
+    private int $tokenExpiresAt = 0;
+
+    public function __construct(
+        private UserDeviceRepository $deviceRepo,
+        private LoggerInterface $logger,
+        private string $projectId,
+        private string $clientEmail,
+        private string $privateKey,
+    ) {
+        $this->httpClient = new Client(['timeout' => 10]);
+    }
+
+    public function sendNotificationToUser(string $userId, string $notificationId): void
+    {
+        if ($this->projectId === '' || $this->clientEmail === '' || $this->privateKey === '') {
+            $this->logger->warning('FCM not configured, skipping push notification');
+            return;
+        }
+
+        $devices = $this->deviceRepo->findPushEnabledDevices($userId);
+
+        if (empty($devices)) {
+            return;
+        }
+
+        $accessToken = $this->getAccessToken();
+        if ($accessToken === null) {
+            $this->logger->error('Failed to obtain FCM access token');
+            return;
+        }
+
+        foreach ($devices as $device) {
+            $this->sendToDevice($device['pushToken'], $notificationId, $accessToken);
+        }
+    }
+
+    public function sendToDevice(string $fcmToken, string $notificationId, ?string $accessToken = null): bool
+    {
+        if ($this->projectId === '' || $this->clientEmail === '' || $this->privateKey === '') {
+            return false;
+        }
+
+        $accessToken ??= $this->getAccessToken();
+        if ($accessToken === null) {
+            return false;
+        }
+
+        $url = sprintf(self::FCM_SEND_URL, $this->projectId);
+
+        $payload = [
+            'message' => [
+                'token' => $fcmToken,
+                'data' => [
+                    'notificationId' => $notificationId,
+                ],
+            ],
+        ];
+
+        try {
+            $response = $this->httpClient->post($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $payload,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            if ($statusCode >= 200 && $statusCode < 300) {
+                return true;
+            }
+
+            $body = (string) $response->getBody();
+            $this->logger->warning('FCM response unexpected status', [
+                'status' => $statusCode,
+                'body' => $body,
+            ]);
+            return false;
+        } catch (GuzzleException $e) {
+            $this->logger->error('FCM send failed', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    private function getAccessToken(): ?string
+    {
+        if ($this->cachedAccessToken !== null && time() < $this->tokenExpiresAt) {
+            return $this->cachedAccessToken;
+        }
+
+        $now = time();
+        $jwt = $this->createJwt($now);
+
+        try {
+            $response = $this->httpClient->post(self::TOKEN_URL, [
+                'form_params' => [
+                    'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                    'assertion' => $jwt,
+                ],
+            ]);
+
+            $data = json_decode((string) $response->getBody(), true);
+
+            if (!is_array($data) || empty($data['access_token'])) {
+                $this->logger->error('FCM token exchange failed', ['response' => $data]);
+                return null;
+            }
+
+            $this->cachedAccessToken = $data['access_token'];
+            $this->tokenExpiresAt = $now + ($data['expires_in'] ?? self::TOKEN_LIFETIME) - 60;
+
+            return $this->cachedAccessToken;
+        } catch (GuzzleException $e) {
+            $this->logger->error('FCM token exchange error', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    private function createJwt(int $now): string
+    {
+        $header = $this->base64UrlEncode(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+        $claimSet = $this->base64UrlEncode(json_encode([
+            'iss' => $this->clientEmail,
+            'scope' => self::FCM_SCOPE,
+            'aud' => self::TOKEN_URL,
+            'iat' => $now,
+            'exp' => $now + self::TOKEN_LIFETIME,
+        ]));
+
+        $data = $header . '.' . $claimSet;
+
+        $signature = '';
+        $privateKey = openssl_pkey_get_private($this->privateKey);
+        if ($privateKey !== false) {
+            openssl_sign($data, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+            openssl_pkey_free($privateKey);
+        }
+
+        return $data . '.' . $this->base64UrlEncode($signature);
+    }
+
+    private function base64UrlEncode(string $data): string
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+}
