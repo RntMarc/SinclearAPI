@@ -1,6 +1,7 @@
 <?php
 
 use Psr\Container\ContainerInterface;
+use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\NotificationController;
@@ -8,6 +9,7 @@ use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
+use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Slim\App;
@@ -99,4 +101,18 @@ return function (App $app): void {
         $group->delete('/{id}', [NotificationController::class, 'markRead']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    // Admin routes (unprotected login)
+    $app->get('/admin/login', [AdminController::class, 'loginPage']);
+    $app->post('/admin/login/otp/request', [AdminController::class, 'loginOtpRequest']);
+    $app->post('/admin/login/otp/verify', [AdminController::class, 'loginOtpVerify']);
+
+    // Admin routes (protected)
+    $app->group('/admin', function (RouteCollectorProxy $group) {
+        $group->get('', [AdminController::class, 'dashboard']);
+        $group->get('/users', [AdminController::class, 'users']);
+        $group->get('/users/json', [AdminController::class, 'adminUsersJson']);
+        $group->get('/travel', [AdminController::class, 'travel']);
+        $group->get('/notifications', [AdminController::class, 'notifications']);
+        $group->post('/notifications/send', [AdminController::class, 'sendNotification']);
+    })->add($container->get(AdminMiddleware::class));
 };

@@ -105,6 +105,69 @@ components:
           type: string
           enum: [Bearer]
 
+    AdminTokenResponse:
+      type: object
+      required: [access_token, expires_in, refresh_token, token_type]
+      properties:
+        access_token:
+          type: string
+          description: JWT Access-Token für den Admin-Bereich
+        expires_in:
+          type: integer
+          description: Gültigkeitsdauer in Sekunden
+          example: 900
+        refresh_token:
+          type: string
+          description: Refresh-Token für Token-Erneuerung
+        token_type:
+          type: string
+          enum: [Bearer]
+
+    AdminUser:
+      type: object
+      required: [id, email, displayName, isAdmin]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        isAdmin:
+          type: boolean
+
+    AdminSendNotificationRequest:
+      type: object
+      required: [userId, code, deepLink]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Empfänger der Benachrichtigung
+        code:
+          type: string
+          description: >
+            Benachrichtigungscode. Unterstützte Werte:
+            `admin.system_update`, `admin.new_feature`,
+            `admin.maintenance`, `admin.welcome`, `admin.test`,
+            `admin.custom`
+          example: admin.system_update
+        deepLink:
+          type: string
+          description: >
+            Zielseite in der App. Unterstützte Werte:
+            `home`, `travel`, `events`, `profile`, `settings`,
+            `friends`, `discover`, `news`, `chat`, `feedback`
+          example: home
+        title:
+          type: string
+          description: Nur bei `admin.custom`: Titel der Benachrichtigung
+        body:
+          type: string
+          description: Nur bei `admin.custom`: Nachrichtentext
+
     RefreshRequest:
       type: object
       required: [refresh_token]
@@ -966,20 +1029,26 @@ components:
 
     Notification:
       type: object
-      required: [id, type, entityId, createdAt]
+      required: [id, code, payload, createdAt]
       properties:
         id:
           type: string
           format: uuid
           description: Eindeutige Benachrichtigungs-ID
-        type:
+        code:
           type: string
-          description: Benachrichtigungstyp (wird vom Client zur Anzeige verwendet)
-          example: recipe_review
-        entityId:
-          type: string
-          format: uuid
-          description: ID der zugehörigen Entität
+          description: >
+            Interner Benachrichtigungscode im Format `domain.action`.
+            Wird vom Client zur Anzeige verwendet. Vollständige Liste
+            in der Dokumentation.
+          example: changelog.new_feature
+        payload:
+          type: object
+          description: >
+            JSON-Objekt mit kontextabhängigen Informationen.
+            Die Struktur variiert je nach `code`. Siehe Dokumentation
+            für die genauen Schemata pro Code.
+          example: { "deepLink": "home" }
         createdAt:
           type: string
           format: date-time
@@ -2670,6 +2739,301 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Gerät nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/login:
+    get:
+      summary: Admin-Login-Seite
+      description: >
+        Gibt die HTML-Login-Seite für den Admin-Bereich zurück.
+      tags: [Admin]
+      responses:
+        '200':
+          description: Login-HTML-Seite
+          content:
+            text/html: {}
+
+  /admin/login/otp/request:
+    post:
+      summary: Admin-OTP anfordern
+      description: >
+        Fordert einen OTP-Login-Code für den Admin-Bereich an.
+        Der Nutzer muss ein Administrator sein.
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP gesendet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSentResponse'
+        '400':
+          description: Ungültige E-Mail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Anfragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/login/otp/verify:
+    post:
+      summary: Admin-OTP verifizieren
+      description: >
+        Verifiziert den OTP-Code und gibt Access- sowie Refresh-Token zurück.
+        Der Nutzer muss ein Administrator sein.
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Token ausgestellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTokenResponse'
+        '400':
+          description: Ungültiger oder abgelaufener Code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin:
+    get:
+      summary: Admin-Dashboard
+      description: >
+        Gibt die HTML-Dashboard-Seite des Admin-Bereichs zurück.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/users:
+    get:
+      summary: Admin-Nutzerverwaltung
+      description: >
+        Gibt die HTML-Nutzerverwaltungs-Seite zurück (Platzhalter).
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Nutzerverwaltungs-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/users/json:
+    get:
+      summary: Admin-Nutzerliste (JSON)
+      description: >
+        Gibt alle Nutzer als JSON für Dropdowns und Admin-Ansichten zurück.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste aller Nutzer
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUser'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel:
+    get:
+      summary: Admin-Reisen & Events
+      description: >
+        Gibt die HTML-Seite für Reisen & Events zurück (Platzhalter).
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Reisen/Events-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/notifications:
+    get:
+      summary: Admin-Benachrichtigungs-Seite
+      description: >
+        Gibt die HTML-Seite zum Senden von Benachrichtigungen zurück.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Benachrichtigungs-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/notifications/send:
+    post:
+      summary: Benachrichtigung senden
+      description: >
+        Sendet eine Push-Benachrichtigung an einen bestimmten Nutzer.
+        Unterstützt vordefinierte Codes und benutzerdefinierte Nachrichten.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSendNotificationRequest'
+      responses:
+        '201':
+          description: Benachrichtigung gesendet
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [id, userId, code]
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      userId:
+                        type: string
+                        format: uuid
+                      code:
+                        type: string
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
           content:
             application/json:
               schema:

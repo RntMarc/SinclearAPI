@@ -10,6 +10,13 @@ final readonly class TravelEventRepository
         private PDO $pdo,
     ) {}
 
+    /** @return list<array<string, mixed>> */
+    public function findAll(): array
+    {
+        $stmt = $this->pdo->query('SELECT * FROM TravelEvent ORDER BY start DESC');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function findByTrip(string $tripId): array
     {
         $stmt = $this->pdo->prepare(

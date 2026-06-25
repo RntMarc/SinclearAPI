@@ -18,6 +18,19 @@ final readonly class TravelTripRepository
         return $result ?: null;
     }
 
+    /** @return list<array<string, mixed>> */
+    public function findAll(): array
+    {
+        $stmt = $this->pdo->query('SELECT * FROM TravelTrip ORDER BY start DESC');
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function countAll(): int
+    {
+        $stmt = $this->pdo->query('SELECT COUNT(*) FROM TravelTrip');
+        return (int) $stmt->fetchColumn();
+    }
+
     public function findByParticipant(string $userId, int $page, int $limit): array
     {
         $params = [$userId];

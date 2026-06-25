@@ -40,4 +40,10 @@ final readonly class UserRepository
         $stmt = $this->pdo->query('SELECT id, email, displayName, discordId, isAdmin, image, createdAt, birthday, birthdayVisibility, emailVisibility, onboardingCompleted FROM User');
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    public function countAll(): int
+    {
+        $stmt = $this->pdo->query('SELECT COUNT(*) FROM User');
+        return (int) $stmt->fetchColumn();
+    }
 }

@@ -11,21 +11,21 @@ final readonly class NotificationRepository
         private PDO $pdo,
     ) {}
 
-    public function create(string $userId, string $type, string $entityId): string
+    public function create(string $userId, string $code, array $payload): string
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO Notification (id, userId, type, entityId, createdAt)
+            'INSERT INTO Notification (id, userId, code, payload, createdAt)
              VALUES (?, ?, ?, ?, NOW(3))'
         );
-        $stmt->execute([$id, $userId, $type, $entityId]);
+        $stmt->execute([$id, $userId, $code, json_encode($payload)]);
         return $id;
     }
 
     public function findById(string $id, string $userId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, userId, type, entityId, createdAt FROM Notification WHERE id = ? AND userId = ?'
+            'SELECT id, userId, code, payload, createdAt FROM Notification WHERE id = ? AND userId = ?'
         );
         $stmt->execute([$id, $userId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -36,7 +36,7 @@ final readonly class NotificationRepository
     {
         if ($since !== null) {
             $stmt = $this->pdo->prepare(
-                'SELECT id, userId, type, entityId, createdAt
+                'SELECT id, userId, code, payload, createdAt
                  FROM Notification
                  WHERE userId = ? AND createdAt > ?
                  ORDER BY createdAt ASC
@@ -45,7 +45,7 @@ final readonly class NotificationRepository
             $stmt->execute([$userId, $since, $limit]);
         } else {
             $stmt = $this->pdo->prepare(
-                'SELECT id, userId, type, entityId, createdAt
+                'SELECT id, userId, code, payload, createdAt
                  FROM Notification
                  WHERE userId = ?
                  ORDER BY createdAt ASC

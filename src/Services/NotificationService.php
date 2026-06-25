@@ -11,9 +11,9 @@ final readonly class NotificationService
         private PushService $pushService,
     ) {}
 
-    public function createNotification(string $userId, string $type, string $entityId): string
+    public function createNotification(string $userId, string $code, array $payload): string
     {
-        $id = $this->notificationRepo->create($userId, $type, $entityId);
+        $id = $this->notificationRepo->create($userId, $code, $payload);
 
         $this->pushService->sendNotificationToUser($userId, $id);
 
@@ -22,7 +22,8 @@ final readonly class NotificationService
 
     public function getNotification(string $userId, string $notificationId): ?array
     {
-        return $this->notificationRepo->findById($notificationId, $userId);
+        $notification = $this->notificationRepo->findById($notificationId, $userId);
+        return $notification !== null ? $this->formatNotification($notification) : null;
     }
 
     public function listNotifications(string $userId, ?string $since, int $limit): array
@@ -53,8 +54,10 @@ final readonly class NotificationService
     {
         return [
             'id' => $notification['id'],
-            'type' => $notification['type'],
-            'entityId' => $notification['entityId'],
+            'code' => $notification['code'],
+            'payload' => is_string($notification['payload'])
+                ? json_decode($notification['payload'], true)
+                : $notification['payload'],
             'createdAt' => $notification['createdAt'],
         ];
     }

@@ -10,6 +10,7 @@ use Monolog\Processor\UidProcessor;
 use PDO;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
+use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\NotificationController;
@@ -17,6 +18,7 @@ use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
+use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
@@ -241,4 +243,12 @@ return [
 
     NotificationService::class => autowire(),
     NotificationController::class => autowire(),
+
+    AdminMiddleware::class => function (ContainerInterface $c): AdminMiddleware {
+        return new AdminMiddleware(
+            tokenService: $c->get(TokenService::class),
+        );
+    },
+
+    AdminController::class => autowire(),
 ];
