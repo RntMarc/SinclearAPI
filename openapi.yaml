@@ -2845,6 +2845,7 @@ paths:
       summary: Admin-Dashboard
       description: >
         Gibt die HTML-Dashboard-Seite des Admin-Bereichs zurück.
+        Erreichbar auch unter `/admin/` (mit `/`).
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -2865,6 +2866,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /admin/:
+    get:
+      $ref: '#/paths/~1admin/get'
 
   /admin/users:
     get:

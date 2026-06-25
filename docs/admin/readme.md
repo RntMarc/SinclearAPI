@@ -60,7 +60,7 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/login` | Login-HTML-Seite |
 | POST | `/admin/login/otp/request` | OTP-Code anfordern |
 | POST | `/admin/login/otp/verify` | OTP-Code verifizieren + Tokens |
-| GET | `/admin/` | Dashboard (geschützt) |
+| GET | `/admin/` oder `/admin` | Dashboard (geschützt) |
 | GET | `/admin/users` | Nutzerverwaltung (geschützt) |
 | GET | `/admin/users/json` | Nutzerliste als JSON (geschützt) |
 | GET | `/admin/travel` | Reisen & Events (geschützt) |

@@ -108,7 +108,7 @@ return function (App $app): void {
 
     // Admin routes (protected)
     $app->group('/admin', function (RouteCollectorProxy $group) {
-        $group->get('', [AdminController::class, 'dashboard']);
+        $group->get('[/]', [AdminController::class, 'dashboard']);
         $group->get('/users', [AdminController::class, 'users']);
         $group->get('/users/json', [AdminController::class, 'adminUsersJson']);
         $group->get('/travel', [AdminController::class, 'travel']);
