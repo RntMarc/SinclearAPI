@@ -7,7 +7,6 @@ use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\UserDeviceRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
-use Sinclear\Api\Security\Policy\NotificationPolicy;
 use Sinclear\Api\Services\NotificationService;
 
 final readonly class NotificationController
@@ -15,7 +14,6 @@ final readonly class NotificationController
     public function __construct(
         private NotificationService $notificationService,
         private UserDeviceRepository $deviceRepo,
-        private NotificationPolicy $policy,
     ) {}
 
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

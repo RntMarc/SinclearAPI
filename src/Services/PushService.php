@@ -7,7 +7,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Repository\UserDeviceRepository;
 
-final readonly class PushService
+final class PushService
 {
     private Client $httpClient;
 
@@ -108,7 +108,13 @@ final readonly class PushService
         }
 
         $now = time();
-        $jwt = $this->createJwt($now);
+
+        try {
+            $jwt = $this->createJwt($now);
+        } catch (\RuntimeException $e) {
+            $this->logger->error('FCM JWT creation failed', ['error' => $e->getMessage()]);
+            return null;
+        }
 
         try {
             $response = $this->httpClient->post(self::TOKEN_URL, [
@@ -148,12 +154,15 @@ final readonly class PushService
 
         $data = $header . '.' . $claimSet;
 
-        $signature = '';
         $privateKey = openssl_pkey_get_private($this->privateKey);
-        if ($privateKey !== false) {
-            openssl_sign($data, $signature, $privateKey, OPENSSL_ALGO_SHA256);
-            openssl_pkey_free($privateKey);
+        if ($privateKey === false) {
+            $this->logger->error('Failed to load FCM private key');
+            throw new \RuntimeException('Invalid FCM private key');
         }
+
+        $signature = '';
+        openssl_sign($data, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+        openssl_pkey_free($privateKey);
 
         return $data . '.' . $this->base64UrlEncode($signature);
     }
