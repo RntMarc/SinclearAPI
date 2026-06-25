@@ -608,6 +608,144 @@ components:
           items:
             $ref: '#/components/schemas/TravelParticipant'
 
+    UserBrief:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        image:
+          type: string
+          nullable: true
+
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        creatorId:
+          type: string
+          format: uuid
+          description: Ersteller des Kalender-Events
+        title:
+          type: string
+          example: Team Meeting
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        visibility:
+          type: integer
+          enum: [0, 1, 2]
+          description: '0 = privat, 1 = öffentlich, 2 = enge Freunde'
+        participants:
+          type: array
+          description: Teilnehmer des Kalender-Events
+          items:
+            $ref: '#/components/schemas/UserBrief'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CalendarEventListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarEvent'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    CalendarEventDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/CalendarEvent'
+
+    CalendarEventCreateRequest:
+      type: object
+      required: [title, startTime, endTime]
+      properties:
+        title:
+          type: string
+          example: Team Meeting
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+          example: '2026-07-01T10:00:00Z'
+        endTime:
+          type: string
+          format: date-time
+          example: '2026-07-01T11:00:00Z'
+        visibility:
+          type: integer
+          enum: [0, 1, 2]
+          default: 0
+        participants:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Optionale Liste von Nutzer-IDs, die als Teilnehmer hinzugefügt werden
+
+    CalendarEventUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        visibility:
+          type: integer
+          enum: [0, 1, 2]
+
+    CalendarEventAddParticipantRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Nutzer-ID, die als Teilnehmer hinzugefügt wird
+
+    CalendarEventAddParticipantResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          properties:
+            calendarEventId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+
     UserBase:
       type: object
       properties:
@@ -2728,7 +2866,337 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Gerät nicht gefunden
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /calendar:
+    get:
+      summary: Kalender-Events auflisten
+      description: >
+        Gibt alle Kalender-Events zurück, die der authentifizierte Nutzer
+        sehen darf. Die Sichtbarkeit richtet sich nach dem `visibility`-Feld
+        des Events (privat/öffentlich/enge Freunde) sowie der expliziten
+        Teilnehmer-Liste. Unterstützt Paginierung und Zeitfilter.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: >
+            Manueller Start der Zeitspanne (ISO 8601). Events deren `endTime`
+            nach diesem Zeitpunkt liegen werden zurückgegeben.
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: >
+            Manuelles Ende der Zeitspanne (ISO 8601). Events deren `startTime`
+            vor diesem Zeitpunkt liegen werden zurückgegeben.
+        - name: range
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [week, month]
+          description: >
+            Vordefinierter Zeitbereich (aktuelle Woche / aktueller Monat).
+            Wird ignoriert, wenn `start` und `end` gesetzt sind.
+      responses:
+        '200':
+          description: Paginierte Liste der Kalender-Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Kalender-Event erstellen
+      description: >
+        Erstellt ein neues Kalender-Event. Der authentifizierte Nutzer wird
+        als Ersteller eingetragen. Optionale Teilnehmer-Liste wird direkt
+        verknüpft. Teilnehmer erhalten eine Push-Benachrichtigung.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarEventCreateRequest'
+      responses:
+        '201':
+          description: Kalender-Event erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventDetailResponse'
+        '400':
+          description: Ungültige Eingabedaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /calendar/{id}:
+    get:
+      summary: Kalender-Event abrufen
+      description: >
+        Gibt die Details eines Kalender-Events zurück. Der Nutzer muss
+        das Event sehen dürfen (Ersteller, Teilnehmer, oder gemäss
+        Sichtbarkeitseinstellung), sonst 404.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Kalender-Event mit Teilnehmern
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden oder keine Berechtigung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Kalender-Event ändern
+      description: >
+        Ändert ein bestehendes Kalender-Event. Nur der Ersteller (oder
+        Admin) darf ändern. Alle Teilnehmer erhalten eine
+        Push-Benachrichtigung über die Änderung.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarEventUpdateRequest'
+      responses:
+        '200':
+          description: Aktualisiertes Kalender-Event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventDetailResponse'
+        '400':
+          description: Ungültige Eingabedaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Ersteller dieses Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Kalender-Event löschen
+      description: >
+        Löscht ein Kalender-Event. Nur der Ersteller (oder Admin) darf
+        löschen. Es wird keine Benachrichtigung versendet.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Event gelöscht (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Ersteller dieses Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /calendar/{id}/participants:
+    post:
+      summary: Teilnehmer zu Kalender-Event hinzufügen
+      description: >
+        Fügt einen Nutzer als Teilnehmer zu einem Kalender-Event hinzu.
+        Nur der Ersteller (oder Admin) darf Teilnehmer hinzufügen.
+        Der hinzugefügte Nutzer erhält eine Push-Benachrichtigung.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalendarEventAddParticipantRequest'
+      responses:
+        '201':
+          description: Teilnehmer hinzugefügt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarEventAddParticipantResponse'
+        '400':
+          description: Ungültige Eingabedaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Ersteller dieses Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /calendar/{id}/participants/{userId}:
+    delete:
+      summary: Teilnehmer aus Kalender-Event entfernen
+      description: >
+        Entfernt einen Nutzer aus der Teilnehmer-Liste eines Kalender-Events.
+        Nur der Ersteller (oder Admin) darf Teilnehmer entfernen.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Teilnehmer entfernt (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Ersteller dieses Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
           content:
             application/json:
               schema:

@@ -3,6 +3,7 @@
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AuthController;
+use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
@@ -86,6 +87,18 @@ return function (App $app): void {
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
         $group->get('/{id}/accommodations/{accommodationId}', [TravelController::class, 'getAccommodation']);
         $group->get('/{id}/participants', [TravelController::class, 'listParticipants']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/calendar', function (RouteCollectorProxy $group) {
+        $group->get('', [CalendarEventController::class, 'list']);
+        $group->post('', [CalendarEventController::class, 'create']);
+
+        $group->get('/{id}', [CalendarEventController::class, 'get']);
+        $group->put('/{id}', [CalendarEventController::class, 'update']);
+        $group->delete('/{id}', [CalendarEventController::class, 'delete']);
+
+        $group->post('/{id}/participants', [CalendarEventController::class, 'addParticipant']);
+        $group->delete('/{id}/participants/{userId}', [CalendarEventController::class, 'removeParticipant']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/notifications', function (RouteCollectorProxy $group) {

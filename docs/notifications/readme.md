@@ -40,6 +40,14 @@ rendert basierend auf dem Code die passende UI und verwendet Daten aus
 
 **Deep-Link-Werte:** `home`, `travel`, `events`, `profile`, `settings`, `friends`, `discover`, `news`, `chat`, `feedback`
 
+### Kalender-Codes
+
+| Code | Payload | Beschreibung |
+|------|---------|-------------|
+| `calendar.event_created` | `{ "calendarEventId": "uuid", "title": "..." }` | Neues Kalender-Event mit Teilnehmern |
+| `calendar.event_updated` | `{ "calendarEventId": "uuid", "title": "..." }` | Kalender-Event wurde geändert |
+| `calendar.participant_added` | `{ "calendarEventId": "uuid", "title": "..." }` | Zu Kalender-Event hinzugefügt |
+
 ### Zukünftige Codes (Beispiele)
 
 | Code | Payload | Beschreibung |

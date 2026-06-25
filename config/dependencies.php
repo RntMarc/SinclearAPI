@@ -12,6 +12,7 @@ use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AuthController;
+use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
@@ -19,6 +20,7 @@ use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AdminMiddleware;
+use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
@@ -45,7 +47,9 @@ use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\TravelService;
+use Sinclear\Api\Security\Policy\CalendarEventPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Security\Policy\NotificationPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
@@ -163,6 +167,11 @@ return [
 
     TravelService::class => autowire(),
     TravelController::class => autowire(),
+
+    CalendarEventRepository::class => autowire(),
+    CalendarEventService::class => autowire(),
+    CalendarEventController::class => autowire(),
+    CalendarEventPolicy::class => autowire(),
 
     ContactInfoRepository::class => autowire(),
     ContactInfoUpdateRepository::class => autowire(),
