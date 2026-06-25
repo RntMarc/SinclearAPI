@@ -4,14 +4,12 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Ramsey\Uuid\Uuid;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\Auth\OtpService;
-use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Services\NotificationService;
 
@@ -33,7 +31,6 @@ final readonly class AdminController
 
     public function __construct(
         private OtpService $otpService,
-        private TokenService $tokenService,
         private OtpTokenRepository $otpTokenRepo,
         private UserRepository $userRepo,
         private NotificationService $notificationService,
@@ -43,6 +40,15 @@ final readonly class AdminController
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        if (isset($_SESSION['admin_id'], $_SESSION['admin_email'])) {
+            $response->getBody()->write('');
+            return $response->withStatus(302)->withHeader('Location', '/api/v2/admin/');
+        }
+
         $html = file_get_contents(__DIR__ . '/../../templates/admin/login.php') ?: '';
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
@@ -103,22 +109,23 @@ final readonly class AdminController
 
         $this->otpTokenRepo->markUsed($otpToken['id']);
 
-        $session = $this->tokenService->createRefreshSession($user['id']);
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['admin_id'] = $user['id'];
+        $_SESSION['admin_email'] = $user['email'];
 
-        $authUser = new AuthenticatedUser(
-            id: $user['id'],
-            email: $user['email'],
-            isAdmin: true,
-            jti: Uuid::uuid7()->toString(),
-        );
-        $accessToken = $this->tokenService->createAccessToken($authUser);
+        return ResponseFactory::json(['message' => 'login_success'], 200, $response);
+    }
 
-        return ResponseFactory::json([
-            'access_token' => $accessToken,
-            'expires_in' => $this->tokenService->getAccessTtl(),
-            'refresh_token' => $session['refresh_token'],
-            'token_type' => 'Bearer',
-        ], 200, $response);
+    public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        session_destroy();
+
+        return $response->withStatus(302)->withHeader('Location', '/api/v2/admin/login');
     }
 
     public function dashboard(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

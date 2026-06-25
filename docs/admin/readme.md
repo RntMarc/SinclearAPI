@@ -4,33 +4,29 @@
 
 Das Admin-Dashboard ist ein einfaches Web-Interface unter `/api/v2/admin/*`,
 das ausschließlich für Administratoren zugänglich ist. Es dient zu Test- und
-Verwaltungszwecken und verwendet die gleiche JWT-Authentifizierung wie die
-normalen API-Clients.
+Verwaltungszwecken und verwendet PHP-Sessions für die Authentifizierung.
 
 ## Authentifizierung
 
 1. Admin ruft `/api/v2/admin/login` auf
 2. E-Mail-Adresse eingeben → `POST /admin/login/otp/request` sendet OTP-Code
-3. 6-stelligen Code eingeben → `POST /admin/login/otp/verify` gibt Tokens zurück
-4. Access-Token wird im localStorage gespeichert und bei jedem Request als
-   `Authorization: Bearer <token>` mitgesendet
-5. Bei Ablauf oder Abmeldung: Token löschen → zurück zum Login
+3. 6-stelligen Code eingeben → `POST /admin/login/otp/verify` startet Session
+4. Session-Cookie wird vom Browser automatisch bei Folge-Requests mitgesendet
+5. Bei Abmeldung: `GET /admin/logout` zerstört Session → zurück zum Login
 
 Der Login-Endpunkt prüft, ob der Nutzer `isAdmin = true` in der Datenbank hat.
 Nicht-Admins erhalten einen 403-Fehler.
 
-### Token-Validierung
+### Session-Verwaltung
 
-- Die Login-Seite prüft vor dem automatischen Redirect zum Dashboard, ob der
-  vorhandene Token noch gültig ist (JWT `exp`-Claim). Abgelaufene oder
-  ungültige Token werden gelöscht, der Nutzer bleibt auf der Login-Seite.
-- Bei jedem Seitenaufruf einer geschützten Admin-Seite wird der Token
-  clientseitig erneut validiert. Bei fehlendem/abgelaufenem Token erfolgt
-  sofort ein Redirect zur Login-Seite.
-- Die `AdminMiddleware` erkennt Browser-Requests am `Accept: text/html`-Header
-  und leitet diese bei fehlender/ungültiger Autorisierung auf die Login-Seite
-  weiter (302 Redirect) anstatt eine JSON-Fehlermeldung zurückzugeben.
-  API-Requests (JSON) erhalten weiterhin strukturierte Fehlerantworten.
+- Die `AdminMiddleware` prüft bei jedem Seitenaufruf einer geschützten
+  Admin-Seite, ob eine gültige Session mit `admin_id` und `admin_email`
+  existiert. Bei fehlender Session wird der Browser zur Login-Seite
+  weitergeleitet (302 Redirect).
+- AJAX-Requests (z.B. Benachrichtigungen senden) senden das Session-Cookie
+  automatisch mit (`credentials: 'same-origin'`).
+- Die Login-Seite prüft serverseitig, ob bereits eine Session existiert –
+  wenn ja, wird direkt zum Dashboard weitergeleitet.
 
 ## Seiten
 
@@ -72,7 +68,8 @@ Nicht-Admins erhalten einen 403-Fehler.
 |---------|------|-------------|
 | GET | `/admin/login` | Login-HTML-Seite |
 | POST | `/admin/login/otp/request` | OTP-Code anfordern |
-| POST | `/admin/login/otp/verify` | OTP-Code verifizieren + Tokens |
+| POST | `/admin/login/otp/verify` | OTP-Code verifizieren + Session starten |
+| GET | `/admin/logout` | Session beenden + Redirect zum Login |
 | GET | `/admin/` oder `/admin` | Dashboard (geschützt) |
 | GET | `/admin/users` | Nutzerverwaltung (geschützt) |
 | GET | `/admin/users/json` | Nutzerliste als JSON (geschützt) |

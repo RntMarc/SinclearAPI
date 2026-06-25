@@ -105,23 +105,13 @@ components:
           type: string
           enum: [Bearer]
 
-    AdminTokenResponse:
+    AdminLoginResponse:
       type: object
-      required: [access_token, expires_in, refresh_token, token_type]
+      required: [message]
       properties:
-        access_token:
+        message:
           type: string
-          description: JWT Access-Token für den Admin-Bereich
-        expires_in:
-          type: integer
-          description: Gültigkeitsdauer in Sekunden
-          example: 900
-        refresh_token:
-          type: string
-          description: Refresh-Token für Token-Erneuerung
-        token_type:
-          type: string
-          enum: [Bearer]
+          example: login_success
 
     AdminUser:
       type: object
@@ -2805,7 +2795,7 @@ paths:
     post:
       summary: Admin-OTP verifizieren
       description: >
-        Verifiziert den OTP-Code und gibt Access- sowie Refresh-Token zurück.
+        Verifiziert den OTP-Code und startet eine PHP-Session für den Admin-Bereich.
         Der Nutzer muss ein Administrator sein.
       tags: [Admin]
       requestBody:
@@ -2816,11 +2806,11 @@ paths:
               $ref: '#/components/schemas/OtpVerifyRequest'
       responses:
         '200':
-          description: Token ausgestellt
+          description: Session gestartet
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AdminTokenResponse'
+                $ref: '#/components/schemas/AdminLoginResponse'
         '400':
           description: Ungültiger oder abgelaufener Code
           content:
@@ -2840,6 +2830,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /admin/logout:
+    get:
+      summary: Admin-Abmeldung
+      description: >
+        Beendet die PHP-Session und leitet zur Login-Seite weiter.
+      tags: [Admin]
+      responses:
+        '302':
+          description: Redirect zur Login-Seite
+
   /admin:
     get:
       summary: Admin-Dashboard
@@ -2847,8 +2847,6 @@ paths:
         Gibt die HTML-Dashboard-Seite des Admin-Bereichs zurück.
         Erreichbar auch unter `/admin/` (mit `/`).
       tags: [Admin]
-      security:
-        - BearerAuth: []
       responses:
         '200':
           description: Dashboard-HTML-Seite
@@ -2877,8 +2875,6 @@ paths:
       description: >
         Gibt die HTML-Nutzerverwaltungs-Seite zurück (Platzhalter).
       tags: [Admin]
-      security:
-        - BearerAuth: []
       responses:
         '200':
           description: Nutzerverwaltungs-HTML-Seite
@@ -2903,8 +2899,6 @@ paths:
       description: >
         Gibt alle Nutzer als JSON für Dropdowns und Admin-Ansichten zurück.
       tags: [Admin]
-      security:
-        - BearerAuth: []
       responses:
         '200':
           description: Liste aller Nutzer
@@ -2937,8 +2931,6 @@ paths:
       description: >
         Gibt die HTML-Seite für Reisen & Events zurück (Platzhalter).
       tags: [Admin]
-      security:
-        - BearerAuth: []
       responses:
         '200':
           description: Reisen/Events-HTML-Seite
@@ -2963,8 +2955,6 @@ paths:
       description: >
         Gibt die HTML-Seite zum Senden von Benachrichtigungen zurück.
       tags: [Admin]
-      security:
-        - BearerAuth: []
       responses:
         '200':
           description: Benachrichtigungs-HTML-Seite
@@ -2990,8 +2980,6 @@ paths:
         Sendet eine Push-Benachrichtigung an einen bestimmten Nutzer.
         Unterstützt vordefinierte Codes und benutzerdefinierte Nachrichten.
       tags: [Admin]
-      security:
-        - BearerAuth: []
       requestBody:
         required: true
         content:

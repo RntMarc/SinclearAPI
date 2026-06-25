@@ -75,10 +75,6 @@
     <script>
         let loginEmail = '';
 
-        function getToken() { return localStorage.getItem('admin_token'); }
-        function setToken(t) { localStorage.setItem('admin_token', t); }
-        function clearToken() { localStorage.removeItem('admin_token'); }
-
         function showError(id, msg) {
             const el = document.getElementById(id);
             el.textContent = msg;
@@ -157,7 +153,6 @@
                         : 'Fehler: ' + (data.error || 'unbekannt'));
                     return;
                 }
-                setToken(data.access_token);
                 window.location.href = '/api/v2/admin/';
             } catch (e) {
                 showError('step2Error', 'Verbindungsfehler. Bitte erneut versuchen.');
@@ -176,22 +171,6 @@
             document.getElementById('email').focus();
             hideError('step1Error');
             hideError('step2Error');
-        }
-
-        // Check if already logged in with a valid (non-expired) token
-        if (getToken()) {
-            try {
-                const payload = JSON.parse(atob(
-                    getToken().split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-                ));
-                if (payload.exp * 1000 > Date.now()) {
-                    window.location.href = '/api/v2/admin/';
-                } else {
-                    clearToken();
-                }
-            } catch {
-                clearToken();
-            }
         }
     </script>
 </body>

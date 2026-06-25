@@ -134,26 +134,8 @@
         {{content}}
     </main>
     <script>
-        function getToken() { return localStorage.getItem('admin_token'); }
-        function setToken(t) { localStorage.setItem('admin_token', t); }
-        function clearToken() { localStorage.removeItem('admin_token'); }
-
         function logout() {
-            clearToken();
-            window.location.href = '/api/v2/admin/login';
-        }
-
-        async function apiFetch(url, options = {}) {
-            const token = getToken();
-            const headers = { 'Content-Type': 'application/json', ...options.headers };
-            if (token) { headers['Authorization'] = 'Bearer ' + token; }
-            const res = await fetch(url, { ...options, headers });
-            if (res.status === 401 || res.status === 403) {
-                clearToken();
-                window.location.href = '/api/v2/admin/login';
-                throw new Error('Unauthorized');
-            }
-            return res;
+            window.location.href = '/api/v2/admin/logout';
         }
 
         function showToast(message, type = 'success') {
@@ -170,27 +152,6 @@
                 link.classList.add('active');
             }
         });
-
-        // Defence-in-depth: verify token is valid on page load
-        (function() {
-            const token = getToken();
-            if (!token) {
-                window.location.href = '/api/v2/admin/login';
-                return;
-            }
-            try {
-                const payload = JSON.parse(atob(
-                    token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-                ));
-                if (payload.exp * 1000 <= Date.now()) {
-                    clearToken();
-                    window.location.href = '/api/v2/admin/login';
-                }
-            } catch {
-                clearToken();
-                window.location.href = '/api/v2/admin/login';
-            }
-        })();
     </script>
 </body>
 </html>

@@ -101,10 +101,11 @@ return function (App $app): void {
         $group->delete('/{id}', [NotificationController::class, 'markRead']);
     })->add($container->get(AuthenticationMiddleware::class));
 
-    // Admin routes (unprotected login)
+    // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);
     $app->post('/admin/login/otp/request', [AdminController::class, 'loginOtpRequest']);
     $app->post('/admin/login/otp/verify', [AdminController::class, 'loginOtpVerify']);
+    $app->get('/admin/logout', [AdminController::class, 'logout']);
 
     // Admin routes (protected)
     $app->group('/admin', function (RouteCollectorProxy $group) {

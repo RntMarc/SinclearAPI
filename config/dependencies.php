@@ -244,11 +244,7 @@ return [
     NotificationService::class => autowire(),
     NotificationController::class => autowire(),
 
-    AdminMiddleware::class => function (ContainerInterface $c): AdminMiddleware {
-        return new AdminMiddleware(
-            tokenService: $c->get(TokenService::class),
-        );
-    },
+    AdminMiddleware::class => create(),
 
     AdminController::class => autowire(),
 ];

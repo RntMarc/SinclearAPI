@@ -69,7 +69,11 @@
 <script>
     async function loadUsers() {
         try {
-            const res = await apiFetch('/api/v2/admin/users/json');
+            const res = await fetch('/api/v2/admin/users/json', { credentials: 'same-origin' });
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = '/api/v2/admin/login';
+                return;
+            }
             const data = await res.json();
             const users = data.data || [];
             const selects = ['presetUserId', 'userId'];
@@ -97,12 +101,18 @@
         if (code === 'admin.welcome') deepLink = 'home';
 
         try {
-            const res = await apiFetch('/api/v2/admin/notifications/send', {
+            const res = await fetch('/api/v2/admin/notifications/send', {
                 method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, code, deepLink }),
             });
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = '/api/v2/admin/login';
+                return;
+            }
             if (res.ok) {
-                showToast('✅ Benachrichtigung gesendet (Code: ' + code + ')');
+                showToast('Benachrichtigung gesendet (Code: ' + code + ')');
             } else {
                 const data = await res.json();
                 showToast('Fehler: ' + (data.error || 'unbekannt'), 'error');
@@ -125,12 +135,18 @@
         if (!data.userId) { showToast('Bitte einen Empfänger auswählen.', 'error'); return; }
 
         try {
-            const res = await apiFetch('/api/v2/admin/notifications/send', {
+            const res = await fetch('/api/v2/admin/notifications/send', {
                 method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = '/api/v2/admin/login';
+                return;
+            }
             if (res.ok) {
-                showToast('✅ Benachrichtigung gesendet');
+                showToast('Benachrichtigung gesendet');
                 form.title.value = '';
                 form.body.value = '';
             } else {
