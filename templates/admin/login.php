@@ -75,6 +75,10 @@
     <script>
         let loginEmail = '';
 
+        function getToken() { return localStorage.getItem('admin_token'); }
+        function setToken(t) { localStorage.setItem('admin_token', t); }
+        function clearToken() { localStorage.removeItem('admin_token'); }
+
         function showError(id, msg) {
             const el = document.getElementById(id);
             el.textContent = msg;
