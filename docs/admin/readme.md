@@ -19,6 +19,19 @@ normalen API-Clients.
 Der Login-Endpunkt prüft, ob der Nutzer `isAdmin = true` in der Datenbank hat.
 Nicht-Admins erhalten einen 403-Fehler.
 
+### Token-Validierung
+
+- Die Login-Seite prüft vor dem automatischen Redirect zum Dashboard, ob der
+  vorhandene Token noch gültig ist (JWT `exp`-Claim). Abgelaufene oder
+  ungültige Token werden gelöscht, der Nutzer bleibt auf der Login-Seite.
+- Bei jedem Seitenaufruf einer geschützten Admin-Seite wird der Token
+  clientseitig erneut validiert. Bei fehlendem/abgelaufenem Token erfolgt
+  sofort ein Redirect zur Login-Seite.
+- Die `AdminMiddleware` erkennt Browser-Requests am `Accept: text/html`-Header
+  und leitet diese bei fehlender/ungültiger Autorisierung auf die Login-Seite
+  weiter (302 Redirect) anstatt eine JSON-Fehlermeldung zurückzugeben.
+  API-Requests (JSON) erhalten weiterhin strukturierte Fehlerantworten.
+
 ## Seiten
 
 ### Dashboard (`/`)

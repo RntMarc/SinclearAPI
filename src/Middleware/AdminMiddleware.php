@@ -21,18 +21,18 @@ final readonly class AdminMiddleware implements MiddlewareInterface
         $authHeader = $request->getHeaderLine('Authorization');
 
         if (empty($authHeader) || !str_starts_with($authHeader, 'Bearer ')) {
-            return ResponseFactory::json(['error' => 'unauthorized'], 401);
+            return $this->unauthorizedResponse($request);
         }
 
         $token = substr($authHeader, 7);
         $payload = $this->tokenService->validateAccessToken($token);
 
         if ($payload === null) {
-            return ResponseFactory::json(['error' => 'token_invalid'], 401);
+            return $this->unauthorizedResponse($request);
         }
 
         if (!($payload->isAdmin ?? false)) {
-            return ResponseFactory::json(['error' => 'forbidden'], 403);
+            return $this->forbiddenResponse($request);
         }
 
         $user = new AuthenticatedUser(
@@ -45,5 +45,25 @@ final readonly class AdminMiddleware implements MiddlewareInterface
         $request = $request->withAttribute(AuthenticatedUser::class, $user);
 
         return $handler->handle($request);
+    }
+
+    private function unauthorizedResponse(ServerRequestInterface $request): ResponseInterface
+    {
+        return $this->isBrowserRequest($request)
+            ? ResponseFactory::redirect('/api/v2/admin/login', 302)
+            : ResponseFactory::json(['error' => 'unauthorized'], 401);
+    }
+
+    private function forbiddenResponse(ServerRequestInterface $request): ResponseInterface
+    {
+        return $this->isBrowserRequest($request)
+            ? ResponseFactory::redirect('/api/v2/admin/login', 302)
+            : ResponseFactory::json(['error' => 'forbidden'], 403);
+    }
+
+    private function isBrowserRequest(ServerRequestInterface $request): bool
+    {
+        $accept = $request->getHeaderLine('Accept');
+        return str_contains($accept, 'text/html');
     }
 }

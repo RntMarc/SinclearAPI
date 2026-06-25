@@ -30,4 +30,12 @@ final class ResponseFactory
             $response
         );
     }
+
+    public static function redirect(string $url, int $status = 302, ?ResponseInterface $response = null): ResponseInterface
+    {
+        $response ??= new Response();
+        return $response
+            ->withStatus($status)
+            ->withHeader('Location', $url);
+    }
 }

@@ -178,9 +178,20 @@
             hideError('step2Error');
         }
 
-        // Check if already logged in
+        // Check if already logged in with a valid (non-expired) token
         if (getToken()) {
-            window.location.href = '/api/v2/admin/';
+            try {
+                const payload = JSON.parse(atob(
+                    getToken().split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+                ));
+                if (payload.exp * 1000 > Date.now()) {
+                    window.location.href = '/api/v2/admin/';
+                } else {
+                    clearToken();
+                }
+            } catch {
+                clearToken();
+            }
         }
     </script>
 </body>

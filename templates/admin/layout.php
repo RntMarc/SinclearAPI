@@ -170,6 +170,27 @@
                 link.classList.add('active');
             }
         });
+
+        // Defence-in-depth: verify token is valid on page load
+        (function() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/api/v2/admin/login';
+                return;
+            }
+            try {
+                const payload = JSON.parse(atob(
+                    token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+                ));
+                if (payload.exp * 1000 <= Date.now()) {
+                    clearToken();
+                    window.location.href = '/api/v2/admin/login';
+                }
+            } catch {
+                clearToken();
+                window.location.href = '/api/v2/admin/login';
+            }
+        })();
     </script>
 </body>
 </html>
