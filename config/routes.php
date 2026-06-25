@@ -89,12 +89,14 @@ return function (App $app): void {
     $app->group('/notifications', function (RouteCollectorProxy $group) {
         $group->get('', [NotificationController::class, 'list']);
         $group->delete('', [NotificationController::class, 'markAllRead']);
-        $group->get('/{id}', [NotificationController::class, 'get']);
-        $group->delete('/{id}', [NotificationController::class, 'markRead']);
 
+        // Static routes MUST come before /{id} to avoid route capture
         $group->get('/devices', [NotificationController::class, 'listDevices']);
         $group->post('/devices', [NotificationController::class, 'registerDevice']);
         $group->delete('/devices/{deviceId}', [NotificationController::class, 'unregisterDevice']);
+
+        $group->get('/{id}', [NotificationController::class, 'get']);
+        $group->delete('/{id}', [NotificationController::class, 'markRead']);
     })->add($container->get(AuthenticationMiddleware::class));
 
 };
