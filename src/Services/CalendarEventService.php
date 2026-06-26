@@ -2,6 +2,8 @@
 
 namespace Sinclear\Api\Services;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
 
@@ -172,6 +174,13 @@ final readonly class CalendarEventService
 
     private function enrich(array $event): array
     {
+        foreach (['startTime', 'endTime', 'createdAt', 'updatedAt'] as $field) {
+            if (isset($event[$field])) {
+                $event[$field] = (new DateTimeImmutable($event[$field], new DateTimeZone('UTC')))
+                    ->format('Y-m-d\TH:i:s.v\Z');
+            }
+        }
+
         $event['participants'] = $this->eventRepo->findParticipantsByEvent($event['id']);
         return $event;
     }
