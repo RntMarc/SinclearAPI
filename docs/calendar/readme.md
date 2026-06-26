@@ -5,6 +5,8 @@ Kalender-Einträgen (Kalender-Events, nicht zu verwechseln mit Reise-Events
 aus `TravelEvent`). Jeder Nutzer kann eigene Einträge erstellen, ändern und
 löschen, andere Nutzer hinzufügen und die Sichtbarkeit festlegen.
 
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC (beim Senden an die API) und von UTC in die lokale Zeitzone (beim Empfangen von der API) verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+
 ## Datenbank-Tabellen
 
 | Tabelle | Beschreibung |

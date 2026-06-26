@@ -4,6 +4,8 @@ Die Travel-Funktion erlaubt Nutzern das Verwalten und Abrufen von Reisen,
 zugehörigen Events und Unterkünften. Jeder Nutzer sieht nur die Reisen,
 bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC (beim Senden an die API) und von UTC in die lokale Zeitzone (beim Empfangen von der API) verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+
 ## Datenbank-Tabellen
 
 | Tabelle | Beschreibung |

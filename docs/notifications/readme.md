@@ -7,6 +7,8 @@ Das Benachrichtigungssystem unterstützt zwei Delivery-Mechanismen:
 1. **FCM Push** (Android/Web): Der Client wird durch eine FCM-Nachricht aufgeweckt und ruft die Benachrichtigung via API ab.
 2. **Polling** (Linux/Windows): Der Client ruft periodisch die API auf, um neue Benachrichtigungen abzurufen.
 
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC (beim Senden an die API) und von UTC in die lokale Zeitzone (beim Empfangen von der API) verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+
 ## Datenbank
 
 ### Notification Tabelle (v2)

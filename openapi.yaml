@@ -232,9 +232,11 @@ components:
         createdAt:
           type: string
           format: date-time
+          description: Erstellungszeitpunkt (UTC)
         lastUpdated:
           type: string
           format: date-time
+          description: Letzte Aktualisierung (UTC)
         distance:
           type: number
           format: float
@@ -249,7 +251,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Zeitpunkt des Bookmarks (nur bei Bookmark-Liste)
+          description: Zeitpunkt des Bookmarks (UTC, nur bei Bookmark-Liste)
         _attribution:
           type: string
           description: Quellennachweis für OpenStreetMap-Daten (immer vorhanden)
@@ -340,6 +342,7 @@ components:
             createdAt:
               type: string
               format: date-time
+              description: Erstellungszeitpunkt (UTC)
 
     ReviewListResponse:
       type: object
@@ -393,9 +396,11 @@ components:
         start:
           type: string
           format: date-time
+          description: Reisebeginn (UTC)
         end:
           type: string
           format: date-time
+          description: Reiseende (UTC)
         hastickets:
           type: string
           enum: ['0', '1']
@@ -444,9 +449,11 @@ components:
         start:
           type: string
           format: date-time
+          description: Event-Beginn (UTC)
         end:
           type: string
           format: date-time
+          description: Event-Ende (UTC)
         hastickets:
           type: string
           enum: ['0', '1']
@@ -639,9 +646,11 @@ components:
         startTime:
           type: string
           format: date-time
+          description: Startzeit (UTC)
         endTime:
           type: string
           format: date-time
+          description: Endzeit (UTC)
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -654,9 +663,11 @@ components:
         createdAt:
           type: string
           format: date-time
+          description: Erstellungszeitpunkt (UTC)
         updatedAt:
           type: string
           format: date-time
+          description: Änderungszeitpunkt (UTC)
 
     CalendarEventListResponse:
       type: object
@@ -689,10 +700,12 @@ components:
         startTime:
           type: string
           format: date-time
+          description: Startzeit (UTC)
           example: '2026-07-01T10:00:00Z'
         endTime:
           type: string
           format: date-time
+          description: Endzeit (UTC)
           example: '2026-07-01T11:00:00Z'
         visibility:
           type: integer
@@ -716,9 +729,11 @@ components:
         startTime:
           type: string
           format: date-time
+          description: Startzeit (UTC)
         endTime:
           type: string
           format: date-time
+          description: Endzeit (UTC)
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -772,6 +787,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          description: Erstellungszeitpunkt (UTC)
         onboardingCompleted:
           type: boolean
         birthday:
@@ -906,6 +922,7 @@ components:
         createdAt:
           type: string
           format: date-time
+          description: Erstellungszeitpunkt (UTC)
         onboardingCompleted:
           type: boolean
         birthday:
@@ -1180,7 +1197,7 @@ components:
         createdAt:
           type: string
           format: date-time
-          description: Erstellungszeitpunkt (ISO 8601)
+          description: Erstellungszeitpunkt (ISO 8601, UTC)
 
     NotificationListResponse:
       type: object
@@ -1265,11 +1282,11 @@ components:
         lastActiveAt:
           type: string
           format: date-time
-          description: Letzte Aktivität
+          description: Letzte Aktivität (UTC)
         createdAt:
           type: string
           format: date-time
-          description: Registrierungszeitpunkt
+          description: Registrierungszeitpunkt (UTC)
 
     DeviceListResponse:
       type: object
@@ -2670,7 +2687,7 @@ paths:
           schema:
             type: string
             format: date-time
-          description: ISO 8601 Zeitstempel - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
+          description: ISO 8601 Zeitstempel (UTC) - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
         - name: limit
           in: query
           required: false
@@ -2906,8 +2923,8 @@ paths:
             type: string
             format: date-time
           description: >
-            Manueller Start der Zeitspanne (ISO 8601). Events deren `endTime`
-            nach diesem Zeitpunkt liegen werden zurückgegeben.
+            Manueller Start der Zeitspanne (ISO 8601, UTC). Events deren
+            `endTime` nach diesem Zeitpunkt liegen werden zurückgegeben.
         - name: end
           in: query
           required: false
@@ -2915,8 +2932,8 @@ paths:
             type: string
             format: date-time
           description: >
-            Manuelles Ende der Zeitspanne (ISO 8601). Events deren `startTime`
-            vor diesem Zeitpunkt liegen werden zurückgegeben.
+            Manuelles Ende der Zeitspanne (ISO 8601, UTC). Events deren
+            `startTime` vor diesem Zeitpunkt liegen werden zurückgegeben.
         - name: range
           in: query
           required: false

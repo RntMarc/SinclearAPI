@@ -4,6 +4,8 @@ Die Explore-Funktion erlaubt Nutzern das Sammeln und Durchsuchen von Orten
 der Kategorien **Gastronomie** und **Freizeit**. Die API integriert sich direkt
 mit **OpenStreetMap** (Nominatim), um Ortsdaten automatisch abzurufen.
 
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC (beim Senden an die API) und von UTC in die lokale Zeitzone (beim Empfangen von der API) verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+
 ## Datenbank-Tabellen
 
 | Tabelle | Beschreibung |
