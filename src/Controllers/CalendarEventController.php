@@ -13,6 +13,7 @@ final readonly class CalendarEventController
     private const array ERROR_MAP = [
         'Event not found' => ['event_not_found', 404],
         'Forbidden' => ['forbidden', 403],
+        'Invalid datetime' => ['invalid_datetime', 400],
     ];
 
     public function __construct(
@@ -45,14 +46,18 @@ final readonly class CalendarEventController
             return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
         }
 
-        $event = $this->calendarService->create($user->id, [
-            'title' => $title,
-            'description' => !empty($body['description']) ? trim((string) $body['description']) : null,
-            'startTime' => $startTime,
-            'endTime' => $endTime,
-            'visibility' => $visibility,
-            'participants' => $participants,
-        ]);
+        try {
+            $event = $this->calendarService->create($user->id, [
+                'title' => $title,
+                'description' => !empty($body['description']) ? trim((string) $body['description']) : null,
+                'startTime' => $startTime,
+                'endTime' => $endTime,
+                'visibility' => $visibility,
+                'participants' => $participants,
+            ]);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
 
         return ResponseFactory::json(['data' => $event], 201, $response);
     }

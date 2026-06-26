@@ -2,8 +2,11 @@
 
 namespace Sinclear\Api\Repository;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 use Ramsey\Uuid\Uuid;
+use RuntimeException;
 
 final readonly class CalendarEventRepository
 {
@@ -24,8 +27,8 @@ final readonly class CalendarEventRepository
             $creatorId,
             $data['title'],
             $data['description'] ?? null,
-            $data['startTime'],
-            $data['endTime'],
+            $this->formatDatetime($data['startTime']),
+            $this->formatDatetime($data['endTime']),
             $data['visibility'] ?? 0,
         ]);
 
@@ -40,7 +43,11 @@ final readonly class CalendarEventRepository
         foreach (['title', 'description', 'startTime', 'endTime', 'visibility'] as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[] = "`$field` = ?";
-                $params[] = $data[$field];
+                $value = $data[$field];
+                if (in_array($field, ['startTime', 'endTime'], true)) {
+                    $value = $this->formatDatetime($value);
+                }
+                $params[] = $value;
             }
         }
 
@@ -91,11 +98,11 @@ final readonly class CalendarEventRepository
         $timeConditions = [];
         if ($start !== null) {
             $timeConditions[] = 'e.endTime > ?';
-            $params[] = $start;
+            $params[] = $this->formatDatetime($start);
         }
         if ($end !== null) {
             $timeConditions[] = 'e.startTime < ?';
-            $params[] = $end;
+            $params[] = $this->formatDatetime($end);
         }
 
         $where = $visibilityWhere;
@@ -172,5 +179,16 @@ final readonly class CalendarEventRepository
         );
         $stmt->execute([$eventId, $userId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    }
+
+    private function formatDatetime(string $value): string
+    {
+        try {
+            return (new DateTimeImmutable($value))
+                ->setTimezone(new DateTimeZone('UTC'))
+                ->format('Y-m-d H:i:s');
+        } catch (\Exception $e) {
+            throw new RuntimeException('Invalid datetime');
+        }
     }
 }
