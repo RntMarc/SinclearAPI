@@ -262,6 +262,7 @@ return [
         $settings = $c->get(Settings::class);
         return new AppController(
             downloadsBaseUrl: $settings->downloads['base_url'],
+            logger: $c->get(LoggerInterface::class),
         );
     },
 ];
