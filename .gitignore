@@ -1,6 +1,9 @@
 # updater
 update.sh
 
+# android updates
+app_version.json
+
 # environment
 .env
 
