@@ -301,8 +301,8 @@ final readonly class ProfileService
         $contact = $this->contactInfoRepo->findByUserId($userId);
 
         $data = $this->userService->formatUserBase($userData);
-        $data['social'] = $social !== null ? $this->userService->formatSocialInfo($social) : [];
-        $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($contact) : [];
+        $data['social'] = $social !== null ? $this->userService->formatSocialInfo($social) : null;
+        $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($contact) : null;
 
         return $data;
     }
