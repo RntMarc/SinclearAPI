@@ -1297,6 +1297,32 @@ components:
           items:
             $ref: '#/components/schemas/Device'
 
+    AppVersionResponse:
+      type: object
+      required: [version, versionCode, downloadUrl, changelog]
+      properties:
+        version:
+          type: string
+          description: Versionsnummer (z.B. "0.5.0")
+          example: "0.5.0"
+        versionCode:
+          type: integer
+          description: Numerischer Versionscode (für Android versionCode)
+          example: 5
+        downloadUrl:
+          type: string
+          format: uri
+          description: Vollständige URL zum APK-Download
+          example: https://sinclear.de/downloads/sinclear-v0.5.0.apk
+        changelog:
+          type: array
+          description: Liste der Änderungen in dieser Version
+          items:
+            type: string
+          example:
+            - "Neue Kalenderfunktion"
+            - "Performance-Verbesserungen"
+
 paths:
   /auth/login/otp/request:
     post:
@@ -3101,7 +3127,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Event nicht gefunden oder keine Berechtigung
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /app/version:
+    get:
+      summary: Aktuelle App-Version abfragen
+      description: >
+        Gibt die aktuell auf dem Server verfügbare App-Version zurück.
+        Wird von der Android-App beim Start aufgerufen, um zu prüfen,
+        ob ein Update verfügbar ist. Dieser Endpoint ist öffentlich
+        zugänglich und erfordert keine Authentifizierung.
+      tags: [App]
+      operationId: getAppVersion
+      responses:
+        '200':
+          description: Versionsinformationen erfolgreich abgerufen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppVersionResponse'
+        '503':
+          description: Versionsinformationen nicht verfügbar
           content:
             application/json:
               schema:
