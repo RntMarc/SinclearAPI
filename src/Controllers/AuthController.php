@@ -135,6 +135,50 @@ final readonly class AuthController
         }
     }
 
+    public function registerDiscordStart(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $result = $this->discordService->generateRegistrationOAuthUrl();
+
+        return ResponseFactory::json([
+            'url' => $result['url'],
+        ], 200, $response);
+    }
+
+    public function registerDiscordCallback(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $params = $request->getQueryParams();
+        $code = $params['code'] ?? '';
+        $state = $params['state'] ?? '';
+
+        if (empty($code) || empty($state)) {
+            $response->getBody()->write(
+                '<html><body><h1>Fehler</h1><p>Ungültige Anfrage.</p></body></html>'
+            );
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        try {
+            $result = $this->discordService->processRegistrationCallback($code, $state);
+
+            $html = strtr(
+                file_get_contents(__DIR__ . '/../../templates/discord-register-callback.php') ?: '',
+                ['{{code}}' => htmlspecialchars($result['pairing_code'])],
+            );
+
+            $response->getBody()->write($html);
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        } catch (\RuntimeException $e) {
+            $response->getBody()->write(
+                '<html><body><h1>Fehler</h1><p>' . htmlspecialchars($e->getMessage()) . '</p></body></html>'
+            );
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+    }
+
     public function refresh(
         ServerRequestInterface $request,
         ResponseInterface $response,

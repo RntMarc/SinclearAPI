@@ -46,4 +46,16 @@ final readonly class UserRepository
         $stmt = $this->pdo->query('SELECT COUNT(*) FROM User');
         return (int) $stmt->fetchColumn();
     }
+
+    public function create(string $email, string $displayName, string $discordId): array
+    {
+        $id = \Ramsey\Uuid\Uuid::uuid7()->toString();
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO User (id, email, passwordHash, displayName, discordId, createdAt)
+             VALUES (?, ?, ?, ?, ?, NOW(3))'
+        );
+        $stmt->execute([$id, $email, '', $displayName, $discordId]);
+
+        return $this->findById($id);
+    }
 }

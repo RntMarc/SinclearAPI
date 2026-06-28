@@ -29,6 +29,7 @@ $settings['discord'] = [
     'client_secret' => $_ENV['DISCORD_CLIENT_SECRET'] ?? '',
     'redirect_uri' => $_ENV['DISCORD_REDIRECT_URI'] ?? '',
     'relink_redirect_uri' => $_ENV['DISCORD_RELINK_REDIRECT_URI'] ?? $_ENV['DISCORD_REDIRECT_URI'] ?? '',
+    'register_redirect_uri' => $_ENV['DISCORD_REGISTER_REDIRECT_URI'] ?? $_ENV['DISCORD_REDIRECT_URI'] ?? '',
     'guild_id' => $_ENV['DISCORD_GUILD_ID'] ?? '',
 ];
 

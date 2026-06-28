@@ -1423,6 +1423,60 @@ paths:
         '400':
           description: Ungültiger oder abgelaufener State / Code
 
+  /auth/register/discord/start:
+    post:
+      summary: Discord OAuth2-Registrierung starten
+      description: >
+        Erzeugt eine Discord OAuth2 Authorize-URL mit PKCE für die
+        Registrierung eines neuen Kontos. Der Client öffnet diese URL
+        in einem Browser. Der Discord-Account darf noch nicht mit einem
+        bestehenden Konto verknüpft sein.
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Discord-URL wurde erzeugt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscordStartResponse'
+
+  /auth/register/discord/callback:
+    get:
+      summary: Discord OAuth2-Registrierungs-Callback
+      description: >
+        Wird von Discord nach erfolgreicher Autorisierung aufgerufen.
+        Die API tauscht den Authorization-Code gegen Discord-Tokens,
+        prüft die Guild-Mitgliedschaft, erstellt einen neuen Nutzer
+        in der DB und zeigt einen 6-stelligen Pairing-Code an.
+        Der Nutzer kopiert diesen Code in die App und verwendet ihn
+        am Endpunkt `/auth/login/otp/verify`.
+      tags: [Authentication]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization-Code von Discord
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: State-Parameter (PKCE, Anti-CSRF)
+      responses:
+        '200':
+          description: HTML-Seite mit dem 6-stelligen Pairing-Code
+          content:
+            text/html:
+              schema:
+                type: string
+                example: "<html>..."
+        '400':
+          description: >
+            Ungültiger State, Discord-Account bereits verknüpft,
+            E-Mail bereits registriert oder Guild-Mitgliedschaft fehlt
+
   /auth/refresh:
     post:
       summary: Access-Token erneuern

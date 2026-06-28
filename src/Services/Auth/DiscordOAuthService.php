@@ -185,6 +185,103 @@ final readonly class DiscordOAuthService
         ];
     }
 
+    public function generateRegistrationOAuthUrl(): array
+    {
+        $state = Uuid::uuid7()->toString();
+        $codeVerifier = $this->generateCodeVerifier();
+        $codeChallenge = $this->generateCodeChallenge($codeVerifier);
+
+        $this->storeState($state, $codeVerifier, '__register__');
+
+        $redirectUri = $this->settings->discord['register_redirect_uri']
+            ?? $this->settings->discord['redirect_uri'];
+
+        $params = http_build_query([
+            'response_type' => 'code',
+            'client_id' => $this->settings->discord['client_id'],
+            'redirect_uri' => $redirectUri,
+            'scope' => 'identify email guilds',
+            'state' => $state,
+            'code_challenge' => $codeChallenge,
+            'code_challenge_method' => 'S256',
+        ]);
+
+        return [
+            'url' => 'https://discord.com/api/oauth2/authorize?' . $params,
+            'state' => $state,
+        ];
+    }
+
+    public function processRegistrationCallback(string $code, string $state): array
+    {
+        $stored = $this->retrieveState($state);
+        if ($stored === null) {
+            throw new \RuntimeException('Invalid or expired state');
+        }
+
+        if ($stored['userId'] !== '__register__') {
+            throw new \RuntimeException('Invalid registration state');
+        }
+
+        $codeVerifier = $stored['code_verifier'];
+
+        $this->deleteState($state);
+
+        $redirectUri = $this->settings->discord['register_redirect_uri']
+            ?? $this->settings->discord['redirect_uri'];
+
+        try {
+            $response = $this->httpClient->post('https://discord.com/api/oauth2/token', [
+                'form_params' => [
+                    'client_id' => $this->settings->discord['client_id'],
+                    'client_secret' => $this->settings->discord['client_secret'],
+                    'grant_type' => 'authorization_code',
+                    'code' => $code,
+                    'redirect_uri' => $redirectUri,
+                    'code_verifier' => $codeVerifier,
+                ],
+            ]);
+        } catch (GuzzleException $e) {
+            throw new \RuntimeException('Discord token exchange failed: ' . $e->getMessage());
+        }
+
+        $tokenData = json_decode((string) $response->getBody(), true);
+        if (!isset($tokenData['access_token'])) {
+            throw new \RuntimeException('Failed to exchange Discord code');
+        }
+
+        $discordUser = $this->getUserInfo($tokenData['access_token']);
+        $this->checkGuildMembership($tokenData['access_token'], $discordUser['id']);
+
+        $repo = new UserRepository($this->pdo);
+        $existingByDiscord = $repo->findByDiscordId($discordUser['id']);
+        if ($existingByDiscord !== null) {
+            throw new \RuntimeException('Dieser Discord-Account ist bereits mit einem Konto verknüpft. Bitte melde dich an.');
+        }
+
+        $email = $discordUser['email'] ?? '';
+        if (empty($email)) {
+            throw new \RuntimeException('Keine E-Mail-Adresse von Discord erhalten. Bitte erteile die Berechtigung für deine E-Mail-Adresse.');
+        }
+
+        $existingByEmail = $repo->findByEmail($email);
+        if ($existingByEmail !== null) {
+            throw new \RuntimeException('Diese E-Mail ist bereits registriert. Bitte melde dich an.');
+        }
+
+        $displayName = $discordUser['username'] ?? 'User';
+        $user = $repo->create($email, $displayName, $discordUser['id']);
+
+        $pairingCode = $this->generatePairingCode();
+        $expiresAt = new \DateTimeImmutable('+' . self::PAIRING_CODE_TTL . ' seconds');
+        $this->otpTokenRepo->create($user['email'], $pairingCode, $expiresAt);
+
+        return [
+            'pairing_code' => $pairingCode,
+            'user_id' => $user['id'],
+        ];
+    }
+
     private function exchangeCode(string $code, string $codeVerifier): array
     {
         try {
