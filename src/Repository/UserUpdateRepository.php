@@ -43,7 +43,7 @@ final readonly class UserUpdateRepository
     /** @param string|int $value */
     public function updateField(string $userId, string $field, mixed $value): void
     {
-        $allowed = ['displayName', 'birthday', 'email', 'discordId', 'emailVisibility', 'birthdayVisibility', 'image'];
+        $allowed = ['displayName', 'birthday', 'email', 'discordId', 'emailVisibility', 'birthdayVisibility', 'image', 'onboardingCompleted'];
         if (!in_array($field, $allowed, true)) {
             throw new \InvalidArgumentException("Invalid field: $field");
         }

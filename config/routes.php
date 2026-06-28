@@ -73,6 +73,7 @@ return function (App $app): void {
         $group->get('/me/discord/callback', [ProfileController::class, 'discordCallback']);
         $group->post('/me/discord/verify', [ProfileController::class, 'verifyDiscordRelink']);
         $group->put('/me/visibility', [ProfileController::class, 'updateVisibility']);
+        $group->put('/me/onboarding/complete', [ProfileController::class, 'completeOnboarding']);
         $group->get('/{userId}', [UserController::class, 'get']);
         $group->get('/{userId}/base', [UserController::class, 'getBase']);
         $group->get('/{userId}/social', [UserController::class, 'getSocial']);

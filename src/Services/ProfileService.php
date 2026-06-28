@@ -289,6 +289,11 @@ final readonly class ProfileService
         }
     }
 
+    public function completeOnboarding(AuthenticatedUser $user): void
+    {
+        $this->userUpdateRepo->updateField($user->id, 'onboardingCompleted', 1);
+    }
+
     private function buildProfileResponse(string $userId): array
     {
         $userData = $this->userRepo->findById($userId);

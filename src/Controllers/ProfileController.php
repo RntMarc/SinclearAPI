@@ -119,6 +119,15 @@ final readonly class ProfileController
         return ResponseFactory::json(['message' => 'discord_updated'], 200, $response);
     }
 
+    public function completeOnboarding(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $this->profileService->completeOnboarding($user);
+        return ResponseFactory::json(['message' => 'onboarding_completed'], 200, $response);
+    }
+
     public function updateVisibility(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);

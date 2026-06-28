@@ -2060,6 +2060,30 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /user/me/onboarding/complete:
+    put:
+      summary: Onboarding als abgeschlossen markieren
+      description: >
+        Setzt das Feld `onboardingCompleted` des angemeldeten Nutzers
+        auf `true`. Wird vom Client aufgerufen, nachdem der Nutzer den
+        Onboarding-Prozess durchlaufen hat.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Onboarding als abgeschlossen markiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /explore:
     get:
       summary: Orte auflisten

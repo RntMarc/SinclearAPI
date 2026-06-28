@@ -42,6 +42,19 @@ Der angemeldete Nutzer sieht seine eigenen Einstellungen.
 |---------|------|-------------|
 | `PUT` | `/user/me/visibility` | Sichtbarkeit beliebig vieler Felder gleichzeitig setzen |
 
+### Onboarding abschließen
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `PUT` | `/user/me/onboarding/complete` | Onboarding als abgeschlossen markieren |
+
+Setzt `onboardingCompleted` auf `true`. Kein Request Body erforderlich.
+
+**Response (200):**
+```json
+{ "message": "onboarding_completed" }
+```
+
 Der Request Body kann eine beliebige Kombination der folgenden Felder enthalten:
 
 **User-Felder:** `emailVisibility`, `birthdayVisibility`
