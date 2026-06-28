@@ -11,6 +11,7 @@ use PDO;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AdminController;
+use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
@@ -256,4 +257,11 @@ return [
     AdminMiddleware::class => create(),
 
     AdminController::class => autowire(),
+
+    AppController::class => function (ContainerInterface $c): AppController {
+        $settings = $c->get(Settings::class);
+        return new AppController(
+            downloadsBaseUrl: $settings->downloads['base_url'],
+        );
+    },
 ];

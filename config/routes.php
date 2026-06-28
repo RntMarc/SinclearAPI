@@ -2,6 +2,7 @@
 
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AdminController;
+use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
@@ -19,6 +20,9 @@ use Slim\Routing\RouteCollectorProxy;
 return function (App $app): void {
     $container = $app->getContainer();
     $app->setBasePath('/api/v2');
+
+    // Public app routes (no auth required)
+    $app->get('/app/version', [AppController::class, 'version']);
 
     $app->group('/auth', function (RouteCollectorProxy $group) use ($container) {
         $group->group('/login', function (RouteCollectorProxy $login) use ($container) {

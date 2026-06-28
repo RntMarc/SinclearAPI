@@ -64,4 +64,8 @@ $settings['fcm'] = [
     'private_key' => $_ENV['FCM_PRIVATE_KEY'] ?? '',
 ];
 
+$settings['downloads'] = [
+    'base_url' => $_ENV['DOWNLOADS_BASE_URL'] ?? 'https://sinclear.de/downloads',
+];
+
 return $settings;

@@ -36,9 +36,17 @@
 </IfModule>
 
 # Sensitive Dateien blockieren
-<FilesMatch "\.(env|log|sql|json|yaml|yml|md|lock|dist|sh)$">
+<FilesMatch "\.(env|log|sql|yaml|yml|md|lock|dist|sh)$">
     Require all denied
 </FilesMatch>
+
+# JSON-Dateien blockieren, ausser app_version.json
+<FilesMatch "\.json$">
+    Require all denied
+</FilesMatch>
+<Files "app_version.json">
+    Require all granted
+</Files>
 
 <FilesMatch "^(composer\.json|composer\.lock|\.gitignore|\.gitmodules|AGENTS\.md|update\.sh|generate_keys\.sh)$">
     Require all denied
