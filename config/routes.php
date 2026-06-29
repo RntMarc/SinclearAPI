@@ -6,6 +6,7 @@ use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -122,6 +123,15 @@ return function (App $app): void {
 
         $group->get('/{id}', [NotificationController::class, 'get']);
         $group->delete('/{id}', [NotificationController::class, 'markRead']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/feedback', function (RouteCollectorProxy $group) {
+        $group->get('/suggestions', [FeedbackController::class, 'list']);
+        $group->post('/suggestions', [FeedbackController::class, 'create']);
+        $group->delete('/suggestions/{id}', [FeedbackController::class, 'delete']);
+        $group->post('/suggestions/{id}/vote', [FeedbackController::class, 'vote']);
+        $group->delete('/suggestions/{id}/vote', [FeedbackController::class, 'removeVote']);
+        $group->put('/suggestions/{id}/status', [FeedbackController::class, 'updateStatus']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)

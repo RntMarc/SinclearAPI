@@ -15,6 +15,7 @@ use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
+use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -41,6 +42,8 @@ use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
+use Sinclear\Api\Repository\FeedbackSuggestionRepository;
+use Sinclear\Api\Repository\FeedbackVoteRepository;
 use Sinclear\Api\Repository\UserDeviceRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
@@ -52,11 +55,13 @@ use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
+use Sinclear\Api\Security\Policy\FeedbackPolicy;
 use Sinclear\Api\Security\Policy\NotificationPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
+use Sinclear\Api\Services\FeedbackService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
 use Sinclear\Api\Services\NotificationService;
@@ -156,6 +161,12 @@ return [
     ReviewPolicy::class => autowire(),
     ReviewService::class => autowire(),
     ReviewController::class => autowire(),
+
+    FeedbackSuggestionRepository::class => autowire(),
+    FeedbackVoteRepository::class => autowire(),
+    FeedbackPolicy::class => autowire(),
+    FeedbackService::class => autowire(),
+    FeedbackController::class => autowire(),
     NominatimRateLimiter::class => autowire(),
     NominatimCache::class => autowire(),
 

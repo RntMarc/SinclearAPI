@@ -1323,6 +1323,84 @@ components:
             - "Neue Kalenderfunktion"
             - "Performance-Verbesserungen"
 
+    FeedbackSuggestion:
+      type: object
+      required: [id, userId, title, status, upvoteCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "Dunkelmodus für die App"
+        description:
+          type: string
+          nullable: true
+          example: "Es wäre schön, wenn die App einen Dunkelmodus unterstützen würde."
+        status:
+          type: string
+          enum: [submitted, planned, next, in_progress, done, cancelled, rejected, later]
+          example: "submitted"
+        upvoteCount:
+          type: integer
+          example: 5
+        hasVoted:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FeedbackSuggestionListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedbackSuggestion'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    FeedbackSuggestionCreateRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Kurze Überschrift des Vorschlags
+          example: "Dunkelmodus für die App"
+        description:
+          type: string
+          nullable: true
+          description: Detaillierte Beschreibung (optional)
+          example: "Es wäre schön, wenn die App einen Dunkelmodus unterstützen würde."
+
+    FeedbackSuggestionCreateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/FeedbackSuggestion'
+
+    FeedbackStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [submitted, planned, next, in_progress, done, cancelled, rejected, later]
+          description: Neuer Status des Vorschlags
+          example: "planned"
+
 paths:
   /auth/login/otp/request:
     post:
@@ -3794,7 +3872,242 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Event nicht gefunden oder keine Teilnahme
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/suggestions:
+    get:
+      summary: Funktionsvorschläge auflisten
+      description: >
+        Gibt alle Funktionsvorschläge sortiert nach Upvote-Anzahl (absteigend)
+        und Erstellungsdatum (absteigend) zurück. Enthält pro Vorschlag die
+        Anzahl der Upvotes und ob der aktuelle Nutzer bereits gevotet hat.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Paginierte Liste der Vorschläge
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackSuggestionListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Funktionsvorschlag erstellen
+      description: >
+        Erstellt einen neuen Funktionsvorschlag. Der eingeloggte Nutzer
+        wird als Ersteller gespeichert. Der Status ist standardmäßig "submitted".
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackSuggestionCreateRequest'
+      responses:
+        '201':
+          description: Vorschlag erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackSuggestionCreateResponse'
+        '400':
+          description: Ungültige Eingabe (z.B. leerer Titel)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/suggestions/{id}:
+    delete:
+      summary: Funktionsvorschlag löschen
+      description: >
+        Löscht einen Funktionsvorschlag. Der Ersteller darf seinen eigenen
+        Vorschlag nur löschen, wenn dieser weniger als 3 Upvotes hat.
+        Administratoren dürfen jeden Vorschlag löschen.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+      responses:
+        '204':
+          description: Vorschlag erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Löschen (nicht Eigentümer oder zu viele Upvotes)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/suggestions/{id}/vote:
+    post:
+      summary: Upvote für Funktionsvorschlag geben
+      description: >
+        Gibt einen Upvote für einen Funktionsvorschlag ab. Pro Nutzer und
+        Vorschlag ist nur ein Upvote möglich.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+      responses:
+        '204':
+          description: Upvote erfolgreich abgegeben
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Upvote bereits vorhanden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Upvote zurückziehen
+      description: >
+        Entfernt den Upvote des aktuellen Nutzers für einen Funktionsvorschlag.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+      responses:
+        '204':
+          description: Upvote erfolgreich entfernt
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/suggestions/{id}/status:
+    put:
+      summary: Status eines Funktionsvorschlags ändern
+      description: >
+        Ändert den Status eines Funktionsvorschlags. Nur für Administratoren.
+        Gültige Status: submitted, planned, next, in_progress, done, cancelled, rejected, later.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackStatusUpdateRequest'
+      responses:
+        '204':
+          description: Status erfolgreich aktualisiert
+        '400':
+          description: Ungültiger Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Recht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden
           content:
             application/json:
               schema:
