@@ -304,8 +304,8 @@ final readonly class FeedbackService
             };
             $email->attach(
                 body: $decoded,
-                filename: "bug-report.$extension",
-                mediaType: $mimeType,
+                name: "bug-report.$extension",
+                contentType: $mimeType,
             );
         }
 
