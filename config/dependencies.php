@@ -44,6 +44,7 @@ use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedbackVoteRepository;
+use Sinclear\Api\Repository\FeedbackCommentRepository;
 use Sinclear\Api\Repository\UserDeviceRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
@@ -164,6 +165,7 @@ return [
 
     FeedbackSuggestionRepository::class => autowire(),
     FeedbackVoteRepository::class => autowire(),
+    FeedbackCommentRepository::class => autowire(),
     FeedbackPolicy::class => autowire(),
     FeedbackService::class => autowire(),
     FeedbackController::class => autowire(),
