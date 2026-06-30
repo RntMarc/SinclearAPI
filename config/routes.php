@@ -133,6 +133,10 @@ return function (App $app): void {
         $group->post('/suggestions/{id}/vote', [FeedbackController::class, 'vote']);
         $group->delete('/suggestions/{id}/vote', [FeedbackController::class, 'removeVote']);
         $group->put('/suggestions/{id}/status', [FeedbackController::class, 'updateStatus']);
+        $group->get('/suggestions/{id}/comments', [FeedbackController::class, 'listComments']);
+        $group->post('/suggestions/{id}/comments', [FeedbackController::class, 'createComment']);
+        $group->put('/suggestions/{id}/comments/{commentId}', [FeedbackController::class, 'updateComment']);
+        $group->delete('/suggestions/{id}/comments/{commentId}', [FeedbackController::class, 'deleteComment']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)

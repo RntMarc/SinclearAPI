@@ -13,6 +13,7 @@ an den Administrator weitergeleitet werden.
 |---------|-------------|
 | `FeedbackSuggestion` | Funktionsvorschläge mit Titel, Beschreibung und Status |
 | `FeedbackVote` | Upvotes von Nutzern für Vorschläge (1x pro Nutzer pro Vorschlag) |
+| `FeedbackComment` | Kommentare zu Vorschlägen (mit Verschachtelung via parentId) |
 
 ## Status-Werte
 
@@ -38,6 +39,10 @@ an den Administrator weitergeleitet werden.
 | `POST` | `/feedback/suggestions/{id}/vote` | JWT | Upvote abgeben (1x pro Nutzer) |
 | `DELETE` | `/feedback/suggestions/{id}/vote` | JWT | Upvote zurückziehen |
 | `PUT` | `/feedback/suggestions/{id}/status` | JWT + Admin | Status ändern (nur Admin) |
+| `GET` | `/feedback/suggestions/{id}/comments` | JWT | Kommentare abrufen (verschachtelte Baumstruktur) |
+| `POST` | `/feedback/suggestions/{id}/comments` | JWT | Kommentar erstellen (Top-Level oder Antwort) |
+| `PUT` | `/feedback/suggestions/{id}/comments/{commentId}` | JWT | Kommentar bearbeiten (max. 10 Min.) |
+| `DELETE` | `/feedback/suggestions/{id}/comments/{commentId}` | JWT | Kommentar löschen (Soft- oder Hard-Delete) |
 
 ## Bug-Reports
 
@@ -101,6 +106,7 @@ GET /feedback/suggestions?page=1&limit=20
 Die Ergebnisse sind nach Upvote-Anzahl (absteigend) und Erstellungsdatum
 (absteigend) sortiert. Jeder Eintrag enthält:
 - `upvoteCount`: Anzahl der Upvotes
+- `commentCount`: Anzahl der Kommentare
 - `hasVoted`: Ob der aktuelle Nutzer bereits gevotet hat
 
 ## Vorschlag löschen
@@ -139,3 +145,67 @@ Body: { "status": "planned" }
 
 Nur Administratoren können den Status ändern. Ungültige Status-Werte
 geben `400 Bad Request` zurück.
+
+## Kommentare
+
+Nutzer können zu jedem Funktionsvorschlag Kommentare verfassen und aufeinander
+antworten. Kommentare werden als verschachtelte Baumstruktur zurückgegeben.
+
+### Kommentare abrufen
+
+```
+GET /feedback/suggestions/{id}/comments
+→ 200 { "data": [...], "meta": { "total": 5 } }
+```
+
+Die Kommentare werden als Baumstruktur zurückgegeben:
+- Top-Level-Kommentare sind chronologisch aufsteigend sortiert
+- Antworten werden unter ihrem Elternkommentar in `children` geschachtelt
+- `text` ist `null` bei gelöschten Kommentaren, die noch Antworten haben
+
+### Kommentar erstellen
+
+```
+POST /feedback/suggestions/{id}/comments
+Body: { "text": "Das wäre wirklich hilfreich!", "parentId": null }
+→ 201 { "data": { "id": "...", "text": "Das wäre wirklich hilfreich!", ... } }
+```
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|-------------|
+| `text` | string | Ja | Kommentartext |
+| `parentId` | string (UUID) | Nein | ID des übergeordneten Kommentars (`null` = Top-Level) |
+
+### Kommentar bearbeiten
+
+```
+PUT /feedback/suggestions/{id}/comments/{commentId}
+Body: { "text": "Bearbeiteter Kommentar" }
+→ 200 { "data": { ... } }
+```
+
+**Bedingungen:**
+- Nur der Eigentümer darf bearbeiten
+- Max. 10 Minuten nach Erstellung
+- `text` darf nicht leer sein
+
+### Kommentar löschen
+
+```
+DELETE /feedback/suggestions/{id}/comments/{commentId}
+→ 204
+```
+
+**Verhalten:**
+- **Hat Antworten:** Soft-Delete — `text` wird auf `NULL` gesetzt, Struktur bleibt erhalten
+- **Keine Antworten:** Hard-Delete — Eintrag wird komplett entfernt
+- Leere Eltern-Kommentare werden rekursiv mitgelöscht
+
+**Löschberechtigung:**
+- Eigentümer des Kommentars
+- Administratoren
+
+### Hinweis: Kaskaden-Löschen
+
+Wenn ein Funktionsvorschlag gelöscht wird, werden automatisch **alle**
+zugehörigen Kommentare mitgelöscht.

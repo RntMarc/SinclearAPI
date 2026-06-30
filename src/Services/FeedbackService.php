@@ -4,6 +4,7 @@ namespace Sinclear\Api\Services;
 
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\Settings;
+use Sinclear\Api\Repository\FeedbackCommentRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedbackVoteRepository;
 use Symfony\Component\Mailer\MailerInterface;
@@ -19,6 +20,7 @@ final readonly class FeedbackService
     public function __construct(
         private FeedbackSuggestionRepository $suggestionRepo,
         private FeedbackVoteRepository $voteRepo,
+        private FeedbackCommentRepository $commentRepo,
         private MailerInterface $mailer,
         private Settings $settings,
         private LoggerInterface $logger,
@@ -63,6 +65,7 @@ final readonly class FeedbackService
             throw new \RuntimeException('forbidden');
         }
 
+        $this->commentRepo->deleteBySuggestion($id);
         $this->suggestionRepo->delete($id);
     }
 
@@ -103,6 +106,135 @@ final readonly class FeedbackService
         }
 
         $this->suggestionRepo->updateStatus($id, $status);
+    }
+
+    public function listComments(string $suggestionId): array
+    {
+        $suggestion = $this->suggestionRepo->findById($suggestionId);
+        if ($suggestion === null) {
+            throw new \RuntimeException('suggestion_not_found');
+        }
+
+        $comments = $this->commentRepo->listBySuggestion($suggestionId);
+        $total = count($comments);
+        $tree = $this->buildCommentTree($comments);
+
+        return [
+            'data' => $tree,
+            'meta' => ['total' => $total],
+        ];
+    }
+
+    public function getComment(string $suggestionId, string $commentId): ?array
+    {
+        $comment = $this->commentRepo->findById($commentId);
+        if ($comment === null || $comment['suggestionId'] !== $suggestionId) {
+            return null;
+        }
+        return $comment;
+    }
+
+    public function createComment(string $suggestionId, string $userId, string $text, ?string $parentId): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            throw new \RuntimeException('text_required');
+        }
+
+        $suggestion = $this->suggestionRepo->findById($suggestionId);
+        if ($suggestion === null) {
+            throw new \RuntimeException('suggestion_not_found');
+        }
+
+        if ($parentId !== null) {
+            $parent = $this->commentRepo->findById($parentId);
+            if ($parent === null || $parent['suggestionId'] !== $suggestionId) {
+                throw new \RuntimeException('comment_not_found');
+            }
+        }
+
+        $id = $this->commentRepo->create([
+            'suggestionId' => $suggestionId,
+            'userId' => $userId,
+            'parentId' => $parentId,
+            'text' => $text,
+        ]);
+
+        $comment = $this->commentRepo->findById($id);
+        return $this->formatComment($comment);
+    }
+
+    public function updateComment(string $suggestionId, string $commentId, string $userId, string $text, bool $isAdmin): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            throw new \RuntimeException('text_required');
+        }
+
+        $comment = $this->commentRepo->findById($commentId);
+        if ($comment === null || $comment['suggestionId'] !== $suggestionId) {
+            throw new \RuntimeException('comment_not_found');
+        }
+
+        $this->commentRepo->update($commentId, $text);
+        $comment = $this->commentRepo->findById($commentId);
+        return $this->formatComment($comment);
+    }
+
+    public function deleteComment(string $suggestionId, string $commentId, string $userId, bool $isAdmin): void
+    {
+        $comment = $this->commentRepo->findById($commentId);
+        if ($comment === null || $comment['suggestionId'] !== $suggestionId) {
+            throw new \RuntimeException('comment_not_found');
+        }
+
+        $hasReplies = $this->commentRepo->hasReplies($commentId);
+
+        if ($hasReplies) {
+            $this->commentRepo->softDelete($commentId);
+        } else {
+            $this->commentRepo->hardDelete($commentId);
+
+            $parentId = $comment['parentId'];
+            while ($parentId !== null) {
+                $parent = $this->commentRepo->findById($parentId);
+                if ($parent === null || $parent['text'] !== null) {
+                    break;
+                }
+                if ($this->commentRepo->hasReplies($parentId)) {
+                    break;
+                }
+                $grandparentId = $parent['parentId'];
+                $this->commentRepo->hardDelete($parentId);
+                $parentId = $grandparentId;
+            }
+        }
+    }
+
+    private function buildCommentTree(array $comments, ?string $parentId = null): array
+    {
+        $tree = [];
+        foreach ($comments as $comment) {
+            if ($comment['parentId'] === $parentId) {
+                $node = $this->formatComment($comment);
+                $node['children'] = $this->buildCommentTree($comments, $comment['id']);
+                $tree[] = $node;
+            }
+        }
+        return $tree;
+    }
+
+    private function formatComment(array $c): array
+    {
+        return [
+            'id' => $c['id'],
+            'suggestionId' => $c['suggestionId'],
+            'userId' => $c['userId'],
+            'parentId' => $c['parentId'],
+            'text' => $c['text'],
+            'createdAt' => $c['createdAt'],
+            'updatedAt' => $c['updatedAt'],
+        ];
     }
 
     public function sendBugReport(
@@ -238,6 +370,7 @@ final readonly class FeedbackService
             'description' => $s['description'],
             'status' => $s['status'],
             'upvoteCount' => (int) $s['upvoteCount'],
+            'commentCount' => (int) ($s['commentCount'] ?? 0),
             'createdAt' => $s['createdAt'],
             'updatedAt' => $s['updatedAt'],
         ];

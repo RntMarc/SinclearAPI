@@ -1347,6 +1347,9 @@ components:
         upvoteCount:
           type: integer
           example: 5
+        commentCount:
+          type: integer
+          example: 3
         hasVoted:
           type: boolean
           example: true
@@ -1440,6 +1443,85 @@ components:
             sent:
               type: boolean
               example: true
+
+    FeedbackComment:
+      type: object
+      required: [id, suggestionId, userId, parentId, text, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        suggestionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des übergeordneten Kommentars (null = Top-Level)
+        text:
+          type: string
+          nullable: true
+          description: Kommentartext (null bei Soft-Delete)
+          example: "Das wäre wirklich hilfreich!"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        children:
+          type: array
+          description: Verschachtelte Antworten
+          items:
+            $ref: '#/components/schemas/FeedbackComment'
+
+    FeedbackCommentListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedbackComment'
+          description: Baumstruktur der Kommentare
+        meta:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+              description: Gesamtanzahl aller Kommentare
+              example: 5
+
+    FeedbackCommentCreateRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Kommentartext
+          example: "Das wäre wirklich hilfreich!"
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des übergeordneten Kommentars (null = Top-Level)
+          example: null
+
+    FeedbackCommentUpdateRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Aktualisierter Kommentartext
+          example: "Das wäre wirklich hilfreich! (bearbeitet)"
 
 paths:
   /auth/login/otp/request:
@@ -4322,7 +4404,207 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Event oder Reise nicht gefunden
+          description: Vorschlag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/suggestions/{id}/comments:
+    get:
+      summary: Kommentare zu einem Vorschlag abrufen
+      description: >
+        Gibt alle Kommentare zu einem Vorschlag als verschachtelte Baumstruktur
+        zurück. Top-Level-Kommentare sind chronologisch sortiert, Antworten
+        werden unter ihrem Elternkommentar angezeigt.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+      responses:
+        '200':
+          description: Kommentare als Baumstruktur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackCommentListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Kommentar erstellen
+      description: >
+        Erstellt einen neuen Kommentar zu einem Vorschlag. Optional kann eine
+        `parentId` angegeben werden, um auf einen bestehenden Kommentar zu antworten.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCommentCreateRequest'
+      responses:
+        '201':
+          description: Kommentar erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedbackComment'
+        '400':
+          description: Ungültige Eingabe (z.B. leerer Text)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag oder Eltern-Kommentar nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/suggestions/{id}/comments/{commentId}:
+    put:
+      summary: Kommentar bearbeiten
+      description: >
+        Aktualisiert den Text eines Kommentars. Nur der Eigentümer darf seinen
+        Kommentar bearbeiten, und nur innerhalb von 10 Minuten nach Erstellung.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Kommentars
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackCommentUpdateRequest'
+      responses:
+        '200':
+          description: Kommentar erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedbackComment'
+        '400':
+          description: Ungültige Eingabe (z.B. leerer Text)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Bearbeiten (nicht Eigentümer oder Zeitfenster abgelaufen)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Kommentar nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Kommentar löschen
+      description: >
+        Löscht einen Kommentar. Wenn der Kommentar Antworten hat, wird nur der
+        Inhalt gelöscht (Soft-Delete). Ohne Antworten wird der Eintrag komplett
+        entfernt (Hard-Delete). Der Eigentümer und Administratoren dürfen löschen.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Vorschlags
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Kommentars
+      responses:
+        '204':
+          description: Kommentar erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Löschen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Kommentar nicht gefunden
           content:
             application/json:
               schema:
