@@ -60,11 +60,13 @@ final readonly class ExploreService
         $cacheKey = 'lookup|' . $type[0] . $osmId;
         $cached = $this->nominatimCache->get($cacheKey);
         if ($cached !== null) {
+            error_log('[OSM_FETCH] osmId=' . $osmId . ' osmType=' . $osmType . ' → Cache-HIT');
             return $cached;
         }
 
         $this->rateLimiter->waitForSlot();
 
+        error_log('[OSM_FETCH] osmId=' . $osmId . ' osmType=' . $osmType . ' → Nominatim-Request startet');
         $response = $this->nominatimRequest('GET', self::NOMINATIM_BASE . '/lookup', [
             'query' => [
                 'osm_ids' => $type[0] . $osmId,
@@ -76,13 +78,30 @@ final readonly class ExploreService
 
         $data = json_decode((string) $response->getBody(), true);
 
+        error_log('[OSM_FETCH] osmId=' . $osmId . ' → Status ' . $response->getStatusCode());
         if (!is_array($data) || empty($data)) {
+            error_log('[OSM_FETCH] osmId=' . $osmId . ' → FEHLER: Keine Daten von Nominatim');
             throw new \RuntimeException('OSM object not found');
         }
 
-        $this->nominatimCache->set($cacheKey, $data[0]);
+        $osmData = $data[0];
+        $extratags = $osmData['extratags'] ?? [];
+        error_log('[OSM_FETCH] osmId=' . $osmId . ' → Rohdaten:');
+        error_log('  name: ' . ($osmData['name'] ?? 'FEHLT'));
+        error_log('  lat: ' . ($osmData['lat'] ?? 'FEHLT'));
+        error_log('  lon: ' . ($osmData['lon'] ?? 'FEHLT'));
+        error_log('  display_name: ' . ($osmData['display_name'] ?? 'FEHLT'));
+        error_log('  extratags.phone: ' . ($extratags['phone'] ?? 'FEHLT'));
+        error_log('  extratags.website: ' . ($extratags['website'] ?? 'FEHLT'));
+        error_log('  extratags.url: ' . ($extratags['url'] ?? 'FEHLT'));
+        error_log('  extratags.email: ' . ($extratags['email'] ?? 'FEHLT'));
+        error_log('  extratags.opening_hours: ' . ($extratags['opening_hours'] ?? 'FEHLT'));
+        error_log('  extratags.cuisine: ' . ($extratags['cuisine'] ?? 'FEHLT'));
+        error_log('  extratags.amenity: ' . ($extratags['amenity'] ?? 'FEHLT'));
 
-        return $data[0];
+        $this->nominatimCache->set($cacheKey, $osmData);
+
+        return $osmData;
     }
 
     public function geocodeLocation(string $query): ?array
@@ -204,6 +223,17 @@ final readonly class ExploreService
             $result['longitude'] = (float) $result['longitude'];
         }
 
+        error_log('[OSM_TRANSFORM] osmId=' . $osmId . ' → Transformierte Daten:');
+        error_log('  name: ' . $result['name']);
+        error_log('  phone: ' . ($result['phone'] ?? 'NULL'));
+        error_log('  website: ' . ($result['website'] ?? 'NULL'));
+        error_log('  email: ' . ($result['email'] ?? 'NULL'));
+        error_log('  openingHours: ' . ($result['openingHours'] ?? 'NULL'));
+        error_log('  latitude: ' . ($result['latitude'] ?? 'NULL'));
+        error_log('  longitude: ' . ($result['longitude'] ?? 'NULL'));
+        error_log('  category: ' . $result['category']);
+        error_log('  cuisine: ' . ($result['cuisine'] ?? 'NULL'));
+
         return $result;
     }
 
@@ -222,6 +252,12 @@ final readonly class ExploreService
 
         $placeId = $this->placeRepo->create($placeData);
 
+        error_log('[CREATE] Place erstellt: id=' . $placeId . ' osmId=' . $osmId . ' name=' . $placeData['name']);
+        error_log('  phone: ' . ($placeData['phone'] ?? 'NULL'));
+        error_log('  website: ' . ($placeData['website'] ?? 'NULL'));
+        error_log('  email: ' . ($placeData['email'] ?? 'NULL'));
+        error_log('  openingHours: ' . ($placeData['openingHours'] ?? 'NULL'));
+
         if ($cuisine !== null && $placeData['category'] === 'gastronomy') {
             $this->gastronomyRepo->create($placeId, $cuisine);
         }
@@ -237,8 +273,36 @@ final readonly class ExploreService
             throw new \RuntimeException('Place not found');
         }
 
+        error_log('[REFRESH] Place ' . $id . ' (osmId=' . ($place['osmId'] ?? 'NULL') . ') → Aktueller Stand in DB:');
+        error_log('  name: ' . ($place['name'] ?? 'NULL'));
+        error_log('  phone: ' . ($place['phone'] ?? 'NULL'));
+        error_log('  website: ' . ($place['website'] ?? 'NULL'));
+        error_log('  email: ' . ($place['email'] ?? 'NULL'));
+        error_log('  openingHours: ' . ($place['openingHours'] ?? 'NULL'));
+
         $osmData = $this->fetchOsmData((int) $place['osmId'], $place['osmType']);
         $updated = $this->buildFromOsm($osmData, (int) $place['osmId'], $place['osmType'], $place['creatorId']);
+
+        error_log('[REFRESH] Place ' . $id . ' → Neue Werte aus OSM:');
+        error_log('  name: ' . ($updated['name'] ?? 'NULL'));
+        error_log('  phone: ' . ($updated['phone'] ?? 'NULL'));
+        error_log('  website: ' . ($updated['website'] ?? 'NULL'));
+        error_log('  email: ' . ($updated['email'] ?? 'NULL'));
+        error_log('  openingHours: ' . ($updated['openingHours'] ?? 'NULL'));
+
+        $changes = [];
+        foreach (['phone', 'website', 'email', 'openingHours'] as $field) {
+            $old = $place[$field] ?? null;
+            $new = $updated[$field] ?? null;
+            if ($old !== $new) {
+                $changes[] = $field . ': "' . ($old ?? 'NULL') . '" → "' . ($new ?? 'NULL') . '"';
+            }
+        }
+        if (!empty($changes)) {
+            error_log('[REFRESH] Place ' . $id . ' → Änderungen: ' . implode(', ', $changes));
+        } else {
+            error_log('[REFRESH] Place ' . $id . ' → Keine Änderungen an Kontaktdaten');
+        }
 
         $cuisine = $updated['cuisine'];
         unset($updated['cuisine'], $updated['creatorId']);
@@ -254,6 +318,12 @@ final readonly class ExploreService
         }
 
         $place = $this->placeRepo->findById($id);
+        error_log('[REFRESH] Place ' . $id . ' → Aktualisierter Stand nach DB-Update:');
+        error_log('  phone: ' . ($place['phone'] ?? 'NULL'));
+        error_log('  website: ' . ($place['website'] ?? 'NULL'));
+        error_log('  email: ' . ($place['email'] ?? 'NULL'));
+        error_log('  openingHours: ' . ($place['openingHours'] ?? 'NULL'));
+
         return $this->formatPlace($place);
     }
 
