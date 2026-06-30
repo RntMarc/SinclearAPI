@@ -1,8 +1,9 @@
-# Feedback (Funktionsvorschläge)
+# Feedback (Funktionsvorschläge & Bug-Reports)
 
 Die Feedback-Funktion ermöglicht es Nutzern, Funktionsvorschläge zu erstellen
 und gegenseitig zu bewerten. Vorschläge werden nach Beliebtheit (Upvotes)
-sortiert angezeigt.
+sortiert angezeigt. Zudem können Nutzer Bug-Reports einsenden, die per E-Mail
+an den Administrator weitergeleitet werden.
 
 > **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben.
 
@@ -22,7 +23,7 @@ sortiert angezeigt.
 | `next` | Nächstes Feature |
 | `in_progress` | In Entwicklung |
 | `done` | Umgesetzt |
-| `cancelled` | Abgesagt |
+| `cancelled` | Abgebrochen |
 | `rejected` | Abgelehnt |
 | `later` | Später eventuell |
 
@@ -30,12 +31,50 @@ sortiert angezeigt.
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
+| `POST` | `/feedback/bug-report` | JWT | Bug-Report per E-Mail an Admin senden |
 | `GET` | `/feedback/suggestions` | JWT | Alle Vorschläge (paginiert, sortiert nach Upvotes) |
 | `POST` | `/feedback/suggestions` | JWT | Neuen Vorschlag erstellen |
 | `DELETE` | `/feedback/suggestions/{id}` | JWT | Vorschlag löschen (Eigentümer + <3 Upvotes oder Admin) |
 | `POST` | `/feedback/suggestions/{id}/vote` | JWT | Upvote abgeben (1x pro Nutzer) |
 | `DELETE` | `/feedback/suggestions/{id}/vote` | JWT | Upvote zurückziehen |
 | `PUT` | `/feedback/suggestions/{id}/status` | JWT + Admin | Status ändern (nur Admin) |
+
+## Bug-Reports
+
+Nutzer können Bug-Reports einsenden, die per E-Mail an den Administrator
+weitergeleitet werden. Die E-Mail enthält Nutzer-Informationen sowie
+optional die App-Version und Build-Nummer.
+
+```
+POST /feedback/bug-report
+Body: { "text": "Die App stürzt beim Öffnen des Profils ab.", "version": "0.5.0", "buildNumber": 5 }
+→ 200 { "data": { "sent": true } }
+```
+
+### Parameter
+
+| Feld | Typ | Pflicht | Beschreibung |
+|------|-----|---------|-------------|
+| `text` | string | Ja | Freitext-Beschreibung des Bugs |
+| `version` | string | Nein | App-Version (z.B. "0.5.0") |
+| `buildNumber` | integer | Nein | Build-Nummer (z.B. 5) |
+| `image` | string | Nein | Base64-kodiertes Screenshot-Bild (JPEG/PNG/WebP, max. 200 KB, max. 4000x4000 px) |
+
+### Antworten
+
+| Status | Beschreibung |
+|--------|-------------|
+| `200` | Bug-Report erfolgreich versendet |
+| `400` | Leerer Text (`text_required`), ungültiges Bild (`invalid_image`, `image_too_large`, `invalid_image_format`, `unsupported_image_format`, `image_dimensions_too_large`) |
+| `401` | Nicht autorisiert |
+| `500` | E-Mail-Versand fehlgeschlagen (`mail_failed`) |
+
+### Hinweis zum Screenshot
+
+Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild. Dieses wird
+ausschließlich als E-Mail-Anhang an den Administrator versendet und **nirgends**
+auf dem Server oder in der Datenbank gespeichert. Nach dem Versand wird der
+Speicher sofort freigegeben.
 
 ## Vorschlag erstellen
 

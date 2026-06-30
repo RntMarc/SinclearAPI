@@ -126,6 +126,7 @@ return function (App $app): void {
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/feedback', function (RouteCollectorProxy $group) {
+        $group->post('/bug-report', [FeedbackController::class, 'bugReport']);
         $group->get('/suggestions', [FeedbackController::class, 'list']);
         $group->post('/suggestions', [FeedbackController::class, 'create']);
         $group->delete('/suggestions/{id}', [FeedbackController::class, 'delete']);

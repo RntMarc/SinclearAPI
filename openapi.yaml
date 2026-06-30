@@ -1401,6 +1401,46 @@ components:
           description: Neuer Status des Vorschlags
           example: "planned"
 
+    BugReportRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Freitext-Beschreibung des Bugs
+          example: "Die App stürzt beim Öffnen des Profils ab."
+        version:
+          type: string
+          nullable: true
+          description: App-Version (optional)
+          example: "0.5.0"
+        buildNumber:
+          type: integer
+          nullable: true
+          description: Build-Nummer (optional)
+          example: 5
+        image:
+          type: string
+          nullable: true
+          description: >
+            Base64-kodiertes Screenshot-Bild (optional). Wird nur als E-Mail-Anhang
+            versendet und nicht auf dem Server gespeichert. Erlaubte Formate: JPEG,
+            PNG, WebP. Max. 200 KB, max. 4000x4000 Pixel.
+          example: "/9j/4AAQSkZJRgABAQEASABIAAD..."
+
+    BugReportResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [sent]
+          properties:
+            sent:
+              type: boolean
+              example: true
+
 paths:
   /auth/login/otp/request:
     post:
@@ -3873,6 +3913,47 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feedback/bug-report:
+    post:
+      summary: Bug-Report senden
+      description: >
+        Sendet einen Bug-Report per E-Mail an den Administrator.
+        Der Nutzer kann optional die App-Version und Build-Nummer angeben.
+      tags: [Feedback]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BugReportRequest'
+      responses:
+        '200':
+          description: Bug-Report erfolgreich versendet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BugReportResponse'
+        '400':
+          description: Ungültige Eingabe (z.B. leerer Text)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: E-Mail-Versand fehlgeschlagen
           content:
             application/json:
               schema:
