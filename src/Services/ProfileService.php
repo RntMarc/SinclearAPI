@@ -70,6 +70,11 @@ final readonly class ProfileService
     /** @param array<string, mixed> $data */
     public function updateProfile(AuthenticatedUser $user, array $data): array
     {
+        $this->logger->debug('ProfileService::updateProfile called', [
+            'userId' => $user->id,
+            'dataKeys' => array_keys($data),
+        ]);
+
         $userUpdates = [];
         $contactUpdates = [];
         $socialUpdates = [];
@@ -92,11 +97,25 @@ final readonly class ProfileService
 
         if (array_key_exists('image', $data)) {
             $imageValue = $data['image'];
+            $this->logger->debug('ProfileService: image field present', [
+                'type' => gettype($imageValue),
+                'is_null' => $imageValue === null,
+                'is_empty_string' => $imageValue === '',
+                'raw_length' => is_string($imageValue) ? strlen($imageValue) : 'N/A',
+                'preview' => is_string($imageValue) ? substr($imageValue, 0, 80) . '...' : 'N/A',
+            ]);
             if ($imageValue === null || $imageValue === '') {
                 $userUpdates['image'] = null;
+                $this->logger->debug('ProfileService: image will be removed (set to null)');
             } else {
-                $userUpdates['image'] = $this->validateProfileImage((string) $imageValue);
+                $validated = $this->validateProfileImage((string) $imageValue);
+                $this->logger->debug('ProfileService: image validated successfully', [
+                    'stored_length' => strlen($validated),
+                ]);
+                $userUpdates['image'] = $validated;
             }
+        } else {
+            $this->logger->debug('ProfileService: no image field in request data');
         }
 
         foreach (self::CONTACT_FIELDS as $field => $validator) {
@@ -138,6 +157,9 @@ final readonly class ProfileService
         }
 
         if (!empty($userUpdates)) {
+            $this->logger->debug('ProfileService: applying userUpdates', [
+                'fields' => array_keys($userUpdates),
+            ]);
             foreach ($userUpdates as $field => $value) {
                 match ($field) {
                     'displayName' => $this->userUpdateRepo->updateDisplayName($user->id, $value),
@@ -145,6 +167,9 @@ final readonly class ProfileService
                     'image' => $this->userUpdateRepo->updateImage($user->id, $value),
                 };
             }
+            $this->logger->debug('ProfileService: userUpdates applied successfully');
+        } else {
+            $this->logger->debug('ProfileService: no userUpdates to apply');
         }
 
         if (!empty($contactUpdates)) {
@@ -303,6 +328,12 @@ final readonly class ProfileService
         $data = $this->userService->formatUserBase($userData);
         $data['social'] = $social !== null ? $this->userService->formatSocialInfo($social) : null;
         $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($contact) : null;
+
+        $this->logger->debug('buildProfileResponse', [
+            'image_returned' => isset($data['image']),
+            'image_length' => isset($data['image']) && is_string($data['image']) ? strlen($data['image']) : 0,
+            'image_preview' => isset($data['image']) && is_string($data['image']) ? substr($data['image'], 0, 80) . '...' : 'null or not set',
+        ]);
 
         return $data;
     }
@@ -510,36 +541,70 @@ final readonly class ProfileService
 
     private function validateProfileImage(string $imageData): string
     {
+        $this->logger->debug('validateProfileImage: start', [
+            'base64_length' => strlen($imageData),
+        ]);
+
         if (!is_string($imageData) || $imageData === '') {
+            $this->logger->debug('validateProfileImage: failed - empty or non-string input');
             throw new \InvalidArgumentException('invalid_image');
         }
 
         $decoded = base64_decode($imageData, true);
         if ($decoded === false) {
+            $this->logger->debug('validateProfileImage: failed - base64 decode returned false');
             throw new \InvalidArgumentException('invalid_image_encoding');
         }
 
-        if (strlen($decoded) > self::MAX_IMAGE_SIZE_BYTES) {
+        $decodedSize = strlen($decoded);
+        $this->logger->debug('validateProfileImage: decoded', [
+            'decoded_bytes' => $decodedSize,
+            'max_allowed' => self::MAX_IMAGE_SIZE_BYTES,
+        ]);
+
+        if ($decodedSize > self::MAX_IMAGE_SIZE_BYTES) {
+            $this->logger->debug('validateProfileImage: failed - image too large', [
+                'decoded_bytes' => $decodedSize,
+                'max_allowed' => self::MAX_IMAGE_SIZE_BYTES,
+            ]);
             throw new \InvalidArgumentException('image_too_large');
         }
 
         $imageInfo = @getimagesizefromstring($decoded);
         if ($imageInfo === false) {
+            $this->logger->debug('validateProfileImage: failed - getimagesizefromstring returned false');
             throw new \InvalidArgumentException('invalid_image_format');
         }
 
         $mimeType = $imageInfo['mime'];
-        if (!in_array($mimeType, self::ALLOWED_IMAGE_MIME_TYPES, true)) {
-            throw new \InvalidArgumentException('unsupported_image_format');
-        }
-
         $width = $imageInfo[0];
         $height = $imageInfo[1];
 
+        $this->logger->debug('validateProfileImage: image info', [
+            'mime' => $mimeType,
+            'width' => $width,
+            'height' => $height,
+        ]);
+
+        if (!in_array($mimeType, self::ALLOWED_IMAGE_MIME_TYPES, true)) {
+            $this->logger->debug('validateProfileImage: failed - unsupported mime type', [
+                'mime' => $mimeType,
+                'allowed' => self::ALLOWED_IMAGE_MIME_TYPES,
+            ]);
+            throw new \InvalidArgumentException('unsupported_image_format');
+        }
+
         if ($width > self::MAX_IMAGE_WIDTH || $height > self::MAX_IMAGE_HEIGHT) {
+            $this->logger->debug('validateProfileImage: failed - dimensions too large', [
+                'width' => $width,
+                'height' => $height,
+                'max_width' => self::MAX_IMAGE_WIDTH,
+                'max_height' => self::MAX_IMAGE_HEIGHT,
+            ]);
             throw new \InvalidArgumentException('image_dimensions_too_large');
         }
 
+        $this->logger->debug('validateProfileImage: validation passed');
         return $imageData;
     }
 }
