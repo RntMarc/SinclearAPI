@@ -81,7 +81,13 @@ final readonly class ProfileService
 
         if (array_key_exists('displayName', $data)) {
             $displayName = trim((string) $data['displayName']);
+            $this->logger->debug('ProfileService: displayName processing', [
+                'original' => $data['displayName'],
+                'trimmed' => $displayName,
+                'is_empty' => $displayName === '',
+            ]);
             if ($displayName === '') {
+                $this->logger->debug('ProfileService: throwing invalid_display_name');
                 throw new \InvalidArgumentException('invalid_display_name');
             }
             $userUpdates['displayName'] = $displayName;
@@ -89,7 +95,14 @@ final readonly class ProfileService
 
         if (array_key_exists('birthday', $data)) {
             $birthday = $data['birthday'];
+            $this->logger->debug('ProfileService: birthday processing', [
+                'raw' => $birthday,
+                'type' => gettype($birthday),
+                'is_null' => $birthday === null,
+                'format_check' => $birthday !== null ? (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $birthday) ? 'valid' : 'invalid') : 'null',
+            ]);
             if ($birthday !== null && !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $birthday)) {
+                $this->logger->debug('ProfileService: throwing invalid_birthday');
                 throw new \InvalidArgumentException('invalid_birthday');
             }
             $userUpdates['birthday'] = $birthday;

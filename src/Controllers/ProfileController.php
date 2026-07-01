@@ -4,6 +4,7 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\ProfileService;
@@ -12,6 +13,7 @@ final readonly class ProfileController
 {
     public function __construct(
         private ProfileService $profileService,
+        private LoggerInterface $logger,
     ) {}
 
     public function update(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -26,6 +28,11 @@ final readonly class ProfileController
         try {
             $profile = $this->profileService->updateProfile($user, $body);
         } catch (\InvalidArgumentException $e) {
+            $this->logger->warning('ProfileController: profile update failed', [
+                'userId' => $user->id,
+                'error' => $e->getMessage(),
+                'dataKeys' => is_array($body) ? array_keys($body) : 'N/A',
+            ]);
             return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
         }
 
