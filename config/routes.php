@@ -183,6 +183,11 @@ return function (App $app): void {
         $group->get('[/]', [AdminController::class, 'dashboard']);
         $group->get('/users', [AdminController::class, 'users']);
         $group->get('/users/json', [AdminController::class, 'adminUsersJson']);
+        $group->get('/forums', [AdminController::class, 'forums']);
+        $group->get('/forums/json', [AdminController::class, 'adminForumsJson']);
+        $group->post('/forums', [AdminController::class, 'createForum']);
+        $group->put('/forums/{id}', [AdminController::class, 'updateForum']);
+        $group->delete('/forums/{id}', [AdminController::class, 'deleteForum']);
         $group->get('/travel', [AdminController::class, 'travel']);
         $group->get('/notifications', [AdminController::class, 'notifications']);
         $group->post('/notifications/send', [AdminController::class, 'sendNotification']);

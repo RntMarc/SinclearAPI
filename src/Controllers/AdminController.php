@@ -5,6 +5,8 @@ namespace Sinclear\Api\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Repository\ForumMemberRepository;
+use Sinclear\Api\Repository\ForumRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserRepository;
@@ -36,6 +38,8 @@ final readonly class AdminController
         private NotificationService $notificationService,
         private TravelTripRepository $tripRepo,
         private TravelEventRepository $eventRepo,
+        private ForumRepository $forumRepo,
+        private ForumMemberRepository $forumMemberRepo,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -232,6 +236,130 @@ ROW;
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function forums(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $result = $this->forumRepo->list(1, 99999);
+        $allForums = $result['data'];
+        $forumIds = array_column($allForums, 'id');
+        $memberCounts = $this->forumMemberRepo->countByForums($forumIds);
+
+        $rows = '';
+        foreach ($allForums as $f) {
+            $createdAt = date('d.m.Y H:i', strtotime($f['createdAt']));
+            $memberCount = $memberCounts[$f['id']] ?? 0;
+            $id = htmlspecialchars($f['id']);
+            $name = htmlspecialchars($f['name']);
+            $description = htmlspecialchars($f['description'] ?? '');
+            $rows .= <<<ROW
+            <tr>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$id}">{$id}</td>
+                <td>{$name}</td>
+                <td>{$description}</td>
+                <td>{$memberCount}</td>
+                <td>{$createdAt}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editForum('{$id}', '{$name}', `{$description}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteForum('{$id}', '{$name}')">Löschen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        $contentHtml = $this->renderTemplate('forums.php', ['rows' => $rows]);
+        $html = $this->renderLayout('Foren', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminForumsJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $result = $this->forumRepo->list(1, 99999);
+        $forumIds = array_column($result['data'], 'id');
+        $memberCounts = $this->forumMemberRepo->countByForums($forumIds);
+
+        $data = array_map(fn(array $f) => [
+            'id' => $f['id'],
+            'name' => $f['name'],
+            'description' => $f['description'],
+            'memberCount' => $memberCounts[$f['id']] ?? 0,
+            'createdAt' => $f['createdAt'],
+        ], $result['data']);
+
+        return ResponseFactory::json(['data' => $data], 200, $response);
+    }
+
+    public function createForum(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $name = trim((string) ($body['name'] ?? ''));
+        if ($name === '') {
+            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+        }
+
+        $description = isset($body['description']) && is_string($body['description'])
+            ? trim($body['description']) : null;
+
+        $id = $this->forumRepo->create([
+            'name' => $name,
+            'description' => $description,
+        ]);
+
+        $forum = $this->forumRepo->findById($id);
+        return ResponseFactory::json(['data' => $forum], 201, $response);
+    }
+
+    public function updateForum(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+        $body = $request->getParsedBody();
+
+        $forum = $this->forumRepo->findById($id);
+        if ($forum === null) {
+            return ResponseFactory::json(['error' => 'forum_not_found'], 404, $response);
+        }
+
+        $data = [];
+        if (isset($body['name'])) {
+            $name = trim((string) $body['name']);
+            if ($name === '') {
+                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+            }
+            $data['name'] = $name;
+        }
+        if (isset($body['description'])) {
+            $data['description'] = is_string($body['description'])
+                ? trim($body['description']) : null;
+        }
+
+        if ($data === []) {
+            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
+        }
+
+        $this->forumRepo->update($id, $data);
+        $updated = $this->forumRepo->findById($id);
+        return ResponseFactory::json(['data' => $updated], 200, $response);
+    }
+
+    public function deleteForum(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+
+        $forum = $this->forumRepo->findById($id);
+        if ($forum === null) {
+            return ResponseFactory::json(['error' => 'forum_not_found'], 404, $response);
+        }
+
+        $this->forumRepo->delete($id);
+        return ResponseFactory::noContent($response);
     }
 
     public function notifications(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
