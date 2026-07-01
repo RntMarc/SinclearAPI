@@ -4,7 +4,7 @@ namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\FeedPostCommentRepository;
 use Sinclear\Api\Repository\FeedPostRepository;
-use Sinclear.Api\Repository\FeedPostVoteRepository;
+use Sinclear\Api\Repository\FeedPostVoteRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
 use Sinclear\Api\Repository\ForumRepository;
 
