@@ -1523,6 +1523,389 @@ components:
           description: Aktualisierter Kommentartext
           example: "Das wäre wirklich hilfreich! (bearbeitet)"
 
+    Forum:
+      type: object
+      required: [id, name, memberCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Musik-Tausch"
+        description:
+          type: string
+          nullable: true
+          example: "Tauscht eure Lieblingssongs"
+        image:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Forum-Bild (optional)
+        memberCount:
+          type: integer
+          example: 12
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ForumDetail:
+      allOf:
+        - $ref: '#/components/schemas/Forum'
+        - type: object
+          properties:
+            isMember:
+              type: boolean
+              description: Ob der eingeloggte Nutzer Mitglied ist
+              example: true
+            notificationsEnabled:
+              type: boolean
+              description: Benachrichtigungseinstellung des eingeloggten Nutzers (nur bei isMember=true)
+              example: true
+
+    ForumListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Forum'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ForumCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Name des Forums
+          example: "Musik-Tausch"
+        description:
+          type: string
+          nullable: true
+          description: Beschreibung des Forums (optional)
+          example: "Tauscht eure Lieblingssongs"
+        image:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Forum-Bild (optional)
+
+    ForumUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Neuer Name des Forums
+          example: "Musik-Tausch"
+        description:
+          type: string
+          nullable: true
+          description: Neue Beschreibung des Forums
+        image:
+          type: string
+          nullable: true
+          description: Neues Base64-kodiertes Forum-Bild
+
+    ForumMember:
+      type: object
+      required: [id, forumId, userId, notificationsEnabled, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        forumId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          description: Name des Mitglieds (nur bei Member-Liste)
+          example: "Max Mustermann"
+        image:
+          type: string
+          nullable: true
+          description: Profilbild des Mitglieds (nur bei Member-Liste)
+        notificationsEnabled:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+
+    ForumMemberListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForumMember'
+
+    ForumNotificationsRequest:
+      type: object
+      required: [notificationsEnabled]
+      properties:
+        notificationsEnabled:
+          type: boolean
+          description: Benachrichtigungen bei neuen Posts aktivieren/deaktivieren
+          example: false
+
+    FeedPost:
+      type: object
+      required: [id, forumId, userId, type, content, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        forumId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [text, music, video, web]
+          description: Art des Posts
+          example: "text"
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/FeedPostContentText'
+            - $ref: '#/components/schemas/FeedPostContentMusic'
+            - $ref: '#/components/schemas/FeedPostContentVideo'
+            - $ref: '#/components/schemas/FeedPostContentWeb'
+          description: JSON-Inhalt des Posts (strukturabhängig vom Typ)
+        upvoteCount:
+          type: integer
+          description: Anzahl der Upvotes (nur bei Listenabfrage)
+          example: 5
+        commentCount:
+          type: integer
+          description: Anzahl der Kommentare (nur bei Listenabfrage)
+          example: 3
+        hasVoted:
+          type: boolean
+          description: Ob der aktuelle Nutzer gevotet hat (nur bei Auth)
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    FeedPostContentText:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: Textinhalt des Posts
+          example: "Hallo zusammen!"
+
+    FeedPostContentMusic:
+      type: object
+      properties:
+        text:
+          type: string
+          nullable: true
+          description: Anmerkungen des Nutzers
+          example: "Schaut euch das an!"
+        urls:
+          type: array
+          items:
+            $ref: '#/components/schemas/MusicUrl'
+          description: Liste von Streaming-URLs
+
+    MusicUrl:
+      type: object
+      required: [platform, url]
+      properties:
+        platform:
+          type: string
+          enum: [spotify, apple_music, youtube_music, youtube, other]
+          description: Streaming-Plattform
+          example: "spotify"
+        url:
+          type: string
+          format: uri
+          description: URL zum Song/Album
+          example: "https://open.spotify.com/track/..."
+
+    FeedPostContentVideo:
+      type: object
+      properties:
+        text:
+          type: string
+          nullable: true
+          description: Anmerkungen des Nutzers
+          example: "Tolles Video!"
+        urls:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoUrl'
+          description: Liste von Video-URLs
+
+    VideoUrl:
+      type: object
+      required: [platform, url]
+      properties:
+        platform:
+          type: string
+          enum: [youtube, peertube, odysee, tv_mediathek, other]
+          description: Video-Plattform
+          example: "youtube"
+        url:
+          type: string
+          format: uri
+          description: URL zum Video
+          example: "https://www.youtube.com/watch?v=..."
+
+    FeedPostContentWeb:
+      type: object
+      properties:
+        text:
+          type: string
+          nullable: true
+          description: Anmerkungen des Nutzers
+          example: "Interessanter Artikel"
+        urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: Liste von URLs zu beliebigen Internetseiten
+          example: ["https://example.com/article", "https://example.com/page2"]
+
+    FeedPostListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedPost'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    FeedPostCreateRequest:
+      type: object
+      required: [content]
+      properties:
+        type:
+          type: string
+          enum: [text, music, video, web]
+          default: text
+          description: Art des Posts (Standard: text)
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/FeedPostContentText'
+            - $ref: '#/components/schemas/FeedPostContentMusic'
+            - $ref: '#/components/schemas/FeedPostContentVideo'
+            - $ref: '#/components/schemas/FeedPostContentWeb'
+          description: JSON-Inhalt des Posts
+
+    FeedPostUpdateRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          oneOf:
+            - $ref: '#/components/schemas/FeedPostContentText'
+            - $ref: '#/components/schemas/FeedPostContentMusic'
+            - $ref: '#/components/schemas/FeedPostContentVideo'
+            - $ref: '#/components/schemas/FeedPostContentWeb'
+          description: Aktualisierter JSON-Inhalt des Posts
+
+    FeedPostComment:
+      type: object
+      required: [id, postId, userId, parentId, text, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        postId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des übergeordneten Kommentars (null = Top-Level)
+        text:
+          type: string
+          nullable: true
+          description: Kommentartext (null bei Soft-Delete)
+          example: "Toller Song!"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        children:
+          type: array
+          description: Verschachtelte Antworten
+          items:
+            $ref: '#/components/schemas/FeedPostComment'
+
+    FeedPostCommentListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedPostComment'
+          description: Baumstruktur der Kommentare
+        meta:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+              description: Gesamtanzahl aller Kommentare
+              example: 5
+
+    FeedPostCommentCreateRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Kommentartext
+          example: "Toller Song!"
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des übergeordneten Kommentars (null = Top-Level)
+          example: null
+
+    FeedPostCommentUpdateRequest:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          description: Aktualisierter Kommentartext
+          example: "Toller Song! (bearbeitet)"
+
 paths:
   /auth/login/otp/request:
     post:
@@ -4493,7 +4876,974 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Vorschlag oder Eltern-Kommentar nicht gefunden
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums:
+    get:
+      summary: Alle Foren auflisten
+      description: >
+        Gibt eine paginierte Liste aller existierenden Foren zurück,
+        sortiert nach Erstellungsdatum (absteigend). Jeder Eintrag
+        enthält die Anzahl der Mitglieder.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Paginierte Liste der Foren
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neues Forum erstellen
+      description: >
+        Erstellt ein neues Forum. Nur Administratoren dürfen Foren erstellen.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumCreateRequest'
+      responses:
+        '201':
+          description: Forum erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Forum'
+        '400':
+          description: Ungültige Eingabe (z.B. leerer Name)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Recht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}:
+    get:
+      summary: Forum-Details abrufen
+      description: >
+        Gibt die Details eines Forums zurück, einschließlich Mitgliederanzahl
+        und ob der eingeloggte Nutzer Mitglied ist.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      responses:
+        '200':
+          description: Forum-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ForumDetail'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Forum bearbeiten
+      description: >
+        Aktualisiert die Daten eines Forums. Nur Administratoren dürfen
+        Foren bearbeiten.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumUpdateRequest'
+      responses:
+        '200':
+          description: Forum erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Forum'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Recht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Forum löschen
+      description: >
+        Löscht ein Forum und alle zugehörigen Posts, Kommentare und
+        Mitgliedschaften. Nur Administratoren dürfen Foren löschen.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      responses:
+        '204':
+          description: Forum erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Recht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/members:
+    get:
+      summary: Mitglieder eines Forums auflisten
+      description: >
+        Gibt eine Liste aller Mitglieder eines Forums zurück,
+        inklusive Namen und Benachrichtigungseinstellungen.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      responses:
+        '200':
+          description: Liste der Mitglieder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumMemberListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Forum beitreten
+      description: >
+        Tritt einem Forum bei. Jeder Nutzer kann jedem Forum beitreten.
+        Bereits vorhandene Mitgliedschaft gibt 409 Conflict zurück.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      responses:
+        '204':
+          description: Forum erfolgreich beigetreten
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Bereits Mitglied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Forum verlassen
+      description: >
+        Verlässt ein Forum. Der Nutzer muss Mitglied sein.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      responses:
+        '204':
+          description: Forum erfolgreich verlassen
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Nicht Mitglied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/members/notifications:
+    put:
+      summary: Benachrichtigungseinstellung ändern
+      description: >
+        Aktualisiert die Benachrichtigungseinstellung des angemeldeten
+        Nutzers für ein Forum. Der Nutzer muss Mitglied sein.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumNotificationsRequest'
+      responses:
+        '204':
+          description: Einstellung erfolgreich aktualisiert
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Nicht Mitglied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/posts:
+    get:
+      summary: Posts im Forum auflisten
+      description: >
+        Gibt eine paginierte Liste aller Posts in einem Forum zurück,
+        sortiert nach Erstellungsdatum (absteigend). Enthält pro Post
+        die Anzahl der Upvotes, Kommentare und ob der aktuelle Nutzer
+        gevotet hat.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Paginierte Liste der Posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPostListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Post erstellen
+      description: >
+        Erstellt einen neuen Post in einem Forum. Der eingeloggte Nutzer
+        muss Mitglied des Forums sein. Der Content muss der Struktur
+        des gewählten Typs entsprechen.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedPostCreateRequest'
+      responses:
+        '201':
+          description: Post erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedPost'
+        '400':
+          description: Ungültige Eingabe (z.B. ungültiger Typ oder Content)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Kein Mitglied des Forums
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/posts/{postId}:
+    get:
+      summary: Einzelnen Post abrufen
+      description: >
+        Gibt die Details eines einzelnen Posts zurück, inklusive
+        Upvote-Anzahl und Kommentar-Anzahl.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      responses:
+        '200':
+          description: Post-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedPost'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post oder Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Post bearbeiten
+      description: >
+        Aktualisiert den Content eines Posts. Nur der Eigentümer
+        darf seinen Post bearbeiten.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedPostUpdateRequest'
+      responses:
+        '200':
+          description: Post erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedPost'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Bearbeiten (nicht Eigentümer)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post oder Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Post löschen
+      description: >
+        Löscht einen Post. Administratoren dürfen immer löschen.
+        Eigentümer dürfen innerhalb von 10 Minuten löschen oder
+        danach nur, wenn keine Kommentare vorhanden sind.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      responses:
+        '204':
+          description: Post erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Löschen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post oder Forum nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/posts/{postId}/vote:
+    post:
+      summary: Post upvoten
+      description: >
+        Gibt einen Upvote für einen Post ab. Pro Nutzer und Post
+        ist nur ein Upvote möglich.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      responses:
+        '204':
+          description: Upvote erfolgreich abgegeben
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Upvote bereits vorhanden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Upvote für Post zurückziehen
+      description: >
+        Entfernt den Upvote des angemeldeten Nutzers für einen Post.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      responses:
+        '204':
+          description: Upvote erfolgreich zurückgezogen
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/posts/{postId}/comments:
+    get:
+      summary: Kommentare eines Posts abrufen
+      description: >
+        Gibt alle Kommentare eines Posts als verschachtelte Baumstruktur
+        zurück. Gelöschte Kommentare haben text=null, behalten aber
+        ihre Struktur bei (wenn Antworten vorhanden sind).
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      responses:
+        '200':
+          description: Kommentare als Baumstruktur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPostCommentListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Kommentar erstellen
+      description: >
+        Erstellt einen Kommentar zu einem Post. Top-Level-Kommentare
+        haben parentId=null, Antworten verweisen auf die ID des
+        übergeordneten Kommentars.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedPostCommentCreateRequest'
+      responses:
+        '201':
+          description: Kommentar erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedPostComment'
+        '400':
+          description: Leerer Text oder ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Post oder Parent-Kommentar nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/{id}/posts/{postId}/comments/{commentId}:
+    put:
+      summary: Kommentar bearbeiten
+      description: >
+        Aktualisiert den Text eines Kommentars. Nur der Eigentümer
+        darf seinen Kommentar bearbeiten, und nur innerhalb von
+        10 Minuten nach Erstellung.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Kommentar-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedPostCommentUpdateRequest'
+      responses:
+        '200':
+          description: Kommentar erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FeedPostComment'
+        '400':
+          description: Leerer Text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Bearbeiten (nicht Eigentümer oder Zeitfenster abgelaufen)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Kommentar oder Post nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Kommentar löschen
+      description: >
+        Löscht einen Kommentar. Administratoren dürfen immer löschen.
+        Eigentümer dürfen innerhalb von 10 Minuten löschen oder
+        danach nur, wenn keine Antworten vorhanden sind.
+        Hat der Kommentar Antworten, wird er nur "soft-gelöscht"
+        (text auf NULL gesetzt), die Struktur bleibt erhalten.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Forum-ID
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Post-ID
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Kommentar-ID
+      responses:
+        '204':
+          description: Kommentar erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Löschen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Kommentar oder Post nicht gefunden
           content:
             application/json:
               schema:

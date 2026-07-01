@@ -7,6 +7,7 @@ use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
+use Sinclear\Api\Controllers\ForumController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -137,6 +138,38 @@ return function (App $app): void {
         $group->post('/suggestions/{id}/comments', [FeedbackController::class, 'createComment']);
         $group->put('/suggestions/{id}/comments/{commentId}', [FeedbackController::class, 'updateComment']);
         $group->delete('/suggestions/{id}/comments/{commentId}', [FeedbackController::class, 'deleteComment']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/forums', function (RouteCollectorProxy $group) {
+        // Forum CRUD
+        $group->get('', [ForumController::class, 'list']);
+        $group->post('', [ForumController::class, 'create']);
+        $group->get('/{id}', [ForumController::class, 'get']);
+        $group->put('/{id}', [ForumController::class, 'update']);
+        $group->delete('/{id}', [ForumController::class, 'delete']);
+
+        // Members
+        $group->get('/{id}/members', [ForumController::class, 'listMembers']);
+        $group->post('/{id}/members', [ForumController::class, 'join']);
+        $group->delete('/{id}/members', [ForumController::class, 'leave']);
+        $group->put('/{id}/members/notifications', [ForumController::class, 'updateNotifications']);
+
+        // Posts
+        $group->get('/{id}/posts', [ForumController::class, 'listPosts']);
+        $group->post('/{id}/posts', [ForumController::class, 'createPost']);
+        $group->get('/{id}/posts/{postId}', [ForumController::class, 'getPost']);
+        $group->put('/{id}/posts/{postId}', [ForumController::class, 'updatePost']);
+        $group->delete('/{id}/posts/{postId}', [ForumController::class, 'deletePost']);
+
+        // Votes
+        $group->post('/{id}/posts/{postId}/vote', [ForumController::class, 'vote']);
+        $group->delete('/{id}/posts/{postId}/vote', [ForumController::class, 'removeVote']);
+
+        // Comments
+        $group->get('/{id}/posts/{postId}/comments', [ForumController::class, 'listComments']);
+        $group->post('/{id}/posts/{postId}/comments', [ForumController::class, 'createComment']);
+        $group->put('/{id}/posts/{postId}/comments/{commentId}', [ForumController::class, 'updateComment']);
+        $group->delete('/{id}/posts/{postId}/comments/{commentId}', [ForumController::class, 'deleteComment']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)
