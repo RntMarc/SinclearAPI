@@ -1906,6 +1906,372 @@ components:
           description: Aktualisierter Kommentartext
           example: "Toller Song! (bearbeitet)"
 
+    RecipeIngredient:
+      type: object
+      required: [id, amount, unit, name, order]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Zutaten-ID
+        amount:
+          type: number
+          format: double
+          description: Menge
+          example: 250
+        unit:
+          type: string
+          description: Mengeneinheit (g, ml, stk, el, tl, etc.)
+          example: "g"
+        name:
+          type: string
+          description: Name der Zutat
+          example: "Mehl"
+        order:
+          type: integer
+          description: Sortierreihenfolge
+          example: 0
+
+    RecipeStep:
+      type: object
+      required: [id, category, description, order]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Schritt-ID
+        category:
+          type: string
+          enum: [vorbereitung, hauptgang, beilage, garnierung, sonstiges]
+          description: Art des Schritts
+        title:
+          type: string
+          nullable: true
+          description: Optionaler Titel für den Schritt
+        description:
+          type: string
+          description: Beschreibung des Schritts
+        order:
+          type: integer
+          description: Sortierreihenfolge
+          example: 0
+
+    RecipeReview:
+      type: object
+      required: [id, recipeId, userId, rating, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Bewertungs-ID
+        recipeId:
+          type: string
+          format: uuid
+          description: ID des Rezepts
+        userId:
+          type: string
+          format: uuid
+          description: ID des bewertenden Nutzers
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Bewertung (1-5)
+          example: 4
+        comment:
+          type: string
+          nullable: true
+          description: Optionale Anmerkung
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+
+    Recipe:
+      type: object
+      required: [id, title, category, servings, creatorId, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Rezept-ID
+        title:
+          type: string
+          description: Rezeptname
+          example: "Käsekuchen nach Omas Rezept"
+        description:
+          type: string
+          nullable: true
+          description: Beschreibung des Rezepts
+        category:
+          type: string
+          enum: [vorspeisen, hauptgerichte, desserts, salate, suppen, backen, fruehstueck, getraenke, sonstiges]
+          description: Rezeptkategorie
+        dietaryTags:
+          type: string
+          nullable: true
+          description: Ernährungshinweise (kommagetrennt)
+          example: "vegetarisch, glutenfrei"
+        image:
+          type: string
+          nullable: true
+          description: URL oder Base64-Bild
+        servings:
+          type: integer
+          description: Anzahl der Portionen
+          example: 4
+        creatorId:
+          type: string
+          format: uuid
+          description: ID des Erstellers
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+        updatedAt:
+          type: string
+          format: date-time
+          description: Letztes Aktualisierungsdatum
+
+    RecipeDetail:
+      allOf:
+        - $ref: '#/components/schemas/Recipe'
+        - type: object
+          properties:
+            avgRating:
+              type: number
+              format: float
+              nullable: true
+              description: Durchschnittliche Bewertung
+              example: 4.2
+            ratingCount:
+              type: integer
+              description: Anzahl der Bewertungen
+              example: 5
+            isBookmarked:
+              type: boolean
+              description: Hat der aktuelle Nutzer dieses Rezept als Lesezeichen gespeichert
+            ingredients:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecipeIngredient'
+              description: Liste der Zutaten
+            steps:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecipeStep'
+              description: Zubereitungsschritte
+
+    RecipeListItem:
+      allOf:
+        - $ref: '#/components/schemas/Recipe'
+        - type: object
+          properties:
+            avgRating:
+              type: number
+              format: float
+              nullable: true
+              description: Durchschnittliche Bewertung
+            ratingCount:
+              type: integer
+              description: Anzahl der Bewertungen
+
+    RecipeCreateRequest:
+      type: object
+      required: [title, category]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: Rezeptname
+          example: "Käsekuchen nach Omas Rezept"
+        description:
+          type: string
+          nullable: true
+          description: Beschreibung
+        category:
+          type: string
+          enum: [vorspeisen, hauptgerichte, desserts, salate, suppen, backen, fruehstueck, getraenke, sonstiges]
+          description: Rezeptkategorie
+        dietaryTags:
+          type: string
+          nullable: true
+          description: Ernährungshinweise
+        image:
+          type: string
+          nullable: true
+          description: URL oder Base64-Bild
+        servings:
+          type: integer
+          default: 4
+          description: Anzahl der Portionen
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeIngredientCreateRequest'
+          description: Zutatenliste (optional)
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeStepCreateRequest'
+          description: Zubereitungsschritte (optional)
+
+    RecipeUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: Rezeptname
+        description:
+          type: string
+          nullable: true
+          description: Beschreibung
+        category:
+          type: string
+          enum: [vorspeisen, hauptgerichte, desserts, salate, suppen, backen, fruehstueck, getraenke, sonstiges]
+          description: Rezeptkategorie
+        dietaryTags:
+          type: string
+          nullable: true
+          description: Ernährungshinweise
+        image:
+          type: string
+          nullable: true
+          description: URL oder Base64-Bild
+        servings:
+          type: integer
+          description: Anzahl der Portionen
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeIngredientCreateRequest'
+          description: Zutatenliste (optional, ersetzt bestehende)
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeStepCreateRequest'
+          description: Zubereitungsschritte (optional, ersetzt bestehende)
+
+    RecipeIngredientCreateRequest:
+      type: object
+      required: [amount, unit, name]
+      properties:
+        amount:
+          type: number
+          format: double
+          description: Menge
+          example: 250
+        unit:
+          type: string
+          description: Mengeneinheit
+          example: "g"
+        name:
+          type: string
+          description: Name der Zutat
+          example: "Mehl"
+        order:
+          type: integer
+          description: Sortierreihenfolge
+          example: 0
+
+    RecipeStepCreateRequest:
+      type: object
+      required: [description]
+      properties:
+        category:
+          type: string
+          enum: [vorbereitung, hauptgang, beilage, garnierung, sonstiges]
+          default: sonstiges
+          description: Art des Schritts
+        title:
+          type: string
+          nullable: true
+          description: Optionaler Titel
+        description:
+          type: string
+          description: Beschreibung des Schritts
+        order:
+          type: integer
+          description: Sortierreihenfolge
+          example: 0
+
+    RecipeReviewCreateRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Bewertung (1-5)
+          example: 4
+        comment:
+          type: string
+          nullable: true
+          description: Optionale Anmerkung
+
+    RecipeReviewUpdateRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: Bewertung (1-5)
+        comment:
+          type: string
+          nullable: true
+          description: Optionale Anmerkung
+
+    RecipeListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeListItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    RecipeDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/RecipeDetail'
+
+    RecipeBookmarkListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeListItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    RecipeBookmarkStatus:
+      type: object
+      required: [bookmarked]
+      properties:
+        bookmarked:
+          type: boolean
+          description: Lesezeichen-Status
+
+    RecipeReviewListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeReview'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
 paths:
   /auth/login/otp/request:
     post:
@@ -5714,7 +6080,542 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Post oder Parent-Kommentar nicht gefunden
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes:
+    get:
+      summary: Rezepte auflisten
+      description: >
+        Gibt eine paginierte Liste aller Rezepte zurück.
+        Unterstützt Volltextsuche in Titel und Zutaten.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Einträge pro Seite
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Suchbegriff (durchsucht Titel und Zutaten)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_asc, created_desc, rating_asc, rating_desc]
+            default: created_desc
+          description: Sortierung
+      responses:
+        '200':
+          description: Liste der Rezepte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListResponse'
+        '400':
+          description: Ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neues Rezept erstellen
+      description: >
+        Erstellt ein neues Rezept. Optional können Zutaten und Schritte
+        direkt mitübergeben werden.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeCreateRequest'
+      responses:
+        '201':
+          description: Rezept erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes/bookmarks:
+    get:
+      summary: Eigene Lesezeichen auflisten
+      description: Gibt eine paginierte Liste aller Rezepte als Lesezeichen des aktuellen Nutzers zurück.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Liste der Lesezeichen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeBookmarkListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes/{id}:
+    get:
+      summary: Rezept-Details abrufen
+      description: >
+        Gibt die vollständigen Details eines Rezepts zurück,
+        einschließlich Zutaten, Schritte, Durchschnittsbewertung und Lesezeichen-Status.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '200':
+          description: Rezept-Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Rezept aktualisieren
+      description: >
+        Aktualisiert ein bestehendes Rezept. Nur der Eigentümer oder
+        ein Administrator darf aktualisieren. Zutaten und Schritte werden
+        komplett ersetzt, wenn sie mitübergeben werden.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeUpdateRequest'
+      responses:
+        '204':
+          description: Rezept erfolgreich aktualisiert
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Bearbeiten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Rezept löschen
+      description: >
+        Löscht ein Rezept und alle zugehörigen Zutaten, Schritte,
+        Bewertungen und Lesezeichen. Nur der Eigentümer oder ein
+        Administrator darf löschen.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '204':
+          description: Rezept erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Löschen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes/{id}/bookmark:
+    get:
+      summary: Lesezeichen-Status abrufen
+      description: Gibt zurück, ob der aktuelle Nutzer dieses Rezept als Lesezeichen gespeichert hat.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '200':
+          description: Lesezeichen-Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RecipeBookmarkStatus'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Lesezeichen setzen
+      description: Fügt das Rezept zu den Lesezeichen des aktuellen Nutzers hinzu.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '201':
+          description: Lesezeichen erfolgreich gesetzt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      bookmarked:
+                        type: boolean
+                        example: true
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Lesezeichen existiert bereits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Lesezeichen entfernen
+      description: Entfernt das Rezept aus den Lesezeichen des aktuellen Nutzers.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '204':
+          description: Lesezeichen erfolgreich entfernt
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes/{id}/reviews:
+    get:
+      summary: Bewertungen eines Rezepts auflisten
+      description: Gibt eine paginierte Liste aller Bewertungen für ein Rezept zurück.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Liste der Bewertungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeReviewListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Bewertung abgeben
+      description: Erstellt eine neue Bewertung für ein Rezept. Pro Nutzer und Rezept ist nur eine Bewertung erlaubt.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeReviewCreateRequest'
+      responses:
+        '201':
+          description: Bewertung erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RecipeReview'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes/{id}/reviews/{reviewId}:
+    patch:
+      summary: Bewertung bearbeiten
+      description: Aktualisiert eine bestehende Bewertung. Nur der Eigentümer darf bearbeiten.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Bewertungs-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecipeReviewUpdateRequest'
+      responses:
+        '200':
+          description: Bewertung erfolgreich aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RecipeReview'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Bearbeiten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bewertung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Bewertung löschen
+      description: Löscht eine Bewertung. Der Eigentümer und Administratoren dürfen löschen.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Bewertungs-ID
+      responses:
+        '204':
+          description: Bewertung erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Löschen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bewertung nicht gefunden
           content:
             application/json:
               schema:

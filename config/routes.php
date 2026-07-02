@@ -10,6 +10,7 @@ use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\ForumController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
+use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -111,6 +112,28 @@ return function (App $app): void {
 
         $group->post('/{id}/participants', [CalendarEventController::class, 'addParticipant']);
         $group->delete('/{id}/participants/{userId}', [CalendarEventController::class, 'removeParticipant']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/recipes', function (RouteCollectorProxy $group) {
+        // List bookmarks MUST come before /{id} to avoid route capture
+        $group->get('/bookmarks', [RecipeController::class, 'listBookmarks']);
+
+        $group->get('', [RecipeController::class, 'list']);
+        $group->post('', [RecipeController::class, 'create']);
+        $group->get('/{id}', [RecipeController::class, 'get']);
+        $group->patch('/{id}', [RecipeController::class, 'update']);
+        $group->delete('/{id}', [RecipeController::class, 'delete']);
+
+        // Bookmarks
+        $group->get('/{id}/bookmark', [RecipeController::class, 'getBookmark']);
+        $group->post('/{id}/bookmark', [RecipeController::class, 'setBookmark']);
+        $group->delete('/{id}/bookmark', [RecipeController::class, 'removeBookmark']);
+
+        // Reviews
+        $group->get('/{id}/reviews', [RecipeController::class, 'listReviews']);
+        $group->post('/{id}/reviews', [RecipeController::class, 'createReview']);
+        $group->patch('/{id}/reviews/{reviewId}', [RecipeController::class, 'updateReview']);
+        $group->delete('/{id}/reviews/{reviewId}', [RecipeController::class, 'deleteReview']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/notifications', function (RouteCollectorProxy $group) {

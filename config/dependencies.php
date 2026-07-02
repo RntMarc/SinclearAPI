@@ -19,11 +19,17 @@ use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\ForumController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
+use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
+use Sinclear\Api\Repository\RecipeRepository;
+use Sinclear\Api\Repository\RecipeBookmarkRepository;
+use Sinclear\Api\Repository\RecipeIngredientRepository;
+use Sinclear\Api\Repository\RecipeReviewRepository;
+use Sinclear\Api\Repository\RecipeStepRepository;
 use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
@@ -63,6 +69,7 @@ use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Security\Policy\FeedbackPolicy;
+use Sinclear\Api\Security\Policy\RecipePolicy;
 use Sinclear\Api\Security\Policy\ForumPolicy;
 use Sinclear\Api\Security\Policy\NotificationPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
@@ -74,6 +81,7 @@ use Sinclear\Api\Services\ForumService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\PushService;
 use Sinclear\Api\Services\RateLimiter;
 use Symfony\Component\Mailer\Mailer;
@@ -170,6 +178,15 @@ return [
     ReviewPolicy::class => autowire(),
     ReviewService::class => autowire(),
     ReviewController::class => autowire(),
+
+    RecipeRepository::class => autowire(),
+    RecipeBookmarkRepository::class => autowire(),
+    RecipeIngredientRepository::class => autowire(),
+    RecipeReviewRepository::class => autowire(),
+    RecipeStepRepository::class => autowire(),
+    RecipePolicy::class => autowire(),
+    RecipeService::class => autowire(),
+    RecipeController::class => autowire(),
 
     FeedbackSuggestionRepository::class => autowire(),
     FeedbackVoteRepository::class => autowire(),
