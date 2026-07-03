@@ -10,6 +10,7 @@ use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\ForumController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
+use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\TravelController;
@@ -134,6 +135,20 @@ return function (App $app): void {
         $group->post('/{id}/reviews', [RecipeController::class, 'createReview']);
         $group->patch('/{id}/reviews/{reviewId}', [RecipeController::class, 'updateReview']);
         $group->delete('/{id}/reviews/{reviewId}', [RecipeController::class, 'deleteReview']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/location-sharing', function (RouteCollectorProxy $group) {
+        // Static route MUST come before /{id}
+        $group->get('/active', [LocationSharingController::class, 'listActive']);
+
+        $group->get('/sessions', [LocationSharingController::class, 'listSessions']);
+        $group->post('/sessions', [LocationSharingController::class, 'create']);
+        $group->get('/sessions/{id}', [LocationSharingController::class, 'get']);
+        $group->patch('/sessions/{id}', [LocationSharingController::class, 'update']);
+        $group->delete('/sessions/{id}', [LocationSharingController::class, 'delete']);
+
+        $group->post('/sessions/{id}/locations', [LocationSharingController::class, 'createLocation']);
+        $group->get('/sessions/{id}/locations', [LocationSharingController::class, 'listLocations']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/notifications', function (RouteCollectorProxy $group) {

@@ -2272,6 +2272,196 @@ components:
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
+    LocationSharingSession:
+      type: object
+      required: [id, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        durationSeconds:
+          type: integer
+          description: Dauer der Session in Sekunden (300–86400)
+        frequencySeconds:
+          type: integer
+          description: Aktualisierungsfrequenz in Sekunden (300–1200, Default 600)
+        isActive:
+          type: boolean
+        startedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    LocationSharingSessionDetail:
+      allOf:
+        - $ref: '#/components/schemas/LocationSharingSession'
+        - type: object
+          properties:
+            recipients:
+              type: array
+              items:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                    format: uuid
+                  displayName:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
+            lastLocation:
+              $ref: '#/components/schemas/LocationSharingLocation'
+
+    LocationSharingLocation:
+      type: object
+      required: [id, latitude, longitude, recordedAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        accuracy:
+          type: number
+          format: double
+          nullable: true
+        recordedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    LocationSharingCreateRequest:
+      type: object
+      required: [recipient_ids, duration_seconds]
+      properties:
+        recipient_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          minItems: 1
+          maxItems: 50
+          description: IDs der Empfänger
+        duration_seconds:
+          type: integer
+          minimum: 300
+          maximum: 86400
+          description: Dauer in Sekunden (5 Min – 24 h)
+        frequency_seconds:
+          type: integer
+          minimum: 300
+          maximum: 1200
+          default: 600
+          description: Aktualisierungsfrequenz in Sekunden (5–20 Min)
+
+    LocationSharingUpdateRequest:
+      type: object
+      properties:
+        duration_seconds:
+          type: integer
+          minimum: 300
+          maximum: 86400
+          description: Neue Dauer in Sekunden
+        is_active:
+          type: boolean
+          description: Session beenden (false) oder aktiv lassen (true)
+
+    LocationSharingLocationCreateRequest:
+      type: object
+      required: [latitude, longitude, recordedAt]
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        accuracy:
+          type: number
+          format: double
+          minimum: 0
+          nullable: true
+          description: GPS-Genauigkeit in Metern
+        recordedAt:
+          type: string
+          format: date-time
+          description: Zeitpunkt der Aufzeichnung (nicht in Zukunft, max. 5 Min alt)
+
+    LocationSharingSessionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationSharingSession'
+
+    LocationSharingSessionDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/LocationSharingSessionDetail'
+
+    LocationSharingLocationListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocationSharingLocation'
+
+    LocationSharingActiveResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              session:
+                $ref: '#/components/schemas/LocationSharingSession'
+              owner:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  displayName:
+                    type: string
+                  image:
+                    type: string
+                    nullable: true
+              lastLocation:
+                $ref: '#/components/schemas/LocationSharingLocation'
+
 paths:
   /auth/login/otp/request:
     post:
@@ -6947,7 +7137,320 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Unterkunft oder Reise nicht gefunden
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /location-sharing/active:
+    get:
+      summary: Aktive Standort-Sharing-Sessions von Kontakten
+      description: >
+        Gibt alle aktiven Sessions zurück, bei denen der aktuelle Nutzer
+        als Empfänger eingetragen ist.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der aktiven Sessions mit Besitzer und letzter Location
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSharingActiveResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /location-sharing/sessions:
+    get:
+      summary: Eigene aktive Sessions auflisten
+      description: Gibt alle aktiven Standort-Sharing-Sessions des aktuellen Nutzers zurück.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der Sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSharingSessionListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neue Standort-Sharing-Session erstellen
+      description: >
+        Erstellt eine neue Session zum Teilen des Standorts mit ausgewählten
+        Kontakten. Die Session läuft automatisch nach Ablauf der Dauer ab.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationSharingCreateRequest'
+      responses:
+        '201':
+          description: Session erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSharingSessionDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /location-sharing/sessions/{id}:
+    get:
+      summary: Session-Details abrufen
+      description: >
+        Gibt die vollständigen Details einer Session zurück, einschließlich
+        Empfänger und letzter Location. Nur Owner oder Empfänger dürfen lesen.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session-Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSharingSessionDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Zugriff auf diese Session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Session aktualisieren (Dauer verlängern / beenden)
+      description: >
+        Aktualisiert eine bestehende Session. Nur der Owner darf aktualisieren.
+        Mit `is_active: false` kann die Session manuell beendet werden.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationSharingUpdateRequest'
+      responses:
+        '200':
+          description: Session aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSharingSessionDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Bearbeiten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Session beenden
+      description: >
+        Beendet eine aktive Session (setzt `isActive` auf false).
+        Nur der Owner darf die Session beenden.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Session erfolgreich beendet
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Beenden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /location-sharing/sessions/{id}/locations:
+    post:
+      summary: Standort an Session senden
+      description: >
+        Fügt einen neuen Standortpunkt zur Session hinzu. Nur der Owner
+        darf Standorte senden. Die Session muss noch aktiv sein.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationSharingLocationCreateRequest'
+      responses:
+        '201':
+          description: Standort erfolgreich gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Senden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: Standort-Verlauf abrufen (Polling)
+      description: >
+        Gibt den Standort-Verlauf einer Session zurück. Optional kann
+        ein `since`-Timestamp übergeben werden, um nur neue Standorte
+        seit dem letzten Abruf zu erhalten. Owner und Empfänger dürfen lesen.
+      tags: [LocationSharing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: since
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Nur Standorte nach diesem Zeitpunkt
+      responses:
+        '200':
+          description: Standort-Verlauf
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationSharingLocationListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Zugriff auf diese Session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Session nicht gefunden
           content:
             application/json:
               schema:

@@ -43,6 +43,16 @@ final readonly class RecipeReviewRepository
         ];
     }
 
+    public function findByUserAndRecipe(string $recipeId, string $userId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM RecipeReview WHERE recipeId = ? AND userId = ?'
+        );
+        $stmt->execute([$recipeId, $userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
     public function create(array $data): string
     {
         $id = Uuid::uuid7()->toString();

@@ -140,7 +140,11 @@ final readonly class RecipeController
             $review = $this->recipeService->createReview($recipeId, $user->id, $rating, $comment);
             return ResponseFactory::json(['data' => $review], 201, $response);
         } catch (\RuntimeException $e) {
-            $status = $e->getMessage() === 'recipe_not_found' ? 404 : 400;
+            $ERROR_MAP = [
+                'recipe_not_found' => 404,
+                'review_exists' => 409,
+            ];
+            $status = $ERROR_MAP[$e->getMessage()] ?? 400;
             return ResponseFactory::json(['error' => $e->getMessage()], $status, $response);
         }
     }

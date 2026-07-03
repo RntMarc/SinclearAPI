@@ -95,6 +95,11 @@ final readonly class RecipeService
             throw new \RuntimeException('recipe_not_found');
         }
 
+        $existing = $this->reviewRepo->findByUserAndRecipe($recipeId, $userId);
+        if ($existing !== null) {
+            throw new \RuntimeException('review_exists');
+        }
+
         $id = $this->reviewRepo->create([
             'recipeId' => $recipeId,
             'userId' => $userId,

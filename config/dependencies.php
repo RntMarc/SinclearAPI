@@ -14,6 +14,7 @@ use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
+use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\ForumController;
@@ -25,6 +26,9 @@ use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
+use Sinclear\Api\Repository\LocationSharingSessionRepository;
+use Sinclear\Api\Repository\LocationSharingRecipientRepository;
+use Sinclear\Api\Repository\LocationSharingLocationRepository;
 use Sinclear\Api\Repository\RecipeRepository;
 use Sinclear\Api\Repository\RecipeBookmarkRepository;
 use Sinclear\Api\Repository\RecipeIngredientRepository;
@@ -65,8 +69,10 @@ use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
+use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
+use Sinclear\Api\Security\Policy\LocationSharingPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Security\Policy\FeedbackPolicy;
 use Sinclear\Api\Security\Policy\RecipePolicy;
@@ -221,6 +227,13 @@ return [
     CalendarEventService::class => autowire(),
     CalendarEventController::class => autowire(),
     CalendarEventPolicy::class => autowire(),
+
+    LocationSharingSessionRepository::class => autowire(),
+    LocationSharingRecipientRepository::class => autowire(),
+    LocationSharingLocationRepository::class => autowire(),
+    LocationSharingPolicy::class => autowire(),
+    LocationSharingService::class => autowire(),
+    LocationSharingController::class => autowire(),
 
     ContactInfoRepository::class => autowire(),
     ContactInfoUpdateRepository::class => autowire(),
