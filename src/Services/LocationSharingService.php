@@ -5,6 +5,7 @@ namespace Sinclear\Api\Services;
 use Sinclear\Api\Repository\LocationSharingSessionRepository;
 use Sinclear\Api\Repository\LocationSharingRecipientRepository;
 use Sinclear\Api\Repository\LocationSharingLocationRepository;
+use Sinclear\Api\Repository\UserRepository;
 
 final readonly class LocationSharingService
 {
@@ -12,6 +13,8 @@ final readonly class LocationSharingService
         private LocationSharingSessionRepository $sessionRepo,
         private LocationSharingRecipientRepository $recipientRepo,
         private LocationSharingLocationRepository $locationRepo,
+        private NotificationService $notificationService,
+        private UserRepository $userRepo,
     ) {}
 
     public function createSession(array $data, string $ownerId): array
@@ -23,6 +26,21 @@ final readonly class LocationSharingService
         ]);
 
         $this->recipientRepo->addRecipients($id, $data['recipient_ids']);
+
+        $owner = $this->userRepo->findById($ownerId);
+        $ownerDisplayName = $owner['displayName'] ?? 'Unbekannt';
+
+        $recipients = $this->recipientRepo->getRecipients($id);
+        foreach ($recipients as $recipient) {
+            $this->notificationService->createNotification(
+                userId: $recipient['userId'],
+                code: 'location_sharing.started',
+                payload: [
+                    'locationSharingSessionId' => $id,
+                    'ownerDisplayName' => $ownerDisplayName,
+                ],
+            );
+        }
 
         return $this->formatSessionDetail($id, $ownerId);
     }

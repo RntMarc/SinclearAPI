@@ -50,6 +50,12 @@ rendert basierend auf dem Code die passende UI und verwendet Daten aus
 | `calendar.event_updated` | `{ "calendarEventId": "uuid", "title": "..." }` | Kalender-Event wurde geändert |
 | `calendar.participant_added` | `{ "calendarEventId": "uuid", "title": "..." }` | Zu Kalender-Event hinzugefügt |
 
+### Location-Sharing-Codes
+
+| Code | Payload | Beschreibung |
+|------|---------|-------------|
+| `location_sharing.started` | `{ "locationSharingSessionId": "uuid", "ownerDisplayName": "..." }` | Ein Kontakt teilt seinen Live-Standort |
+
 ### Zukünftige Codes (Beispiele)
 
 | Code | Payload | Beschreibung |
