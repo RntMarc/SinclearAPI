@@ -16,7 +16,7 @@ final readonly class LocationSharingLocationRepository
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
             'INSERT INTO LocationSharingLocation (id, sessionId, latitude, longitude, accuracy, recordedAt, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, NOW(3))'
+             VALUES (?, ?, ?, ?, ?, ?, NOW())'
         );
         $stmt->execute([
             $id,

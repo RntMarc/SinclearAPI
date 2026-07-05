@@ -53,10 +53,22 @@ final readonly class LocationSharingController
         $user = $this->requireUser($request);
         $body = $request->getParsedBody();
 
-        if (empty($body['recipient_ids']) || !is_array($body['recipient_ids'])) {
+        if (!is_array($body) || !isset($body['recipient_ids']) || !is_array($body['recipient_ids'])) {
             return ResponseFactory::json(['error' => 'recipient_ids_required'], 400, $response);
         }
-        if (empty($body['duration_seconds']) || !is_int($body['duration_seconds'])) {
+
+        $recipientIds = $body['recipient_ids'];
+        if (count($recipientIds) < 1 || count($recipientIds) > 50) {
+            return ResponseFactory::json(['error' => 'recipient_ids_count_invalid'], 400, $response);
+        }
+
+        foreach ($recipientIds as $rid) {
+            if (!is_string($rid) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rid)) {
+                return ResponseFactory::json(['error' => 'recipient_id_invalid'], 400, $response);
+            }
+        }
+
+        if (!isset($body['duration_seconds']) || !is_int($body['duration_seconds'])) {
             return ResponseFactory::json(['error' => 'duration_seconds_required'], 400, $response);
         }
 
@@ -70,18 +82,16 @@ final readonly class LocationSharingController
             return ResponseFactory::json(['error' => 'frequency_seconds_out_of_range'], 400, $response);
         }
 
-        if (count($body['recipient_ids']) > 50) {
-            return ResponseFactory::json(['error' => 'too_many_recipients'], 400, $response);
+        try {
+            $session = $this->service->createSession([
+                'recipient_ids' => $recipientIds,
+                'duration_seconds' => $duration,
+                'frequency_seconds' => $frequency,
+            ], $user->id);
+            return ResponseFactory::json(['data' => $session], 201, $response);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
         }
-
-        foreach ($body['recipient_ids'] as $rid) {
-            if (!is_string($rid) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rid)) {
-                return ResponseFactory::json(['error' => 'invalid_recipient_id'], 400, $response);
-            }
-        }
-
-        $session = $this->service->createSession($body, $user->id);
-        return ResponseFactory::json(['data' => $session], 201, $response);
     }
 
     public function update(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -99,23 +109,21 @@ final readonly class LocationSharingController
             return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
         }
 
-        if (array_key_exists('duration_seconds', $body)) {
-            $d = $body['duration_seconds'];
-            if (!is_int($d) || $d < 300 || $d > 86400) {
+        if (isset($body['duration_seconds'])) {
+            if (!is_int($body['duration_seconds']) || $body['duration_seconds'] < 300 || $body['duration_seconds'] > 86400) {
                 return ResponseFactory::json(['error' => 'duration_seconds_out_of_range'], 400, $response);
             }
         }
-        if (array_key_exists('is_active', $body)) {
-            if (!is_bool($body['is_active'])) {
-                return ResponseFactory::json(['error' => 'is_active_must_be_boolean'], 400, $response);
-            }
+
+        if (isset($body['is_active']) && !is_bool($body['is_active'])) {
+            return ResponseFactory::json(['error' => 'is_active_invalid'], 400, $response);
         }
 
         try {
-            $updated = $this->service->updateSession($id, $body);
-            return ResponseFactory::json(['data' => $updated], 200, $response);
+            $session = $this->service->updateSession($id, $body);
+            return ResponseFactory::json(['data' => $session], 200, $response);
         } catch (\RuntimeException $e) {
-            return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
         }
     }
 
@@ -126,15 +134,15 @@ final readonly class LocationSharingController
 
         $existing = $this->service->getSession($id);
         if ($existing === null) {
-            return ResponseFactory::noContent($response);
+            return ResponseFactory::json(['error' => 'session_not_found'], 404, $response);
         }
 
         if (!$this->policy->canModify($user, $existing['ownerId'])) {
             return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
         }
 
-        $this->service->updateSession($id, ['is_active' => false]);
-        return ResponseFactory::noContent($response);
+        $this->service->deleteSession($id);
+        return ResponseFactory::json(['data' => ['id' => $id]], 200, $response);
     }
 
     public function createLocation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -152,28 +160,26 @@ final readonly class LocationSharingController
             return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
         }
 
-        if (!$existing['isActive']) {
-            return ResponseFactory::json(['error' => 'session_inactive'], 400, $response);
-        }
-
         if (!isset($body['latitude']) || !is_numeric($body['latitude'])) {
             return ResponseFactory::json(['error' => 'latitude_required'], 400, $response);
         }
-        if (!isset($body['longitude']) || !is_numeric($body['longitude'])) {
-            return ResponseFactory::json(['error' => 'longitude_required'], 400, $response);
-        }
-
         $lat = (float) $body['latitude'];
-        $lng = (float) $body['longitude'];
         if ($lat < -90 || $lat > 90) {
             return ResponseFactory::json(['error' => 'latitude_out_of_range'], 400, $response);
         }
+
+        if (!isset($body['longitude']) || !is_numeric($body['longitude'])) {
+            return ResponseFactory::json(['error' => 'longitude_required'], 400, $response);
+        }
+        $lng = (float) $body['longitude'];
         if ($lng < -180 || $lng > 180) {
             return ResponseFactory::json(['error' => 'longitude_out_of_range'], 400, $response);
         }
 
-        if (isset($body['accuracy']) && (is_numeric($body['accuracy']) && $body['accuracy'] < 0)) {
-            return ResponseFactory::json(['error' => 'accuracy_must_be_positive'], 400, $response);
+        if (array_key_exists('accuracy', $body)) {
+            if (!is_numeric($body['accuracy']) || $body['accuracy'] < 0) {
+                return ResponseFactory::json(['error' => 'accuracy_invalid'], 400, $response);
+            }
         }
 
         if (empty($body['recordedAt']) || !is_string($body['recordedAt'])) {
@@ -181,19 +187,14 @@ final readonly class LocationSharingController
         }
 
         $recordedAt = $body['recordedAt'];
-        $recordedDt = \DateTime::createFromFormat('Y-m-d\TH:i:s.v\Z', $recordedAt)
-            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $recordedAt)
-            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s.v', $recordedAt)
-            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s.u', $recordedAt)
-            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s', $recordedAt);
+        $utc = new \DateTimeZone('UTC');
+        $recordedDt = \DateTime::createFromFormat('Y-m-d H:i:s', $recordedAt, $utc);
 
         if ($recordedDt === false) {
             return ResponseFactory::json(['error' => 'recordedAt_invalid_format'], 400, $response);
         }
 
-        $recordedDt->setTimezone(new \DateTimeZone('UTC'));
-
-        $now = new \DateTime('now', new \DateTimeZone('UTC'));
+        $now = new \DateTime('now', $utc);
         if ($recordedDt > $now) {
             return ResponseFactory::json(['error' => 'recordedAt_cannot_be_future'], 400, $response);
         }
@@ -209,7 +210,7 @@ final readonly class LocationSharingController
                 'latitude' => $lat,
                 'longitude' => $lng,
                 'accuracy' => $body['accuracy'] ?? null,
-                'recordedAt' => $recordedDt->format('Y-m-d\TH:i:s.u'),
+                'recordedAt' => $recordedDt->format('Y-m-d H:i:s'),
             ]);
             return ResponseFactory::json(['data' => ['id' => $locationId]], 201, $response);
         } catch (\RuntimeException $e) {

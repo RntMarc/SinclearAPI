@@ -5,7 +5,7 @@ Kalender-Einträgen (Kalender-Events, nicht zu verwechseln mit Reise-Events
 aus `TravelEvent`). Jeder Nutzer kann eigene Einträge erstellen, ändern und
 löschen, andere Nutzer hinzufügen und die Sichtbarkeit festlegen.
 
-> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Die API akzeptiert ISO-8601-Strings **mit oder ohne Zeitzonenangabe** (z. B. `2026-07-01T12:00:00+02:00` oder `2026-07-01T10:00:00Z`) und konvertiert diese zuverlässig nach UTC. Clients können lokale Zeitangaben also direkt mitsenden – die API normalisiert die Werte vor dem Speichern.
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Das Format ist `YYYY-MM-DD HH:MM:SS` (24h, ohne Millisekunden, ohne Zeitzonenindikatoren). Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
 
 ## Datenbank-Tabellen
 
@@ -56,14 +56,14 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 |-----------|-----|-------------|
 | `page` | int (default 1) | Seitenzahl |
 | `limit` | int (default 20, max 100) | Einträge pro Seite |
-| `start` | ISO 8601 | Manueller Start der Zeitspanne (z. B. `2026-06-01T00:00:00Z`) |
-| `end` | ISO 8601 | Manuelles Ende der Zeitspanne |
+| `start` | `YYYY-MM-DD HH:MM:SS` | Manueller Start der Zeitspanne in UTC (z. B. `2026-06-01 00:00:00`) |
+| `end` | `YYYY-MM-DD HH:MM:SS` | Manuelles Ende der Zeitspanne in UTC |
 | `range` | `week` oder `month` | Vordefinierter Bereich (aktuelle Woche / aktueller Monat). Wird ignoriert wenn `start` + `end` gesetzt sind |
 
 **Beispiele:**
 ```
 GET /calendar?page=1&limit=20
-GET /calendar?start=2026-06-01T00:00:00Z&end=2026-06-30T23:59:59Z
+GET /calendar?start=2026-06-01 00:00:00&end=2026-06-30 23:59:59
 GET /calendar?range=week
 GET /calendar?range=month&page=1&limit=50
 ```
@@ -79,14 +79,14 @@ Ein Kalender-Event wird immer mit Teilnehmern ausgeliefert:
     "creatorId": "uuid-des-erstellers",
     "title": "Team Meeting",
     "description": "Wöchentliches Sync",
-    "startTime": "2026-07-01T10:00:00.000Z",
-    "endTime": "2026-07-01T11:00:00.000Z",
+    "startTime": "2026-07-01 10:00:00",
+    "endTime": "2026-07-01 11:00:00",
     "visibility": 1,
     "participants": [
       { "id": "uuid", "displayName": "Max", "image": null }
     ],
-    "createdAt": "2026-06-26T10:00:00.000Z",
-    "updatedAt": "2026-06-26T10:00:00.000Z"
+    "createdAt": "2026-06-26 10:00:00",
+    "updatedAt": "2026-06-26 10:00:00"
   }
 }
 ```
@@ -97,8 +97,8 @@ Ein Kalender-Event wird immer mit Teilnehmern ausgeliefert:
 {
   "title": "Team Meeting",
   "description": "Wöchentliches Sync",
-  "startTime": "2026-07-01T10:00:00Z",
-  "endTime": "2026-07-01T11:00:00Z",
+  "startTime": "2026-07-01 10:00:00",
+  "endTime": "2026-07-01 11:00:00",
   "visibility": 1,
   "participants": ["user-uuid-1", "user-uuid-2"]
 }
@@ -114,7 +114,7 @@ Nur die zu ändernden Felder mitsenden:
 ```json
 {
   "title": "Geändertes Meeting",
-  "startTime": "2026-07-01T14:00:00Z"
+  "startTime": "2026-07-01 14:00:00"
 }
 ```
 

@@ -396,11 +396,11 @@ components:
         start:
           type: string
           format: date-time
-          description: Reisebeginn (UTC)
+          description: Reisebeginn (UTC), Format `YYYY-MM-DD HH:MM:SS`
         end:
           type: string
           format: date-time
-          description: Reiseende (UTC)
+          description: Reiseende (UTC), Format `YYYY-MM-DD HH:MM:SS`
         hastickets:
           type: string
           enum: ['0', '1']
@@ -646,11 +646,11 @@ components:
         startTime:
           type: string
           format: date-time
-          description: Startzeit (UTC)
+          description: Startzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
         endTime:
           type: string
           format: date-time
-          description: Endzeit (UTC)
+          description: Endzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -663,11 +663,11 @@ components:
         createdAt:
           type: string
           format: date-time
-          description: Erstellungszeitpunkt (UTC)
+          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
         updatedAt:
           type: string
           format: date-time
-          description: Änderungszeitpunkt (UTC)
+          description: Änderungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
 
     CalendarEventListResponse:
       type: object
@@ -700,13 +700,13 @@ components:
         startTime:
           type: string
           format: date-time
-          description: Startzeit (UTC)
-          example: '2026-07-01T10:00:00Z'
+          description: Startzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: '2026-07-01 10:00:00'
         endTime:
           type: string
           format: date-time
-          description: Endzeit (UTC)
-          example: '2026-07-01T11:00:00Z'
+          description: Endzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: '2026-07-01 11:00:00'
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1197,7 +1197,7 @@ components:
         createdAt:
           type: string
           format: date-time
-          description: Erstellungszeitpunkt (ISO 8601, UTC)
+          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
 
     NotificationListResponse:
       type: object
@@ -1282,11 +1282,11 @@ components:
         lastActiveAt:
           type: string
           format: date-time
-          description: Letzte Aktivität (UTC)
+          description: Letzte Aktivität (UTC), Format `YYYY-MM-DD HH:MM:SS`
         createdAt:
           type: string
           format: date-time
-          description: Registrierungszeitpunkt (UTC)
+          description: Registrierungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
 
     DeviceListResponse:
       type: object
@@ -2307,15 +2307,19 @@ components:
         startedAt:
           type: string
           format: date-time
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
         expiresAt:
           type: string
           format: date-time
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
         createdAt:
           type: string
           format: date-time
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
         updatedAt:
           type: string
           format: date-time
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
 
     LocationSharingSessionDetail:
       allOf:
@@ -2361,9 +2365,11 @@ components:
         recordedAt:
           type: string
           format: date-time
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
         createdAt:
           type: string
           format: date-time
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
 
     LocationSharingCreateRequest:
       type: object
@@ -2424,7 +2430,7 @@ components:
         recordedAt:
           type: string
           format: date-time
-          description: Zeitpunkt der Aufzeichnung (nicht in Zukunft, max. 5 Min alt)
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Nicht in der Zukunft, max. 5 Minuten alt.
 
     LocationSharingSessionListResponse:
       type: object
@@ -3944,7 +3950,7 @@ paths:
           schema:
             type: string
             format: date-time
-          description: ISO 8601 Zeitstempel (UTC) - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS` - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
         - name: limit
           in: query
           required: false
@@ -4180,7 +4186,7 @@ paths:
             type: string
             format: date-time
           description: >
-            Manueller Start der Zeitspanne (ISO 8601, UTC). Events deren
+            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Events deren
             `endTime` nach diesem Zeitpunkt liegen werden zurückgegeben.
         - name: end
           in: query
@@ -4189,7 +4195,7 @@ paths:
             type: string
             format: date-time
           description: >
-            Manuelles Ende der Zeitspanne (ISO 8601, UTC). Events deren
+            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Events deren
             `startTime` vor diesem Zeitpunkt liegen werden zurückgegeben.
         - name: range
           in: query
@@ -7443,7 +7449,7 @@ paths:
           schema:
             type: string
             format: date-time
-          description: Nur Standorte nach diesem Zeitpunkt
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS` - nur Standorte nach diesem Zeitpunkt
       responses:
         '200':
           description: Standort-Verlauf

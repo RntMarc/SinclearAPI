@@ -46,10 +46,10 @@ POST /api/v2/location-sharing/sessions
     "durationSeconds": 3600,
     "frequencySeconds": 600,
     "isActive": true,
-    "startedAt": "2026-07-03T12:00:00.000Z",
-    "expiresAt": "2026-07-03T13:00:00.000Z",
-    "createdAt": "2026-07-03T12:00:00.000Z",
-    "updatedAt": "2026-07-03T12:00:00.000Z",
+    "startedAt": "2026-07-03 12:00:00",
+    "expiresAt": "2026-07-03 13:00:00",
+    "createdAt": "2026-07-03 12:00:00",
+    "updatedAt": "2026-07-03 12:00:00",
     "recipients": [
       {"userId": "uuid1", "displayName": "User 1", "image": null}
     ],
@@ -70,7 +70,7 @@ POST /api/v2/location-sharing/sessions/:id/locations
   "latitude": 48.137154,
   "longitude": 11.576124,
   "accuracy": 10.5,
-  "recordedAt": "2026-07-03T12:05:00.000Z"
+  "recordedAt": "2026-07-03 12:05:00"
 }
 ```
 
@@ -78,7 +78,7 @@ POST /api/v2/location-sharing/sessions/:id/locations
 - `latitude`: -90 bis 90
 - `longitude`: -180 bis 180
 - `accuracy`: Optional, >= 0
-- `recordedAt`: ISO 8601, nicht in der Zukunft, max. 5 Minuten alt
+- `recordedAt`: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`, nicht in der Zukunft, max. 5 Minuten alt
 
 ## Session verlängern / beenden
 
@@ -99,10 +99,10 @@ Beide Felder sind optional. `is_active: false` beendet die Session manuell.
 ## Location-Verlauf (Polling)
 
 ```
-GET /api/v2/location-sharing/sessions/:id/locations?since=2026-07-03T12:00:00.000Z
+GET /api/v2/location-sharing/sessions/:id/locations?since=2026-07-03 12:00:00
 ```
 
-Der `since`-Parameter ist optional. Ohne ihn werden alle Standorte zurückgegeben.
+Der `since`-Parameter ist optional. Ohne ihn werden alle Standorte zurückgegeben. Der Wert muss ein UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS` sein.
 
 ## Aktive Sessions von Kontakten
 
@@ -128,7 +128,7 @@ Gibt alle aktiven Sessions zurück, bei denen der aktuelle Nutzer als Empfänger
 ## Client-Implementierung
 
 ### Hintergrund-Updates
-- **Android:** Wake Lock oderperiodische Wecker (AlarmManager) für regelmäßige Standort-Updates
+- **Android:** Wake Lock oder periodische Wecker (AlarmManager) für regelmäßige Standort-Updates
 - **Web:** Service Worker mit Periodic Sync oder Hintergrund-Fetch API
 - **Desktop:** Kein Standort-Sharing, nur Anzeige geteilter Standorte
 
@@ -141,3 +141,7 @@ Gibt alle aktiven Sessions zurück, bei denen der aktuelle Nutzer als Empfänger
 Clients sollten den `since`-Parameter verwenden, um nur neue Standorte abzurufen:
 1. Beim ersten Abruf: `GET /sessions/:id/locations` (alle Standorte)
 2. Bei Folge-Abrufen: `GET /sessions/:id/locations?since=<letzter_timestamp>`
+
+## Zeitformat
+
+Die API arbeitet ausschließlich in UTC. Alle Datumswerte (Input und Output) verwenden das Format `YYYY-MM-DD HH:MM:SS`. Clients müssen lokale Zeiten vor dem Senden nach UTC umrechnen und empfangene UTC-Zeiten für die Anzeige in die lokale Zeitzone des Nutzers konvertieren.

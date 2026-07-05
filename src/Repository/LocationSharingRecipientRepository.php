@@ -18,8 +18,7 @@ final readonly class LocationSharingRecipientRepository
         }
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO LocationSharingRecipient (id, sessionId, userId, createdAt)
-             VALUES (?, ?, ?, NOW(3))'
+            'INSERT INTO LocationSharingRecipient (sessionId, userId, addedAt) VALUES (?, ?, NOW())'
         );
 
         foreach ($userIds as $userId) {

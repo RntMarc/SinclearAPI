@@ -17,7 +17,7 @@ final readonly class LocationSharingSessionRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO LocationSharingSession
                 (id, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, 1, NOW(3), DATE_ADD(NOW(3), INTERVAL ? SECOND), NOW(3), NOW(3))'
+             VALUES (?, ?, ?, ?, 1, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), NOW(), NOW())'
         );
         $stmt->execute([
             $id,
@@ -57,7 +57,7 @@ final readonly class LocationSharingSessionRepository
             return;
         }
 
-        $sets[] = 'updatedAt = NOW(3)';
+        $sets[] = 'updatedAt = NOW()';
         $values[] = $id;
 
         $sql = 'UPDATE LocationSharingSession SET ' . implode(', ', $sets) . ' WHERE id = ?';
@@ -75,7 +75,7 @@ final readonly class LocationSharingSessionRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT * FROM LocationSharingSession
-             WHERE ownerId = ? AND isActive = 1 AND expiresAt > NOW(3)
+              WHERE ownerId = ? AND isActive = 1 AND expiresAt > NOW()
              ORDER BY createdAt DESC'
         );
         $stmt->execute([$ownerId]);
@@ -89,7 +89,7 @@ final readonly class LocationSharingSessionRepository
              FROM LocationSharingSession s
              JOIN LocationSharingRecipient r ON r.sessionId = s.id
              JOIN User u ON u.id = s.ownerId
-             WHERE r.userId = ? AND s.isActive = 1 AND s.expiresAt > NOW(3)
+              WHERE r.userId = ? AND s.isActive = 1 AND s.expiresAt > NOW()
              ORDER BY s.createdAt DESC'
         );
         $stmt->execute([$userId]);

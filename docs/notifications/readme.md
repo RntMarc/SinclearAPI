@@ -7,7 +7,7 @@ Das Benachrichtigungssystem unterstützt zwei Delivery-Mechanismen:
 1. **FCM Push** (Android/Web): Der Client wird durch eine FCM-Nachricht aufgeweckt und ruft die Benachrichtigung via API ab.
 2. **Polling** (Linux/Windows): Der Client ruft periodisch die API auf, um neue Benachrichtigungen abzurufen.
 
-> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC (beim Senden an die API) und von UTC in die lokale Zeitzone (beim Empfangen von der API) verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Das Format ist `YYYY-MM-DD HH:MM:SS` (24h, ohne Millisekunden, ohne Zeitzonenindikatoren). Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
 
 ## Datenbank
 
@@ -73,7 +73,7 @@ rendert basierend auf dem Code die passende UI und verwendet Daten aus
 Gibt alle Benachrichtigungen des Nutzers zurück. Unterstützt Polling.
 
 **Query-Parameter:**
-- `since` (optional): ISO 8601 Zeitstempel - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
+- `since` (optional): UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS` - gibt nur Benachrichtigungen zurück, die danach erstellt wurden
 - `limit` (optional): Maximale Anzahl (1-100, Standard: 50)
 
 **Antwort:**
@@ -84,7 +84,7 @@ Gibt alle Benachrichtigungen des Nutzers zurück. Unterstützt Polling.
       "id": "01912345-6789-...",
       "code": "admin.system_update",
       "payload": { "deepLink": "home" },
-      "createdAt": "2025-01-15T10:30:00.000Z"
+      "createdAt": "2025-01-15 10:30:00"
     }
   ],
   "meta": {
@@ -104,7 +104,7 @@ Gibt eine einzelne Benachrichtigung zurück.
     "id": "01912345-6789-...",
     "code": "admin.system_update",
     "payload": { "deepLink": "home" },
-    "createdAt": "2025-01-15T10:30:00.000Z"
+    "createdAt": "2025-01-15 10:30:00"
   }
 }
 ```
@@ -139,8 +139,8 @@ Gibt alle registrierten Geräte des Nutzers zurück.
       "deviceName": "Mein Android Handy",
       "platform": "android",
       "pushEnabled": true,
-      "lastActiveAt": "2025-01-15T10:30:00.000Z",
-      "createdAt": "2025-01-10T08:00:00.000Z"
+      "lastActiveAt": "2025-01-15 10:30:00",
+      "createdAt": "2025-01-10 08:00:00"
     }
   ]
 }

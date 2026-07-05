@@ -121,12 +121,18 @@ final readonly class LocationSharingService
 
     public function listLocations(string $sessionId, ?string $since): array
     {
-        return $this->locationRepo->listBySession($sessionId, $since);
+        $rows = $this->locationRepo->listBySession($sessionId, $since);
+        return array_map(fn(array $row) => $this->formatLocation($row), $rows);
     }
 
     public function isRecipient(string $sessionId, string $userId): bool
     {
         return $this->recipientRepo->isRecipient($sessionId, $userId);
+    }
+
+    public function deleteSession(string $id): void
+    {
+        $this->sessionRepo->delete($id);
     }
 
     private function formatSession(array $session): array
