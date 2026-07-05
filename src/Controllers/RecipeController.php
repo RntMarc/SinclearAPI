@@ -11,6 +11,24 @@ use Sinclear\Api\Services\RecipeService;
 
 final readonly class RecipeController
 {
+    private const array ERROR_MAP = [
+        'title_required' => ['error' => 'title_required', 'status' => 400],
+        'category_required' => ['error' => 'category_required', 'status' => 400],
+        'invalid_category' => ['error' => 'invalid_category', 'status' => 400],
+        'recipe_not_found' => ['error' => 'recipe_not_found', 'status' => 404],
+        'review_not_found' => ['error' => 'review_not_found', 'status' => 404],
+        'review_exists' => ['error' => 'review_exists', 'status' => 409],
+        'invalid_rating' => ['error' => 'invalid_rating', 'status' => 400],
+        'forbidden' => ['error' => 'forbidden', 'status' => 403],
+        'bookmark_exists' => ['error' => 'bookmark_exists', 'status' => 409],
+        'invalid_image' => ['error' => 'invalid_image', 'status' => 400],
+        'invalid_image_encoding' => ['error' => 'invalid_image_encoding', 'status' => 400],
+        'image_too_large' => ['error' => 'image_too_large', 'status' => 400],
+        'invalid_image_format' => ['error' => 'invalid_image_format', 'status' => 400],
+        'unsupported_image_format' => ['error' => 'unsupported_image_format', 'status' => 400],
+        'image_dimensions_too_large' => ['error' => 'image_dimensions_too_large', 'status' => 400],
+    ];
+
     public function __construct(
         private RecipeService $recipeService,
         private RecipePolicy $policy,
@@ -66,8 +84,12 @@ final readonly class RecipeController
             return ResponseFactory::json(['error' => 'invalid_category'], 400, $response);
         }
 
-        $recipe = $this->recipeService->createRecipe($body, $user->id);
-        return ResponseFactory::json(['data' => $recipe], 201, $response);
+        try {
+            $recipe = $this->recipeService->createRecipe($body, $user->id);
+            return ResponseFactory::json(['data' => $recipe], 201, $response);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
+        }
     }
 
     public function update(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -95,6 +117,8 @@ final readonly class RecipeController
         try {
             $this->recipeService->updateRecipe($id, $body);
             return ResponseFactory::noContent($response);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
         } catch (\RuntimeException $e) {
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
@@ -245,6 +269,15 @@ final readonly class RecipeController
 
         $result = $this->recipeService->listBookmarks($user->id, $page, $limit);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    private function errorResponse(string $message, ResponseInterface $response): ResponseInterface
+    {
+        $mapped = self::ERROR_MAP[$message] ?? null;
+        if ($mapped !== null) {
+            return ResponseFactory::json(['error' => $mapped['error']], $mapped['status'], $response);
+        }
+        return ResponseFactory::json(['error' => 'internal_error'], 500, $response);
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

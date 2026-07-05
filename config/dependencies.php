@@ -90,6 +90,7 @@ use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\PushService;
 use Sinclear\Api\Services\RateLimiter;
+use Sinclear\Api\Services\ImageService;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
@@ -153,6 +154,7 @@ return [
     },
 
     RateLimiter::class => autowire(),
+    ImageService::class => autowire(),
 
     UserRepository::class => autowire(),
     OtpTokenRepository::class => autowire(),

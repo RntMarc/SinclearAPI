@@ -54,6 +54,41 @@ POST /recipes
 }
 ```
 
+**Rezeptbild:**
+Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild.
+
+| Eigenschaft | Limit |
+|-------------|-------|
+| Dateigröße (Base64-decodiert) | Max. 200 KB |
+| Erlaubte Formate | JPEG, PNG, WebP |
+| Max. Breite | 1000 Pixel |
+| Max. Höhe | 1000 Pixel |
+
+**Beispiel-Request:**
+```json
+{
+  "image": "/9j/4AAQSkZJRgABAQEASABIAAD..."
+}
+```
+
+**Bild entfernen:**
+```json
+{
+  "image": null
+}
+```
+
+**Fehlercodes:**
+
+| Code | Beschreibung |
+|------|-------------|
+| `invalid_image` | Ungültiges Bild oder leerer String |
+| `invalid_image_encoding` | Base64-Dekodierung fehlgeschlagen |
+| `image_too_large` | Dateigröße überschreitet 200 KB |
+| `invalid_image_format` | Datei ist kein gültiges Bild |
+| `unsupported_image_format` | Format nicht erlaubt (nur JPEG, PNG, WebP) |
+| `image_dimensions_too_large` | Abmessungen überschreiten 1000x1000 Pixel |
+
 ### Rezept-Details abrufen
 
 ```

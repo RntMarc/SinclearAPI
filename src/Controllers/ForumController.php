@@ -27,6 +27,12 @@ final readonly class ForumController
         'already_voted' => ['error' => 'already_voted', 'status' => 409],
         'edit_window_expired' => ['error' => 'edit_window_expired', 'status' => 403],
         'not_found' => ['error' => 'not_found', 'status' => 404],
+        'invalid_image' => ['error' => 'invalid_image', 'status' => 400],
+        'invalid_image_encoding' => ['error' => 'invalid_image_encoding', 'status' => 400],
+        'image_too_large' => ['error' => 'image_too_large', 'status' => 400],
+        'invalid_image_format' => ['error' => 'invalid_image_format', 'status' => 400],
+        'unsupported_image_format' => ['error' => 'unsupported_image_format', 'status' => 400],
+        'image_dimensions_too_large' => ['error' => 'image_dimensions_too_large', 'status' => 400],
     ];
 
     public function __construct(

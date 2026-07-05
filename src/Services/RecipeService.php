@@ -16,6 +16,7 @@ final readonly class RecipeService
         private RecipeStepRepository $stepRepo,
         private RecipeReviewRepository $reviewRepo,
         private RecipeBookmarkRepository $bookmarkRepo,
+        private ImageService $imageService,
     ) {}
 
     public function listRecipes(int $page, int $limit, ?string $search, string $sort): array
@@ -36,12 +37,17 @@ final readonly class RecipeService
 
     public function createRecipe(array $data, string $creatorId): array
     {
+        $validatedImage = null;
+        if (isset($data['image']) && $data['image'] !== null && $data['image'] !== '') {
+            $validatedImage = $this->imageService->validate($data['image']);
+        }
+
         $id = $this->recipeRepo->create([
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'category' => $data['category'],
             'dietaryTags' => $data['dietaryTags'] ?? null,
-            'image' => $data['image'] ?? null,
+            'image' => $validatedImage,
             'creatorId' => $creatorId,
             'servings' => $data['servings'] ?? 4,
         ]);
@@ -65,12 +71,20 @@ final readonly class RecipeService
             throw new \RuntimeException('recipe_not_found');
         }
 
+        $validatedImage = $recipe['image'];
+        if (array_key_exists('image', $data)) {
+            $image = $data['image'];
+            $validatedImage = ($image !== null && $image !== '')
+                ? $this->imageService->validate($image)
+                : null;
+        }
+
         $this->recipeRepo->update($id, [
             'title' => $data['title'] ?? $recipe['title'],
             'description' => array_key_exists('description', $data) ? $data['description'] : $recipe['description'],
             'category' => $data['category'] ?? $recipe['category'],
             'dietaryTags' => array_key_exists('dietaryTags', $data) ? $data['dietaryTags'] : $recipe['dietaryTags'],
-            'image' => array_key_exists('image', $data) ? $data['image'] : $recipe['image'],
+            'image' => $validatedImage,
             'servings' => $data['servings'] ?? $recipe['servings'],
         ]);
 

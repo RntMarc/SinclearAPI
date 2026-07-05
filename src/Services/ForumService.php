@@ -21,6 +21,7 @@ final readonly class ForumService
         private FeedPostRepository $postRepo,
         private FeedPostVoteRepository $voteRepo,
         private FeedPostCommentRepository $commentRepo,
+        private ImageService $imageService,
     ) {}
 
     // ── Forum ──────────────────────────────────────────────
@@ -32,10 +33,15 @@ final readonly class ForumService
             throw new \RuntimeException('name_required');
         }
 
+        $validatedImage = null;
+        if ($image !== null && $image !== '') {
+            $validatedImage = $this->imageService->validate($image);
+        }
+
         $id = $this->forumRepo->create([
             'name' => $name,
             'description' => $description !== null ? trim($description) : null,
-            'image' => $image,
+            'image' => $validatedImage,
         ]);
 
         return $this->forumRepo->findById($id);
@@ -59,6 +65,13 @@ final readonly class ForumService
         if (isset($data['description'])) {
             $data['description'] = $data['description'] !== null
                 ? trim((string) $data['description'])
+                : null;
+        }
+
+        if (array_key_exists('image', $data)) {
+            $image = $data['image'];
+            $data['image'] = ($image !== null && $image !== '')
+                ? $this->imageService->validate($image)
                 : null;
         }
 

@@ -65,6 +65,7 @@ final readonly class ProfileService
         private MailerInterface $mailer,
         private LoggerInterface $logger,
         private Settings $settings,
+        private ImageService $imageService,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -121,7 +122,7 @@ final readonly class ProfileService
                 $userUpdates['image'] = null;
                 $this->logger->debug('ProfileService: image will be removed (set to null)');
             } else {
-                $validated = $this->validateProfileImage((string) $imageValue);
+                $validated = $this->imageService->validate((string) $imageValue);
                 $this->logger->debug('ProfileService: image validated successfully', [
                     'stored_length' => strlen($validated),
                 ]);

@@ -153,10 +153,10 @@ components:
           example: home
         title:
           type: string
-          description: Nur bei `admin.custom`: Titel der Benachrichtigung
+          description: "Nur bei `admin.custom`: Titel der Benachrichtigung"
         body:
           type: string
-          description: Nur bei `admin.custom`: Nachrichtentext
+          description: "Nur bei `admin.custom`: Nachrichtentext"
 
     RefreshRequest:
       type: object
@@ -1540,7 +1540,9 @@ components:
         image:
           type: string
           nullable: true
-          description: Base64-kodiertes Forum-Bild (optional)
+          description: >-
+            Forum-Bild als Base64-kodierter String. Erlaubte Formate: JPEG, PNG,
+            WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
         memberCount:
           type: integer
           example: 12
@@ -1594,7 +1596,9 @@ components:
         image:
           type: string
           nullable: true
-          description: Base64-kodiertes Forum-Bild (optional)
+          description: >-
+            Forum-Bild als Base64-kodierter String (optional). Erlaubte Formate:
+            JPEG, PNG, WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
 
     ForumUpdateRequest:
       type: object
@@ -1612,7 +1616,10 @@ components:
         image:
           type: string
           nullable: true
-          description: Neues Base64-kodiertes Forum-Bild
+          description: >-
+            Neues Forum-Bild als Base64-kodierter String. Erlaubte Formate:
+            JPEG, PNG, WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
+            Setze null, um das Bild zu entfernen.
 
     ForumMember:
       type: object
@@ -1806,7 +1813,7 @@ components:
           type: string
           enum: [text, music, video, web]
           default: text
-          description: Art des Posts (Standard: text)
+          description: "Art des Posts (Standard: text)"
         content:
           oneOf:
             - $ref: '#/components/schemas/FeedPostContentText'
@@ -2015,7 +2022,9 @@ components:
         image:
           type: string
           nullable: true
-          description: URL oder Base64-Bild
+          description: >-
+            Rezeptbild als Base64-kodierter String. Erlaubte Formate: JPEG, PNG,
+            WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
         servings:
           type: integer
           description: Anzahl der Portionen
@@ -2100,7 +2109,9 @@ components:
         image:
           type: string
           nullable: true
-          description: URL oder Base64-Bild
+          description: >-
+            Rezeptbild als Base64-kodierter String (optional). Erlaubte Formate:
+            JPEG, PNG, WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
         servings:
           type: integer
           default: 4
@@ -2138,7 +2149,10 @@ components:
         image:
           type: string
           nullable: true
-          description: URL oder Base64-Bild
+          description: >-
+            Rezeptbild als Base64-kodierter String. Erlaubte Formate: JPEG, PNG,
+            WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
+            Setze null, um das Bild zu entfernen.
         servings:
           type: integer
           description: Anzahl der Portionen
