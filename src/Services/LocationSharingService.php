@@ -32,14 +32,18 @@ final readonly class LocationSharingService
 
         $recipients = $this->recipientRepo->getRecipients($id);
         foreach ($recipients as $recipient) {
-            $this->notificationService->createNotification(
-                userId: $recipient['userId'],
-                code: 'location_sharing.started',
-                payload: [
-                    'locationSharingSessionId' => $id,
-                    'ownerDisplayName' => $ownerDisplayName,
-                ],
-            );
+            try {
+                $this->notificationService->createNotification(
+                    userId: $recipient['userId'],
+                    code: 'location_sharing.started',
+                    payload: [
+                        'locationSharingSessionId' => $id,
+                        'ownerDisplayName' => $ownerDisplayName,
+                    ],
+                );
+            } catch (\Throwable $e) {
+                error_log('Location sharing notification failed: ' . $e->getMessage());
+            }
         }
 
         return $this->formatSessionDetail($id, $ownerId);
