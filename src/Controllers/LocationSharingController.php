@@ -181,12 +181,17 @@ final readonly class LocationSharingController
         }
 
         $recordedAt = $body['recordedAt'];
-        $recordedDt = \DateTime::createFromFormat('Y-m-d\TH:i:s', $recordedAt)
-            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s.u', $recordedAt);
+        $recordedDt = \DateTime::createFromFormat('Y-m-d\TH:i:s.v\Z', $recordedAt)
+            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $recordedAt)
+            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s.v', $recordedAt)
+            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s.u', $recordedAt)
+            ?: \DateTime::createFromFormat('Y-m-d\TH:i:s', $recordedAt);
 
         if ($recordedDt === false) {
             return ResponseFactory::json(['error' => 'recordedAt_invalid_format'], 400, $response);
         }
+
+        $recordedDt->setTimezone(new \DateTimeZone('UTC'));
 
         $now = new \DateTime('now', new \DateTimeZone('UTC'));
         if ($recordedDt > $now) {
