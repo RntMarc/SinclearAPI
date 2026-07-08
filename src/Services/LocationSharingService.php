@@ -2,6 +2,7 @@
 
 namespace Sinclear\Api\Services;
 
+use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Repository\LocationSharingSessionRepository;
 use Sinclear\Api\Repository\LocationSharingRecipientRepository;
 use Sinclear\Api\Repository\LocationSharingLocationRepository;
@@ -15,6 +16,7 @@ final readonly class LocationSharingService
         private LocationSharingLocationRepository $locationRepo,
         private NotificationService $notificationService,
         private UserRepository $userRepo,
+        private Settings $settings,
     ) {}
 
     public function createSession(array $data, string $ownerId): array
@@ -123,6 +125,45 @@ final readonly class LocationSharingService
         ]);
     }
 
+    public function addLocationByToken(string $token, float $lat, float $lon, ?float $accuracy, ?string $recordedAt): string
+    {
+        $session = $this->sessionRepo->findByToken($token);
+        if ($session === null) {
+            throw new \RuntimeException('session_not_found');
+        }
+
+        if ($session['isActive'] != 1) {
+            throw new \RuntimeException('session_inactive');
+        }
+
+        $utc = new \DateTimeZone('UTC');
+        $now = new \DateTime('now', $utc);
+        $expiresAt = \DateTime::createFromFormat('Y-m-d H:i:s', $session['expiresAt'], $utc);
+        if ($expiresAt !== false && $expiresAt < $now) {
+            throw new \RuntimeException('session_expired');
+        }
+
+        $recordedAtFormatted = $recordedAt;
+        if ($recordedAtFormatted === null) {
+            $recordedAtFormatted = $now->format('Y-m-d H:i:s');
+        } else {
+            $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $recordedAtFormatted, $utc);
+            if ($dt !== false) {
+                $recordedAtFormatted = $dt->format('Y-m-d H:i:s');
+            } else {
+                $recordedAtFormatted = $now->format('Y-m-d H:i:s');
+            }
+        }
+
+        return $this->locationRepo->create([
+            'sessionId' => $session['id'],
+            'latitude' => $lat,
+            'longitude' => $lon,
+            'accuracy' => $accuracy,
+            'recordedAt' => $recordedAtFormatted,
+        ]);
+    }
+
     public function listLocations(string $sessionId, ?string $since): array
     {
         $rows = $this->locationRepo->listBySession($sessionId, $since);
@@ -139,10 +180,29 @@ final readonly class LocationSharingService
         $this->sessionRepo->delete($id);
     }
 
+    public function generateIntegrationUrls(string $token): array
+    {
+        $baseUrl = $this->settings->app['url'];
+        $base = $baseUrl . '/api/v2/location-sharing/log';
+
+        return [
+            'osmand' => $base . '/osmand/' . $token . '/yourname?lat={0}&lon={1}&alt={4}&acc={3}&timestamp={2}&speed={5}&bearing={6}',
+            'gpslogger' => $base . '/gpslogger/' . $token . '/yourname?lat=%LAT&lon=%LON&sat=%SAT&alt=%ALT&acc=%ACC&speed=%SPD&bearing=%DIR&timestamp=%TIMESTAMP&bat=%BATT',
+            'owntracks' => $base . '/owntracks/' . $token . '/yourname',
+            'ulogger' => $base . '/ulogger/' . $token . '/yourname',
+            'traccar' => $base . '/traccar/' . $token . '/yourname',
+            'opengts' => $base . '/opengts/' . $token . '/yourname',
+            'overland' => $base . '/overland/' . $token . '/yourname',
+            'locusmap' => $base . '/locusmap/' . $token . '/yourname?lat=LAT&lon=LON&time=TIME&alt=ALT&speed=SPEED&bearing=BEARING',
+            'httpGet' => $base . '/get/' . $token . '/yourname?lat=LAT&lon=LON&alt=ALT&acc=ACC&bat=BAT&sat=SAT&speed=SPD&bearing=DIR&timestamp=TIME',
+        ];
+    }
+
     private function formatSession(array $session): array
     {
         return [
             'id' => $session['id'],
+            'token' => $session['token'],
             'ownerId' => $session['ownerId'],
             'durationSeconds' => (int) $session['durationSeconds'],
             'frequencySeconds' => (int) $session['frequencySeconds'],
@@ -162,6 +222,7 @@ final readonly class LocationSharingService
         $data['lastLocation'] = $this->formatLocation(
             $this->locationRepo->getLastLocation($id)
         );
+        $data['integrationUrls'] = $this->generateIntegrationUrls($session['token']);
         return $data;
     }
 

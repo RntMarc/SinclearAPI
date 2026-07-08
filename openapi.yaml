@@ -2288,11 +2288,15 @@ components:
 
     LocationSharingSession:
       type: object
-      required: [id, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt]
+      required: [id, token, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt]
       properties:
         id:
           type: string
           format: uuid
+        token:
+          type: string
+          pattern: '^[a-f0-9]{32}$'
+          description: 32-Zeichen-hex Session-Token für Drittanbieter-Integration
         ownerId:
           type: string
           format: uuid
@@ -2344,6 +2348,37 @@ components:
                     format: date-time
             lastLocation:
               $ref: '#/components/schemas/LocationSharingLocation'
+            integrationUrls:
+              type: object
+              description: URL-Vorlagen für Drittanbieter-Tracking-Clients
+              properties:
+                osmand:
+                  type: string
+                  format: uri
+                gpslogger:
+                  type: string
+                  format: uri
+                owntracks:
+                  type: string
+                  format: uri
+                ulogger:
+                  type: string
+                  format: uri
+                traccar:
+                  type: string
+                  format: uri
+                opengts:
+                  type: string
+                  format: uri
+                overland:
+                  type: string
+                  format: uri
+                locusmap:
+                  type: string
+                  format: uri
+                httpGet:
+                  type: string
+                  format: uri
 
     LocationSharingLocation:
       type: object
@@ -7475,6 +7510,433 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /location-sharing/log/osmand/{token}/{name}:
+    get:
+      summary: Standort via OsmAnd übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für OsmAnd-Client. Koordinaten werden über Query-Parameter übermittelt.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+          description: 32-Zeichen-hex Session-Token
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Beliebiger Name für die Anzeige
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          description: Breitengrad
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          description: Längengrad
+        - name: acc
+          in: query
+          schema:
+            type: number
+            format: double
+          description: GPS-Genauigkeit in Metern
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+          description: Unix-Epoch Timestamp in Sekunden
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/gpslogger/{token}/{name}:
+    get:
+      summary: Standort via GpsLogger übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für GpsLogger-Client.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: acc
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/owntracks/{token}/{name}:
+    post:
+      summary: Standort via Owntracks übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für Owntracks-Client. Koordinaten werden als JSON-Body übermittelt.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat:
+                  type: number
+                  format: double
+                lon:
+                  type: number
+                  format: double
+                acc:
+                  type: number
+                  format: double
+                ts:
+                  type: integer
+                  description: Unix-Epoch Timestamp in Sekunden
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/traccar/{token}/{name}:
+    get:
+      summary: Standort via Traccar übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für Traccar-Client.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: accuracy
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/opengts/{token}/{name}:
+    get:
+      summary: Standort via OpenGTS übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für OpenGTS-Client.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: gpsAccuracy
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: time
+          in: query
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/overland/{token}/{name}:
+    post:
+      summary: Standort via Overland übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für Overland-Client. Koordinaten werden als GeoJSON-Feature übermittelt.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                geometry:
+                  type: object
+                  properties:
+                    coordinates:
+                      type: array
+                      items:
+                        type: number
+                      description: "[longitude, latitude]"
+                properties:
+                  type: object
+                  properties:
+                    timestamp:
+                      type: string
+                      format: date-time
+                    horizontal_accuracy:
+                      type: number
+                      format: double
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/locusmap/{token}/{name}:
+    get:
+      summary: Standort via Locus Maps übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für Locus Maps-Client.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: acc
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: time
+          in: query
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/get/{token}/{name}:
+    get:
+      summary: Standort via HTTP GET übermitteln
+      description: >
+        Unauthentifizierter generischer Endpunkt für HTTP GET.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+        - name: acc
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/post/{token}/{name}:
+    post:
+      summary: Standort via HTTP POST übermitteln
+      description: >
+        Unauthentifizierter generischer Endpunkt für HTTP POST.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat:
+                  type: number
+                  format: double
+                lon:
+                  type: number
+                  format: double
+                acc:
+                  type: number
+                  format: double
+                timestamp:
+                  type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
 
   /trips/{id}/participants:
     get:

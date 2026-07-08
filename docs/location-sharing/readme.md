@@ -145,3 +145,104 @@ Clients sollten den `since`-Parameter verwenden, um nur neue Standorte abzurufen
 ## Zeitformat
 
 Die API arbeitet ausschließlich in UTC. Alle Datumswerte (Input und Output) verwenden das Format `YYYY-MM-DD HH:MM:SS`. Clients müssen lokale Zeiten vor dem Senden nach UTC umrechnen und empfangene UTC-Zeiten für die Anzeige in die lokale Zeitzone des Nutzers konvertieren.
+
+## Drittanbieter-Integration (Third-Party Clients)
+
+Statt der direkten Nutzung der Flutter-App können Nutzer etablierte Tracking-Apps wie OsmAnd, GpsLogger, Owntracks oder Traccar verwenden. Die API stellt für jede dieser Apps einen dedizierten, unauthentifizierten Endpunkt bereit.
+
+### Wie es funktioniert
+
+1. Nutzer erstellt eine Location-Sharing-Session über die API
+2. Die Response enthält `token` und `integrationUrls` mit passenden URL-Vorlagen
+3. Nutzer installiert eine beliebige Tracking-App und trägt die URL ein
+4. Die App sendet Koordinaten automatisch an die API – ohne erneute Authentifizierung
+
+### Unterstützte Apps
+
+| App | URL-Muster | Methode | Parameter |
+|-----|-----------|---------|-----------|
+| **OsmAnd** | `/log/osmand/{token}/{name}?lat={0}&lon={1}&acc={3}&timestamp={2}` | GET | `{0}=lat, {1}=lon, {2}=timestamp, {3}=accuracy, {4}=altitude, {5}=speed, {6}=bearing` |
+| **GpsLogger** | `/log/gpslogger/{token}/{name}?lat=%LAT&lon=%LON&acc=%ACC&timestamp=%TIMESTAMP` | GET | `%LAT, %LON, %ALT, %ACC, %SPD, %DIR, %TIMESTAMP, %BAT, %SAT` |
+| **Owntracks** | `/log/owntracks/{token}/{name}` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "ts":...}` |
+| **Ulogger** | `/log/ulogger/{token}/{name}?lat=...&lon=...&time=...` | GET | `lat, lon, time` |
+| **Traccar** | `/log/traccar/{token}/{name}?lat=...&lon=...&accuracy=...&timestamp=...` | GET | `lat, lon, accuracy, timestamp, altitude, speed, bearing` |
+| **OpenGTS** | `/log/opengts/{token}/{name}?lat=...&lon=...&gpsAccuracy=...&time=...` | GET | `lat, lon, gpsAccuracy, time, speed, bearing` |
+| **Overland** | `/log/overland/{token}/{name}` | POST | GeoJSON: `{"geometry":{"coordinates":[lon,lat]},"properties":{"timestamp":...,"horizontal_accuracy":...}}` |
+| **Locus Maps** | `/log/locusmap/{token}/{name}?lat=...&lon=...&acc=...&time=...` | GET | `lat, lon, acc, time, alt, speed, bearing` |
+| **HTTP GET** | `/log/get/{token}/{name}?lat=...&lon=...&acc=...&timestamp=...` | GET | `lat, lon, alt, acc, timestamp, speed, bearing, bat, sat` |
+| **HTTP POST** | `/log/post/{token}/{name}` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "timestamp":...}` |
+
+### Session-Token
+
+Jede Session erhält ein einzigartiges 32-Zeichen-hex Token (128 Bit). Dieses Token dient als Authentifizierung für die Drittanbieter-Endpunkte. Es ist NICHT das Auth-Token des Nutzers.
+
+**Beispiel-Token:** `a1b2c3d4e5f678901234567890abcdef`
+
+### Name-Parameter
+
+Der `{name}`-Pfadparameter ist ein beliebiger alphanumerischer Name (a-zA-Z0-9_-), den der Nutzer in der Tracking-App eingibt. Er dient nur zur Anzeige und wird nicht ausgewertet.
+
+### Zeitstempel
+
+Die meisten Drittanbieter senden Unix-Epoch-Timestamps (Sekunden oder Millisekunden). Die API erkennt automatisch das Format und konvertiert es nach `YYYY-MM-DD HH:MM:SS`. Wenn kein Timestamp gesendet wird, verwendet die API die aktuelle Serverzeit.
+
+### Beispiel: Session erstellen
+
+**Request:**
+```json
+POST /api/v2/location-sharing/sessions
+{
+  "recipient_ids": ["uuid1"],
+  "duration_seconds": 3600
+}
+```
+
+**Response (201):**
+```json
+{
+  "data": {
+    "id": "uuid",
+    "token": "a1b2c3d4e5f678901234567890abcdef",
+    "ownerId": "uuid",
+    "durationSeconds": 3600,
+    "frequencySeconds": 600,
+    "isActive": true,
+    "startedAt": "2026-07-03 12:00:00",
+    "expiresAt": "2026-07-03 13:00:00",
+    "createdAt": "2026-07-03 12:00:00",
+    "updatedAt": "2026-07-03 12:00:00",
+    "recipients": [
+      {"userId": "uuid1", "displayName": "User 1", "image": null}
+    ],
+    "lastLocation": null,
+    "integrationUrls": {
+      "osmand": "https://api.sinclear.de/api/v2/location-sharing/log/osmand/a1b2c3d4e5f678901234567890abcdef/yourname?lat={0}&lon={1}&alt={4}&acc={3}&timestamp={2}&speed={5}&bearing={6}",
+      "gpslogger": "https://api.sinclear.de/api/v2/location-sharing/log/gpslogger/a1b2c3d4e5f678901234567890abcdef/yourname?lat=%LAT&lon=%LON&sat=%SAT&alt=%ALT&acc=%ACC&speed=%SPD&bearing=%DIR&timestamp=%TIMESTAMP&bat=%BATT",
+      "owntracks": "https://api.sinclear.de/api/v2/location-sharing/log/owntracks/a1b2c3d4e5f678901234567890abcdef/yourname",
+      "ulogger": "https://api.sinclear.de/api/v2/location-sharing/log/ulogger/a1b2c3d4e5f678901234567890abcdef/yourname",
+      "traccar": "https://api.sinclear.de/api/v2/location-sharing/log/traccar/a1b2c3d4e5f678901234567890abcdef/yourname",
+      "opengts": "https://api.sinclear.de/api/v2/location-sharing/log/opengts/a1b2c3d4e5f678901234567890abcdef/yourname",
+      "overland": "https://api.sinclear.de/api/v2/location-sharing/log/overland/a1b2c3d4e5f678901234567890abcdef/yourname",
+      "locusmap": "https://api.sinclear.de/api/v2/location-sharing/log/locusmap/a1b2c3d4e5f678901234567890abcdef/yourname?lat=LAT&lon=LON&time=TIME&alt=ALT&speed=SPEED&bearing=BEARING",
+      "httpGet": "https://api.sinclear.de/api/v2/location-sharing/log/get/a1b2c3d4e5f678901234567890abcdef/yourname?lat=LAT&lon=LON&alt=ALT&acc=ACC&bat=BAT&sat=SAT&speed=SPD&bearing=DIR&timestamp=TIME"
+    }
+  }
+}
+```
+
+### Beispiel: OsmAnd konfigurieren
+
+1. OsmAnd öffnen → Einstellungen → Plugins → "Aufzeichnung von Tracks" aktivieren
+2. Menü → "Live-Teilen" → Server-URL eingeben:
+   ```
+   https://api.sinclear.de/api/v2/location-sharing/log/osmand/a1b2c3d4e5f678901234567890abcdef/yourname
+   ```
+3. Koordinaten-Format: `lat={0}&lon={1}&alt={4}&acc={3}&timestamp={2}`
+4. Automatische Übermittlung aktivieren
+
+### Sicherheit
+
+- Der Endpunkt erfordert keine Authentifizierung – nur das Session-Token
+- Das Token kann nicht zur Auslesen von Daten verwendet werden (nur Schreibzugriff)
+- Sessions laufen automatisch nach `durationSeconds` ab
+- Bei abgelaufenen Sessions wird `404 session_expired` zurückgegeben

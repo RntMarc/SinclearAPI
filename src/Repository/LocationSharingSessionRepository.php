@@ -14,13 +14,16 @@ final readonly class LocationSharingSessionRepository
     public function create(array $data): string
     {
         $id = Uuid::uuid7()->toString();
+        $token = bin2hex(random_bytes(16));
+
         $stmt = $this->pdo->prepare(
             'INSERT INTO LocationSharingSession
-                (id, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, 1, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), NOW(), NOW())'
+                (id, token, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, 1, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), NOW(), NOW())'
         );
         $stmt->execute([
             $id,
+            $token,
             $data['ownerId'],
             $data['durationSeconds'],
             $data['frequencySeconds'],
@@ -33,6 +36,14 @@ final readonly class LocationSharingSessionRepository
     {
         $stmt = $this->pdo->prepare('SELECT * FROM LocationSharingSession WHERE id = ?');
         $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    public function findByToken(string $token): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM LocationSharingSession WHERE token = ?');
+        $stmt->execute([$token]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }

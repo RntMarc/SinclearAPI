@@ -15,6 +15,7 @@ use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\LocationSharingController;
+use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\ForumController;
@@ -236,6 +237,7 @@ return [
     LocationSharingPolicy::class => autowire(),
     LocationSharingService::class => autowire(),
     LocationSharingController::class => autowire(),
+    LocationSharingIngressController::class => autowire(),
 
     ContactInfoRepository::class => autowire(),
     ContactInfoUpdateRepository::class => autowire(),
