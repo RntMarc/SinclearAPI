@@ -354,6 +354,123 @@ components:
         data:
           $ref: '#/components/schemas/TravelEvent'
 
+    AdminAddTripParticipantRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        accommodation:
+          type: string
+          format: uuid
+          nullable: true
+
+    AdminAddEventParticipantRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+
+    AdminUpdateAccommodationRequest:
+      type: object
+      properties:
+        accommodation:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID der Unterkunft oder null zum Entfernen
+
+    AdminParticipantResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+
+    AdminCreateAccommodationRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        mail:
+          type: string
+          format: email
+          nullable: true
+        latitude:
+          type: number
+          format: float
+          nullable: true
+        longitude:
+          type: number
+          format: float
+          nullable: true
+        OSMID:
+          type: integer
+          nullable: true
+        ishotel:
+          type: integer
+          enum: [0, 1]
+          default: 0
+
+    AdminUpdateAccommodationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        mail:
+          type: string
+          format: email
+          nullable: true
+        latitude:
+          type: number
+          format: float
+          nullable: true
+        longitude:
+          type: number
+          format: float
+          nullable: true
+        OSMID:
+          type: integer
+          nullable: true
+        ishotel:
+          type: integer
+          enum: [0, 1]
+
+    AdminAccommodationResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/TravelAccommodation'
+
     RefreshRequest:
       type: object
       required: [refresh_token]
@@ -5210,6 +5327,467 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}:
+    get:
+      summary: Admin-Reisedetail
+      description: >
+        Gibt die HTML-Detailseite einer Reise mit Teilnehmern,
+        Unterkünften und zugehörigen Events zurück.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reisedetail-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}/participants:
+    post:
+      summary: Admin-Teilnehmer zu Reise hinzufügen
+      description: >
+        Fügt einen Benutzer als Teilnehmer zu einer Reise hinzu.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAddTripParticipantRequest'
+      responses:
+        '201':
+          description: Teilnehmer hinzugefügt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminParticipantResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Benutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Bereits Teilnehmer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}/participants/{userId}:
+    delete:
+      summary: Admin-Teilnehmer von Reise entfernen
+      description: >
+        Entfernt einen Benutzer als Teilnehmer von einer Reise.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Teilnehmer entfernt (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Kein Teilnehmer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}/participants/{userId}/accommodation:
+    put:
+      summary: Admin-Unterkunftszuweisung ändern
+      description: >
+        Ändert die Unterkunftszuweisung eines Teilnehmers.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateAccommodationRequest'
+      responses:
+        '200':
+          description: Unterkunft aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: accommodation_updated
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Kein Teilnehmer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}/accommodations:
+    post:
+      summary: Admin-Unterkunft erstellen
+      description: >
+        Erstellt eine neue Unterkunft.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateAccommodationRequest'
+      responses:
+        '201':
+          description: Unterkunft erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAccommodationResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}/accommodations/{accId}:
+    put:
+      summary: Admin-Unterkunft bearbeiten
+      description: >
+        Aktualisiert eine vorhandene Unterkunft.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: accId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateAccommodationRequest'
+      responses:
+        '200':
+          description: Unterkunft aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAccommodationResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Admin-Unterkunft löschen
+      description: >
+        Löscht eine Unterkunft.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: accId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Unterkunft gelöscht (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}:
+    get:
+      summary: Admin-Eventdetail
+      description: >
+        Gibt die HTML-Detailseite eines Events mit Teilnehmern zurück.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Eventdetail-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}/participants:
+    post:
+      summary: Admin-Teilnehmer zu Event hinzufügen
+      description: >
+        Fügt einen Benutzer als Teilnehmer zu einem Event hinzu.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminAddEventParticipantRequest'
+      responses:
+        '201':
+          description: Teilnehmer hinzugefügt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminParticipantResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event oder Benutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}/participants/{userId}:
+    delete:
+      summary: Admin-Teilnehmer von Event entfernen
+      description: >
+        Entfernt einen Benutzer als Teilnehmer von einem Event.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Teilnehmer entfernt (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Teilnehmer nicht gefunden
           content:
             application/json:
               schema:

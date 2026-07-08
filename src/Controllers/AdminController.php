@@ -5,9 +5,12 @@ namespace Sinclear\Api\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
 use Sinclear\Api\Repository\ForumRepository;
+use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
+use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
@@ -38,6 +41,9 @@ final readonly class AdminController
         private NotificationService $notificationService,
         private TravelTripRepository $tripRepo,
         private TravelEventRepository $eventRepo,
+        private TravelRelationRepository $travelRelationRepo,
+        private TravelAccommodationRepository $accommodationRepo,
+        private EventRelationRepository $eventRelationRepo,
         private ForumRepository $forumRepo,
         private ForumMemberRepository $forumMemberRepo,
     ) {}
@@ -216,7 +222,7 @@ ROW;
             $tripRows .= <<<ROW
             <tr>
                 <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$id}">{$id}</td>
-                <td>{$name}</td>
+                <td><a href="/api/v2/admin/travel/trips/{$id}" style="color:#5865F2;text-decoration:none;">{$name}</a></td>
                 <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$desc}">{$desc}</td>
                 <td>{$start} – {$end}</td>
                 <td>{$hastickets}</td>
@@ -242,7 +248,7 @@ ROW;
             $eventRows .= <<<ROW
             <tr>
                 <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$eId}">{$eId}</td>
-                <td>{$eName}</td>
+                <td><a href="/api/v2/admin/travel/events/{$eId}" style="color:#5865F2;text-decoration:none;">{$eName}</a></td>
                 <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$eDesc}">{$eDesc}</td>
                 <td>{$eTripName}</td>
                 <td>{$eStart}</td>
@@ -491,6 +497,472 @@ ROW;
         }
 
         $this->eventRepo->delete($id);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function tripDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $id = $args['id'];
+
+        $trip = $this->tripRepo->findById($id);
+        if ($trip === null) {
+            $response->getBody()->write('<h1>Reise nicht gefunden</h1><a href="/api/v2/admin/travel">Zurück</a>');
+            return $response->withStatus(404)->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        // Participants
+        $participants = $this->travelRelationRepo->findParticipantRelationsByTrip($id);
+        $participantCount = count($participants);
+
+        $participantRows = '';
+        foreach ($participants as $p) {
+            $pUserId = htmlspecialchars($p['userid']);
+            $pName = htmlspecialchars($p['displayName']);
+            $pEmail = htmlspecialchars($p['email']);
+            $pAcc = htmlspecialchars($p['accommodationName'] ?? '–');
+            $participantRows .= <<<ROW
+            <tr>
+                <td>{$pName}</td>
+                <td>{$pEmail}</td>
+                <td>
+                    <select class="acc-select" data-userid="{$pUserId}" onchange="changeAccommodation('{$pUserId}', this)" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.3rem;max-width:180px;">
+                        <option value="">– Keine –</option>
+                        {{accommodationOptionsForSelect}}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeParticipant('{$pUserId}', '{$pName}')">Entfernen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        // All accommodations for the select dropdown + pre-select current
+        $allAccommodations = $this->accommodationRepo->findAll();
+        $accommodationOptionsForSelect = '';
+        foreach ($allAccommodations as $a) {
+            $aId = htmlspecialchars($a['ID']);
+            $aName = htmlspecialchars($a['name']);
+            $accommodationOptionsForSelect .= "<option value=\"{$aId}\">{$aName}</option>";
+        }
+
+        // Fix the participantRows to have proper selected option
+        $fixedParticipantRows = '';
+        foreach ($participants as $p) {
+            $pUserId = htmlspecialchars($p['userid']);
+            $pName = htmlspecialchars($p['displayName']);
+            $pEmail = htmlspecialchars($p['email']);
+            $currentAccId = $p['accommodation'] ?? '';
+            $options = '<option value="">– Keine –</option>';
+            foreach ($allAccommodations as $a) {
+                $aId = htmlspecialchars($a['ID']);
+                $aName = htmlspecialchars($a['name']);
+                $selected = $aId === $currentAccId ? ' selected' : '';
+                $options .= "<option value=\"{$aId}\"{$selected}>{$aName}</option>";
+            }
+            $fixedParticipantRows .= <<<ROW
+            <tr>
+                <td>{$pName}</td>
+                <td>{$pEmail}</td>
+                <td>
+                    <select onchange="changeAccommodation('{$pUserId}', this)" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.3rem;max-width:180px;">
+                        {$options}
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeParticipant('{$pUserId}', '{$pName}')">Entfernen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        // User options for add-participant dropdown
+        $allUsers = $this->userRepo->findAll();
+        $userOptions = '';
+        foreach ($allUsers as $u) {
+            $uid = htmlspecialchars($u['id']);
+            $uname = htmlspecialchars($u['displayName']);
+            $uemail = htmlspecialchars($u['email']);
+            $userOptions .= "<option value=\"{$uid}\">{$uname} ({$uemail})</option>";
+        }
+
+        // Accommodations table
+        $tripAccommodations = $this->accommodationRepo->findByTrip($id);
+        $accommodationRows = '';
+        foreach ($tripAccommodations as $a) {
+            $aId = htmlspecialchars($a['ID']);
+            $aName = htmlspecialchars($a['name']);
+            $aAddress = htmlspecialchars($a['address'] ?? '');
+            $aPhone = htmlspecialchars($a['phone'] ?? '');
+            $aMail = htmlspecialchars($a['mail'] ?? '');
+            $aContact = $aPhone . ($aMail ? ' / ' . $aMail : '');
+            $aIshotel = $a['ishotel'] ? 'Hotel' : 'Privat';
+            $accommodationRows .= <<<ROW
+            <tr>
+                <td>{$aName}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$aAddress}">{$aAddress}</td>
+                <td>{$aIshotel}</td>
+                <td>{$aContact}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editAccommodation('{$aId}', `{$aName}`, `{$a['description']}`, `{$aAddress}`, '{$aPhone}', '{$aMail}', '{$a['latitude']}', '{$a['longitude']}', '{$a['OSMID']}', '{$a['ishotel']}')">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteAccommodation('{$aId}', '{$aName}')">Löschen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        // Events for this trip
+        $tripEvents = $this->eventRepo->findByTrip($id);
+        $eventSection = '';
+        if (count($tripEvents) > 0) {
+            $eventSection .= '<table><thead><tr><th>Name</th><th>Start</th><th>Ende</th></tr></thead><tbody>';
+            foreach ($tripEvents as $e) {
+                $eId = htmlspecialchars($e['ID']);
+                $eName = htmlspecialchars($e['name']);
+                $eStart = date('d.m.Y H:i', strtotime($e['start']));
+                $eEnd = date('d.m.Y H:i', strtotime($e['end']));
+                $eventSection .= <<<ROW
+                <tr>
+                    <td><a href="/api/v2/admin/travel/events/{$eId}" style="color:#5865F2;text-decoration:none;">{$eName}</a></td>
+                    <td>{$eStart}</td>
+                    <td>{$eEnd}</td>
+                </tr>
+ROW;
+            }
+            $eventSection .= '</tbody></table>';
+        } else {
+            $eventSection = '<p style="color:#666;">Keine Events für diese Reise.</p>';
+        }
+
+        $tripName = htmlspecialchars($trip['name']);
+        $tripDesc = htmlspecialchars($trip['description'] ?? '');
+        $tripStart = date('d.m.Y H:i', strtotime($trip['start']));
+        $tripEnd = date('d.m.Y H:i', strtotime($trip['end']));
+
+        $contentHtml = $this->renderTemplate('trip_detail.php', [
+            'tripId' => $id,
+            'tripName' => $tripName,
+            'tripDescription' => $tripDesc,
+            'tripStart' => $tripStart,
+            'tripEnd' => $tripEnd,
+            'participantRows' => $fixedParticipantRows,
+            'participantCount' => $participantCount,
+            'userOptions' => $userOptions,
+            'accommodationOptions' => $accommodationOptionsForSelect,
+            'accommodationRows' => $accommodationRows,
+            'eventSection' => $eventSection,
+        ]);
+        $html = $this->renderLayout("Reise: {$tripName}", $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function addTripParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $body = $request->getParsedBody();
+
+        $userId = trim((string) ($body['userId'] ?? ''));
+        if ($userId === '') {
+            return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
+        }
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $user = $this->userRepo->findById($userId);
+        if ($user === null) {
+            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
+        }
+
+        if ($this->travelRelationRepo->isParticipant($userId, $tripId)) {
+            return ResponseFactory::json(['error' => 'already_participant'], 409, $response);
+        }
+
+        $accommodation = isset($body['accommodation']) && is_string($body['accommodation']) && $body['accommodation'] !== ''
+            ? trim($body['accommodation']) : null;
+
+        $relationId = $this->travelRelationRepo->addParticipant($userId, $tripId, $accommodation);
+
+        return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
+    }
+
+    public function removeTripParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $userId = $args['userId'];
+
+        if (!$this->travelRelationRepo->isParticipant($userId, $tripId)) {
+            return ResponseFactory::json(['error' => 'not_a_participant'], 404, $response);
+        }
+
+        $this->travelRelationRepo->removeByUserAndTrip($userId, $tripId);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function updateParticipantAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $userId = $args['userId'];
+        $body = $request->getParsedBody();
+
+        if (!$this->travelRelationRepo->isParticipant($userId, $tripId)) {
+            return ResponseFactory::json(['error' => 'not_a_participant'], 404, $response);
+        }
+
+        $accommodation = isset($body['accommodation']) && is_string($body['accommodation']) && $body['accommodation'] !== ''
+            ? trim($body['accommodation']) : null;
+
+        $this->travelRelationRepo->updateAccommodation($userId, $tripId, $accommodation);
+        return ResponseFactory::json(['message' => 'accommodation_updated'], 200, $response);
+    }
+
+    public function createTripAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $name = trim((string) ($body['name'] ?? ''));
+        if ($name === '') {
+            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+        }
+
+        $id = $this->accommodationRepo->create([
+            'name' => $name,
+            'description' => isset($body['description']) && is_string($body['description'])
+                ? trim($body['description']) : null,
+            'address' => isset($body['address']) && is_string($body['address'])
+                ? trim($body['address']) : null,
+            'OSMID' => isset($body['OSMID']) && $body['OSMID'] !== ''
+                ? (int) $body['OSMID'] : null,
+            'latitude' => isset($body['latitude']) && $body['latitude'] !== ''
+                ? (float) $body['latitude'] : null,
+            'longitude' => isset($body['longitude']) && $body['longitude'] !== ''
+                ? (float) $body['longitude'] : null,
+            'phone' => isset($body['phone']) && is_string($body['phone'])
+                ? trim($body['phone']) : null,
+            'mail' => isset($body['mail']) && is_string($body['mail'])
+                ? trim($body['mail']) : null,
+            'ishotel' => !empty($body['ishotel']) ? 1 : 0,
+        ]);
+
+        $accommodation = $this->accommodationRepo->findById($id);
+        return ResponseFactory::json(['data' => $accommodation], 201, $response);
+    }
+
+    public function updateTripAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['accId'];
+        $body = $request->getParsedBody();
+
+        $accommodation = $this->accommodationRepo->findById($id);
+        if ($accommodation === null) {
+            return ResponseFactory::json(['error' => 'accommodation_not_found'], 404, $response);
+        }
+
+        $data = [];
+        if (isset($body['name'])) {
+            $name = trim((string) $body['name']);
+            if ($name === '') {
+                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+            }
+            $data['name'] = $name;
+        }
+        $stringFields = ['description', 'address', 'phone', 'mail'];
+        foreach ($stringFields as $field) {
+            if (isset($body[$field])) {
+                $data[$field] = is_string($body[$field])
+                    ? trim($body[$field]) : null;
+            }
+        }
+        if (isset($body['OSMID'])) {
+            $data['OSMID'] = $body['OSMID'] !== '' ? (int) $body['OSMID'] : null;
+        }
+        if (isset($body['latitude'])) {
+            $data['latitude'] = $body['latitude'] !== '' ? (float) $body['latitude'] : null;
+        }
+        if (isset($body['longitude'])) {
+            $data['longitude'] = $body['longitude'] !== '' ? (float) $body['longitude'] : null;
+        }
+        if (isset($body['ishotel'])) {
+            $data['ishotel'] = !empty($body['ishotel']) ? 1 : 0;
+        }
+
+        if ($data === []) {
+            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
+        }
+
+        $this->accommodationRepo->update($id, $data);
+        $updated = $this->accommodationRepo->findById($id);
+        return ResponseFactory::json(['data' => $updated], 200, $response);
+    }
+
+    public function deleteTripAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['accId'];
+
+        $accommodation = $this->accommodationRepo->findById($id);
+        if ($accommodation === null) {
+            return ResponseFactory::json(['error' => 'accommodation_not_found'], 404, $response);
+        }
+
+        $this->accommodationRepo->delete($id);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function eventDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $id = $args['id'];
+
+        $event = $this->eventRepo->findById($id);
+        if ($event === null) {
+            $response->getBody()->write('<h1>Event nicht gefunden</h1><a href="/api/v2/admin/travel">Zurück</a>');
+            return $response->withStatus(404)->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $participants = $this->eventRelationRepo->findByEvent($id);
+        $participantCount = count($participants);
+
+        $participantRows = '';
+        foreach ($participants as $p) {
+            $pUserId = htmlspecialchars($p['userId']);
+            $pName = htmlspecialchars($p['displayName']);
+            $pEmail = htmlspecialchars($p['email']);
+            $pCreatedAt = date('d.m.Y H:i', strtotime($p['createdAt']));
+            $participantRows .= <<<ROW
+            <tr>
+                <td>{$pName}</td>
+                <td>{$pEmail}</td>
+                <td>{$pCreatedAt}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeParticipant('{$pUserId}', '{$pName}')">Entfernen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        // User options for add-participant dropdown
+        $allUsers = $this->userRepo->findAll();
+        $userOptions = '';
+        foreach ($allUsers as $u) {
+            $uid = htmlspecialchars($u['id']);
+            $uname = htmlspecialchars($u['displayName']);
+            $uemail = htmlspecialchars($u['email']);
+            $userOptions .= "<option value=\"{$uid}\">{$uname} ({$uemail})</option>";
+        }
+
+        $eventName = htmlspecialchars($event['name']);
+        $eventDesc = htmlspecialchars($event['description'] ?? '');
+        $eventStart = date('d.m.Y H:i', strtotime($event['start']));
+        $eventEnd = date('d.m.Y H:i', strtotime($event['end']));
+        $eventTrip = $event['trip'] ?? null;
+        if ($eventTrip !== null) {
+            $trip = $this->tripRepo->findById($eventTrip);
+            $eventTrip = $trip ? '<a href="/api/v2/admin/travel/trips/' . htmlspecialchars($trip['id']) . '" style="color:#5865F2;text-decoration:none;">' . htmlspecialchars($trip['name']) . '</a>' : '–';
+        } else {
+            $eventTrip = 'Standalone-Event';
+        }
+        $eventOrganizer = htmlspecialchars($event['organizer'] ?? '–');
+        $eventAddress = htmlspecialchars($event['address'] ?? '–');
+
+        $extras = '';
+        if (!empty($event['url'])) {
+            $extras .= '<tr><td style="border:none;padding:0.3rem 0;color:#888;">URL</td><td style="border:none;padding:0.3rem 0;"><a href="' . htmlspecialchars($event['url']) . '" target="_blank" style="color:#5865F2;">' . htmlspecialchars($event['url']) . '</a></td></tr>';
+        }
+        if (!empty($event['latitude']) && !empty($event['longitude'])) {
+            $extras .= '<tr><td style="border:none;padding:0.3rem 0;color:#888;">Koordinaten</td><td style="border:none;padding:0.3rem 0;">' . htmlspecialchars($event['latitude']) . ', ' . htmlspecialchars($event['longitude']) . '</td></tr>';
+        }
+        if (!empty($event['hastickets']) && $event['hastickets'] === '1') {
+            $extras .= '<tr><td style="border:none;padding:0.3rem 0;color:#888;">Tickets</td><td style="border:none;padding:0.3rem 0;">Ja' .
+                (!empty($event['ticket']) ? ' – ' . htmlspecialchars($event['ticket']) : '') .
+                (!empty($event['ticketUrl']) ? ' – <a href="' . htmlspecialchars($event['ticketUrl']) . '" target="_blank" style="color:#5865F2;">Link</a>' : '') .
+                '</td></tr>';
+        }
+
+        // JSON data for the edit button
+        $editData = json_encode([
+            'id' => $event['ID'],
+            'name' => $event['name'],
+            'description' => $event['description'] ?? '',
+            'trip' => $event['trip'] ?? '',
+            'start' => $event['start'],
+            'end' => $event['end'],
+            'hastickets' => $event['hastickets'] ?? '0',
+            'ticket' => $event['ticket'] ?? '',
+            'ticketUrl' => $event['ticketUrl'] ?? '',
+            'url' => $event['url'] ?? '',
+            'image' => $event['image'] ?? '',
+            'organizer' => $event['organizer'] ?? '',
+            'address' => $event['address'] ?? '',
+            'latitude' => $event['latitude'] ?? '',
+            'longitude' => $event['longitude'] ?? '',
+            'OSMID' => $event['OSMID'] ?? '',
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_SINGLE | JSON_HEX_QUOT);
+
+        $contentHtml = $this->renderTemplate('event_detail.php', [
+            'eventId' => $id,
+            'eventName' => $eventName,
+            'eventDescription' => $eventDesc,
+            'eventStart' => $eventStart,
+            'eventEnd' => $eventEnd,
+            'eventTrip' => $eventTrip,
+            'eventOrganizer' => $eventOrganizer,
+            'eventAddress' => $eventAddress,
+            'eventDetailsExtras' => $extras,
+            'participantRows' => $participantRows,
+            'participantCount' => $participantCount,
+            'userOptions' => $userOptions,
+            'eventEditData' => $editData,
+        ]);
+        $html = $this->renderLayout("Event: {$eventName}", $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function addEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $eventId = $args['id'];
+        $body = $request->getParsedBody();
+
+        $userId = trim((string) ($body['userId'] ?? ''));
+        if ($userId === '') {
+            return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
+        }
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        }
+
+        $user = $this->userRepo->findById($userId);
+        if ($user === null) {
+            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
+        }
+
+        $relationId = $this->eventRelationRepo->addParticipant($eventId, $userId);
+
+        return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
+    }
+
+    public function removeEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $eventId = $args['id'];
+        $userId = $args['userId'];
+
+        $this->eventRelationRepo->removeByEventAndUser($eventId, $userId);
         return ResponseFactory::noContent($response);
     }
 

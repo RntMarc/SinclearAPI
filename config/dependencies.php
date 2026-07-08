@@ -50,6 +50,7 @@ use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
+use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
@@ -222,6 +223,7 @@ return [
     TravelEventRepository::class => autowire(),
     TravelAccommodationRepository::class => autowire(),
     TravelRelationRepository::class => autowire(),
+    EventRelationRepository::class => autowire(),
 
     TravelService::class => autowire(),
     TravelController::class => autowire(),

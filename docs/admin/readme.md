@@ -46,6 +46,18 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Ticket-Informationen, Orts- und Kontaktdaten verwaltbar
 - OpenStreetMap-ID, Koordinaten und Adresse pro Event
 
+### Reisedetail (`/travel/trips/{id}`) – **voll implementiert**
+- Zeigt Reiseinformationen, Teilnehmer, Unterkünfte und zugehörige Events
+- Teilnehmer können hinzugefügt und entfernt werden
+- Unterkunftszuweisung pro Teilnehmer änderbar
+- Unterkünfte können erstellt, bearbeitet und gelöscht werden
+- Dropdown mit allen registrierten Nutzern zum Hinzufügen
+
+### Eventdetail (`/travel/events/{id}`) – **voll implementiert**
+- Zeigt Eventinformationen und Teilnehmer
+- Teilnehmer können hinzugefügt und entfernt werden
+- Dropdown mit allen registrierten Nutzern zum Hinzufügen
+
 ### Benachrichtigungen (`/notifications`) – **voll implementiert**
 - Vordefinierte Vorlagen: System-Update, Neue Funktion, Wartungshinweis,
   Willkommensnachricht, Test Ping
@@ -82,6 +94,16 @@ Nicht-Admins erhalten einen 403-Fehler.
 | POST | `/admin/travel/events` | Neues Event anlegen (geschützt) |
 | PUT | `/admin/travel/events/{id}` | Event bearbeiten (geschützt) |
 | DELETE | `/admin/travel/events/{id}` | Event löschen (geschützt) |
+| GET | `/admin/travel/trips/{id}` | Reisedetail-Seite mit Teilnehmern, Unterkünften, Events (geschützt) |
+| POST | `/admin/travel/trips/{id}/participants` | Teilnehmer zu Reise hinzufügen (geschützt) |
+| DELETE | `/admin/travel/trips/{id}/participants/{userId}` | Teilnehmer von Reise entfernen (geschützt) |
+| PUT | `/admin/travel/trips/{id}/participants/{userId}/accommodation` | Unterkunftszuweisung ändern (geschützt) |
+| POST | `/admin/travel/trips/{id}/accommodations` | Unterkunft erstellen (geschützt) |
+| PUT | `/admin/travel/trips/{id}/accommodations/{accId}` | Unterkunft bearbeiten (geschützt) |
+| DELETE | `/admin/travel/trips/{id}/accommodations/{accId}` | Unterkunft löschen (geschützt) |
+| GET | `/admin/travel/events/{id}` | Eventdetail-Seite mit Teilnehmern (geschützt) |
+| POST | `/admin/travel/events/{id}/participants` | Teilnehmer zu Event hinzufügen (geschützt) |
+| DELETE | `/admin/travel/events/{id}/participants/{userId}` | Teilnehmer von Event entfernen (geschützt) |
 | GET | `/admin/notifications` | Benachrichtigungen senden (geschützt) |
 | POST | `/admin/notifications/send` | Notification versenden (geschützt) |
 
