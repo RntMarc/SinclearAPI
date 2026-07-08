@@ -18,13 +18,14 @@ final readonly class LocationSharingSessionRepository
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO LocationSharingSession
-                (id, token, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, 1, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), NOW(), NOW())'
+                (id, token, ownerId, sharingMode, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), NOW(), NOW())'
         );
         $stmt->execute([
             $id,
             $token,
             $data['ownerId'],
+            $data['sharingMode'] ?? 'location',
             $data['durationSeconds'],
             $data['frequencySeconds'],
             $data['durationSeconds'],
@@ -80,6 +81,13 @@ final readonly class LocationSharingSessionRepository
         $this->pdo->prepare('DELETE FROM LocationSharingLocation WHERE sessionId = ?')->execute([$id]);
         $this->pdo->prepare('DELETE FROM LocationSharingRecipient WHERE sessionId = ?')->execute([$id]);
         $this->pdo->prepare('DELETE FROM LocationSharingSession WHERE id = ?')->execute([$id]);
+    }
+
+    public function countLocations(string $sessionId): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM LocationSharingLocation WHERE sessionId = ?');
+        $stmt->execute([$sessionId]);
+        return (int) $stmt->fetchColumn();
     }
 
     public function listByOwner(string $ownerId): array

@@ -28,7 +28,8 @@ POST /api/v2/location-sharing/sessions
 {
   "recipient_ids": ["uuid1", "uuid2"],
   "duration_seconds": 3600,
-  "frequency_seconds": 600
+  "frequency_seconds": 600,
+  "sharing_mode": "route"
 }
 ```
 
@@ -36,6 +37,7 @@ POST /api/v2/location-sharing/sessions
 - `recipient_ids`: Array, 1–50 Einträge, gültige UUIDs
 - `duration_seconds`: 300–86400 (5 Min – 24 h)
 - `frequency_seconds`: 300–1200 (5–20 Min), Default 600
+- `sharing_mode`: `location` (Default) oder `route`
 
 **Response (201):**
 ```json
@@ -43,6 +45,7 @@ POST /api/v2/location-sharing/sessions
   "data": {
     "id": "uuid",
     "ownerId": "uuid",
+    "sharingMode": "route",
     "durationSeconds": 3600,
     "frequencySeconds": 600,
     "isActive": true,
@@ -53,10 +56,25 @@ POST /api/v2/location-sharing/sessions
     "recipients": [
       {"userId": "uuid1", "displayName": "User 1", "image": null}
     ],
-    "lastLocation": null
+    "lastLocation": null,
+    "locationCount": 0
   }
 }
 ```
+
+## Sharing-Modi
+
+Die API unterstützt zwei Sharing-Modi:
+
+| Modus | Beschreibung | Use-Case |
+|-------|-------------|----------|
+| `location` | Nur aktueller Standort wird geteilt | "Wo bin ich gerade?" |
+| `route` | Standort + Strecke (alle Standpunkte) | "Welchen Weg habe ich zurückgelegt?" |
+
+- **`location`** (Default): Speichert alle Standortpunkte, aber die Clients zeigen typischerweise nur den aktuellen Standort an. Gut für Live-Standort-Teilen.
+- **`route`**: Speichert alle Standortpunkte und Clients können den vollen Pfad abrufen. Gut für Aktivitäten wie Wandern, Laufen oder Fahrradfahren.
+
+**Hinweis:** Der `sharingMode` kann nach der Session-Erstellung nicht geändert werden. Alle Standortpunkte werden in beiden Modi gespeichert – der Modus bestimmt nur, wie die Daten von den Clients angezeigt werden.
 
 ## Standort senden
 
@@ -193,7 +211,8 @@ Die meisten Drittanbieter senden Unix-Epoch-Timestamps (Sekunden oder Millisekun
 POST /api/v2/location-sharing/sessions
 {
   "recipient_ids": ["uuid1"],
-  "duration_seconds": 3600
+  "duration_seconds": 3600,
+  "sharing_mode": "route"
 }
 ```
 
@@ -204,6 +223,7 @@ POST /api/v2/location-sharing/sessions
     "id": "uuid",
     "token": "a1b2c3d4e5f678901234567890abcdef",
     "ownerId": "uuid",
+    "sharingMode": "route",
     "durationSeconds": 3600,
     "frequencySeconds": 600,
     "isActive": true,
@@ -215,6 +235,7 @@ POST /api/v2/location-sharing/sessions
       {"userId": "uuid1", "displayName": "User 1", "image": null}
     ],
     "lastLocation": null,
+    "locationCount": 0,
     "integrationUrls": {
       "osmand": "https://api.sinclear.de/api/v2/location-sharing/log/osmand/a1b2c3d4e5f678901234567890abcdef/yourname?lat={0}&lon={1}&alt={4}&acc={3}&timestamp={2}&speed={5}&bearing={6}",
       "gpslogger": "https://api.sinclear.de/api/v2/location-sharing/log/gpslogger/a1b2c3d4e5f678901234567890abcdef/yourname?lat=%LAT&lon=%LON&sat=%SAT&alt=%ALT&acc=%ACC&speed=%SPD&bearing=%DIR&timestamp=%TIMESTAMP&bat=%BATT",
@@ -246,3 +267,11 @@ POST /api/v2/location-sharing/sessions
 - Das Token kann nicht zur Auslesen von Daten verwendet werden (nur Schreibzugriff)
 - Sessions laufen automatisch nach `durationSeconds` ab
 - Bei abgelaufenen Sessions wird `404 session_expired` zurückgegeben
+
+## Automatisches Aufräumen
+
+Die API bereinigt automatisch alte Location-Sharing-Daten:
+
+- **MySQL Event:** Täglich werden Sessions gelöscht, die älter als 7 Tage sind
+- **Cascade:** Zugehörige Standortpunkte und Empfänger werden ebenfalls gelöscht
+- **Keine manuelle Bereinigung nötig:** Das System verwaltet die Datenhaltung automatisch

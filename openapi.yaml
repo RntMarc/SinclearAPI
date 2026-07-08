@@ -2288,7 +2288,7 @@ components:
 
     LocationSharingSession:
       type: object
-      required: [id, token, ownerId, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt]
+      required: [id, token, ownerId, sharingMode, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -2300,6 +2300,13 @@ components:
         ownerId:
           type: string
           format: uuid
+        sharingMode:
+          type: string
+          enum: [location, route]
+          description: |
+            Teilen-Modus:
+            - `location` (Default): Nur aktueller Standort wird geteilt
+            - `route`: Standort + Strecke (alle Standpunkte werden gespeichert)
         durationSeconds:
           type: integer
           description: Dauer der Session in Sekunden (300–86400)
@@ -2348,6 +2355,9 @@ components:
                     format: date-time
             lastLocation:
               $ref: '#/components/schemas/LocationSharingLocation'
+            locationCount:
+              type: integer
+              description: Anzahl der gespeicherten Standortpunkte
             integrationUrls:
               type: object
               description: URL-Vorlagen für Drittanbieter-Tracking-Clients
@@ -2429,6 +2439,14 @@ components:
           maximum: 1200
           default: 600
           description: Aktualisierungsfrequenz in Sekunden (5–20 Min)
+        sharing_mode:
+          type: string
+          enum: [location, route]
+          default: location
+          description: |
+            Teilen-Modus:
+            - `location` (Default): Nur aktueller Standort wird geteilt
+            - `route`: Standort + Strecke (alle Standpunkte werden gespeichert)
 
     LocationSharingUpdateRequest:
       type: object

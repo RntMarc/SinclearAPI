@@ -23,6 +23,7 @@ final readonly class LocationSharingService
     {
         $id = $this->sessionRepo->create([
             'ownerId' => $ownerId,
+            'sharingMode' => $data['sharing_mode'] ?? 'location',
             'durationSeconds' => $data['duration_seconds'],
             'frequencySeconds' => $data['frequency_seconds'] ?? 600,
         ]);
@@ -204,6 +205,7 @@ final readonly class LocationSharingService
             'id' => $session['id'],
             'token' => $session['token'],
             'ownerId' => $session['ownerId'],
+            'sharingMode' => $session['sharingMode'],
             'durationSeconds' => (int) $session['durationSeconds'],
             'frequencySeconds' => (int) $session['frequencySeconds'],
             'isActive' => (bool) $session['isActive'],
@@ -222,6 +224,7 @@ final readonly class LocationSharingService
         $data['lastLocation'] = $this->formatLocation(
             $this->locationRepo->getLastLocation($id)
         );
+        $data['locationCount'] = $this->sessionRepo->countLocations($id);
         $data['integrationUrls'] = $this->generateIntegrationUrls($session['token']);
         return $data;
     }

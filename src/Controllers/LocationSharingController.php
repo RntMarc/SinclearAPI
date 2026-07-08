@@ -82,9 +82,15 @@ final readonly class LocationSharingController
             return ResponseFactory::json(['error' => 'frequency_seconds_out_of_range'], 400, $response);
         }
 
+        $sharingMode = $body['sharing_mode'] ?? 'location';
+        if (!in_array($sharingMode, ['location', 'route'], true)) {
+            return ResponseFactory::json(['error' => 'sharing_mode_invalid'], 400, $response);
+        }
+
         try {
             $session = $this->service->createSession([
                 'recipient_ids' => $recipientIds,
+                'sharing_mode' => $sharingMode,
                 'duration_seconds' => $duration,
                 'frequency_seconds' => $frequency,
             ], $user->id);
