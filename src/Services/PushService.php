@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Services;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Repository\UserDeviceRepository;
@@ -95,8 +96,35 @@ final class PushService
                 'body' => $body,
             ]);
             return false;
+        } catch (ClientException $e) {
+            $response = $e->getResponse();
+            $body = $response !== null ? (string) $response->getBody() : '';
+
+            $errorData = json_decode($body, true);
+            $errorStatus = $errorData['error']['status'] ?? '';
+            $errorMessage = $errorData['error']['message'] ?? $e->getMessage();
+
+            if (
+                $errorStatus === 'UNREGISTERED'
+                || $errorStatus === 'NOT_FOUND'
+                || str_contains($errorMessage, 'Device unregistered')
+                || str_contains($errorMessage, 'Requested entity was not found')
+            ) {
+                $this->deviceRepo->deleteByPushToken($fcmToken);
+                $this->logger->info('FCM token removed (unregistered)', [
+                    'errorStatus' => $errorStatus,
+                    'message' => $errorMessage,
+                ]);
+            } else {
+                $this->logger->warning('FCM response error', [
+                    'errorStatus' => $errorStatus,
+                    'body' => $body,
+                ]);
+            }
+
+            return false;
         } catch (GuzzleException $e) {
-            $this->logger->error('FCM send failed', ['error' => $e->getMessage()]);
+            $this->logger->error('FCM send failed (network error)', ['error' => $e->getMessage()]);
             return false;
         }
     }
