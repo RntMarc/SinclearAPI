@@ -4,6 +4,7 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Services\LocationSharingService;
 
@@ -11,12 +12,39 @@ final readonly class LocationSharingIngressController
 {
     public function __construct(
         private LocationSharingService $service,
+        private LoggerInterface $logger,
     ) {}
+
+    private function logDebug(ServerRequestInterface $request, string $message, array $context = []): void
+    {
+        $this->logger->debug('[LocationSharingIngress] ' . $message, array_merge([
+            'method' => $request->getMethod(),
+            'uri' => (string) $request->getUri(),
+            'headers' => $request->getHeaders(),
+            'queryParams' => $request->getQueryParams(),
+            'body' => $request->getBody()->__toString(),
+            'parsedBody' => $request->getParsedBody(),
+        ], $context));
+    }
+
+    private function extractFromQueryOrBody(ServerRequestInterface $request, string $queryKey, string $bodyKey): mixed
+    {
+        $params = $request->getQueryParams();
+        if (isset($params[$queryKey]) && $params[$queryKey] !== '') {
+            return $params[$queryKey];
+        }
+        $body = $request->getParsedBody();
+        if (is_array($body) && isset($body[$bodyKey])) {
+            return $body[$bodyKey];
+        }
+        return null;
+    }
 
     public function handleOsmAnd(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
@@ -25,6 +53,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($params['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -35,6 +64,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -43,6 +73,7 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
@@ -51,6 +82,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($params['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -61,6 +93,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -69,11 +102,13 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
         $body = $request->getParsedBody();
         if (!is_array($body)) {
+            $this->logDebug($request, 'invalid_body');
             return ResponseFactory::json(['error' => 'invalid_body'], 400, $response);
         }
 
@@ -81,6 +116,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($body['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -91,6 +127,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -99,6 +136,7 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
@@ -107,6 +145,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($params['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -117,6 +156,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -125,24 +165,26 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
-        $params = $request->getQueryParams();
-        $lat = $this->parseFloat($params['lat'] ?? null);
-        $lon = $this->parseFloat($params['lon'] ?? null);
+        $lat = $this->parseFloat($this->extractFromQueryOrBody($request, 'lat', 'lat'));
+        $lon = $this->parseFloat($this->extractFromQueryOrBody($request, 'lon', 'lon'));
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
-        $accuracy = $this->parseFloat($params['accuracy'] ?? null);
-        $recordedAt = isset($params['timestamp']) ? $this->parseTimestamp($params['timestamp']) : null;
+        $accuracy = $this->parseFloat($this->extractFromQueryOrBody($request, 'accuracy', 'accuracy'));
+        $recordedAt = $this->parseTimestamp($this->extractFromQueryOrBody($request, 'timestamp', 'timestamp'));
 
         try {
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -151,6 +193,7 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
@@ -159,6 +202,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($params['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -169,6 +213,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -177,11 +222,13 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
         $body = $request->getParsedBody();
         if (!is_array($body)) {
+            $this->logDebug($request, 'invalid_body');
             return ResponseFactory::json(['error' => 'invalid_body'], 400, $response);
         }
 
@@ -195,6 +242,7 @@ final readonly class LocationSharingIngressController
         }
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -205,6 +253,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -213,6 +262,7 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
@@ -221,6 +271,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($params['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -231,6 +282,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -239,6 +291,7 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
@@ -247,6 +300,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($params['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -257,6 +311,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }
@@ -265,11 +320,13 @@ final readonly class LocationSharingIngressController
     {
         $token = $this->validateToken($args['token'] ?? '');
         if ($token === null) {
+            $this->logDebug($request, 'invalid_token');
             return ResponseFactory::json(['error' => 'invalid_token'], 400, $response);
         }
 
         $body = $request->getParsedBody();
         if (!is_array($body)) {
+            $this->logDebug($request, 'invalid_body');
             return ResponseFactory::json(['error' => 'invalid_body'], 400, $response);
         }
 
@@ -277,6 +334,7 @@ final readonly class LocationSharingIngressController
         $lon = $this->parseFloat($body['lon'] ?? null);
 
         if ($lat === null || $lon === null) {
+            $this->logDebug($request, 'lat_lon_required');
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
@@ -287,6 +345,7 @@ final readonly class LocationSharingIngressController
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
+            $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
         }
     }

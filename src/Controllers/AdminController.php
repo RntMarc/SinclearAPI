@@ -200,42 +200,298 @@ ROW;
         $allTrips = $this->tripRepo->findAll();
         $allEvents = $this->eventRepo->findAll();
 
+        $tripById = [];
+        foreach ($allTrips as $t) {
+            $tripById[$t['id']] = $t['name'];
+        }
+
         $tripRows = '';
         foreach ($allTrips as $t) {
+            $id = htmlspecialchars($t['id']);
+            $name = htmlspecialchars($t['name']);
+            $desc = htmlspecialchars($t['description'] ?? '');
             $start = date('d.m.Y', strtotime($t['start']));
             $end = date('d.m.Y', strtotime($t['end']));
+            $hastickets = $t['hastickets'] === '1' ? 'Ja' : 'Nein';
             $tripRows .= <<<ROW
             <tr>
-                <td>{$t['name']}</td>
+                <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$id}">{$id}</td>
+                <td>{$name}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$desc}">{$desc}</td>
                 <td>{$start} – {$end}</td>
-                <td><button class="btn btn-sm" disabled title="Coming soon">Bearbeiten</button></td>
+                <td>{$hastickets}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['start']}', '{$t['end']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteTrip('{$id}', '{$name}')">Löschen</button>
+                </td>
             </tr>
 ROW;
         }
 
         $eventRows = '';
         foreach ($allEvents as $e) {
-            $evName = $e['name'];
-            $evTrip = $e['trip'] ?? '–';
-            $evStart = date('d.m.Y H:i', strtotime($e['start']));
+            $eId = htmlspecialchars($e['ID']);
+            $eName = htmlspecialchars($e['name']);
+            $eDesc = htmlspecialchars($e['description'] ?? '');
+            $eTripId = $e['trip'] ?? '';
+            $eTripName = $eTripId !== '' && isset($tripById[$eTripId])
+                ? htmlspecialchars($tripById[$eTripId])
+                : '–';
+            $eStart = date('d.m.Y H:i', strtotime($e['start']));
+            $eEnd = date('d.m.Y H:i', strtotime($e['end']));
             $eventRows .= <<<ROW
             <tr>
-                <td>{$evName}</td>
-                <td>{$evTrip}</td>
-                <td>{$evStart}</td>
-                <td><button class="btn btn-sm" disabled title="Coming soon">Bearbeiten</button></td>
+                <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$eId}">{$eId}</td>
+                <td>{$eName}</td>
+                <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$eDesc}">{$eDesc}</td>
+                <td>{$eTripName}</td>
+                <td>{$eStart}</td>
+                <td>{$eEnd}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editEvent('{$eId}', `{$eName}`, `{$eDesc}`, '{$eTripId}', '{$e['start']}', '{$e['end']}', '{$e['hastickets']}', `{$e['ticket']}`, `{$e['ticketUrl']}`, `{$e['url']}`, `{$e['image']}`, `{$e['organizer']}`, `{$e['address']}")">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteEvent('{$eId}', '{$eName}')">Löschen</button>
+                </td>
             </tr>
 ROW;
+        }
+
+        $tripOptions = '<option value="">– Keine Reise (Standalone) –</option>';
+        foreach ($allTrips as $t) {
+            $tid = htmlspecialchars($t['id']);
+            $tname = htmlspecialchars($t['name']);
+            $tripOptions .= "<option value=\"{$tid}\">{$tname}</option>";
         }
 
         $contentHtml = $this->renderTemplate('travel.php', [
             'tripRows' => $tripRows,
             'eventRows' => $eventRows,
+            'tripOptions' => $tripOptions,
         ]);
         $html = $this->renderLayout('Reisen & Events', $contentHtml, $user->email);
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function createTrip(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $name = trim((string) ($body['name'] ?? ''));
+        if ($name === '') {
+            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+        }
+
+        $start = trim((string) ($body['start'] ?? ''));
+        $end = trim((string) ($body['end'] ?? ''));
+        if ($start === '' || $end === '') {
+            return ResponseFactory::json(['error' => 'start_and_end_required'], 400, $response);
+        }
+
+        $id = $this->tripRepo->create([
+            'name' => $name,
+            'description' => isset($body['description']) && is_string($body['description'])
+                ? trim($body['description']) : null,
+            'start' => $start,
+            'end' => $end,
+            'hastickets' => !empty($body['hastickets']) ? '1' : '0',
+            'ticket' => isset($body['ticket']) && is_string($body['ticket'])
+                ? trim($body['ticket']) : null,
+            'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
+                ? trim($body['ticketUrl']) : null,
+        ]);
+
+        $trip = $this->tripRepo->findById($id);
+        return ResponseFactory::json(['data' => $trip], 201, $response);
+    }
+
+    public function updateTrip(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+        $body = $request->getParsedBody();
+
+        $trip = $this->tripRepo->findById($id);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $data = [];
+        if (isset($body['name'])) {
+            $name = trim((string) $body['name']);
+            if ($name === '') {
+                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+            }
+            $data['name'] = $name;
+        }
+        if (isset($body['description'])) {
+            $data['description'] = is_string($body['description'])
+                ? trim($body['description']) : null;
+        }
+        if (isset($body['start'])) {
+            $data['start'] = trim((string) $body['start']);
+        }
+        if (isset($body['end'])) {
+            $data['end'] = trim((string) $body['end']);
+        }
+        if (isset($body['hastickets'])) {
+            $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
+        }
+        if (isset($body['ticket'])) {
+            $data['ticket'] = is_string($body['ticket'])
+                ? trim($body['ticket']) : null;
+        }
+        if (isset($body['ticketUrl'])) {
+            $data['ticketUrl'] = is_string($body['ticketUrl'])
+                ? trim($body['ticketUrl']) : null;
+        }
+
+        if ($data === []) {
+            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
+        }
+
+        $this->tripRepo->update($id, $data);
+        $updated = $this->tripRepo->findById($id);
+        return ResponseFactory::json(['data' => $updated], 200, $response);
+    }
+
+    public function deleteTrip(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+
+        $trip = $this->tripRepo->findById($id);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $this->tripRepo->delete($id);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function createEvent(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $name = trim((string) ($body['name'] ?? ''));
+        if ($name === '') {
+            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+        }
+
+        $start = trim((string) ($body['start'] ?? ''));
+        $end = trim((string) ($body['end'] ?? ''));
+        if ($start === '' || $end === '') {
+            return ResponseFactory::json(['error' => 'start_and_end_required'], 400, $response);
+        }
+
+        $tripId = isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
+            ? trim($body['trip']) : null;
+
+        $id = $this->eventRepo->create([
+            'trip' => $tripId,
+            'name' => $name,
+            'description' => isset($body['description']) && is_string($body['description'])
+                ? trim($body['description']) : null,
+            'start' => $start,
+            'end' => $end,
+            'hastickets' => !empty($body['hastickets']) ? '1' : '0',
+            'ticket' => isset($body['ticket']) && is_string($body['ticket'])
+                ? trim($body['ticket']) : null,
+            'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
+                ? trim($body['ticketUrl']) : null,
+            'url' => isset($body['url']) && is_string($body['url'])
+                ? trim($body['url']) : null,
+            'image' => isset($body['image']) && is_string($body['image'])
+                ? trim($body['image']) : null,
+            'organizer' => isset($body['organizer']) && is_string($body['organizer'])
+                ? trim($body['organizer']) : null,
+            'address' => isset($body['address']) && is_string($body['address'])
+                ? trim($body['address']) : null,
+            'latitude' => isset($body['latitude']) && $body['latitude'] !== ''
+                ? (float) $body['latitude'] : null,
+            'longitude' => isset($body['longitude']) && $body['longitude'] !== ''
+                ? (float) $body['longitude'] : null,
+            'OSMID' => isset($body['OSMID']) && $body['OSMID'] !== ''
+                ? (int) $body['OSMID'] : null,
+        ]);
+
+        $event = $this->eventRepo->findById($id);
+        return ResponseFactory::json(['data' => $event], 201, $response);
+    }
+
+    public function updateEvent(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+        $body = $request->getParsedBody();
+
+        $event = $this->eventRepo->findById($id);
+        if ($event === null) {
+            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        }
+
+        $data = [];
+        if (isset($body['name'])) {
+            $name = trim((string) $body['name']);
+            if ($name === '') {
+                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+            }
+            $data['name'] = $name;
+        }
+        if (isset($body['description'])) {
+            $data['description'] = is_string($body['description'])
+                ? trim($body['description']) : null;
+        }
+        $stringFields = ['start', 'end', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address'];
+        foreach ($stringFields as $field) {
+            if (isset($body[$field])) {
+                $data[$field] = is_string($body[$field])
+                    ? trim($body[$field]) : null;
+            }
+        }
+        if (isset($body['trip'])) {
+            $data['trip'] = is_string($body['trip']) && $body['trip'] !== ''
+                ? trim($body['trip']) : null;
+        }
+        if (isset($body['hastickets'])) {
+            $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
+        }
+        if (isset($body['latitude'])) {
+            $data['latitude'] = $body['latitude'] !== ''
+                ? (float) $body['latitude'] : null;
+        }
+        if (isset($body['longitude'])) {
+            $data['longitude'] = $body['longitude'] !== ''
+                ? (float) $body['longitude'] : null;
+        }
+        if (isset($body['OSMID'])) {
+            $data['OSMID'] = $body['OSMID'] !== ''
+                ? (int) $body['OSMID'] : null;
+        }
+
+        if ($data === []) {
+            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
+        }
+
+        $this->eventRepo->update($id, $data);
+        $updated = $this->eventRepo->findById($id);
+        return ResponseFactory::json(['data' => $updated], 200, $response);
+    }
+
+    public function deleteEvent(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+
+        $event = $this->eventRepo->findById($id);
+        if ($event === null) {
+            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        }
+
+        $this->eventRepo->delete($id);
+        return ResponseFactory::noContent($response);
     }
 
     public function forums(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

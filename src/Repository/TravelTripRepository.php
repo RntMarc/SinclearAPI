@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Repository;
 
 use PDO;
+use Ramsey\Uuid\Uuid;
 
 final readonly class TravelTripRepository
 {
@@ -65,5 +66,53 @@ final readonly class TravelTripRepository
                 'totalPages' => (int) ceil($total / $limit),
             ],
         ];
+    }
+
+    public function create(array $data): string
+    {
+        $id = Uuid::uuid7()->toString();
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO TravelTrip (id, name, description, start, end, hastickets, ticket, ticketUrl)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        );
+        $stmt->execute([
+            $id,
+            $data['name'],
+            $data['description'] ?? null,
+            $data['start'],
+            $data['end'],
+            $data['hastickets'] ?? '0',
+            $data['ticket'] ?? null,
+            $data['ticketUrl'] ?? null,
+        ]);
+        return $id;
+    }
+
+    public function update(string $id, array $data): void
+    {
+        $sets = [];
+        $values = [];
+
+        foreach (['name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $sets[] = "$field = ?";
+                $values[] = $data[$field];
+            }
+        }
+
+        if ($sets === []) {
+            return;
+        }
+
+        $values[] = $id;
+        $sql = 'UPDATE TravelTrip SET ' . implode(', ', $sets) . ' WHERE id = ?';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($values);
+    }
+
+    public function delete(string $id): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelTrip WHERE id = ?');
+        $stmt->execute([$id]);
     }
 }

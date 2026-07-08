@@ -183,7 +183,7 @@ Statt der direkten Nutzung der Flutter-App können Nutzer etablierte Tracking-Ap
 | **GpsLogger** | `/log/gpslogger/{token}[/{name}]?lat=%LAT&lon=%LON&acc=%ACC&timestamp=%TIMESTAMP` | GET | `%LAT, %LON, %ALT, %ACC, %SPD, %DIR, %TIMESTAMP, %BAT, %SAT` |
 | **Owntracks** | `/log/owntracks/{token}[/{name}]` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "ts":...}` |
 | **Ulogger** | `/log/ulogger/{token}[/{name}]?lat=...&lon=...&time=...` | GET | `lat, lon, time` |
-| **Traccar** | `/log/traccar/{token}[/{name}]?lat=...&lon=...&accuracy=...&timestamp=...` | GET | `lat, lon, accuracy, timestamp, altitude, speed, bearing` |
+| **Traccar** | `/log/traccar/{token}[/{name}]?lat=...&lon=...&accuracy=...&timestamp=...` | GET + POST | `lat, lon, accuracy, timestamp, altitude, speed, bearing`. POST akzeptiert JSON-Body oder Query-Parameter. |
 | **OpenGTS** | `/log/opengts/{token}[/{name}]?lat=...&lon=...&gpsAccuracy=...&time=...` | GET | `lat, lon, gpsAccuracy, time, speed, bearing` |
 | **Overland** | `/log/overland/{token}[/{name}]` | POST | GeoJSON: `{"geometry":{"coordinates":[lon,lat]},"properties":{"timestamp":...,"horizontal_accuracy":...}}` |
 | **Locus Maps** | `/log/locusmap/{token}[/{name}]?lat=...&lon=...&acc=...&time=...` | GET | `lat, lon, acc, time, alt, speed, bearing` |
@@ -273,6 +273,21 @@ POST /api/v2/location-sharing/sessions
 - Das Token kann nicht zur Auslesen von Daten verwendet werden (nur Schreibzugriff)
 - Sessions laufen automatisch nach `durationSeconds` ab
 - Bei abgelaufenen Sessions wird `404 session_expired` zurückgegeben
+
+## Debugging
+
+Die API loggt fehlgeschlagene Ingress-Requests (400/404) automatisch mit vollständigen Request-Details (Methode, URL, Header, Query-Parameter, Body) in den Error-Log auf Level `debug`. Fehlermeldungen enthalten den genauen Grund:
+
+- `invalid_token` – Token-Format ungültig
+- `lat_lon_required` – Breiten-/Längengrad fehlt oder ungültig
+- `session_not_found` – Session existiert nicht
+- `session_inactive` – Session wurde manuell beendet
+- `session_expired` – Session ist abgelaufen
+
+**Log-Auszug-Beispiel:**
+```
+[LocationSharingIngress] lat_lon_required {"method":"POST","uri":"...","queryParams":{"lat":...,"lon":...},"body":"...","parsedBody":{"key":"..."}}
+```
 
 ## Automatisches Aufräumen
 

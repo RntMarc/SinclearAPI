@@ -39,10 +39,12 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Bearbeiten-Buttons sind deaktiviert mit "Coming soon"
 - Geplante Funktionen: Bearbeiten, Timeout/Ban, Einladungen
 
-### Reisen & Events (`/travel`) – **Platzhalter**
+### Reisen & Events (`/travel`) – **voll implementiert**
 - Listet alle Reisen und Events in Tabellen
-- Bearbeiten-Buttons sind deaktiviert mit "Coming soon"
-- Geplante Funktionen: Erstellen, Bearbeiten, Löschen
+- Reisen und Events können erstellt, bearbeitet und gelöscht werden
+- Standalone-Events (ohne Reise-Bezug) können angelegt werden
+- Ticket-Informationen, Orts- und Kontaktdaten verwaltbar
+- OpenStreetMap-ID, Koordinaten und Adresse pro Event
 
 ### Benachrichtigungen (`/notifications`) – **voll implementiert**
 - Vordefinierte Vorlagen: System-Update, Neue Funktion, Wartungshinweis,
@@ -74,6 +76,12 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/users` | Nutzerverwaltung (geschützt) |
 | GET | `/admin/users/json` | Nutzerliste als JSON (geschützt) |
 | GET | `/admin/travel` | Reisen & Events (geschützt) |
+| POST | `/admin/travel/trips` | Neue Reise anlegen (geschützt) |
+| PUT | `/admin/travel/trips/{id}` | Reise bearbeiten (geschützt) |
+| DELETE | `/admin/travel/trips/{id}` | Reise löschen (geschützt) |
+| POST | `/admin/travel/events` | Neues Event anlegen (geschützt) |
+| PUT | `/admin/travel/events/{id}` | Event bearbeiten (geschützt) |
+| DELETE | `/admin/travel/events/{id}` | Event löschen (geschützt) |
 | GET | `/admin/notifications` | Benachrichtigungen senden (geschützt) |
 | POST | `/admin/notifications/send` | Notification versenden (geschützt) |
 

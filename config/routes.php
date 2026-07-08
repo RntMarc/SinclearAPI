@@ -158,6 +158,7 @@ return function (App $app): void {
         $group->post('/owntracks/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOwntracks']);
         $group->get('/ulogger/{token}[/{name}]', [LocationSharingIngressController::class, 'handleUlogger']);
         $group->get('/traccar/{token}[/{name}]', [LocationSharingIngressController::class, 'handleTraccar']);
+        $group->post('/traccar/{token}[/{name}]', [LocationSharingIngressController::class, 'handleTraccar']);
         $group->get('/opengts/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOpenGTS']);
         $group->post('/overland/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOverland']);
         $group->get('/locusmap/{token}[/{name}]', [LocationSharingIngressController::class, 'handleLocusMap']);
@@ -241,6 +242,12 @@ return function (App $app): void {
         $group->put('/forums/{id}', [AdminController::class, 'updateForum']);
         $group->delete('/forums/{id}', [AdminController::class, 'deleteForum']);
         $group->get('/travel', [AdminController::class, 'travel']);
+        $group->post('/travel/trips', [AdminController::class, 'createTrip']);
+        $group->put('/travel/trips/{id}', [AdminController::class, 'updateTrip']);
+        $group->delete('/travel/trips/{id}', [AdminController::class, 'deleteTrip']);
+        $group->post('/travel/events', [AdminController::class, 'createEvent']);
+        $group->put('/travel/events/{id}', [AdminController::class, 'updateEvent']);
+        $group->delete('/travel/events/{id}', [AdminController::class, 'deleteEvent']);
         $group->get('/notifications', [AdminController::class, 'notifications']);
         $group->post('/notifications/send', [AdminController::class, 'sendNotification']);
     })->add($container->get(AdminMiddleware::class));

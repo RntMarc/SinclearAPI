@@ -158,6 +158,202 @@ components:
           type: string
           description: "Nur bei `admin.custom`: Nachrichtentext"
 
+    AdminCreateTripRequest:
+      type: object
+      required: [name, start, end]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Name der Reise
+          example: Sommerurlaub 2025
+        description:
+          type: string
+          nullable: true
+          description: Beschreibung der Reise
+        start:
+          type: string
+          format: date-time
+          description: Reisebeginn (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: "2025-07-01 10:00:00"
+        end:
+          type: string
+          format: date-time
+          description: Reiseende (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: "2025-07-15 18:00:00"
+        hastickets:
+          type: string
+          enum: ['0', '1']
+          default: '0'
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    AdminUpdateTripRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        hastickets:
+          type: string
+          enum: ['0', '1']
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          format: uri
+          nullable: true
+
+    AdminTripResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/TravelTrip'
+
+    AdminCreateEventRequest:
+      type: object
+      required: [name, start, end]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Name des Events
+          example: Konzert Berlin
+        description:
+          type: string
+          nullable: true
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            ID der zugehörigen Reise. Bei `null` oder leerem String
+            wird ein Standalone-Event angelegt.
+        start:
+          type: string
+          format: date-time
+          description: Event-Beginn (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: "2025-07-10 14:00:00"
+        end:
+          type: string
+          format: date-time
+          description: Event-Ende (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: "2025-07-10 18:00:00"
+        hastickets:
+          type: string
+          enum: ['0', '1']
+          default: '0'
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          format: uri
+          nullable: true
+        url:
+          type: string
+          format: uri
+          nullable: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+        organizer:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: float
+          nullable: true
+        longitude:
+          type: number
+          format: float
+          nullable: true
+        OSMID:
+          type: integer
+          nullable: true
+
+    AdminUpdateEventRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+          nullable: true
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        hastickets:
+          type: string
+          enum: ['0', '1']
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          format: uri
+          nullable: true
+        url:
+          type: string
+          format: uri
+          nullable: true
+        image:
+          type: string
+          format: uri
+          nullable: true
+        organizer:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: float
+          nullable: true
+        longitude:
+          type: number
+          format: float
+          nullable: true
+        OSMID:
+          type: integer
+          nullable: true
+
+    AdminEventResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/TravelEvent'
+
     RefreshRequest:
       type: object
       required: [refresh_token]
@@ -4754,7 +4950,8 @@ paths:
     get:
       summary: Admin-Reisen & Events
       description: >
-        Gibt die HTML-Seite für Reisen & Events zurück (Platzhalter).
+        Gibt die HTML-Seite für Reisen & Events zurück mit allen
+        Reisen und Events in Tabellenansicht.
       tags: [Admin]
       responses:
         '200':
@@ -4769,6 +4966,250 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips:
+    post:
+      summary: Admin-Reise anlegen
+      description: >
+        Legt eine neue Reise an.
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateTripRequest'
+      responses:
+        '201':
+          description: Reise angelegt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTripResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}:
+    put:
+      summary: Admin-Reise bearbeiten
+      description: >
+        Aktualisiert eine vorhandene Reise.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateTripRequest'
+      responses:
+        '200':
+          description: Reise aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTripResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Admin-Reise löschen
+      description: >
+        Löscht eine Reise und alle zugehörigen Daten.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Reise gelöscht (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events:
+    post:
+      summary: Admin-Event anlegen
+      description: >
+        Legt ein neues Event an (Reise-Event oder Standalone-Event).
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateEventRequest'
+      responses:
+        '201':
+          description: Event angelegt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEventResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}:
+    put:
+      summary: Admin-Event bearbeiten
+      description: >
+        Aktualisiert ein vorhandenes Event.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateEventRequest'
+      responses:
+        '200':
+          description: Event aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEventResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Admin-Event löschen
+      description: >
+        Löscht ein Event und alle zugehörigen Daten.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Event gelöscht (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
           content:
             application/json:
               schema:
@@ -7933,6 +8374,69 @@ paths:
         '404':
           description: Session nicht gefunden oder abgelaufen
 
+  /location-sharing/log/traccar/{token}/{name}:
+    post:
+      summary: Standort via Traccar (POST) übermitteln
+      description: >
+        Unauthentifizierter Endpunkt für Traccar-Client (POST-Modus).
+        Koordinaten werden aus Query-Parametern oder JSON-Body gelesen.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: accuracy
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat:
+                  type: number
+                  format: double
+                lon:
+                  type: number
+                  format: double
+                accuracy:
+                  type: number
+                  format: double
+                timestamp:
+                  type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
   /location-sharing/log/traccar/{token}:
     get:
       summary: Standort via Traccar übermitteln (ohne Name)
@@ -7968,6 +8472,65 @@ paths:
           in: query
           schema:
             type: integer
+      responses:
+        '204':
+          description: Erfolgreich gespeichert
+        '400':
+          description: Ungültiger Token oder fehlende Parameter
+        '404':
+          description: Session nicht gefunden oder abgelaufen
+
+  /location-sharing/log/traccar/{token}:
+    post:
+      summary: Standort via Traccar (POST) übermitteln (ohne Name)
+      description: >
+        Unauthentifizierter Endpunkt für Traccar-Client (POST-Modus).
+        Der optionale {name}-Pfadparameter wird weggelassen.
+        Koordinaten werden aus Query-Parametern oder JSON-Body gelesen.
+      tags: [LocationSharing]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{32}$'
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: accuracy
+          in: query
+          schema:
+            type: number
+            format: double
+        - name: timestamp
+          in: query
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lat:
+                  type: number
+                  format: double
+                lon:
+                  type: number
+                  format: double
+                accuracy:
+                  type: number
+                  format: double
+                timestamp:
+                  type: integer
       responses:
         '204':
           description: Erfolgreich gespeichert
