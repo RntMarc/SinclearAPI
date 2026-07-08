@@ -153,16 +153,16 @@ return function (App $app): void {
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/location-sharing/log', function (RouteCollectorProxy $group) {
-        $group->get('/osmand/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleOsmAnd']);
-        $group->get('/gpslogger/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleGpsLogger']);
-        $group->post('/owntracks/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleOwntracks']);
-        $group->get('/ulogger/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleUlogger']);
-        $group->get('/traccar/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleTraccar']);
-        $group->get('/opengts/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleOpenGTS']);
-        $group->post('/overland/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleOverland']);
-        $group->get('/locusmap/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleLocusMap']);
-        $group->get('/get/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleGenericGet']);
-        $group->post('/post/{token}/{name:.+}', [LocationSharingIngressController::class, 'handleGenericPost']);
+        $group->get('/osmand/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOsmAnd']);
+        $group->get('/gpslogger/{token}[/{name}]', [LocationSharingIngressController::class, 'handleGpsLogger']);
+        $group->post('/owntracks/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOwntracks']);
+        $group->get('/ulogger/{token}[/{name}]', [LocationSharingIngressController::class, 'handleUlogger']);
+        $group->get('/traccar/{token}[/{name}]', [LocationSharingIngressController::class, 'handleTraccar']);
+        $group->get('/opengts/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOpenGTS']);
+        $group->post('/overland/{token}[/{name}]', [LocationSharingIngressController::class, 'handleOverland']);
+        $group->get('/locusmap/{token}[/{name}]', [LocationSharingIngressController::class, 'handleLocusMap']);
+        $group->get('/get/{token}[/{name}]', [LocationSharingIngressController::class, 'handleGenericGet']);
+        $group->post('/post/{token}[/{name}]', [LocationSharingIngressController::class, 'handleGenericPost']);
     });
 
     $app->group('/notifications', function (RouteCollectorProxy $group) {

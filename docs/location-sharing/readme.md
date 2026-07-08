@@ -179,16 +179,16 @@ Statt der direkten Nutzung der Flutter-App können Nutzer etablierte Tracking-Ap
 
 | App | URL-Muster | Methode | Parameter |
 |-----|-----------|---------|-----------|
-| **OsmAnd** | `/log/osmand/{token}/{name}?lat={0}&lon={1}&acc={3}&timestamp={2}` | GET | `{0}=lat, {1}=lon, {2}=timestamp, {3}=accuracy, {4}=altitude, {5}=speed, {6}=bearing` |
-| **GpsLogger** | `/log/gpslogger/{token}/{name}?lat=%LAT&lon=%LON&acc=%ACC&timestamp=%TIMESTAMP` | GET | `%LAT, %LON, %ALT, %ACC, %SPD, %DIR, %TIMESTAMP, %BAT, %SAT` |
-| **Owntracks** | `/log/owntracks/{token}/{name}` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "ts":...}` |
-| **Ulogger** | `/log/ulogger/{token}/{name}?lat=...&lon=...&time=...` | GET | `lat, lon, time` |
-| **Traccar** | `/log/traccar/{token}/{name}?lat=...&lon=...&accuracy=...&timestamp=...` | GET | `lat, lon, accuracy, timestamp, altitude, speed, bearing` |
-| **OpenGTS** | `/log/opengts/{token}/{name}?lat=...&lon=...&gpsAccuracy=...&time=...` | GET | `lat, lon, gpsAccuracy, time, speed, bearing` |
-| **Overland** | `/log/overland/{token}/{name}` | POST | GeoJSON: `{"geometry":{"coordinates":[lon,lat]},"properties":{"timestamp":...,"horizontal_accuracy":...}}` |
-| **Locus Maps** | `/log/locusmap/{token}/{name}?lat=...&lon=...&acc=...&time=...` | GET | `lat, lon, acc, time, alt, speed, bearing` |
-| **HTTP GET** | `/log/get/{token}/{name}?lat=...&lon=...&acc=...&timestamp=...` | GET | `lat, lon, alt, acc, timestamp, speed, bearing, bat, sat` |
-| **HTTP POST** | `/log/post/{token}/{name}` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "timestamp":...}` |
+| **OsmAnd** | `/log/osmand/{token}[/{name}]?lat={0}&lon={1}&acc={3}&timestamp={2}` | GET | `{0}=lat, {1}=lon, {2}=timestamp, {3}=accuracy, {4}=altitude, {5}=speed, {6}=bearing` |
+| **GpsLogger** | `/log/gpslogger/{token}[/{name}]?lat=%LAT&lon=%LON&acc=%ACC&timestamp=%TIMESTAMP` | GET | `%LAT, %LON, %ALT, %ACC, %SPD, %DIR, %TIMESTAMP, %BAT, %SAT` |
+| **Owntracks** | `/log/owntracks/{token}[/{name}]` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "ts":...}` |
+| **Ulogger** | `/log/ulogger/{token}[/{name}]?lat=...&lon=...&time=...` | GET | `lat, lon, time` |
+| **Traccar** | `/log/traccar/{token}[/{name}]?lat=...&lon=...&accuracy=...&timestamp=...` | GET | `lat, lon, accuracy, timestamp, altitude, speed, bearing` |
+| **OpenGTS** | `/log/opengts/{token}[/{name}]?lat=...&lon=...&gpsAccuracy=...&time=...` | GET | `lat, lon, gpsAccuracy, time, speed, bearing` |
+| **Overland** | `/log/overland/{token}[/{name}]` | POST | GeoJSON: `{"geometry":{"coordinates":[lon,lat]},"properties":{"timestamp":...,"horizontal_accuracy":...}}` |
+| **Locus Maps** | `/log/locusmap/{token}[/{name}]?lat=...&lon=...&acc=...&time=...` | GET | `lat, lon, acc, time, alt, speed, bearing` |
+| **HTTP GET** | `/log/get/{token}[/{name}]?lat=...&lon=...&acc=...&timestamp=...` | GET | `lat, lon, alt, acc, timestamp, speed, bearing, bat, sat` |
+| **HTTP POST** | `/log/post/{token}[/{name}]` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "timestamp":...}` |
 
 ### Session-Token
 
@@ -196,9 +196,15 @@ Jede Session erhält ein einzigartiges 32-Zeichen-hex Token (128 Bit). Dieses To
 
 **Beispiel-Token:** `a1b2c3d4e5f678901234567890abcdef`
 
-### Name-Parameter
+### Name-Parameter (optional)
 
-Der `{name}`-Pfadparameter ist ein beliebiger alphanumerischer Name (a-zA-Z0-9_-), den der Nutzer in der Tracking-App eingibt. Er dient nur zur Anzeige und wird nicht ausgewertet.
+Der `{name}`-Pfadparameter ist optional und kann weggelassen werden. Er ist ein beliebiger alphanumerischer Name (a-zA-Z0-9_-), den der Nutzer in der Tracking-App eingibt. Er dient nur zur Anzeige und wird nicht ausgewertet.
+
+**Beispiele:**
+- Mit Name: `https://api.sinclear.de/api/v2/location-sharing/log/owntracks/TOKEN/mein-handy`
+- Ohne Name: `https://api.sinclear.de/api/v2/location-sharing/log/owntracks/TOKEN`
+
+**Hinweis:** Viele Clients (z.B. Owntracks, Traccar) unterstützen standardmäßig keinen Namen in der URL. Die API akzeptiert beide Varianten.
 
 ### Zeitstempel
 
