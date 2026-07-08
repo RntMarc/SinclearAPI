@@ -16,20 +16,29 @@ final readonly class LocationSharingSessionRepository
         $id = Uuid::uuid7()->toString();
         $token = bin2hex(random_bytes(16));
 
+        $hasDuration = isset($data['durationSeconds']) && $data['durationSeconds'] !== null;
+        $expiresAtSql = $hasDuration
+            ? 'DATE_ADD(NOW(), INTERVAL ? SECOND)'
+            : 'NULL';
+
         $stmt = $this->pdo->prepare(
-            'INSERT INTO LocationSharingSession
+            "INSERT INTO LocationSharingSession
                 (id, token, ownerId, sharingMode, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), DATE_ADD(NOW(), INTERVAL ? SECOND), NOW(), NOW())'
+             VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), $expiresAtSql, NOW(), NOW())"
         );
-        $stmt->execute([
+
+        $params = [
             $id,
             $token,
             $data['ownerId'],
             $data['sharingMode'] ?? 'location',
-            $data['durationSeconds'],
+            $data['durationSeconds'] ?? null,
             $data['frequencySeconds'],
-            $data['durationSeconds'],
-        ]);
+        ];
+        if ($hasDuration) {
+            $params[] = $data['durationSeconds'];
+        }
+        $stmt->execute($params);
         return $id;
     }
 
@@ -94,7 +103,7 @@ final readonly class LocationSharingSessionRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT * FROM LocationSharingSession
-              WHERE ownerId = ? AND isActive = 1 AND expiresAt > NOW()
+              WHERE ownerId = ? AND isActive = 1 AND (expiresAt IS NULL OR expiresAt > NOW())
              ORDER BY createdAt DESC'
         );
         $stmt->execute([$ownerId]);
@@ -108,7 +117,7 @@ final readonly class LocationSharingSessionRepository
              FROM LocationSharingSession s
              JOIN LocationSharingRecipient r ON r.sessionId = s.id
              JOIN User u ON u.id = s.ownerId
-              WHERE r.userId = ? AND s.isActive = 1 AND s.expiresAt > NOW()
+              WHERE r.userId = ? AND s.isActive = 1 AND (s.expiresAt IS NULL OR s.expiresAt > NOW())
              ORDER BY s.createdAt DESC'
         );
         $stmt->execute([$userId]);

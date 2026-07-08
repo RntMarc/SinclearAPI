@@ -24,7 +24,7 @@ final readonly class LocationSharingService
         $id = $this->sessionRepo->create([
             'ownerId' => $ownerId,
             'sharingMode' => $data['sharing_mode'] ?? 'location',
-            'durationSeconds' => $data['duration_seconds'],
+            'durationSeconds' => $data['duration_seconds'] ?? null,
             'frequencySeconds' => $data['frequency_seconds'] ?? 600,
         ]);
 
@@ -139,9 +139,11 @@ final readonly class LocationSharingService
 
         $utc = new \DateTimeZone('UTC');
         $now = new \DateTime('now', $utc);
-        $expiresAt = \DateTime::createFromFormat('Y-m-d H:i:s', $session['expiresAt'], $utc);
-        if ($expiresAt !== false && $expiresAt < $now) {
-            throw new \RuntimeException('session_expired');
+        if ($session['expiresAt'] !== null) {
+            $expiresAt = \DateTime::createFromFormat('Y-m-d H:i:s', $session['expiresAt'], $utc);
+            if ($expiresAt !== false && $expiresAt < $now) {
+                throw new \RuntimeException('session_expired');
+            }
         }
 
         $recordedAtFormatted = $recordedAt;
@@ -206,7 +208,7 @@ final readonly class LocationSharingService
             'token' => $session['token'],
             'ownerId' => $session['ownerId'],
             'sharingMode' => $session['sharingMode'],
-            'durationSeconds' => (int) $session['durationSeconds'],
+            'durationSeconds' => $session['durationSeconds'] !== null ? (int) $session['durationSeconds'] : null,
             'frequencySeconds' => (int) $session['frequencySeconds'],
             'isActive' => (bool) $session['isActive'],
             'startedAt' => $session['startedAt'],

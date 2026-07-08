@@ -68,13 +68,12 @@ final readonly class LocationSharingController
             }
         }
 
-        if (!isset($body['duration_seconds']) || !is_int($body['duration_seconds'])) {
-            return ResponseFactory::json(['error' => 'duration_seconds_required'], 400, $response);
-        }
-
-        $duration = $body['duration_seconds'];
-        if ($duration < 300 || $duration > 86400) {
-            return ResponseFactory::json(['error' => 'duration_seconds_out_of_range'], 400, $response);
+        $duration = null;
+        if (isset($body['duration_seconds'])) {
+            if (!is_int($body['duration_seconds']) || $body['duration_seconds'] < 300 || $body['duration_seconds'] > 86400) {
+                return ResponseFactory::json(['error' => 'duration_seconds_out_of_range'], 400, $response);
+            }
+            $duration = $body['duration_seconds'];
         }
 
         $frequency = $body['frequency_seconds'] ?? 600;

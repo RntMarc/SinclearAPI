@@ -2601,7 +2601,7 @@ components:
 
     LocationSharingSession:
       type: object
-      required: [id, token, ownerId, sharingMode, durationSeconds, frequencySeconds, isActive, startedAt, expiresAt, createdAt, updatedAt]
+      required: [id, token, ownerId, sharingMode, frequencySeconds, isActive, startedAt, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -2622,7 +2622,8 @@ components:
             - `route`: Standort + Strecke (alle Standpunkte werden gespeichert)
         durationSeconds:
           type: integer
-          description: Dauer der Session in Sekunden (300–86400)
+          nullable: true
+          description: Dauer in Sekunden (300–86400). `null` = unbegrenzt (wird nach 7 Tagen ohne Standort gelöscht)
         frequencySeconds:
           type: integer
           description: Aktualisierungsfrequenz in Sekunden (300–1200, Default 600)
@@ -2635,7 +2636,8 @@ components:
         expiresAt:
           type: string
           format: date-time
-          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`
+          nullable: true
+          description: UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. `null` = unbegrenzt gültig
         createdAt:
           type: string
           format: date-time
@@ -2731,7 +2733,7 @@ components:
 
     LocationSharingCreateRequest:
       type: object
-      required: [recipient_ids, duration_seconds]
+      required: [recipient_ids]
       properties:
         recipient_ids:
           type: array
@@ -2745,7 +2747,7 @@ components:
           type: integer
           minimum: 300
           maximum: 86400
-          description: Dauer in Sekunden (5 Min – 24 h)
+          description: Dauer in Sekunden (5 Min – 24 h). Optional – wenn nicht gesetzt, läuft die Session unbegrenzt (wird nach 7 Tagen ohne Standort gelöscht)
         frequency_seconds:
           type: integer
           minimum: 300

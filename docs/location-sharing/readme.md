@@ -35,7 +35,7 @@ POST /api/v2/location-sharing/sessions
 
 **Validierung:**
 - `recipient_ids`: Array, 1–50 Einträge, gültige UUIDs
-- `duration_seconds`: 300–86400 (5 Min – 24 h)
+- `duration_seconds`: Optional, 300–86400 (5 Min – 24 h). Wenn nicht gesetzt, läuft die Session unbegrenzt (wird nach 7 Tagen ohne Standort gelöscht)
 - `frequency_seconds`: 300–1200 (5–20 Min), Default 600
 - `sharing_mode`: `location` (Default) oder `route`
 
