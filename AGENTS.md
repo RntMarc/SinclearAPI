@@ -16,6 +16,17 @@ After every change to the API (routes, controllers, DTOs, or ResourceRegistry), 
 1. Update the relevant documentation files in `docs/` to reflect the changes.
 2. Ensure that all flows, endpoints, and configuration are accurately documented.
 
+## Cron-Jobs / Geplante Aufgaben
+Das Projekt verwendet eine zentrale `bin/cron.php` als Taktgeber. Tasks werden in `src/Services/Cron/Tasks/` als Klassen implementiert und in `bin/cron.php` registriert.
+
+Die Datei `docs/CRON.md` enthält eine vollständige Übersicht aller Cron-Tasks und ihrer Intervalle.
+
+**Requirement:**
+Wenn ein bestehender Cron-Task verändert, ein neuer hinzugefügt oder einer gelöscht wird, MUSS die Datei `docs/CRON.md` aktualisiert werden:
+1. Tabelle der Übersicht aktualisieren (Task-Name, Intervall, Beschreibung).
+2. Details des betroffenen Cron-Tasks anpassen oder neuen Eintrag ergänzen.
+3. Sicherstellen, dass der Task in `bin/cron.php` registriert ist.
+
 ## Security and File Access
 To ensure that secrets inside the .env file or log files cannot be read by anyone, a `.htaccess` is present to secure the API.
 

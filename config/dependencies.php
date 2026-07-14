@@ -237,6 +237,8 @@ return [
     PublicTransportService::class => autowire(),
     PublicTransportController::class => autowire(),
 
+    \Sinclear\Api\Services\Cron\CronScheduler::class => autowire(),
+
     CalendarEventRepository::class => autowire(),
     CalendarEventService::class => autowire(),
     CalendarEventController::class => autowire(),
