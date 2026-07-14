@@ -28,7 +28,7 @@ final class CleanupOldLocationSharingTask implements CronTaskInterface
     {
         $pdo = $container->get(PDO::class);
 
-        $staleSessionQuery = 'SELECT id FROM LocationSharingSession WHERE (
+        $staleSessionQuery = 'SELECT s.id FROM LocationSharingSession s WHERE (
             SELECT COALESCE(MAX(l.recordedAt), s.createdAt)
             FROM LocationSharingLocation l WHERE l.sessionId = s.id
         ) < DATE_SUB(NOW(), INTERVAL 7 DAY)';
