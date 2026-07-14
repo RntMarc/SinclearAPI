@@ -928,6 +928,302 @@ components:
           items:
             $ref: '#/components/schemas/TravelParticipant'
 
+    PublicTransportStop:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Station-ID aus der DB-API (z.B. EVA-Nummer)
+          example: "8011113"
+        type:
+          type: string
+          example: stop
+        name:
+          type: string
+          example: Berlin Südkreuz
+        ril100:
+          type: string
+          nullable: true
+          example: BLS
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 52.47623
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 13.365863
+        weight:
+          type: number
+          format: double
+          nullable: true
+          example: 1212
+        products:
+          type: object
+          nullable: true
+          properties:
+            nationalExpress:
+              type: boolean
+            national:
+              type: boolean
+            regionalExp:
+              type: boolean
+            regional:
+              type: boolean
+            suburban:
+              type: boolean
+            bus:
+              type: boolean
+            ferry:
+              type: boolean
+            subway:
+              type: boolean
+            tram:
+              type: boolean
+            taxi:
+              type: boolean
+
+    PublicTransportStopListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTransportStop'
+
+    PublicTransportJourneyLeg:
+      type: object
+      properties:
+        origin:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        destination:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        departure:
+          type: string
+          nullable: true
+          description: Tatsächliche Abfahrt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        arrival:
+          type: string
+          nullable: true
+          description: Tatsächliche Ankunft (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        plannedDeparture:
+          type: string
+          nullable: true
+          description: Soll-Abfahrt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        plannedArrival:
+          type: string
+          nullable: true
+          description: Soll-Ankunft (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        departureDelay:
+          type: integer
+          nullable: true
+          description: Verspätung Abfahrt in Sekunden
+        arrivalDelay:
+          type: integer
+          nullable: true
+          description: Verspätung Ankunft in Sekunden
+        platform:
+          type: string
+          nullable: true
+          description: Aktuelles Gleis
+        plannedPlatform:
+          type: string
+          nullable: true
+          description: Soll-Gleis
+        walking:
+          type: boolean
+          description: Fußweg?
+        distance:
+          type: integer
+          nullable: true
+          description: Entfernung in Metern (nur Fußwege)
+        mode:
+          type: string
+          description: Verkehrsmittel
+          example: train
+        line:
+          type: object
+          nullable: true
+          properties:
+            name:
+              type: string
+              example: ICE 123
+            product:
+              type: string
+              example: nationalExpress
+        tripId:
+          type: string
+          nullable: true
+          description: Trip-ID aus der DB-API (für Refresh)
+        cancelled:
+          type: boolean
+
+    PublicTransportJourneySearchResult:
+      type: object
+      properties:
+        type:
+          type: string
+          example: journey
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTransportJourneyLeg'
+        transfers:
+          type: integer
+          description: Anzahl Umstiege
+
+    PublicTransportJourneySearchResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTransportJourneySearchResult'
+
+    PublicTransportSavedLeg:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        journeyId:
+          type: string
+          format: uuid
+        legIndex:
+          type: integer
+        mode:
+          type: string
+        lineName:
+          type: string
+          nullable: true
+        lineProduct:
+          type: string
+          nullable: true
+        originStopId:
+          type: string
+        destinationStopId:
+          type: string
+        originStopName:
+          type: string
+        destinationStopName:
+          type: string
+        dbTripId:
+          type: string
+          nullable: true
+        plannedDeparture:
+          type: string
+          description: Soll-Abfahrt (UTC)
+        plannedArrival:
+          type: string
+          description: Soll-Ankunft (UTC)
+        actualDeparture:
+          type: string
+          nullable: true
+          description: Ist-Abfahrt (UTC)
+        actualArrival:
+          type: string
+          nullable: true
+          description: Ist-Ankunft (UTC)
+        departureDelay:
+          type: integer
+          nullable: true
+        arrivalDelay:
+          type: integer
+          nullable: true
+        departurePlatform:
+          type: string
+          nullable: true
+        arrivalPlatform:
+          type: string
+          nullable: true
+        cancelled:
+          type: boolean
+        status:
+          type: string
+          enum: [planned, delayed, cancelled, in_transit, arrived]
+
+    PublicTransportSavedJourney:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Verknüpfte TravelTrip-ID (optional)
+        creatorId:
+          type: string
+          format: uuid
+        chosenAt:
+          type: string
+          description: Zeitpunkt der Auswahl (UTC)
+        createdAt:
+          type: string
+          description: Erstellungszeitpunkt (UTC)
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTransportSavedLeg'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserBrief'
+
+    PublicTransportSavedJourneyListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTransportSavedJourney'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PublicTransportSaveJourneyRequest:
+      type: object
+      required: [journeyData]
+      properties:
+        tripId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Optional verknüpfte TravelTrip-ID
+        journeyData:
+          type: object
+          description: Vollständige Journey-Daten aus der Suche
+        participantIds:
+          type: array
+          items:
+            type: string
+          description: optionale weitere Teilnehmer-IDs
+
+    PublicTransportRefreshResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            updated:
+              type: integer
+              description: Anzahl aktualisierter Fahrten
+
     UserBrief:
       type: object
       properties:
@@ -5417,11 +5713,391 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Reise oder Benutzer nicht gefunden
+          description: Reise nicht gefunden
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /public-transport/stations:
+    get:
+      summary: Haltestellen suchen (Autocomplete)
+      description: >
+        Sucht nach Haltestellen über den lokalen Cache und ggf. die DB-API.
+        Unterstützt Fuzzy-Suche.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Suchbegriff (min. 2 Zeichen)
+          example: Berlin Hbf
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 20
+          description: Max. Ergebnisse
+      responses:
+        '200':
+          description: Liste gefundener Haltestellen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTransportStopListResponse'
+        '400':
+          description: query-Parameter fehlt
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/stations/refresh:
+    post:
+      summary: Stationen-Cache aktualisieren
+      description: >
+        Lädt alle DB-Stationen aus dem db-stations Dataset und aktualisiert den
+        lokalen Cache. Wird typischerweise per Cron-Job (max. täglich) ausgeführt.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Anzahl aktualisierter Stationen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: integer
+                        description: Anzahl aktualisierter Stationen
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/journeys:
+    get:
+      summary: Verbindungen suchen (live von DB-API)
+      description: >
+        Sucht Verbindungen von A nach B über die DB-API (v6.db.transport.rest).
+        Kein Caching – jede Anfrage geht live an die DB-API.
+        Zeitangaben im UTC-Format `YYYY-MM-DD HH:MM:SS`.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Start-Station-ID
+          example: "8000105"
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Ziel-Station-ID
+          example: "8000261"
+        - name: departure
+          in: query
+          schema:
+            type: string
+          description: Abfahrtszeit (UTC), Format `YYYY-MM-DD HH:MM:SS` (Default: jetzt)
+          example: "2026-07-14 14:30:00"
+        - name: results
+          in: query
+          schema:
+            type: integer
+            default: 5
+            maximum: 10
+          description: Max. Anzahl Ergebnisse
+      responses:
+        '200':
+          description: Gefundene Verbindungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTransportJourneySearchResponse'
+        '400':
+          description: from oder to fehlt
+        '401':
+          description: Nicht autorisiert
+    post:
+      summary: Fahrt speichern (aus Suchergebnis ausgewählt)
+      description: >
+        Speichert eine ausgewählte Verbindung in der Datenbank.
+        Der speichernde Nutzer wird automatisch als Fahrgast hinzugefügt.
+        Optional kann eine Reise (TravelTrip) verknüpft und weitere
+        Teilnehmer angegeben werden.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicTransportSaveJourneyRequest'
+      responses:
+        '201':
+          description: Fahrt gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTransportSavedJourney'
+        '400':
+          description: journeyData fehlt oder ungültig
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Zugriff auf angegebene TravelTrip
+
+  /public-transport/journeys/list:
+    get:
+      summary: Eigene Fahrten auflisten
+      description: >
+        Listet alle Fahrten des authentifizierten Nutzers auf.
+        Optional nach TravelTrip filtern.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tripId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Nur Fahrten zu einer bestimmten Reise
+        - name: includeLegs
+          in: query
+          schema:
+            type: boolean
+            default: true
+          description: Legs direkt mitsenden (false = nur IDs)
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der Fahrten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTransportSavedJourneyListResponse'
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/journeys/refresh:
+    post:
+      summary: Batch-Update aller veralteten Fahrten
+      description: >
+        Aktualisiert alle Fahrten, deren letzte Aktualisierung länger als
+        maxAgeMinutes zurückliegt. Designed für Cron-Job-Aufruf.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                maxAgeMinutes:
+                  type: integer
+                  default: 15
+                  description: Maximales Alter der letzten Aktualisierung in Minuten
+      responses:
+        '200':
+          description: Anzahl aktualisierter Fahrten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicTransportRefreshResponse'
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/journeys/{id}:
+    get:
+      summary: Fahrt-Details abrufen
+      description: >
+        Gibt die vollständigen Details einer Fahrt zurück, einschließlich
+        aller Legs und Teilnehmer.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Fahrt-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTransportSavedJourney'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer dieser Fahrt
+        '404':
+          description: Fahrt nicht gefunden
+    delete:
+      summary: Fahrt löschen
+      description: >
+        Löscht eine Fahrt. Nur der Ersteller kann die Fahrt löschen.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Nicht der Ersteller
+        '404':
+          description: Fahrt nicht gefunden
+
+  /public-transport/journeys/{id}/refresh:
+    post:
+      summary: Einzelfahrt aktualisieren (Echtzeit)
+      description: >
+        Ruft für alle Legs der Fahrt die aktuellen Daten von der DB-API ab
+        (Verspätungen, Ausfälle, Gleisänderungen).
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Aktualisierte Fahrt-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PublicTransportSavedJourney'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer dieser Fahrt
+        '404':
+          description: Fahrt nicht gefunden
+
+  /public-transport/journeys/{id}/participants:
+    post:
+      summary: Teilnehmer hinzufügen
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                  description: User-ID des hinzuzufügenden Teilnehmers
+      responses:
+        '200':
+          description: Aktualisierte Teilnehmerliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserBrief'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer dieser Fahrt
+    delete:
+      summary: Teilnehmer entfernen
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: User-ID des zu entfernenden Teilnehmers
+      responses:
+        '200':
+          description: Aktualisierte Teilnehmerliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserBrief'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer dieser Fahrt
         '409':
           description: Bereits Teilnehmer
           content:

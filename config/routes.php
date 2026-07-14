@@ -14,6 +14,7 @@ use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
+use Sinclear\Api\Controllers\PublicTransportController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AdminMiddleware;
@@ -223,6 +224,21 @@ return function (App $app): void {
         $group->post('/{id}/posts/{postId}/comments', [ForumController::class, 'createComment']);
         $group->put('/{id}/posts/{postId}/comments/{commentId}', [ForumController::class, 'updateComment']);
         $group->delete('/{id}/posts/{postId}/comments/{commentId}', [ForumController::class, 'deleteComment']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    $app->group('/public-transport', function (RouteCollectorProxy $group) {
+        $group->get('/stations', [PublicTransportController::class, 'searchStations']);
+        $group->post('/stations/refresh', [PublicTransportController::class, 'refreshStations']);
+
+        $group->get('/journeys', [PublicTransportController::class, 'findJourneys']);
+        $group->post('/journeys', [PublicTransportController::class, 'saveJourney']);
+        $group->get('/journeys/list', [PublicTransportController::class, 'listJourneys']);
+        $group->post('/journeys/refresh', [PublicTransportController::class, 'refreshAllJourneys']);
+        $group->get('/journeys/{id}', [PublicTransportController::class, 'getJourney']);
+        $group->delete('/journeys/{id}', [PublicTransportController::class, 'deleteJourney']);
+        $group->post('/journeys/{id}/refresh', [PublicTransportController::class, 'refreshJourney']);
+        $group->post('/journeys/{id}/participants', [PublicTransportController::class, 'addParticipant']);
+        $group->delete('/journeys/{id}/participants/{userId}', [PublicTransportController::class, 'removeParticipant']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)
