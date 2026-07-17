@@ -229,19 +229,17 @@ final readonly class PublicTransportService
         $count = 0;
 
         try {
-            $response = $this->http->get('https://raw.githubusercontent.com/derhuerst/db-stations/refs/heads/main/data/stations.json', [
-                'timeout' => 30,
+            $response = $this->http->get('https://unpkg.com/db-stations@5.0.2/data.ndjson', [
+                'timeout' => 60,
+                'stream' => true,
             ]);
 
-            $stations = json_decode((string) $response->getBody(), true);
-            if (!is_array($stations)) {
-                return 0;
-            }
-
-            $this->stopRepo->deleteAll();
+            $body = $response->getBody();
             $now = date('Y-m-d H:i:s.000');
 
-            foreach ($stations as $s) {
+            $this->stopRepo->deleteAll();
+
+            foreach ($this->readNdjson($body) as $s) {
                 $id = $s['id'] ?? null;
                 if ($id === null) {
                     continue;
@@ -263,6 +261,32 @@ final readonly class PublicTransportService
         }
 
         return $count;
+    }
+
+    private function readNdjson($stream): iterable
+    {
+        $buffer = '';
+        while (!$stream->eof()) {
+            $buffer .= $stream->read(8192);
+            $lines = explode("\n", $buffer);
+            $buffer = array_pop($lines);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '') {
+                    continue;
+                }
+                $decoded = json_decode($line, true);
+                if (is_array($decoded)) {
+                    yield $decoded;
+                }
+            }
+        }
+        if (trim($buffer) !== '') {
+            $decoded = json_decode(trim($buffer), true);
+            if (is_array($decoded)) {
+                yield $decoded;
+            }
+        }
     }
 
     public function refreshStaleJourneys(int $maxAgeMinutes = 15): int
