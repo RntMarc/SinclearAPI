@@ -3,25 +3,17 @@
 
 declare(strict_types=1);
 
-namespace Sinclear\Api\Cli;
-
-use DI\ContainerBuilder;
-use Dotenv\Dotenv;
-use Sinclear\Api\Services\PublicTransportService;
-
 require_once __DIR__ . '/../vendor/autoload.php';
 
-$rootDir = dirname(__DIR__);
-
-$dotenv = Dotenv\Dotenv::createImmutable($rootDir);
+$dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__));
 $dotenv->safeLoad();
 
-$containerBuilder = new ContainerBuilder();
-$containerBuilder->addDefinitions($rootDir . '/config/dependencies.php');
+$containerBuilder = new DI\ContainerBuilder();
+$containerBuilder->addDefinitions(dirname(__DIR__) . '/config/dependencies.php');
 
 $container = $containerBuilder->build();
 
-$service = $container->get(PublicTransportService::class);
+$service = $container->get(Sinclear\Api\Services\PublicTransportService::class);
 
 echo "Lade Stationen von db-stations...\n";
 $count = $service->refreshAllStations();
