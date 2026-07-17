@@ -84,14 +84,36 @@ final readonly class PublicTransportService
         ?string $departure,
         int $results = 5,
     ): array {
-        $query = [
-            'fromPlace' => $fromId,
-            'toPlace' => $toId,
-            'numItineraries' => $results,
-        ];
+        $timeParam = $departure !== null
+            ? str_replace(' ', 'T', $departure) . 'Z'
+            : null;
 
-        if ($departure !== null) {
-            $query['time'] = str_replace(' ', 'T', $departure) . 'Z';
+        $result = $this->doPlan($fromId, $toId, $timeParam, $results);
+        if ($result !== null) {
+            return $result;
+        }
+
+        $resolvedFrom = $this->resolveTransitousPlace($fromId);
+        $resolvedTo = $this->resolveTransitousPlace($toId);
+        if ($resolvedFrom !== $fromId || $resolvedTo !== $toId) {
+            $result = $this->doPlan($resolvedFrom, $resolvedTo, $timeParam, $results);
+            if ($result !== null) {
+                return $result;
+            }
+        }
+
+        return ['data' => [], 'refreshToken' => null];
+    }
+
+    private function doPlan(string $from, string $to, ?string $time, int $numItineraries): ?array
+    {
+        $query = [
+            'fromPlace' => $from,
+            'toPlace' => $to,
+            'numItineraries' => $numItineraries,
+        ];
+        if ($time !== null) {
+            $query['time'] = $time;
         }
 
         $lastException = null;
@@ -128,7 +150,35 @@ final readonly class PublicTransportService
         }
 
         $this->logger->warning('Journey search failed: ' . $lastException->getMessage());
-        return ['data' => [], 'refreshToken' => null];
+        return null;
+    }
+
+    private function resolveTransitousPlace(string $placeId): string
+    {
+        $stop = $this->stopRepo->findById($placeId);
+        if ($stop !== null && $stop['latitude'] !== null && $stop['longitude'] !== null) {
+            return $stop['latitude'] . ',' . $stop['longitude'];
+        }
+
+        if ($stop !== null && !empty($stop['name'])) {
+            try {
+                $response = $this->http->get(self::API_BASE . '/api/v1/geocode', $this->apiOpts([
+                    'query' => [
+                        'text' => $stop['name'],
+                        'type' => 'STOP',
+                        'numResults' => 1,
+                    ],
+                ]));
+                $body = json_decode((string) $response->getBody(), true);
+                if (is_array($body) && isset($body[0]['id'])) {
+                    return (string) $body[0]['id'];
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('Transitous geocode fallback failed: ' . $e->getMessage());
+            }
+        }
+
+        return $placeId;
     }
 
     /** @return array{legs: list<array>}|null */
