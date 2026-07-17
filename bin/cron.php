@@ -8,8 +8,7 @@ use Sinclear\Api\Services\Cron\CronScheduler;
 use Sinclear\Api\Services\Cron\Tasks\CleanupExpiredOtpTokensTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupOldLocationSharingTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupOldNotificationsTask;
-use Sinclear\Api\Services\Cron\Tasks\RefreshPublicTransportJourneysTask;
-use Sinclear\Api\Services\Cron\Tasks\RefreshPublicTransportStationsTask;
+
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -33,8 +32,7 @@ $scheduler = $container->get(CronScheduler::class);
 $scheduler->register(new CleanupExpiredOtpTokensTask());
 $scheduler->register(new CleanupOldNotificationsTask());
 $scheduler->register(new CleanupOldLocationSharingTask());
-$scheduler->register(new RefreshPublicTransportStationsTask());
-$scheduler->register(new RefreshPublicTransportJourneysTask());
+
 
 // Ausstehende Tasks ausführen
 $results = $scheduler->runDueTasks($container);

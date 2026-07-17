@@ -29,8 +29,6 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 1 | `cleanup_otp_tokens` | 1 Stunde | Löscht abgelaufene und benutzte OTP-Codes |
 | 2 | `cleanup_notifications` | 24 Stunden | Löscht Notifications älter als 30 Tage |
 | 3 | `cleanup_location_sharing` | 24 Stunden | Bereinigt alte Location-Sharing-Sessions |
-| 4 | `pt_stations_refresh` | 24 Stunden | Aktualisiert den lokalen Stationen-Cache |
-| 5 | `pt_journeys_refresh` | 15 Minuten | Aktualisiert Verspätungen/Ausfälle für offene Fahrten |
 
 ## Details
 
@@ -48,17 +46,6 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Task-Name:** `cleanup_location_sharing`
 - **Intervall:** 86400 Sekunden (24 Stunden)
 - **Aktion:** Löscht Sessions ohne Location-Updates seit >7 Tagen (mit zugehörigen Locations und Recipients)
-
-### Public Transport Stations Refresh
-- **Task-Name:** `pt_stations_refresh`
-- **Intervall:** 86400 Sekunden (24 Stunden)
-- **Aktion:** Lädt alle DB-Stationen aus `db-stations` GitHub-Repository und aktualisiert die `TravelStop`-Tabelle
-- **Dauer:** Je nach Datenmenge mehrere Minuten (1 Request/Sekunde für Rate-Limiting)
-
-### Public Transport Journeys Refresh
-- **Task-Name:** `pt_journeys_refresh`
-- **Intervall:** 900 Sekunden (15 Minuten)
-- **Aktion:** Aktualisiert alle Fahrten, deren `lastCheckedAt` älter als 15 Minuten ist und deren Status nicht `arrived` oder `cancelled` ist
 
 ## CronSchedule-Tabelle
 
