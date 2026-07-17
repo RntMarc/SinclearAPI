@@ -1,6 +1,6 @@
 # Public Transport Plan - Transitious Integration
 
-> **Status:** Entwurf
+> **Status:** Abgeschlossen (Grundlage der Implementation)
 > **Datum:** 2026-07-16
 > **API:** [Transitous](https://transitous.org/) (MOTIS 2 API)
 
@@ -354,26 +354,26 @@ Sinclear API (PHP 8.4, Slim 4)
 ### Phase 1: Planung & Vorbereitung
 - [x] Alte Implementation entfernen
 - [x] Transitious API recherchieren
-- [ ] plan.md erstellen (dieses Dokument)
+- [x] plan.md erstellen (dieses Dokument)
 
 ### Phase 2: Datenbank & Service
-- [ ] SQL-Migration: `PtStation`, `PtJourney`, `PtLeg`, `PtParticipant`
-- [ ] `PtStationRepository` – CRUD für Station-Cache
-- [ ] `PtJourneyRepository` – CRUD für Journey + Legs + Participants
-- [ ] `PtService` – Kommunikation mit Transitious API inkl. Mapping
+- [x] SQL-Migration: `PtStation`, `PtJourney`, `PtLeg`, `PtParticipant`
+- [x] `PtStationRepository` – CRUD für Station-Cache
+- [x] `PtJourneyRepository` – CRUD für Journey + Legs + Participants
+- [x] `PtService` – Kommunikation mit Transitious API inkl. Mapping
 
 ### Phase 3: Controller & Routes
-- [ ] `PtController` – Alle API-Endpunkte
-- [ ] Routen in `config/routes.php` registrieren
-- [ ] Dependency Wiring in `config/dependencies.php`
+- [x] `PtController` – Alle API-Endpunkte
+- [x] Routen in `config/routes.php` registrieren
+- [x] Dependency Wiring in `config/dependencies.php`
 
 ### Phase 4: Cron-Tasks
-- [ ] Optional: Stations-Cache-Refresh
+- [ ] Optional: Stations-Cache-Refresh (nicht implementiert, kann später ergänzt werden)
 
 ### Phase 5: Dokumentation
-- [ ] `docs/public-transport/readme.md` aktualisieren
-- [ ] `openapi.yaml` aktualisieren
-- [ ] `.htaccess` prüfen
+- [x] `docs/public-transport/readme.md` aktualisieren
+- [x] `openapi.yaml` aktualisieren
+- [x] `.htaccess` prüfen
 
 ## 8. Wichtige Hinweise
 
