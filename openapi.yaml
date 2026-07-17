@@ -5783,10 +5783,10 @@ paths:
 
   /public-transport/journeys:
     get:
-      summary: Verbindungen suchen (live von DB-API)
+      summary: Verbindungen suchen (live von Transitous/MOTIS)
       description: >
-        Sucht Verbindungen von A nach B über die DB-API (v6.db.transport.rest).
-        Kein Caching – jede Anfrage geht live an die DB-API.
+        Sucht Verbindungen von A nach B über die Transitous API (MOTIS 2.x, api.transitous.org).
+        Kein Caching – jede Anfrage geht live an die Transitous-API.
         Zeitangaben im UTC-Format `YYYY-MM-DD HH:MM:SS`.
       tags: [Public Transport]
       security:

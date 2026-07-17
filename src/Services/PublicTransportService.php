@@ -9,7 +9,8 @@ use Sinclear\Api\Repository\TravelStopRepository;
 
 final readonly class PublicTransportService
 {
-    private const API_BASE = 'https://v6.db.transport.rest';
+    private const API_BASE = 'https://api.transitous.org';
+    private const USER_AGENT = 'SinclearBeyond/1.0 (dev@sinclear.com)';
 
     public function __construct(
         private Client $http,
@@ -17,6 +18,13 @@ final readonly class PublicTransportService
         private TravelStopRepository $stopRepo,
         private LoggerInterface $logger,
     ) {}
+
+    private function apiOpts(array $overrides = []): array
+    {
+        return array_merge([
+            'headers' => ['User-Agent' => self::USER_AGENT],
+        ], $overrides);
+    }
 
     /** @return list<array> */
     public function searchStations(string $query, int $limit = 10): array
@@ -31,14 +39,13 @@ final readonly class PublicTransportService
         }
 
         try {
-            $response = $this->http->get(self::API_BASE . '/locations', [
+            $response = $this->http->get(self::API_BASE . '/api/v1/geocode', $this->apiOpts([
                 'query' => [
-                    'query' => $query,
-                    'poi' => 'false',
-                    'addresses' => 'false',
-                    'results' => $limit,
+                    'text' => $query,
+                    'type' => 'STOP',
+                    'numResults' => $limit,
                 ],
-            ]);
+            ]));
 
             $body = json_decode((string) $response->getBody(), true);
             if (!is_array($body)) {
@@ -48,16 +55,16 @@ final readonly class PublicTransportService
             $now = date('Y-m-d H:i:s.000');
             foreach ($body as $item) {
                 $id = $item['id'] ?? null;
-                if ($id === null || ($item['type'] ?? '') !== 'stop') {
+                if ($id === null || ($item['type'] ?? '') !== 'STOP') {
                     continue;
                 }
                 $this->stopRepo->upsert($id, [
                     'name' => $item['name'] ?? '',
-                    'ril100' => $item['ril100'] ?? null,
-                    'latitude' => $item['location']['latitude'] ?? null,
-                    'longitude' => $item['location']['longitude'] ?? null,
-                    'weight' => $item['weight'] ?? null,
-                    'products' => $item['products'] ?? null,
+                    'ril100' => null,
+                    'latitude' => $item['lat'] ?? null,
+                    'longitude' => $item['lon'] ?? null,
+                    'weight' => $item['importance'] ?? null,
+                    'products' => isset($item['modes']) ? json_encode($item['modes']) : null,
                     'lastUpdated' => $now,
                 ]);
             }
@@ -65,12 +72,12 @@ final readonly class PublicTransportService
             $local = $this->stopRepo->searchByNameFuzzy($query, $limit);
             return array_map(fn(array $s) => $this->mapStopFromDb($s), $local);
         } catch (\Throwable $e) {
-            $this->logger->warning('DB station search failed: ' . $e->getMessage());
-            throw new \RuntimeException('Stationen-Datenbank leer und DB API nicht erreichbar. Bitte zuerst Stationen aktualisieren via POST /api/v2/public-transport/stations/refresh');
+            $this->logger->warning('Station search failed: ' . $e->getMessage());
+            throw new \RuntimeException('Stationen-Datenbank leer und API nicht erreichbar. Bitte zuerst Stationen aktualisieren via POST /api/v2/public-transport/stations/refresh');
         }
     }
 
-    /** @return array{data: list<array>, refreshToken: ?string} */
+    /** @return array{data: list<array>, refreshToken: null} */
     public function findJourneys(
         string $fromId,
         string $toId,
@@ -78,53 +85,75 @@ final readonly class PublicTransportService
         int $results = 5,
     ): array {
         $query = [
-            'from' => $fromId,
-            'to' => $toId,
-            'results' => $results,
-            'stopovers' => 'false',
+            'fromPlace' => $fromId,
+            'toPlace' => $toId,
+            'numItineraries' => $results,
         ];
 
         if ($departure !== null) {
-            $query['departure'] = $departure . 'Z';
+            $query['time'] = str_replace(' ', 'T', $departure) . 'Z';
         }
 
-        try {
-            $response = $this->http->get(self::API_BASE . '/journeys', [
-                'query' => $query,
-            ]);
-
-            $body = json_decode((string) $response->getBody(), true);
-            if (!is_array($body) || !isset($body['journeys'])) {
-                return ['data' => [], 'refreshToken' => null];
+        $lastException = null;
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            if ($attempt > 0) {
+                usleep(500_000 * $attempt);
             }
+            try {
+                $response = $this->http->get(self::API_BASE . '/api/v6/plan', $this->apiOpts([
+                    'query' => $query,
+                ]));
 
-            $journeys = [];
-            foreach ($body['journeys'] as $j) {
-                $journeys[] = $this->mapJourneyFromApi($j);
+                $body = json_decode((string) $response->getBody(), true);
+                if (!is_array($body) || !isset($body['itineraries'])) {
+                    return ['data' => [], 'refreshToken' => null];
+                }
+
+                $journeys = [];
+                foreach ($body['itineraries'] as $j) {
+                    $journeys[] = $this->mapJourneyFromApi($j);
+                }
+
+                return [
+                    'data' => $journeys,
+                    'refreshToken' => null,
+                ];
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                if ($e instanceof \GuzzleHttp\Exception\ServerException) {
+                    continue;
+                }
+                break;
             }
-
-            return [
-                'data' => $journeys,
-                'refreshToken' => $body['refreshToken'] ?? null,
-            ];
-        } catch (\Throwable $e) {
-            $this->logger->warning('DB journey search failed: ' . $e->getMessage());
-            return ['data' => [], 'refreshToken' => null];
         }
+
+        $this->logger->warning('Journey search failed: ' . $lastException->getMessage());
+        return ['data' => [], 'refreshToken' => null];
     }
 
-    /** @return array|null */
+    /** @return array{legs: list<array>}|null */
     public function refreshTrip(string $dbTripId): ?array
     {
-        try {
-            $response = $this->http->get(self::API_BASE . '/trips/' . $dbTripId, [
-                'query' => ['stopovers' => 'true'],
-            ]);
-            return json_decode((string) $response->getBody(), true);
-        } catch (\Throwable $e) {
-            $this->logger->warning("DB trip refresh failed for $dbTripId: " . $e->getMessage());
-            return null;
+        $lastException = null;
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            if ($attempt > 0) {
+                usleep(500_000 * $attempt);
+            }
+            try {
+                $response = $this->http->get(self::API_BASE . '/api/v6/trip', $this->apiOpts([
+                    'query' => ['tripId' => $dbTripId],
+                ]));
+                return json_decode((string) $response->getBody(), true);
+            } catch (\Throwable $e) {
+                $lastException = $e;
+                if ($e instanceof \GuzzleHttp\Exception\ServerException) {
+                    continue;
+                }
+                break;
+            }
         }
+        $this->logger->warning("Trip refresh failed for $dbTripId: " . $lastException->getMessage());
+        return null;
     }
 
     public function saveJourneyFromApi(string $creatorId, ?string $tripId, array $journeyApiData, array $additionalParticipantIds = []): string
@@ -203,18 +232,44 @@ final readonly class PublicTransportService
             return $leg;
         }
 
-        $departure = $this->parseTime($tripData['departure'] ?? $tripData['plannedWhen'] ?? '');
-        $arrival = $this->parseTime($tripData['arrival'] ?? $tripData['plannedArrival'] ?? '');
+        $motisLeg = $tripData['legs'][0] ?? [];
+        $from = $motisLeg['from'] ?? [];
+        $to = $motisLeg['to'] ?? [];
+
+        $departure = $this->normalizeTime($from['departure'] ?? null);
+        $arrival = $this->normalizeTime($to['arrival'] ?? null);
+
+        $mapped = [
+            'departure' => $from['departure'] ?? null,
+            'plannedWhen' => $from['scheduledDeparture'] ?? null,
+            'plannedDeparture' => $from['scheduledDeparture'] ?? null,
+            'arrival' => $to['arrival'] ?? null,
+            'plannedArrival' => $to['scheduledArrival'] ?? null,
+            'departureDelay' => $this->calcDelay(
+                $from['scheduledDeparture'] ?? null,
+                $from['departure'] ?? null,
+                $motisLeg['realTime'] ?? false,
+            ),
+            'arrivalDelay' => $this->calcDelay(
+                $to['scheduledArrival'] ?? null,
+                $to['arrival'] ?? null,
+                $motisLeg['realTime'] ?? false,
+            ),
+            'platform' => $from['track'] ?? null,
+            'departurePlatform' => $from['track'] ?? null,
+            'arrivalPlatform' => $to['track'] ?? null,
+            'cancelled' => $motisLeg['cancelled'] ?? false,
+        ];
 
         $update = [
             'actualDeparture' => $departure,
             'actualArrival' => $arrival,
-            'departureDelay' => $tripData['departureDelay'] ?? $leg['departureDelay'],
-            'arrivalDelay' => $tripData['arrivalDelay'] ?? $leg['arrivalDelay'],
-            'departurePlatform' => $tripData['platform'] ?? $tripData['departurePlatform'] ?? $leg['departurePlatform'],
-            'arrivalPlatform' => $tripData['arrivalPlatform'] ?? $leg['arrivalPlatform'],
-            'cancelled' => $tripData['cancelled'] ?? $leg['cancelled'],
-            'status' => $this->deriveLegStatus($tripData),
+            'departureDelay' => $mapped['departureDelay'] ?? $leg['departureDelay'],
+            'arrivalDelay' => $mapped['arrivalDelay'] ?? $leg['arrivalDelay'],
+            'departurePlatform' => $mapped['departurePlatform'] ?? $leg['departurePlatform'],
+            'arrivalPlatform' => $mapped['arrivalPlatform'] ?? $leg['arrivalPlatform'],
+            'cancelled' => $mapped['cancelled'] ?? $leg['cancelled'],
+            'status' => $this->deriveLegStatus($mapped),
             'rawResponse' => $tripData,
             'lastCheckedAt' => date('Y-m-d H:i:s.000'),
         ];
@@ -307,7 +362,7 @@ final readonly class PublicTransportService
 
     private function ensureStopExists(array $stop): void
     {
-        $id = $stop['id'] ?? null;
+        $id = $stop['id'] ?? $stop['stopId'] ?? null;
         if ($id === null) {
             return;
         }
@@ -320,10 +375,10 @@ final readonly class PublicTransportService
         $this->stopRepo->upsert((string) $id, [
             'name' => $stop['name'] ?? '',
             'ril100' => null,
-            'latitude' => $stop['location']['latitude'] ?? null,
-            'longitude' => $stop['location']['longitude'] ?? null,
+            'latitude' => $stop['location']['latitude'] ?? $stop['lat'] ?? null,
+            'longitude' => $stop['location']['longitude'] ?? $stop['lon'] ?? null,
             'weight' => null,
-            'products' => $stop['products'] ?? null,
+            'products' => $stop['products'] ?? $stop['modes'] ?? null,
             'lastUpdated' => date('Y-m-d H:i:s.000'),
         ]);
     }
@@ -342,38 +397,56 @@ final readonly class PublicTransportService
         ];
     }
 
-    private function mapJourneyFromApi(array $j): array
+    private function mapJourneyFromApi(array $motisItinerary): array
     {
         $legs = [];
-        foreach ($j['legs'] ?? [] as $leg) {
-            $origin = $leg['origin'] ?? [];
-            $destination = $leg['destination'] ?? [];
-            $line = $leg['line'] ?? null;
-            $isWalking = ($leg['walking'] ?? false);
+        foreach ($motisItinerary['legs'] ?? [] as $leg) {
+            $from = $leg['from'] ?? [];
+            $to = $leg['to'] ?? [];
+            $mode = $leg['mode'] ?? 'RAIL';
+            $isWalking = $mode === 'WALK';
 
             $legs[] = [
                 'origin' => [
-                    'id' => (string) ($origin['id'] ?? ''),
-                    'name' => $origin['name'] ?? '',
+                    'id' => (string) ($from['stopId'] ?? ''),
+                    'name' => $from['name'] ?? '',
+                    'location' => [
+                        'latitude' => $from['lat'] ?? null,
+                        'longitude' => $from['lon'] ?? null,
+                    ],
+                    'products' => $from['modes'] ?? null,
                 ],
                 'destination' => [
-                    'id' => (string) ($destination['id'] ?? ''),
-                    'name' => $destination['name'] ?? '',
+                    'id' => (string) ($to['stopId'] ?? ''),
+                    'name' => $to['name'] ?? '',
+                    'location' => [
+                        'latitude' => $to['lat'] ?? null,
+                        'longitude' => $to['lon'] ?? null,
+                    ],
+                    'products' => $to['modes'] ?? null,
                 ],
-                'departure' => $this->normalizeTime($leg['departure'] ?? null),
-                'arrival' => $this->normalizeTime($leg['arrival'] ?? null),
-                'plannedDeparture' => $this->normalizeTime($leg['plannedWhen'] ?? null),
-                'plannedArrival' => $this->normalizeTime($leg['plannedArrival'] ?? null),
-                'departureDelay' => $leg['departureDelay'] ?? null,
-                'arrivalDelay' => $leg['arrivalDelay'] ?? null,
-                'platform' => $leg['platform'] ?? null,
-                'plannedPlatform' => $leg['plannedPlatform'] ?? null,
+                'departure' => $this->normalizeTime($from['departure'] ?? null),
+                'arrival' => $this->normalizeTime($to['arrival'] ?? null),
+                'plannedWhen' => $this->normalizeTime($from['scheduledDeparture'] ?? null),
+                'plannedArrival' => $this->normalizeTime($to['scheduledArrival'] ?? null),
+                'departureDelay' => $this->calcDelay(
+                    $from['scheduledDeparture'] ?? null,
+                    $from['departure'] ?? null,
+                    $leg['realTime'] ?? false,
+                ),
+                'arrivalDelay' => $this->calcDelay(
+                    $to['scheduledArrival'] ?? null,
+                    $to['arrival'] ?? null,
+                    $leg['realTime'] ?? false,
+                ),
+                'platform' => $from['track'] ?? null,
+                'plannedPlatform' => $from['scheduledTrack'] ?? null,
                 'walking' => $isWalking,
                 'distance' => $leg['distance'] ?? null,
-                'mode' => $isWalking ? 'walking' : ($line['product'] ?? 'train'),
-                'line' => $line !== null ? [
-                    'name' => $line['name'] ?? '',
-                    'product' => $line['product'] ?? '',
+                'mode' => $isWalking ? 'walking' : strtolower($mode),
+                'line' => isset($leg['routeShortName']) ? [
+                    'name' => $leg['routeShortName'],
+                    'product' => strtolower($mode),
                 ] : null,
                 'tripId' => $leg['tripId'] ?? null,
                 'cancelled' => $leg['cancelled'] ?? false,
@@ -383,7 +456,7 @@ final readonly class PublicTransportService
         return [
             'type' => 'journey',
             'legs' => $legs,
-            'transfers' => count(array_filter($legs, fn(array $l) => !($l['walking'] ?? false))) - 1,
+            'transfers' => max(0, $motisItinerary['transfers'] ?? 0),
         ];
     }
 
@@ -438,5 +511,18 @@ final readonly class PublicTransportService
             return null;
         }
         return $this->parseTime($iso);
+    }
+
+    private function calcDelay(?string $scheduled, ?string $actual, bool $realTime): ?int
+    {
+        if (!$realTime || $scheduled === null || $actual === null) {
+            return null;
+        }
+        $scheduledTs = strtotime($scheduled);
+        $actualTs = strtotime($actual);
+        if ($scheduledTs === false || $actualTs === false) {
+            return null;
+        }
+        return $actualTs - $scheduledTs;
     }
 }

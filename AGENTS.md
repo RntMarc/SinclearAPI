@@ -56,3 +56,15 @@ The API operates exclusively in UTC. This is a hard requirement that all impleme
 - Vermeidet Inkonsistenzen durch mehrfache Zeitzonen-Konvertierung
 - Hält die API einfach und deterministisch
 - Verschiebt die Zeitzonen-Logik dorthin, wo sie hingehört: auf das Client-Gerät des Nutzers
+
+## Transitous / Public Transport API
+Der Public-Transport-Service verwendet die Transitous-API (MOTIS 2.x, `api.transitous.org`).
+Die alte `v6.db.transport.rest` ist dauerhaft ausgefallen und wird nicht mehr verwendet.
+
+**Anforderungen:**
+1. Jeder HTTP-Request an Transitous MUSS einen `User-Agent`-Header enthalten:
+   `SinclearBeyond/1.0 (dev@sinclear.com)`
+2. Der `User-Agent` identifiziert unsere App gegenüber Transitous und ist Voraussetzung für die Nutzung.
+3. Der `time`-Parameter an `/api/v6/plan` MUSS mit `Z`-Suffix gesendet werden (ISO 8601 UTC).
+4. Transitous liefert `scheduledDeparture`/`scheduledArrival` als Planzeiten; die tatsächlichen Zeiten stehen in `departure`/`arrival`. Die Verspätung wird via `realTime`-Flag und Differenzberechnung ermittelt.
+5. Nach jeder Änderung an der Public-Transport-Integration MUSS `docs/public-transport/readme.md` aktualisiert werden.
