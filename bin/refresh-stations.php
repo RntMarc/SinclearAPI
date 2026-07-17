@@ -6,6 +6,7 @@ declare(strict_types=1);
 namespace Sinclear\Api\Cli;
 
 use DI\ContainerBuilder;
+use Dotenv\Dotenv;
 use Sinclear\Api\Services\PublicTransportService;
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -17,10 +18,6 @@ $dotenv->safeLoad();
 
 $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions($rootDir . '/config/dependencies.php');
-
-if (!isset($_ENV['APP_DEBUG']) || !filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-    $containerBuilder->enableCompilation($rootDir . '/var/cache');
-}
 
 $container = $containerBuilder->build();
 
