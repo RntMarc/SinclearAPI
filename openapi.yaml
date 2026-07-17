@@ -928,6 +928,260 @@ components:
           items:
             $ref: '#/components/schemas/TravelParticipant'
 
+    # =========================================================================
+    # Public Transport (Transitious)
+    # =========================================================================
+
+    PtStation:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Station-ID aus Transitious
+          example: "8000105"
+        name:
+          type: string
+          example: Frankfurt(Main)Hbf
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 50.1109
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 8.6821
+
+    PtStationListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PtStation'
+
+    PtDeparture:
+      type: object
+      properties:
+        lineName:
+          type: string
+          nullable: true
+          description: Linien-Name (z.B. "ICE 123")
+          example: "ICE 123"
+        mode:
+          type: string
+          nullable: true
+          description: Verkehrsmittel
+          example: "RAIL"
+        departure:
+          type: string
+          nullable: true
+          description: Abfahrtszeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          example: "2026-07-17 14:30:00"
+        platform:
+          type: string
+          nullable: true
+          description: Gleis
+          example: "1"
+        headsign:
+          type: string
+          nullable: true
+          description: Ziel
+          example: "München Hbf"
+
+    PtDepartureListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PtDeparture'
+
+    PtLeg:
+      type: object
+      properties:
+        mode:
+          type: string
+          description: Verkehrsmittel (WALK, BUS, RAIL, TRAM, etc.)
+          example: "RAIL"
+        lineName:
+          type: string
+          nullable: true
+          description: Linien-Name
+          example: "ICE 123"
+        lineProduct:
+          type: string
+          nullable: true
+          description: Produkt-Typ
+          example: "nationalExpress"
+        fromStationId:
+          type: string
+          nullable: true
+        fromStationName:
+          type: string
+          nullable: true
+        toStationId:
+          type: string
+          nullable: true
+        toStationName:
+          type: string
+          nullable: true
+        tripId:
+          type: string
+          nullable: true
+          description: Transitious Trip-ID (für Refresh)
+        plannedDeparture:
+          type: string
+          nullable: true
+          description: Soll-Abfahrt (UTC)
+        plannedArrival:
+          type: string
+          nullable: true
+          description: Soll-Ankunft (UTC)
+        departureDelay:
+          type: integer
+          nullable: true
+          description: Verspätung Abfahrt in Sekunden
+        arrivalDelay:
+          type: integer
+          nullable: true
+          description: Verspätung Ankunft in Sekunden
+        departurePlatform:
+          type: string
+          nullable: true
+        arrivalPlatform:
+          type: string
+          nullable: true
+        cancelled:
+          type: boolean
+        realTimeState:
+          type: string
+          nullable: true
+          description: CANCELED, UPDATED, SCHEDULED
+
+    PtJourneySearchResult:
+      type: object
+      properties:
+        duration:
+          type: integer
+          description: Gesamtdauer in Sekunden
+        transfers:
+          type: integer
+          description: Anzahl Umstiege
+        departureTime:
+          type: string
+          nullable: true
+          description: Abfahrtszeit (UTC)
+        arrivalTime:
+          type: string
+          nullable: true
+          description: Ankunftszeit (UTC)
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PtLeg'
+
+    PtJourneySearchResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PtJourneySearchResult'
+
+    PtSavedJourney:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tripId:
+          type: string
+          format: uuid
+          nullable: true
+        creatorId:
+          type: string
+          format: uuid
+        fromStationId:
+          type: string
+        fromStationName:
+          type: string
+        toStationId:
+          type: string
+        toStationName:
+          type: string
+        departureTime:
+          type: string
+          description: Abfahrtszeit (UTC)
+        arrivalTime:
+          type: string
+          description: Ankunftszeit (UTC)
+        duration:
+          type: integer
+          description: Gesamtdauer in Sekunden
+        transfers:
+          type: integer
+        chosenAt:
+          type: string
+        createdAt:
+          type: string
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/PtLeg'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserBrief'
+
+    PtSavedJourneyListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PtSavedJourney'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PtSaveJourneyRequest:
+      type: object
+      required: [legs]
+      properties:
+        tripId:
+          type: string
+          format: uuid
+          nullable: true
+        fromStationId:
+          type: string
+        fromStationName:
+          type: string
+        toStationId:
+          type: string
+        toStationName:
+          type: string
+        departureTime:
+          type: string
+        arrivalTime:
+          type: string
+        duration:
+          type: integer
+        transfers:
+          type: integer
+        legs:
+          type: array
+          items:
+            type: object
+        participantIds:
+          type: array
+          items:
+            type: string
+
     UserBrief:
       type: object
       properties:
@@ -5910,6 +6164,368 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  # =========================================================================
+  # Public Transport (Transitious API)
+  # =========================================================================
+
+  /public-transport/stations:
+    get:
+      summary: Stationen suchen (Autocomplete)
+      description: >
+        Sucht nach Stationen über die Transitious Geocoding API.
+        Lokaler Cache wird zuerst durchsucht, Fallback auf Live-API.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Suchbegriff
+          example: Frankfurt
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 20
+          description: Max. Ergebnisse
+      responses:
+        '200':
+          description: Liste gefundener Stationen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PtStationListResponse'
+        '400':
+          description: q-Parameter fehlt
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/stations/{id}/departures:
+    get:
+      summary: Abfahrtsplan einer Station
+      description: >
+        Gibt die nächsten Abfahrten (oder Ankünfte) an einer Station zurück.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Station-ID
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+        - name: arriveBy
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: true für Ankünfte
+      responses:
+        '200':
+          description: Abfahrtsliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PtDepartureListResponse'
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/journeys:
+    get:
+      summary: Verbindungen suchen (Transitious Routing)
+      description: >
+        Sucht Verbindungen von A nach B über die Transitious API.
+        Kein Caching – jede Anfrage geht live an die API.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Start-Station-ID oder Koordinaten (lat,lon)
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Ziel-Station-ID oder Koordinaten (lat,lon)
+        - name: departure
+          in: query
+          schema:
+            type: string
+          description: Abfahrtszeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        - name: arriveBy
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: true = nach Ankunft suchen
+        - name: results
+          in: query
+          schema:
+            type: integer
+            default: 5
+            maximum: 10
+        - name: maxTransfers
+          in: query
+          schema:
+            type: integer
+          description: Max. Umstiege
+        - name: pageCursor
+          in: query
+          schema:
+            type: string
+          description: Für Pagination
+      responses:
+        '200':
+          description: Gefundene Verbindungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PtJourneySearchResponse'
+        '400':
+          description: from oder to fehlt
+        '401':
+          description: Nicht autorisiert
+    post:
+      summary: Verbindung speichern
+      description: >
+        Speichert eine ausgewählte Verbindung.
+        Der speichernde Nutzer wird automatisch als Teilnehmer hinzugefügt.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PtSaveJourneyRequest'
+      responses:
+        '201':
+          description: Verbindung gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PtSavedJourney'
+        '400':
+          description: Ungültige Eingabe
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/journeys/list:
+    get:
+      summary: Eigene Verbindungen auflisten
+      description: >
+        Listet alle gespeicherten Verbindungen des Nutzers auf.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: tripId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Nur Verbindungen zu einer bestimmten Reise
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PtSavedJourneyListResponse'
+        '401':
+          description: Nicht autorisiert
+
+  /public-transport/journeys/{id}:
+    get:
+      summary: Verbindungsdetails abrufen
+      description: >
+        Gibt die vollständigen Details einer gespeicherten Verbindung zurück.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Verbindungs-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PtSavedJourney'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer
+        '404':
+          description: Nicht gefunden
+    delete:
+      summary: Verbindung löschen
+      description: >
+        Löscht eine Verbindung. Nur der Ersteller darf löschen.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Nicht der Ersteller
+        '404':
+          description: Nicht gefunden
+
+  /public-transport/journeys/{id}/refresh:
+    post:
+      summary: Verbindung aktualisieren (Echtzeit)
+      description: >
+        Ruft aktuelle Daten für alle Legs der Verbindung ab.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Aktualisierte Verbindung
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PtSavedJourney'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer
+        '404':
+          description: Nicht gefunden
+
+  /public-transport/journeys/{id}/participants:
+    post:
+      summary: Teilnehmer hinzufügen
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+      responses:
+        '200':
+          description: Aktualisierte Teilnehmerliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserBrief'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer
+    delete:
+      summary: Teilnehmer entfernen
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Aktualisierte Teilnehmerliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserBrief'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer
 
   /trips:
     get:

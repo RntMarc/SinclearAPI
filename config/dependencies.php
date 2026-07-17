@@ -23,6 +23,7 @@ use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
+use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AdminMiddleware;
@@ -69,10 +70,13 @@ use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
+use Sinclear\Api\Repository\PtStationRepository;
+use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
+use Sinclear\Api\Services\PtService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
 use Sinclear\Api\Security\Policy\LocationSharingPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
@@ -227,6 +231,11 @@ return [
 
     TravelService::class => autowire(),
     TravelController::class => autowire(),
+
+    PtStationRepository::class => autowire(),
+    PtJourneyRepository::class => autowire(),
+    PtService::class => autowire(),
+    PtController::class => autowire(),
 
     \Sinclear\Api\Services\Cron\CronScheduler::class => autowire(),
 

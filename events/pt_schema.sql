@@ -12,7 +12,7 @@ CREATE TABLE PtStation (
   lastUpdated DATETIME(3) NOT NULL,
   PRIMARY KEY (id),
   INDEX idx_pt_station_name (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
 -- PtJourney: Gespeicherte Verbindung (A→B)
@@ -38,7 +38,7 @@ CREATE TABLE PtJourney (
   INDEX idx_pt_journey_departure (departureTime),
   CONSTRAINT fk_pt_journey_creator FOREIGN KEY (creatorId) REFERENCES User(id) ON DELETE CASCADE,
   CONSTRAINT fk_pt_journey_trip FOREIGN KEY (tripId) REFERENCES TravelTrip(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
 -- PtLeg: Einzelner Fahrtabschnitt einer gespeicherten Verbindung
@@ -74,7 +74,7 @@ CREATE TABLE PtLeg (
   INDEX idx_pt_leg_trip (tripId),
   INDEX idx_pt_leg_lastChecked (lastCheckedAt),
   CONSTRAINT fk_pt_leg_journey FOREIGN KEY (journeyId) REFERENCES PtJourney(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================================================
 -- PtParticipant: Teilnehmer-Verknüpfung
@@ -86,4 +86,4 @@ CREATE TABLE PtParticipant (
   PRIMARY KEY (journeyId, userId),
   CONSTRAINT fk_pt_participant_journey FOREIGN KEY (journeyId) REFERENCES PtJourney(id) ON DELETE CASCADE,
   CONSTRAINT fk_pt_participant_user FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
