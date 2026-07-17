@@ -26,6 +26,10 @@ final readonly class PublicTransportService
             return array_map(fn(array $s) => $this->mapStopFromDb($s), $local);
         }
 
+        if ($this->stopRepo->countAll() > 0) {
+            return [];
+        }
+
         try {
             $response = $this->http->get(self::API_BASE . '/locations', [
                 'query' => [
@@ -62,7 +66,7 @@ final readonly class PublicTransportService
             return array_map(fn(array $s) => $this->mapStopFromDb($s), $local);
         } catch (\Throwable $e) {
             $this->logger->warning('DB station search failed: ' . $e->getMessage());
-            return [];
+            throw new \RuntimeException('Stationen-Datenbank leer und DB API nicht erreichbar. Bitte zuerst Stationen aktualisieren via POST /api/v2/public-transport/stations/refresh');
         }
     }
 

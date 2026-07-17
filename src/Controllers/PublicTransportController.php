@@ -39,7 +39,12 @@ final readonly class PublicTransportController
         }
 
         $limit = min(20, max(1, (int) ($params['limit'] ?? 10)));
-        $stops = $this->service->searchStations($query, $limit);
+
+        try {
+            $stops = $this->service->searchStations($query, $limit);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 503, $response);
+        }
 
         return ResponseFactory::json(['data' => $stops], 200, $response);
     }
