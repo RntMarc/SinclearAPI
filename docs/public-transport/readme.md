@@ -1,32 +1,7 @@
-# ÖPNV Integration (Public Transport)
+# ÖPNV / Deutsche Bahn Integration (Public Transport)
 
-Integration von Fahrplandaten und Fahrtinformationen via [Transitous](https://transitous.org/) (MOTIS 2.x API).
-
-## Datenquelle
-
-[Transitous](https://transitous.org/) ist ein Community-betriebener, offener
-Public-Transport-Router, der GTFS-Daten vieler Verkehrsverbünde weltweit
-vereint und über eine standardisierte [MOTIS 2.x](https://github.com/motis-project/motis) API bereitstellt.
-
-- **Routing:** `GET https://api.transitous.org/api/v6/plan`
-- **Trip-Details:** `GET https://api.transitous.org/api/v6/trip`
-- **Geokodierung:** `GET https://api.transitous.org/api/v1/geocode`
-- **Health:** `GET https://api.transitous.org/api/v1/health`
-
-**Vorteile gegenüber der eingestellten DB-API (v6.db.transport.rest):**
-- Kein API-Key nötig
-- Community-betrieben, offene Daten (GTFS)
-- Weiterentwickeltes MOTIS-API-Format
-- Transitous unterstützt viele Verkehrsverbünde (nicht nur DB)
-
-## Stationen-Cache (TravelStop)
-
-`db-stations` von npm (via unpkg.com) wird heruntergeladen und lokal gecacht
-(`GET https://unpkg.com/db-stations@5.0.2/data.ndjson`, NDJSON-Format).
-
-Die Stationssuche erfolgt **zuerst lokal** in `TravelStop`. Wenn kein
-Ergebnis lokal gefunden wird und die Datenbank leer ist, wird als Fallback
-der Transitous-Geocoding-Endpoint aufgerufen.
+Integration von Fahrplandaten und Fahrtinformationen aus der API der Deutschen Bahn
+via [`v6.db.transport.rest`](https://v6.db.transport.rest/).
 
 ## Architektur-Übersicht
 
@@ -38,8 +13,16 @@ Sinclear API (PHP, Slim 4)
     │
     ├── Eigene Datenbank (gespeicherte Fahrten, Stationen-Cache, Nutzer-Zuordnung)
     │
-    └── api.transitous.org (HTTP via Guzzle, MOTIS 2.x /api/v6)
+    └── v6.db.transport.rest (HTTP via Guzzle)
+            │
+            └── DB Vendo/Movas API (gleiches Backend wie DB Navigator)
 ```
+
+**Warum `v6.db.transport.rest`?**
+- Einzige verfügbare API mit **Routenplanung (A→B)** für das deutsche Schienennetz
+- Kein API-Key nötig (aber 60 req/min Limit)
+- Liefert Echtzeitdaten (Verspätungen, Ausfälle, Gleisänderungen)
+- Wird von vielen Projekten produktiv genutzt
 
 ## Datenbank-Tabellen
 
@@ -53,28 +36,28 @@ mehreren Legs (Abschnitten). Optional mit einem `TravelTrip` verknüpft.
 | `id` | `varchar(191) PK` | UUID v7 |
 | `tripId` | `varchar(191) NULL` | FK → `TravelTrip.id` (optional, wenn Teil einer Reise) |
 | `creatorId` | `varchar(191) NOT NULL` | FK → `User.id` (wer hat gespeichert) |
-| `refreshToken` | `varchar(191) NULL` | Nicht mehr von der API geliefert (MOTIS hat kein Äquivalent) |
+| `refreshToken` | `varchar(191) NULL` | Von der DB-API für Pagination (frühere/spätere Verbindungen) |
 | `chosenAt` | `datetime NOT NULL` | Wann der Nutzer diese Verbindung ausgewählt hat (UTC) |
 | `createdAt` | `datetime(3) NOT NULL` | |
 | `updatedAt` | `datetime(3) NOT NULL` | |
 
 ### `TravelPublicTransportLeg`
 
-Ein einzelner Fahrtabschnitt (z.B. MEX16 von Stuttgart Hbf nach Geislingen).
+Ein einzelner Fahrtabschnitt (z.B. ICE 123 von Frankfurt Hbf nach München Hbf).
 
 | Spalte | Typ | Beschreibung |
 |--------|-----|-------------|
 | `id` | `varchar(191) PK` | UUID v7 |
 | `journeyId` | `varchar(191) NOT NULL` | FK → `TravelPublicTransportJourney.id` |
 | `legIndex` | `tinyint NOT NULL` | Reihenfolge im Journey (0, 1, 2, ...) |
-| `mode` | `varchar(50) NOT NULL` | Verkehrsmittel: `train`, `bus`, `walking`, `ferry`, `subway`, `tram`, `suburban`, `regional_rail` |
-| `lineName` | `varchar(191) NULL` | Z.B. "MEX16", "ICE 123", `null` bei Fußwegen |
-| `lineProduct` | `varchar(50) NULL` | Z.B. `nationalExpress`, `regional_rail`, `bus`, `subway` |
+| `mode` | `varchar(50) NOT NULL` | Verkehrsmittel: `train`, `bus`, `walking`, `ferry`, `subway`, `tram`, `suburban` |
+| `lineName` | `varchar(191) NULL` | Z.B. "ICE 123", "Bus 248", `null` bei Fußwegen |
+| `lineProduct` | `varchar(50) NULL` | Z.B. `nationalExpress`, `regional`, `bus`, `suburban` |
 | `originStopId` | `varchar(191) NOT NULL` | FK → `TravelStop.id` |
 | `destinationStopId` | `varchar(191) NOT NULL` | FK → `TravelStop.id` |
 | `originStopName` | `varchar(255) NOT NULL` | Denormalisiert |
 | `destinationStopName` | `varchar(255) NOT NULL` | Denormalisiert |
-| `dbTripId` | `varchar(191) NULL` | tripId aus der Transitous/MOTIS-API (z.B. `20260717_14:03_de-DELFI_3288100731`), `null` bei Fußwegen |
+| `dbTripId` | `varchar(191) NULL` | tripId aus der DB-API (z.B. `1|245684|0|80|27032019`), `null` bei Fußwegen |
 | `plannedDeparture` | `datetime NOT NULL` | Soll-Abfahrt (UTC) |
 | `plannedArrival` | `datetime NOT NULL` | Soll-Ankunft (UTC) |
 | `actualDeparture` | `datetime NULL` | Tatsächliche Abfahrt (UTC, nach Refresh) |
@@ -104,73 +87,58 @@ Verknüpfung eines Nutzers mit einem Journey.
 
 ### `TravelStop`
 
-Lokaler Cache der Stationen (regelmäßig aktualisierbar).
+Lokaler Cache der DB-Stationen (regelmäßig aktualisierbar).
 
 | Spalte | Typ | Beschreibung |
 |--------|-----|-------------|
-| `id` | `varchar(191) PK` | Station-ID aus Transitous/MOTIS (z.B. `de-DELFI_de:08111:6115:6:12` für Stuttgart Hbf) |
+| `id` | `varchar(191) PK` | Station-ID aus der DB-API (z.B. `8011113` für Berlin Südkreuz) |
 | `name` | `varchar(255) NOT NULL` | Stationsname |
-| `ril100` | `varchar(10) NULL` | RIL100-Kürzel (z.B. `BLS`) – nur aus dem ndjson-Stations-Cache |
+| `ril100` | `varchar(10) NULL` | RIL100-Kürzel (z.B. `BLS`) |
 | `latitude` | `double NULL` | Geokoordinate |
 | `longitude` | `double NULL` | Geokoordinate |
 | `weight` | `double NULL` | Relevanz-Gewichtung |
 | `products` | `json NULL` | Verfügbare Verkehrsmittel |
-| `lastUpdated` | `datetime(3) NOT NULL` | Wann zuletzt aktualisiert |
+| `lastUpdated` | `datetime(3) NOT NULL` | Wann zuletzt von der DB-API aktualisiert |
 
-## MOTIS API Kommunikation (Service-Schicht)
+## DB-API Kommunikation (Service-Schicht)
 
 ### `src/Services/PublicTransportService.php`
 
-Kapselt alle Aufrufe an Transitous (api.transitous.org) via Guzzle.
+Kapselt alle Aufrufe an `v6.db.transport.rest` via Guzzle.
 
-**API-Endpunkte:**
+**API-Endpunkte von v6.db.transport.rest:**
 
 | Methode | Pfad | Beschreibung |
 |---------|------|-------------|
-| `GET` | `/api/v1/geocode?text={q}&type=STOP&numResults={n}` | Stationssuche (Fallback) |
-| `GET` | `/api/v6/plan?fromPlace={id}&toPlace={id}&time={iso}&numItineraries={n}` | Routenplanung A→B |
-| `GET` | `/api/v6/trip?tripId={id}` | Details zu einem Trip (für Refresh) |
-
-**MOTIS-Response-Mapping:**
-
-| Transitous/MOTIS | Internes Format |
-|---|---|
-| `leg.from.stopId` | `origin.id` |
-| `leg.from.name` | `origin.name` |
-| `leg.to.stopId` | `destination.id` |
-| `leg.to.name` | `destination.name` |
-| `leg.from.departure` | `departure` (actual) |
-| `leg.from.scheduledDeparture` | `plannedWhen` (planned departure) |
-| `leg.to.arrival` | `arrival` (actual) |
-| `leg.to.scheduledArrival` | `plannedArrival` |
-| `leg.mode` | `mode` (lowercased) + `walking` (true bei WALK) |
-| `leg.routeShortName` | `line.name` |
-| `leg.tripId` | `tripId` |
-| `leg.from.track` / `leg.to.track` | `platform` / `arrivalPlatform` |
-| `leg.cancelled` / `leg.realTime` | `cancelled` + delay-Berechnung |
+| `GET` | `/locations?query={q}&poi=false&addresses=false` | Stations-/Haltestellensuche |
+| `GET` | `/journeys?from={id}&to={id}&departure={datetime}&results={n}` | Routenplanung A→B |
+| `GET` | `/trips/{tripId}?stopovers=true` | Details zu einem Trip (für Refresh) |
 
 **Datenfluss:**
 
 ```
 PublicTransportService
     ├── searchStations(string $query): array
-    │   → Zuerst lokal in TravelStop (Fuzzy-Suche)
-    │   → Fallback: GET /api/v1/geocode?text=...&type=STOP
+    │   → GET /locations?query=...&poi=false&addresses=false
+    │   → Lokal cachen in TravelStop
     │
     ├── findJourneys(string $fromId, string $toId, string $departure): array
-    │   → GET /api/v6/plan?fromPlace=...&toPlace=...&time=...Z
+    │   → GET /journeys?from=...&to=...&departure=...
     │   → Live (kein Caching)
     │
     ├── refreshLeg(string $dbTripId): ?array
-    │   → GET /api/v6/trip?tripId=...
+    │   → GET /trips/{tripId}?stopovers=true
     │   → Aktualisiert Verspätungen/Ausfälle
     │
     └── refreshAllStations(): void
-        → Ruft Stationen von unpkg.com/db-stations ab (NDJSON)
+        → Ruft Stationen-Set von db-stations ab und aktualisiert TravelStop
 ```
 
-**User-Agent:** Transitous verlangt einen `User-Agent`-Header mit
-App-Name/Version/Kontakt: `SinclearBeyond/1.0 (dev@sinclear.com)`.
+**Rate-Limiting:**
+- v6.db.transport.rest hat ~60 req/min
+- Ein `refreshAllStations()`-Durchlauf könnte hunderte Requests erzeugen → **muss** mit
+  entsprechenden Verzögerungen/Throttling laufen (z.B. 1 Request pro Sekunde).
+- Ein `refreshLeg()` ist ein einzelner Request, unkritisch.
 
 ## API-Endpunkte (öffentlich, JWT-geschützt)
 
@@ -179,24 +147,26 @@ App-Name/Version/Kontakt: `SinclearBeyond/1.0 (dev@sinclear.com)`.
 | Methode | Pfad | Beschreibung |
 |---------|------|-------------|
 | `GET` | `/public-transport/stations?query=...` | Stationen suchen (Autocomplete) |
-| `POST` | `/public-transport/stations/refresh` | Stationen-Cache updaten (triggert NDJSON-Download) |
+| `POST` | `/public-transport/stations/refresh` | Stationen-Cache updaten (triggert asynchrone Aktualisierung) |
 
 `GET /public-transport/stations` sucht **zuerst lokal** in `TravelStop` nach passenden
-Stationen (für schnelles Autocomplete). Wenn kein Ergebnis, Fallback auf Transitous Geocode.
+Stationen (für schnelles Autocomplete). Wenn kein Ergebnis, Fallback auf Live-API.
+Optional: `?forceLive=true` überspringt den lokalen Cache.
 
 ### Routenplanung / Verbindungssuche
 
 | Methode | Pfad | Beschreibung |
 |---------|------|-------------|
-| `GET` | `/public-transport/journeys?from={stopId}&to={stopId}&departure={datetime}` | Verbindungen suchen (live von Transitous) |
+| `GET` | `/public-transport/journeys?from={stopId}&to={stopId}&departure={datetime}` | Verbindungen suchen (live von DB-API) |
 
 Query-Parameter:
 - `from` (required) – Start-Station-ID
 - `to` (required) – Ziel-Station-ID
 - `departure` (optional, default: now) – Abfahrtszeit `YYYY-MM-DD HH:MM:SS` UTC
+- `arrival` (optional) – Ankunftszeit (statt Abfahrt)
 - `results` (optional, default: 5) – Anzahl Ergebnisse
 
-**Kein Caching**, jede Anfrage geht live an die Transitous-API.
+**Kein Caching**, jede Anfrage geht live an die DB-API.
 
 Antwortformat:
 ```json
@@ -206,17 +176,17 @@ Antwortformat:
       "type": "journey",
       "legs": [
         {
-          "origin": { "id": "de-DELFI_de:08111:6115:6:12", "name": "Stuttgart Hbf (oben)" },
-          "destination": { "id": "de-DELFI_de:08111:226:9:26", "name": "Stadtwerke" },
-          "departure": "2026-07-17 12:03:00",
-          "arrival": "2026-07-17 12:12:00",
-          "mode": "regional_rail",
-          "line": { "name": "MEX16", "product": "regional_rail" },
+          "origin": { "id": "8000105", "name": "Frankfurt(Main)Hbf" },
+          "destination": { "id": "8000261", "name": "München Hbf" },
+          "departure": "2026-07-14 14:30:00",
+          "arrival": "2026-07-14 19:06:00",
+          "mode": "train",
+          "line": { "name": "ICE 123", "product": "nationalExpress" },
           "platform": "12",
-          "cancelled": false,
-          "tripId": "20260717_14:03_de-DELFI_3288100731"
+          "cancelled": false
         }
       ],
+      "duration": 276,
       "transfers": 0
     }
   ]
@@ -243,13 +213,13 @@ Request-Body:
   "journeyData": {
     "legs": [
       {
-        "origin": { "id": "de-DELFI_de:08111:6115:6:12", "name": "Stuttgart Hbf (oben)" },
-        "destination": { "id": "de-DELFI_de:08111:226:9:26", "name": "Stadtwerke" },
-        "departure": "2026-07-17 12:03:00",
-        "arrival": "2026-07-17 12:12:00",
-        "mode": "regional_rail",
-        "line": { "name": "MEX16", "product": "regional_rail" },
-        "tripId": "20260717_14:03_de-DELFI_3288100731",
+        "origin": { "id": "8000105", "name": "Frankfurt(Main)Hbf" },
+        "destination": { "id": "8000261", "name": "München Hbf" },
+        "departure": "2026-07-14 14:30:00",
+        "arrival": "2026-07-14 19:06:00",
+        "mode": "train",
+        "line": { "name": "ICE 123", "product": "nationalExpress" },
+        "tripId": "1|245684|0|80|27032019",
         "platform": "12"
       }
     ]
@@ -265,22 +235,24 @@ Request-Body:
 
 Query-Parameter:
 - `tripId` (optional) – Nur Fahrten zu einer bestimmten Reise
+- `userId` (optional) – Nur Fahrten eines bestimmten Teilnehmers
 - `includeLegs` (optional, default: `true`) – Legs direkt mitsenden
 - `page`, `limit` – Pagination
 
 **Autorisierung:**
 - Ohne Filter: Nur eigene Fahrten
 - Mit `tripId`: Nur wenn der Nutzer Teilnehmer dieser Reise ist
+- Mit `userId`: Nur der eigene `userId` (kein fremder Zugriff)
 
 ### Echtzeit-Updates
 
 | Methode | Pfad | Beschreibung |
 |---------|------|-------------|
 | `POST` | `/public-transport/journeys/{id}/refresh` | Einzelne Fahrt aktualisieren |
-| `POST` | `/public-transport/journeys/refresh` | Alle nicht-aktualisierten Fahrten aktualisieren |
+| `POST` | `/public-transport/journeys/refresh` | Alle eigenen (oder alle nicht-aktualisierten) Fahrten aktualisieren |
 
 `POST /public-transport/journeys/{id}/refresh`:
-- Ruft für jeden Leg mit `dbTripId` die aktuelle Trip-Info ab (`GET /api/v6/trip?tripId=...`)
+- Ruft für jeden Leg mit `dbTripId` die aktuelle Trip-Info ab
 - Aktualisiert `actualDeparture`, `actualArrival`, `delay`, `platform`, `cancelled`, `status`
 - Gibt den aktualisierten Journey zurück
 
@@ -288,18 +260,35 @@ Query-Parameter:
 - Iteriert über Legs, deren `lastCheckedAt` älter als ein konfigurierbares Intervall ist
 - Dies ist der Endpunkt, den ein Cron-Job regelmäßig aufrufen kann
 
-## Zeitformat
+## Implementierungs-Reihenfolge
 
-Die Transitous/MOTIS API liefert ISO 8601 UTC mit `Z`-Suffix
-(z.B. `2026-07-17T12:03:00Z`). Die Service-Schicht konvertiert vor dem Speichern
-in das interne UTC-Format `YYYY-MM-DD HH:MM:SS`.
+### Phase 1: Basis (Datenbank + Service)
+1. SQL-Migration: `TravelStop`, `TravelPublicTransportJourney`, `TravelPublicTransportLeg`, `TravelPublicTransportParticipant`
+2. `StopRepository` – CRUD für TravelStop
+3. `PublicTransportJourneyRepository` – CRUD für Journey + Legs + Participants
+4. `PublicTransportService` – Kommunikation mit v6.db.transport.rest inkl. Mapping
 
-**Eingabe für die API:** Das `time`-Parameter für `/api/v6/plan` muss als
-ISO 8601 UTC mit `Z`-Suffix gesendet werden (z.B. `2026-07-17T12:00:00Z`).
+### Phase 2: Controller + Routes
+5. `PublicTransportController` – Alle API-Endpunkte
+6. Routen in `config/routes.php` registrieren
+7. Dependency Wiring in `config/dependencies.php`
+
+### Phase 3: Stations-Cache
+8. `POST /public-transport/stations/refresh` – Initialbefüllung und regelmäßiges Update
+9. CLI-Script für Cron-Job (optional)
+
+### Phase 4: Echtzeit-Updates
+10. `POST /public-transport/journeys/{id}/refresh` – Einzelfahrt-Update
+11. `POST /public-transport/journeys/refresh` – Batch-Update (für Cron-Job)
+
+### Phase 5: Dokumentation + OpenAPI
+12. `docs/public-transport/readme.md` (dieses Dokument)
+13. `openapi.yaml` aktualisieren
+14. `.htaccess` prüfen
 
 ## Cron-Jobs (MySQL Events)
 
-Geplante DB Events:
+Geplante DB Events, analog zu bestehenden Cleanup-Events:
 
 | Event | Intervall | Beschreibung |
 |-------|-----------|-------------|
@@ -307,22 +296,27 @@ Geplante DB Events:
 | `refresh_public_transport_stations` | Täglich (04:00) | Aktualisiert den Stationen-Cache |
 | `clean_old_public_transport_data` | Täglich (04:30) | Löscht Fahrten älter als 90 Tage |
 
-> Die Refresh-Events rufen **HTTP-Endpunkte** der API auf (da die
+> **Hinweis:** Die Refresh-Events rufen **HTTP-Endpunkte** der API auf (da die
 > Business-Logik im PHP-Service liegt). Alternativ kann ein externer Cron-Job
 > (z.B. via `crontab -e` oder systemd-timer) die API-Endpunkte aufrufen:
 > ```
 > */15 * * * * curl -X POST https://api.sinclear.de/api/v2/public-transport/journeys/refresh
 > ```
 
-## Stations-IDs
+## Wichtige Hinweise
 
-Die `TravelStop.id` entspricht der `id` aus dem `db-stations` NDJSON-Datensatz
-(z.B. `de-DELFI_de:08111:6115:6:12` für Stuttgart Hbf Bahnsteig 11+12).
-Abhängig von der Quelle (NDJSON vs. Transitous-Geocode) können die IDs
-unterschiedlich sein (DELFI-Format mit/ohne Prefix).
+### Rate Limits
+Die `v6.db.transport.rest` API hat ein Limit von ~60 Requests pro Minute pro IPv4.
+Ein `stations/refresh` muss daher mit ausreichendem Abstand zwischen Requests erfolgen.
+Ein `journeys/search` oder `journeys/{id}/refresh` ist ein einzelner Request und unkritisch.
 
-## Attribution
+### Zeitformat
+Alle Zeitangaben in der API folgen dem UTC-Standard: `YYYY-MM-DD HH:MM:SS`.
+Die DB-API (v6.db.transport.rest) liefert ISO 8601 mit Zeitzone (z.B.
+`2026-07-14T14:30:00+02:00`). Die Service-Schicht konvertiert vor dem Speichern
+nach UTC.
 
-Bei Nutzung der Transitous-API ist ein User-Agent-Header mit App-Name,
-Version und Kontakt-Informationen erforderlich.
-Die Datenquellen von Transitous sind unter https://transitous.org/sources/ einsehbar.
+### Stations-IDs
+Die `TravelStop.id` entspricht der `id` aus der `v6.db.transport.rest` API
+(z.B. `8011113` für Berlin Südkreuz). Dies können sowohl EVA-Nummern als auch
+interne IDs sein.

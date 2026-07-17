@@ -21,6 +21,10 @@ $dotenv->safeLoad();
 $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions($rootDir . '/config/dependencies.php');
 
+if (!isset($_ENV['APP_DEBUG']) || !filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+    $containerBuilder->enableCompilation($rootDir . '/var/cache');
+}
+
 $container = $containerBuilder->build();
 
 $scheduler = $container->get(CronScheduler::class);
