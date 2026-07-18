@@ -40,6 +40,16 @@ After every change to the API (routes, controllers, DTOs, or ResourceRegistry), 
 - Follow the established CRUD pattern using `ResourceRegistry.php` for standard resources.
 - Ensure all endpoints are secured with the appropriate Policy classes.
 
+## Admin Dashboard Consistency
+Das Admin Dashboard (`templates/admin/`) muss immer den aktuellen Zustand der API und des Clients widerspiegeln.
+
+**Requirement:**
+Nach jeder Änderung an der API (Routes, Controllers, DTOs, Services) oder am Client (Router, Seiten), MUSS geprüft werden:
+1. Alle im Admin Dashboard angebotenen Bearbeitungsmöglichkeiten (Formulare, Dropdowns, Listen) sind aktuell und funktionieren.
+2. Deep-Links, Auswahllisten und Referenzwerte im Dashboard stimmen mit den tatsächlichen Werten im Client (z.B. GoRouter-Routes) überein.
+3. Keine veralteten oder nicht mehr existierenden Seiten/Optionen werden im Dashboard angeboten.
+4. Neue API-Endpunkte oder Client-Seiten, die eine Admin-Bearbeitung erfordern, sind im Dashboard vorhanden.
+
 ## Date/Time Convention (UTC-only)
 The API operates exclusively in UTC. This is a hard requirement that all implementations MUST follow:
 

@@ -41,6 +41,21 @@ final readonly class UserRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** @return list<array<string, mixed>> */
+    public function search(string $query): array
+    {
+        $like = '%' . $query . '%';
+        $stmt = $this->pdo->prepare(
+            'SELECT id, email, displayName, image
+             FROM User
+             WHERE displayName LIKE ? OR email LIKE ?
+             ORDER BY displayName
+             LIMIT 20'
+        );
+        $stmt->execute([$like, $like]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function countAll(): int
     {
         $stmt = $this->pdo->query('SELECT COUNT(*) FROM User');

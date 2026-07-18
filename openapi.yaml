@@ -125,6 +125,10 @@ components:
           format: email
         displayName:
           type: string
+        image:
+          type: string
+          nullable: true
+          description: URL des Profilbilds
         isAdmin:
           type: boolean
 
@@ -147,9 +151,10 @@ components:
         deepLink:
           type: string
           description: >
-            Zielseite in der App. Unterstützte Werte:
-            `home`, `travel`, `events`, `profile`, `settings`,
-            `friends`, `discover`, `news`, `chat`, `feedback`
+            Zielseite in der App (GoRouter-Pfad). Unterstützte Werte:
+            `home`, `reisen`, `kalender`, `entdecken`, `kontakte`,
+            `feedback`, `forum`, `rezepte`, `abos`,
+            `einstellungen`, `einstellungen/profil`
           example: home
         title:
           type: string
@@ -5347,8 +5352,16 @@ paths:
     get:
       summary: Admin-Nutzerliste (JSON)
       description: >
-        Gibt alle Nutzer als JSON für Dropdowns und Admin-Ansichten zurück.
+        Gibt Nutzer als JSON zurück. Ohne Parameter alle Nutzer,
+        mit `q`-Parameter wird nach Name oder E-Mail gesucht.
       tags: [Admin]
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Suchbegriff (filtert nach displayName oder email)
       responses:
         '200':
           description: Liste aller Nutzer

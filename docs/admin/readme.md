@@ -86,7 +86,7 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/logout` | Session beenden + Redirect zum Login |
 | GET | `/admin/` oder `/admin` | Dashboard (geschützt) |
 | GET | `/admin/users` | Nutzerverwaltung (geschützt) |
-| GET | `/admin/users/json` | Nutzerliste als JSON (geschützt) |
+| GET | `/admin/users/json` | Nutzerliste als JSON, optional mit `?q=` Suchparameter (geschützt) |
 | GET | `/admin/travel` | Reisen & Events (geschützt) |
 | POST | `/admin/travel/trips` | Neue Reise anlegen (geschützt) |
 | PUT | `/admin/travel/trips/{id}` | Reise bearbeiten (geschützt) |

@@ -42,15 +42,16 @@
                 <label for="deepLink">Zielseite (Deep Link) *</label>
                 <select id="deepLink" name="deepLink" required>
                     <option value="home">Startseite</option>
-                    <option value="travel">Reisen</option>
-                    <option value="events">Events</option>
-                    <option value="profile">Profil</option>
-                    <option value="settings">Einstellungen</option>
-                    <option value="friends">Freunde</option>
-                    <option value="discover">Entdecken</option>
-                    <option value="news">News</option>
-                    <option value="chat">Chat</option>
+                    <option value="reisen">Reisen</option>
+                    <option value="kalender">Kalender</option>
+                    <option value="entdecken">Entdecken</option>
+                    <option value="kontakte">Kontakte</option>
                     <option value="feedback">Feedback</option>
+                    <option value="forum">Forum</option>
+                    <option value="rezepte">Rezepte</option>
+                    <option value="abos">Abos</option>
+                    <option value="einstellungen">Einstellungen</option>
+                    <option value="einstellungen/profil">Profil</option>
                 </select>
             </div>
         </div>
@@ -97,7 +98,7 @@
         if (!userId) { showToast('Bitte einen Empfänger auswählen.', 'error'); return; }
 
         let deepLink = 'home';
-        if (code === 'admin.new_feature') deepLink = 'discover';
+        if (code === 'admin.new_feature') deepLink = 'entdecken';
         if (code === 'admin.welcome') deepLink = 'home';
 
         try {

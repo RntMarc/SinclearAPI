@@ -32,8 +32,9 @@ final readonly class AdminController
     ];
 
     private const array VALID_DEEP_LINKS = [
-        'home', 'travel', 'events', 'profile', 'settings',
-        'friends', 'discover', 'news', 'chat', 'feedback',
+        'home', 'reisen', 'kalender', 'entdecken', 'kontakte',
+        'feedback', 'forum', 'rezepte', 'abos',
+        'einstellungen', 'einstellungen/profil',
     ];
 
     public function __construct(
@@ -191,14 +192,20 @@ ROW;
     public function adminUsersJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $this->requireUser($request);
-        $users = $this->userRepo->findAll();
 
-        $result = array_map(fn(array $u) => [
-            'id' => $u['id'],
-            'email' => $u['email'],
-            'displayName' => $u['displayName'],
-            'isAdmin' => (bool) ($u['isAdmin'] ?? false),
-        ], $users);
+        $query = trim((string) ($request->getQueryParams()['q'] ?? ''));
+
+        if ($query !== '') {
+            $result = $this->userRepo->search($query);
+        } else {
+            $result = array_map(fn(array $u) => [
+                'id' => $u['id'],
+                'email' => $u['email'],
+                'displayName' => $u['displayName'],
+                'image' => $u['image'] ?? null,
+                'isAdmin' => (bool) ($u['isAdmin'] ?? false),
+            ], $this->userRepo->findAll());
+        }
 
         return ResponseFactory::json(['data' => $result], 200, $response);
     }

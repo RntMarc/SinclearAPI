@@ -45,13 +45,16 @@
     <div class="card" style="width:500px; max-width:90vw;">
         <h2 style="margin-bottom:1.5rem;">Teilnehmer hinzufügen</h2>
         <form id="addParticipantForm" onsubmit="return addParticipant(event)">
-            <div class="form-group">
-                <label for="participantName">Name (für Nicht-Nutzer)</label>
-                <input type="text" id="participantName">
+            <div class="form-group" style="position:relative;">
+                <label for="userSearch">App-Nutzer suchen</label>
+                <input type="text" id="userSearch" placeholder="Name oder E-Mail eingeben …" autocomplete="off">
+                <div id="userSearchResults" style="display:none; position:absolute; top:100%; left:0; right:0; background:#1a1a2e; border:1px solid #0f3460; border-radius:6px; max-height:200px; overflow-y:auto; z-index:10;"></div>
+                <input type="hidden" id="participantUserId">
+                <div id="selectedUser" style="display:none; margin-top:0.5rem; padding:0.5rem; background:#0f3460; border-radius:6px; font-size:0.9rem;"></div>
             </div>
             <div class="form-group">
-                <label for="participantUserId">Nutzer-ID (falls bekannt)</label>
-                <input type="text" id="participantUserId">
+                <label for="participantName">Name (bei Nicht-Nutzer ausfüllen)</label>
+                <input type="text" id="participantName">
             </div>
             <div class="form-group">
                 <label>
@@ -68,24 +71,105 @@
 
 <script>
     const subscriptionId = '{{subscriptionId}}';
+    let searchTimeout = null;
+    let selectedUserId = null;
 
     function showAddParticipantModal() {
         document.getElementById('addParticipantModal').style.display = 'flex';
+        selectedUserId = null;
+        document.getElementById('participantUserId').value = '';
+        document.getElementById('selectedUser').style.display = 'none';
+        document.getElementById('userSearch').value = '';
+        document.getElementById('participantName').value = '';
     }
 
     function hideAddParticipantModal() {
         document.getElementById('addParticipantModal').style.display = 'none';
         document.getElementById('addParticipantForm').reset();
+        document.getElementById('userSearchResults').style.display = 'none';
+        document.getElementById('selectedUser').style.display = 'none';
+        selectedUserId = null;
+        document.getElementById('participantUserId').value = '';
+    }
+
+    function selectUser(id, name, email, image) {
+        selectedUserId = id;
+        document.getElementById('participantUserId').value = id;
+        document.getElementById('userSearch').value = '';
+        document.getElementById('userSearchResults').style.display = 'none';
+        document.getElementById('participantName').value = '';
+
+        const avatar = image
+            ? '<img src="' + image + '" style="width:24px;height:24px;border-radius:50%;margin-right:0.5rem;">'
+            : '<span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#5865F2;text-align:center;line-height:24px;font-size:0.75rem;margin-right:0.5rem;">' + name.charAt(0).toUpperCase() + '</span>';
+
+        document.getElementById('selectedUser').innerHTML =
+            avatar + '<strong>' + name + '</strong> <span style="color:#888;">(' + email + ')</span>' +
+            ' <button type="button" onclick="clearSelectedUser()" style="background:none;border:none;color:#ff6b6b;cursor:pointer;margin-left:0.5rem;">×</button>';
+        document.getElementById('selectedUser').style.display = 'flex';
+        document.getElementById('selectedUser').style.alignItems = 'center';
+    }
+
+    function clearSelectedUser() {
+        selectedUserId = null;
+        document.getElementById('participantUserId').value = '';
+        document.getElementById('selectedUser').style.display = 'none';
+    }
+
+    document.getElementById('userSearch').addEventListener('input', function () {
+        clearTimeout(searchTimeout);
+        const q = this.value.trim();
+        if (q.length < 2) {
+            document.getElementById('userSearchResults').style.display = 'none';
+            return;
+        }
+        searchTimeout = setTimeout(() => searchUsers(q), 300);
+    });
+
+    document.getElementById('userSearch').addEventListener('blur', function () {
+        setTimeout(() => {
+            document.getElementById('userSearchResults').style.display = 'none';
+        }, 200);
+    });
+
+    async function searchUsers(q) {
+        try {
+            const res = await fetch('/api/v2/admin/users/json?q=' + encodeURIComponent(q), { credentials: 'same-origin' });
+            if (res.status === 401 || res.status === 403) {
+                window.location.href = '/api/v2/admin/login';
+                return;
+            }
+            const data = await res.json();
+            const users = data.data || [];
+            const container = document.getElementById('userSearchResults');
+
+            if (users.length === 0) {
+                container.innerHTML = '<div style="padding:0.5rem;color:#888;">Keine Ergebnisse</div>';
+                container.style.display = 'block';
+                return;
+            }
+
+            container.innerHTML = users.map(u => {
+                const avatar = u.image
+                    ? '<img src="' + u.image + '" style="width:28px;height:28px;border-radius:50%;margin-right:0.5rem;">'
+                    : '<span style="display:inline-block;width:28px;height:28px;border-radius:50%;background:#5865F2;text-align:center;line-height:28px;font-size:0.8rem;margin-right:0.5rem;">' + u.displayName.charAt(0).toUpperCase() + '</span>';
+                return '<div onmousedown="selectUser(\'' + u.id + '\', \'' + u.displayName.replace(/'/g, "\\'") + '\', \'' + u.email.replace(/'/g, "\\'") + '\', \'' + (u.image || '') + '\')" style="padding:0.5rem;cursor:pointer;display:flex;align-items:center;border-bottom:1px solid #0f3460;">' +
+                    avatar + '<div><strong>' + u.displayName + '</strong><br><span style="color:#888;font-size:0.85rem;">' + u.email + '</span></div></div>';
+            }).join('');
+            container.style.display = 'block';
+        } catch (e) {
+            showToast('Fehler bei der Suche', 'error');
+        }
     }
 
     async function addParticipant(event) {
         event.preventDefault();
+        const userId = selectedUserId || document.getElementById('participantUserId').value.trim();
         const name = document.getElementById('participantName').value.trim();
-        const userId = document.getElementById('participantUserId').value.trim();
         const hasPaid = document.getElementById('participantPaid').checked;
 
-        if (!name && !userId) {
-            showToast('Name oder Nutzer-ID angeben', 'error');
+        if (!userId && !name) {
+            showToast('Nutzer auswählen oder Name eingeben', 'error');
             return false;
         }
 
