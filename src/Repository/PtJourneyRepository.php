@@ -43,7 +43,7 @@ final readonly class PtJourneyRepository
     public function findParticipantsByJourney(string $journeyId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT u.id, u.displayName, u.avatarUrl
+            'SELECT u.id, u.displayName, u.image
              FROM PtParticipant p
              JOIN User u ON u.id = p.userId
              WHERE p.journeyId = ?

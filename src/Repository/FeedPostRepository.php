@@ -27,13 +27,14 @@ final readonly class FeedPostRepository
 
         $offset = ($page - 1) * $limit;
 
-        $sql = 'SELECT p.*, COUNT(v.id) AS upvoteCount, COUNT(fc.id) AS commentCount';
+        $sql = 'SELECT p.*, u.displayName AS userDisplayName, u.image AS userImage, COUNT(v.id) AS upvoteCount, COUNT(fc.id) AS commentCount';
         if ($userId !== null) {
             $sql .= ', COALESCE(MAX(CASE WHEN v.userId = ? THEN 1 END), 0) AS hasVoted';
         }
         $sql .= ' FROM FeedPosts p'
             . ' LEFT JOIN FeedPostVote v ON v.postId = p.id'
             . ' LEFT JOIN FeedPostComment fc ON fc.postId = p.id AND fc.text IS NOT NULL'
+            . ' LEFT JOIN User u ON u.id = p.userId'
             . ' WHERE p.forumId = ?';
         if ($userId !== null) {
             $sql .= ' GROUP BY p.id ORDER BY p.createdAt DESC LIMIT ? OFFSET ?';

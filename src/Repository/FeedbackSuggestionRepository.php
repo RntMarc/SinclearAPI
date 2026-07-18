@@ -26,13 +26,14 @@ final readonly class FeedbackSuggestionRepository
 
         $offset = ($page - 1) * $limit;
 
-        $sql = 'SELECT s.*, COUNT(v.id) AS upvoteCount, COUNT(fc.id) AS commentCount';
+        $sql = 'SELECT s.*, u.displayName AS userDisplayName, u.image AS userImage, COUNT(v.id) AS upvoteCount, COUNT(fc.id) AS commentCount';
         if ($userId !== null) {
             $sql .= ', COALESCE(MAX(CASE WHEN v.userId = ? THEN 1 END), 0) AS hasVoted';
         }
         $sql .= ' FROM FeedbackSuggestion s'
             . ' LEFT JOIN FeedbackVote v ON v.suggestionId = s.id'
-            . ' LEFT JOIN FeedbackComment fc ON fc.suggestionId = s.id AND fc.text IS NOT NULL';
+            . ' LEFT JOIN FeedbackComment fc ON fc.suggestionId = s.id AND fc.text IS NOT NULL'
+            . ' LEFT JOIN User u ON u.id = s.userId';
         if ($userId !== null) {
             $sql .= ' GROUP BY s.id ORDER BY upvoteCount DESC, s.createdAt DESC LIMIT ? OFFSET ?';
             $dataStmt = $this->pdo->prepare($sql);

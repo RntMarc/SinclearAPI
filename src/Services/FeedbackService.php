@@ -230,6 +230,8 @@ final readonly class FeedbackService
             'id' => $c['id'],
             'suggestionId' => $c['suggestionId'],
             'userId' => $c['userId'],
+            'userDisplayName' => $c['userDisplayName'] ?? null,
+            'userImage' => $c['userImage'] ?? null,
             'parentId' => $c['parentId'],
             'text' => $c['text'],
             'createdAt' => $c['createdAt'],
@@ -366,6 +368,8 @@ final readonly class FeedbackService
         $result = [
             'id' => $s['id'],
             'userId' => $s['userId'],
+            'userDisplayName' => $s['userDisplayName'] ?? null,
+            'userImage' => $s['userImage'] ?? null,
             'title' => $s['title'],
             'description' => $s['description'],
             'status' => $s['status'],

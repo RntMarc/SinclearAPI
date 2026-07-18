@@ -71,27 +71,25 @@ final readonly class SubscriptionRepository
     public function findByUserId(string $userId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.*, sr.id AS relationId, sr.isUser, sr.userName, sr.hasPaid,
-                    CASE WHEN sr.userId = ? THEN 1 ELSE 0 END AS isCreator
+            'SELECT s.*, sr.id AS relationId, sr.isUser, sr.userName, sr.hasPaid
              FROM Subscription s
              JOIN SubscriptionRelation sr ON sr.subscriptionId = s.id
-             WHERE sr.userId = ? OR sr.isUser = 0
+             WHERE sr.userId = ?
              ORDER BY s.name ASC'
         );
-        $stmt->execute([$userId, $userId]);
+        $stmt->execute([$userId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function findByIdWithAccess(string $id, string $userId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT s.*, sr.id AS relationId, sr.isUser, sr.userName, sr.hasPaid,
-                    CASE WHEN sr.userId = ? THEN 1 ELSE 0 END AS isCreator
+            'SELECT s.*, sr.id AS relationId, sr.isUser, sr.userName, sr.hasPaid
              FROM Subscription s
              JOIN SubscriptionRelation sr ON sr.subscriptionId = s.id
-             WHERE s.id = ? AND (sr.userId = ? OR sr.isUser = 0)'
+             WHERE s.id = ? AND sr.userId = ?'
         );
-        $stmt->execute([$userId, $id, $userId]);
+        $stmt->execute([$id, $userId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
@@ -99,8 +97,10 @@ final readonly class SubscriptionRepository
     public function findParticipants(string $subscriptionId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT sr.id, sr.userId, sr.userName, sr.isUser, sr.hasPaid
+            'SELECT sr.id, sr.userId, sr.userName, sr.isUser, sr.hasPaid,
+                    u.displayName AS userDisplayName, u.image AS userImage
              FROM SubscriptionRelation sr
+             LEFT JOIN User u ON u.id = sr.userId
              WHERE sr.subscriptionId = ?
              ORDER BY sr.userName ASC, sr.userId ASC'
         );

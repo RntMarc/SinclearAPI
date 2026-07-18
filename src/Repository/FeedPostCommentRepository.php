@@ -22,7 +22,11 @@ final readonly class FeedPostCommentRepository
     public function listByPost(string $postId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM FeedPostComment WHERE postId = ? ORDER BY createdAt ASC'
+            'SELECT c.*, u.displayName AS userDisplayName, u.image AS userImage
+             FROM FeedPostComment c
+             LEFT JOIN User u ON u.id = c.userId
+             WHERE c.postId = ?
+             ORDER BY c.createdAt ASC'
         );
         $stmt->execute([$postId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

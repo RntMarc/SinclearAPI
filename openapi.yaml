@@ -1204,6 +1204,14 @@ components:
           type: string
           format: uuid
           description: Ersteller des Kalender-Events
+        creatorDisplayName:
+          type: string
+          nullable: true
+          description: Name des Erstellers
+        creatorImage:
+          type: string
+          nullable: true
+          description: Profilbild des Erstellers (Base64)
         title:
           type: string
           example: Team Meeting
@@ -1900,6 +1908,14 @@ components:
         userId:
           type: string
           format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Name des Nutzers
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
         title:
           type: string
           example: "Dunkelmodus für die App"
@@ -2024,6 +2040,14 @@ components:
         userId:
           type: string
           format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Name des Nutzers
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
         parentId:
           type: string
           format: uuid
@@ -2247,6 +2271,14 @@ components:
         userId:
           type: string
           format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Name des Nutzers
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
         type:
           type: string
           enum: [text, music, video, web]
@@ -2414,6 +2446,14 @@ components:
         userId:
           type: string
           format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Name des Nutzers
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
         parentId:
           type: string
           format: uuid
@@ -2546,6 +2586,14 @@ components:
           type: string
           format: uuid
           description: ID des bewertenden Nutzers
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Name des Nutzers
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
         rating:
           type: integer
           minimum: 1
@@ -2600,6 +2648,14 @@ components:
           type: string
           format: uuid
           description: ID des Erstellers
+        creatorDisplayName:
+          type: string
+          nullable: true
+          description: Name des Erstellers
+        creatorImage:
+          type: string
+          nullable: true
+          description: Profilbild des Erstellers (Base64)
         createdAt:
           type: string
           format: date-time
@@ -6006,11 +6062,23 @@ paths:
     get:
       summary: Eigene Abonnements auflisten
       description: >
-        Gibt alle Abonnements zurück, an denen der Nutzer beteiligt ist
-        (als Ersteller oder als Teilnehmer).
+        Gibt die Abonnements des Nutzers zurück, an denen er beteiligt ist.
+        Mit dem Parameter `all=1` (nur für Administratoren) werden alle Abos
+        des Systems zurückgegeben (für Admin-Dashboard).
       tags: [Subscriptions]
       security:
         - BearerAuth: []
+      parameters:
+        - name: all
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['0', '1']
+            default: '0'
+          description: >-
+            Nur für Administratoren: Gibt alle Abos des Systems zurück
+            statt nur der eigenen.
       responses:
         '200':
           description: Liste der Abonnements
@@ -6134,10 +6202,6 @@ components:
           type: number
           format: double
           description: Grundpreis des Abonnements
-        role:
-          type: string
-          enum: [creator, participant]
-          description: Rolle des Nutzers bei diesem Abo
         hasPaid:
           type: boolean
           description: Ob der Nutzer bereits bezahlt hat
@@ -6161,6 +6225,14 @@ components:
           type: string
           nullable: true
           description: Name des Teilnehmers (bei Nicht-Nutzern)
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Angezeigter Name des Nutzers (aus User-Tabelle)
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
         isUser:
           type: boolean
           description: Ob es sich um einen registrierten Nutzer handelt

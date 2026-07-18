@@ -72,7 +72,12 @@ final readonly class CalendarEventRepository
 
     public function findById(string $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM CalendarEvent WHERE id = ?');
+        $stmt = $this->pdo->prepare(
+            'SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
+             FROM CalendarEvent e
+             LEFT JOIN User u ON u.id = e.creatorId
+             WHERE e.id = ?'
+        );
         $stmt->execute([$id]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
@@ -118,7 +123,10 @@ final readonly class CalendarEventRepository
 
         $offset = ($page - 1) * $limit;
         $dataStmt = $this->pdo->prepare(
-            "SELECT e.* FROM CalendarEvent e WHERE $where ORDER BY e.startTime ASC LIMIT ? OFFSET ?"
+            "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
+             FROM CalendarEvent e
+             LEFT JOIN User u ON u.id = e.creatorId
+             WHERE $where ORDER BY e.startTime ASC LIMIT ? OFFSET ?"
         );
         $dataStmt->execute([...$params, $limit, $offset]);
         $events = $dataStmt->fetchAll(PDO::FETCH_ASSOC);

@@ -10,8 +10,16 @@ final readonly class SubscriptionService
         private SubscriptionRepository $subscriptionRepo,
     ) {}
 
-    public function listByUser(string $userId): array
+    public function listByUser(string $userId, bool $adminAll = false): array
     {
+        if ($adminAll) {
+            $subscriptions = $this->subscriptionRepo->findAll();
+
+            return array_map(function (array $sub) {
+                return $this->enrichAdmin($sub);
+            }, $subscriptions);
+        }
+
         $subscriptions = $this->subscriptionRepo->findByUserId($userId);
 
         return array_map(function (array $sub) use ($userId) {
@@ -110,7 +118,6 @@ final readonly class SubscriptionService
             'billingPeriodStart' => $subscription['billingPeriodStart'],
             'billingPeriodEnd' => $subscription['billingPeriodEnd'],
             'basePrice' => (float) $subscription['basePrice'],
-            'role' => ((int) ($subscription['isCreator'] ?? 0)) === 1 ? 'creator' : 'participant',
             'hasPaid' => (bool) $subscription['hasPaid'],
         ];
 

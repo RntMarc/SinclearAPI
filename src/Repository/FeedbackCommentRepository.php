@@ -22,7 +22,11 @@ final readonly class FeedbackCommentRepository
     public function listBySuggestion(string $suggestionId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM FeedbackComment WHERE suggestionId = ? ORDER BY createdAt ASC'
+            'SELECT c.*, u.displayName AS userDisplayName, u.image AS userImage
+             FROM FeedbackComment c
+             LEFT JOIN User u ON u.id = c.userId
+             WHERE c.suggestionId = ?
+             ORDER BY c.createdAt ASC'
         );
         $stmt->execute([$suggestionId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

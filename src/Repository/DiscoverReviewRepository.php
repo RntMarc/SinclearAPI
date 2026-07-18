@@ -34,7 +34,11 @@ final readonly class DiscoverReviewRepository
 
         $offset = ($page - 1) * $limit;
         $dataStmt = $this->pdo->prepare(
-            'SELECT * FROM DiscoverReview WHERE placeId = ? ORDER BY createdAt DESC LIMIT ? OFFSET ?'
+            'SELECT r.*, u.displayName AS userDisplayName, u.image AS userImage
+             FROM DiscoverReview r
+             LEFT JOIN User u ON u.id = r.userId
+             WHERE r.placeId = ?
+             ORDER BY r.createdAt DESC LIMIT ? OFFSET ?'
         );
         $dataStmt->execute([$placeId, $limit, $offset]);
         $reviews = $dataStmt->fetchAll(PDO::FETCH_ASSOC);

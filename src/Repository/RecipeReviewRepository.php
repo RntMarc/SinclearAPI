@@ -27,7 +27,11 @@ final readonly class RecipeReviewRepository
 
         $offset = ($page - 1) * $limit;
         $dataStmt = $this->pdo->prepare(
-            'SELECT * FROM RecipeReview WHERE recipeId = ? ORDER BY createdAt DESC LIMIT ? OFFSET ?'
+            'SELECT r.*, u.displayName AS userDisplayName, u.image AS userImage
+             FROM RecipeReview r
+             LEFT JOIN User u ON u.id = r.userId
+             WHERE r.recipeId = ?
+             ORDER BY r.createdAt DESC LIMIT ? OFFSET ?'
         );
         $dataStmt->execute([$recipeId, $limit, $offset]);
         $reviews = $dataStmt->fetchAll(PDO::FETCH_ASSOC);

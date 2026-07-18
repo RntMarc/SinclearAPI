@@ -78,6 +78,8 @@ final readonly class ReviewService
             'id' => $review['id'],
             'placeId' => $review['placeId'],
             'userId' => $review['userId'],
+            'userDisplayName' => $review['userDisplayName'] ?? null,
+            'userImage' => $review['userImage'] ?? null,
             'rating' => (int) $review['rating'],
             'comment' => $review['comment'],
             'createdAt' => $review['createdAt'],

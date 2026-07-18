@@ -22,8 +22,15 @@ final readonly class SubscriptionController
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
 
-        $subscriptions = $this->subscriptionService->listByUser($user->id);
+        $adminAll = isset($params['all']) && $params['all'] === '1';
+
+        if ($adminAll && !$user->isAdmin) {
+            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        }
+
+        $subscriptions = $this->subscriptionService->listByUser($user->id, $adminAll);
         return ResponseFactory::json(['data' => $subscriptions], 200, $response);
     }
 
