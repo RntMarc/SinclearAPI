@@ -72,11 +72,13 @@ use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
+use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Services\PtService;
+use Sinclear\Api\Services\SubscriptionService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
 use Sinclear\Api\Security\Policy\LocationSharingPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
@@ -335,6 +337,11 @@ return [
     AdminMiddleware::class => create(),
 
     AdminController::class => autowire(),
+
+    SubscriptionRepository::class => autowire(),
+    SubscriptionService::class => autowire(),
+    SubscriptionController::class => autowire(),
+    SubscriptionPolicy::class => autowire(),
 
     AppController::class => function (ContainerInterface $c): AppController {
         $settings = $c->get(Settings::class);

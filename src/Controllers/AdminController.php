@@ -13,10 +13,12 @@ use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\SubscriptionService;
 
 final readonly class AdminController
 {
@@ -46,6 +48,8 @@ final readonly class AdminController
         private EventRelationRepository $eventRelationRepo,
         private ForumRepository $forumRepo,
         private ForumMemberRepository $forumMemberRepo,
+        private SubscriptionRepository $subscriptionRepo,
+        private SubscriptionService $subscriptionService,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -1155,6 +1159,224 @@ ROW;
                 'code' => $code,
             ],
         ], 201, $response);
+    }
+
+    public function subscriptions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $subscriptions = $this->subscriptionService->listAll();
+
+        $rows = '';
+        foreach ($subscriptions as $sub) {
+            $start = date('d.m.Y', strtotime($sub['billingPeriodStart']));
+            $end = date('d.m.Y', strtotime($sub['billingPeriodEnd']));
+            $price = number_format($sub['basePrice'], 2, ',', '.') . ' €';
+            $rows .= <<<ROW
+            <tr>
+                <td>{$sub['id']}</td>
+                <td>{$sub['name']}</td>
+                <td>{$start}</td>
+                <td>{$end}</td>
+                <td>{$price}</td>
+                <td>{$sub['participantCount']}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="editSubscription('{$sub['id']}', '{$sub['name']}', '{$sub['billingPeriodStart']}', '{$sub['billingPeriodEnd']}', {$sub['basePrice']})">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteSubscription('{$sub['id']}')">Löschen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        $contentHtml = $this->renderTemplate('subscriptions.php', ['rows' => $rows]);
+        $html = $this->renderLayout('Abonnements', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminSubscriptionsJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $subscriptions = $this->subscriptionService->listAll();
+
+        return ResponseFactory::json(['data' => $subscriptions], 200, $response);
+    }
+
+    public function createSubscription(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $name = trim((string) ($body['name'] ?? ''));
+        $billingPeriodStart = trim((string) ($body['billingPeriodStart'] ?? ''));
+        $billingPeriodEnd = trim((string) ($body['billingPeriodEnd'] ?? ''));
+        $basePrice = isset($body['basePrice']) ? (float) $body['basePrice'] : null;
+
+        if ($name === '') {
+            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+        }
+        if ($billingPeriodStart === '' || $billingPeriodEnd === '') {
+            return ResponseFactory::json(['error' => 'billing_period_required'], 400, $response);
+        }
+        if ($basePrice === null || $basePrice < 0) {
+            return ResponseFactory::json(['error' => 'invalid_base_price'], 400, $response);
+        }
+
+        try {
+            $subscription = $this->subscriptionService->create([
+                'name' => $name,
+                'billingPeriodStart' => $billingPeriodStart,
+                'billingPeriodEnd' => $billingPeriodEnd,
+                'basePrice' => $basePrice,
+            ]);
+            return ResponseFactory::json(['data' => $subscription], 201, $response);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => 'creation_failed'], 500, $response);
+        }
+    }
+
+    public function updateSubscription(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $data = [];
+
+        if (isset($body['name'])) {
+            $name = trim((string) $body['name']);
+            if ($name === '') {
+                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+            }
+            $data['name'] = $name;
+        }
+
+        if (isset($body['billingPeriodStart'])) {
+            $data['billingPeriodStart'] = trim((string) $body['billingPeriodStart']);
+        }
+
+        if (isset($body['billingPeriodEnd'])) {
+            $data['billingPeriodEnd'] = trim((string) $body['billingPeriodEnd']);
+        }
+
+        if (isset($body['basePrice'])) {
+            $basePrice = (float) $body['basePrice'];
+            if ($basePrice < 0) {
+                return ResponseFactory::json(['error' => 'invalid_base_price'], 400, $response);
+            }
+            $data['basePrice'] = $basePrice;
+        }
+
+        if ($data === []) {
+            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
+        }
+
+        try {
+            $subscription = $this->subscriptionService->update($args['id'], $data);
+            return ResponseFactory::json(['data' => $subscription], 200, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'Subscription not found' ? 404 : 500;
+            $error = $e->getMessage() === 'Subscription not found' ? 'subscription_not_found' : 'update_failed';
+            return ResponseFactory::json(['error' => $error], $code, $response);
+        }
+    }
+
+    public function deleteSubscription(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        try {
+            $this->subscriptionService->delete($args['id']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'Subscription not found' ? 404 : 500;
+            $error = $e->getMessage() === 'Subscription not found' ? 'subscription_not_found' : 'delete_failed';
+            return ResponseFactory::json(['error' => $error], $code, $response);
+        }
+    }
+
+    public function addSubscriptionParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $userName = !empty($body['userName']) ? trim((string) $body['userName']) : null;
+        $userId = !empty($body['userId']) ? trim((string) $body['userId']) : null;
+        $hasPaid = isset($body['hasPaid']) ? (bool) $body['hasPaid'] : false;
+
+        if ($userName === null && $userId === null) {
+            return ResponseFactory::json(['error' => 'userName_or_userId_required'], 400, $response);
+        }
+
+        try {
+            $participant = $this->subscriptionService->addParticipant($args['id'], [
+                'userId' => $userId,
+                'isUser' => $userId !== null ? 1 : 0,
+                'userName' => $userName,
+                'hasPaid' => $hasPaid ? 1 : 0,
+            ]);
+            return ResponseFactory::json(['data' => $participant], 201, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'Subscription not found' ? 404 : 500;
+            $error = $e->getMessage() === 'Subscription not found' ? 'subscription_not_found' : 'add_participant_failed';
+            return ResponseFactory::json(['error' => $error], $code, $response);
+        }
+    }
+
+    public function removeSubscriptionParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        try {
+            $this->subscriptionService->removeParticipant($args['participantId']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'Participant not found' ? 404 : 500;
+            $error = $e->getMessage() === 'Participant not found' ? 'participant_not_found' : 'remove_participant_failed';
+            return ResponseFactory::json(['error' => $error], $code, $response);
+        }
+    }
+
+    public function subscriptionDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $subscription = $this->subscriptionRepo->findById($args['id']);
+
+        if ($subscription === null) {
+            $response->getBody()->write('Abo nicht gefunden');
+            return $response->withStatus(404)->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $participants = $this->subscriptionRepo->findParticipants($args['id']);
+
+        $participantRows = '';
+        foreach ($participants as $p) {
+            $name = $p['userName'] ?? $p['userId'] ?? 'Unbekannt';
+            $paidBadge = $p['hasPaid']
+                ? '<span class="badge badge-success">Bezahlt</span>'
+                : '<span class="badge badge-danger">Offen</span>';
+            $userBadge = $p['isUser'] ? '<span class="badge badge-admin">Nutzer</span>' : '';
+            $participantRows .= <<<ROW
+            <tr>
+                <td>{$name}</td>
+                <td>{$userBadge}</td>
+                <td>{$paidBadge}</td>
+                <td><button class="btn btn-sm btn-danger" onclick="removeParticipant('{$args['id']}', '{$p['id']}')">Entfernen</button></td>
+            </tr>
+ROW;
+        }
+
+        $contentHtml = $this->renderTemplate('subscription_detail.php', [
+            'subscriptionId' => $args['id'],
+            'subscriptionName' => htmlspecialchars($subscription['name']),
+            'billingPeriodStart' => $subscription['billingPeriodStart'],
+            'billingPeriodEnd' => $subscription['billingPeriodEnd'],
+            'basePrice' => number_format($subscription['basePrice'], 2, ',', '.'),
+            'participantRows' => $participantRows,
+        ]);
+        $html = $this->renderLayout('Abo-Details', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
     }
 
     private function renderLayout(string $title, string $content, string $userEmail): string

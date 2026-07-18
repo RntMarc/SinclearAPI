@@ -15,6 +15,7 @@ use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
+use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Middleware\AdminMiddleware;
@@ -180,6 +181,12 @@ return function (App $app): void {
         $group->delete('/{id}', [NotificationController::class, 'markRead']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    $app->group('/subscriptions', function (RouteCollectorProxy $group) {
+        $group->get('', [SubscriptionController::class, 'list']);
+        $group->get('/{id}', [SubscriptionController::class, 'get']);
+        $group->get('/{id}/participants', [SubscriptionController::class, 'getParticipants']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
     $app->group('/feedback', function (RouteCollectorProxy $group) {
         $group->post('/bug-report', [FeedbackController::class, 'bugReport']);
         $group->get('/suggestions', [FeedbackController::class, 'list']);
@@ -284,5 +291,13 @@ return function (App $app): void {
         $group->delete('/travel/events/{id}/participants/{userId}', [AdminController::class, 'removeEventParticipant']);
         $group->get('/notifications', [AdminController::class, 'notifications']);
         $group->post('/notifications/send', [AdminController::class, 'sendNotification']);
+        $group->get('/subscriptions', [AdminController::class, 'subscriptions']);
+        $group->get('/subscriptions/json', [AdminController::class, 'adminSubscriptionsJson']);
+        $group->post('/subscriptions', [AdminController::class, 'createSubscription']);
+        $group->get('/subscriptions/{id}', [AdminController::class, 'subscriptionDetail']);
+        $group->put('/subscriptions/{id}', [AdminController::class, 'updateSubscription']);
+        $group->delete('/subscriptions/{id}', [AdminController::class, 'deleteSubscription']);
+        $group->post('/subscriptions/{id}/participants', [AdminController::class, 'addSubscriptionParticipant']);
+        $group->delete('/subscriptions/{id}/participants/{participantId}', [AdminController::class, 'removeSubscriptionParticipant']);
     })->add($container->get(AdminMiddleware::class));
 };
