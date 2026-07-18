@@ -298,6 +298,7 @@ return function (App $app): void {
         $group->put('/subscriptions/{id}', [AdminController::class, 'updateSubscription']);
         $group->delete('/subscriptions/{id}', [AdminController::class, 'deleteSubscription']);
         $group->post('/subscriptions/{id}/participants', [AdminController::class, 'addSubscriptionParticipant']);
+        $group->put('/subscriptions/{id}/participants/{participantId}', [AdminController::class, 'updateSubscriptionParticipant']);
         $group->delete('/subscriptions/{id}/participants/{participantId}', [AdminController::class, 'removeSubscriptionParticipant']);
     })->add($container->get(AdminMiddleware::class));
 };

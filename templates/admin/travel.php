@@ -500,7 +500,7 @@
         } catch (e) { showToast('Fehler beim Erstellen', 'error'); }
     }
 
-    function editEvent(id, name, description, trip, start, end, hastickets, ticket, ticketUrl, url, image, organizer, address) {
+    function editEvent(id, name, description, trip, start, end, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID) {
         document.getElementById('editEventId').value = id;
         document.getElementById('editEventName').value = name;
         document.getElementById('editEventDescription').value = description;
@@ -516,7 +516,9 @@
         document.getElementById('editEventImage').value = image || '';
         document.getElementById('editEventOrganizer').value = organizer || '';
         document.getElementById('editEventAddress').value = address || '';
-        // Note: latitude, longitude, OSMID are not passed via onclick to keep URL manageable
+        document.getElementById('editEventLatitude').value = latitude || '';
+        document.getElementById('editEventLongitude').value = longitude || '';
+        document.getElementById('editEventOSMID').value = OSMID || '';
         showEditEventForm();
     }
 

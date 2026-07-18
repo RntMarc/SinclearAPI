@@ -110,6 +110,18 @@ final readonly class SubscriptionService
         $this->subscriptionRepo->removeParticipant($participantId);
     }
 
+    public function updateParticipant(string $participantId, array $data): array
+    {
+        $participant = $this->subscriptionRepo->findParticipantById($participantId);
+        if ($participant === null) {
+            throw new \RuntimeException('Participant not found');
+        }
+
+        $this->subscriptionRepo->updateParticipant($participantId, $data);
+
+        return $this->subscriptionRepo->findParticipantById($participantId);
+    }
+
     private function enrich(array $subscription, string $userId): array
     {
         $result = [

@@ -258,7 +258,7 @@ ROW;
                 <td>{$eStart}</td>
                 <td>{$eEnd}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editEvent('{$eId}', `{$eName}`, `{$eDesc}`, '{$eTripId}', '{$e['start']}', '{$e['end']}', '{$e['hastickets']}', `{$e['ticket']}`, `{$e['ticketUrl']}`, `{$e['url']}`, `{$e['image']}`, `{$e['organizer']}`, `{$e['address']}")">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editEvent('{$eId}', `{$eName}`, `{$eDesc}`, '{$eTripId}', '{$e['start']}', '{$e['end']}', '{$e['hastickets']}', `{$e['ticket']}`, `{$e['ticketUrl']}`, `{$e['url']}`, `{$e['image']}`, `{$e['organizer']}`, `{$e['address']}`, `{$e['latitude']}`, `{$e['longitude']}`, `{$e['OSMID']}`)">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteEvent('{$eId}', '{$eName}')">Löschen</button>
                 </td>
             </tr>
@@ -519,29 +519,6 @@ ROW;
         $participants = $this->travelRelationRepo->findParticipantRelationsByTrip($id);
         $participantCount = count($participants);
 
-        $participantRows = '';
-        foreach ($participants as $p) {
-            $pUserId = htmlspecialchars($p['userid']);
-            $pName = htmlspecialchars($p['displayName']);
-            $pEmail = htmlspecialchars($p['email']);
-            $pAcc = htmlspecialchars($p['accommodationName'] ?? '–');
-            $participantRows .= <<<ROW
-            <tr>
-                <td>{$pName}</td>
-                <td>{$pEmail}</td>
-                <td>
-                    <select class="acc-select" data-userid="{$pUserId}" onchange="changeAccommodation('{$pUserId}', this)" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.3rem;max-width:180px;">
-                        <option value="">– Keine –</option>
-                        {{accommodationOptionsForSelect}}
-                    </select>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-danger" onclick="removeParticipant('{$pUserId}', '{$pName}')">Entfernen</button>
-                </td>
-            </tr>
-ROW;
-        }
-
         // All accommodations for the select dropdown + pre-select current
         $allAccommodations = $this->accommodationRepo->findAll();
         $accommodationOptionsForSelect = '';
@@ -551,8 +528,7 @@ ROW;
             $accommodationOptionsForSelect .= "<option value=\"{$aId}\">{$aName}</option>";
         }
 
-        // Fix the participantRows to have proper selected option
-        $fixedParticipantRows = '';
+        $participantRows = '';
         foreach ($participants as $p) {
             $pUserId = htmlspecialchars($p['userid']);
             $pName = htmlspecialchars($p['displayName']);
@@ -565,7 +541,7 @@ ROW;
                 $selected = $aId === $currentAccId ? ' selected' : '';
                 $options .= "<option value=\"{$aId}\"{$selected}>{$aName}</option>";
             }
-            $fixedParticipantRows .= <<<ROW
+            $participantRows .= <<<ROW
             <tr>
                 <td>{$pName}</td>
                 <td>{$pEmail}</td>
@@ -616,27 +592,53 @@ ROW;
 ROW;
         }
 
-        // Events for this trip
+        // Events for this trip (linked events with unlink button)
+        $allTrips = $this->tripRepo->findAll();
+        $tripById = [];
+        foreach ($allTrips as $t) {
+            $tripById[$t['id']] = $t['name'];
+        }
+
         $tripEvents = $this->eventRepo->findByTrip($id);
-        $eventSection = '';
-        if (count($tripEvents) > 0) {
-            $eventSection .= '<table><thead><tr><th>Name</th><th>Start</th><th>Ende</th></tr></thead><tbody>';
+        $tripEventCount = count($tripEvents);
+        $tripEventRows = '';
+        if ($tripEventCount > 0) {
+            $tripEventRows .= '<table><thead><tr><th>Name</th><th>Start</th><th>Ende</th><th>Aktionen</th></tr></thead><tbody>';
             foreach ($tripEvents as $e) {
                 $eId = htmlspecialchars($e['ID']);
                 $eName = htmlspecialchars($e['name']);
                 $eStart = date('d.m.Y H:i', strtotime($e['start']));
                 $eEnd = date('d.m.Y H:i', strtotime($e['end']));
-                $eventSection .= <<<ROW
+                $tripEventRows .= <<<ROW
                 <tr>
                     <td><a href="/api/v2/admin/travel/events/{$eId}" style="color:#5865F2;text-decoration:none;">{$eName}</a></td>
                     <td>{$eStart}</td>
                     <td>{$eEnd}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="unlinkEvent('{$eId}', '{$eName}')">Trennen</button>
+                    </td>
                 </tr>
 ROW;
             }
-            $eventSection .= '</tbody></table>';
+            $tripEventRows .= '</tbody></table>';
         } else {
-            $eventSection = '<p style="color:#666;">Keine Events für diese Reise.</p>';
+            $tripEventRows = '<p style="color:#666;">Keine Events für diese Reise.</p>';
+        }
+
+        // All events not linked to this trip (for the link dropdown)
+        $allEvents = $this->eventRepo->findAll();
+        $availableEventOptions = '';
+        foreach ($allEvents as $e) {
+            if (($e['trip'] ?? null) === $id) {
+                continue;
+            }
+            $eId = htmlspecialchars($e['ID']);
+            $eName = htmlspecialchars($e['name']);
+            $eTripLabel = '';
+            if (!empty($e['trip'])) {
+                $eTripLabel = ' (Reise: ' . htmlspecialchars($tripById[$e['trip']] ?? $e['trip']) . ')';
+            }
+            $availableEventOptions .= "<option value=\"{$eId}\">{$eName}{$eTripLabel}</option>";
         }
 
         $tripName = htmlspecialchars($trip['name']);
@@ -650,12 +652,14 @@ ROW;
             'tripDescription' => $tripDesc,
             'tripStart' => $tripStart,
             'tripEnd' => $tripEnd,
-            'participantRows' => $fixedParticipantRows,
+            'participantRows' => $participantRows,
             'participantCount' => $participantCount,
             'userOptions' => $userOptions,
             'accommodationOptions' => $accommodationOptionsForSelect,
             'accommodationRows' => $accommodationRows,
-            'eventSection' => $eventSection,
+            'tripEventRows' => $tripEventRows,
+            'tripEventCount' => $tripEventCount,
+            'availableEventOptions' => $availableEventOptions,
         ]);
         $html = $this->renderLayout("Reise: {$tripName}", $contentHtml, $user->email);
 
@@ -913,6 +917,15 @@ ROW;
             'OSMID' => $event['OSMID'] ?? '',
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_SINGLE | JSON_HEX_QUOT);
 
+        // Trip options for the edit form
+        $allTrips = $this->tripRepo->findAll();
+        $tripOptions = '<option value="">– Keine Reise (Standalone) –</option>';
+        foreach ($allTrips as $t) {
+            $tid = htmlspecialchars($t['id']);
+            $tname = htmlspecialchars($t['name']);
+            $tripOptions .= "<option value=\"{$tid}\">{$tname}</option>";
+        }
+
         $contentHtml = $this->renderTemplate('event_detail.php', [
             'eventId' => $id,
             'eventName' => $eventName,
@@ -926,6 +939,7 @@ ROW;
             'participantRows' => $participantRows,
             'participantCount' => $participantCount,
             'userOptions' => $userOptions,
+            'tripOptions' => $tripOptions,
             'eventEditData' => $editData,
         ]);
         $html = $this->renderLayout("Event: {$eventName}", $contentHtml, $user->email);
@@ -1171,6 +1185,7 @@ ROW;
             $start = date('d.m.Y', strtotime($sub['billingPeriodStart']));
             $end = date('d.m.Y', strtotime($sub['billingPeriodEnd']));
             $price = number_format($sub['basePrice'], 2, ',', '.') . ' €';
+            $participantBadge = '<span class="badge badge-admin">' . $sub['participantCount'] . '</span>';
             $rows .= <<<ROW
             <tr>
                 <td>{$sub['id']}</td>
@@ -1178,8 +1193,9 @@ ROW;
                 <td>{$start}</td>
                 <td>{$end}</td>
                 <td>{$price}</td>
-                <td>{$sub['participantCount']}</td>
+                <td>{$participantBadge}</td>
                 <td>
+                    <a href="/api/v2/admin/subscriptions/{$sub['id']}" class="btn btn-sm">Details</a>
                     <button class="btn btn-sm" onclick="editSubscription('{$sub['id']}', '{$sub['name']}', '{$sub['billingPeriodStart']}', '{$sub['billingPeriodEnd']}', {$sub['basePrice']})">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteSubscription('{$sub['id']}')">Löschen</button>
                 </td>
@@ -1336,6 +1352,29 @@ ROW;
         }
     }
 
+    public function updateSubscriptionParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $hasPaid = isset($body['hasPaid']) ? (bool) $body['hasPaid'] : null;
+
+        if ($hasPaid === null) {
+            return ResponseFactory::json(['error' => 'hasPaid_required'], 400, $response);
+        }
+
+        try {
+            $participant = $this->subscriptionService->updateParticipant($args['participantId'], [
+                'hasPaid' => $hasPaid ? 1 : 0,
+            ]);
+            return ResponseFactory::json(['data' => $participant], 200, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'Participant not found' ? 404 : 500;
+            $error = $e->getMessage() === 'Participant not found' ? 'participant_not_found' : 'update_participant_failed';
+            return ResponseFactory::json(['error' => $error], $code, $response);
+        }
+    }
+
     public function subscriptionDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);
@@ -1351,25 +1390,34 @@ ROW;
         $participantRows = '';
         foreach ($participants as $p) {
             $name = $p['userName'] ?? $p['userId'] ?? 'Unbekannt';
+            if (!empty($p['userDisplayName'])) {
+                $name = htmlspecialchars($p['userDisplayName']);
+            }
             $paidBadge = $p['hasPaid']
                 ? '<span class="badge badge-success">Bezahlt</span>'
                 : '<span class="badge badge-danger">Offen</span>';
             $userBadge = $p['isUser'] ? '<span class="badge badge-admin">Nutzer</span>' : '';
+            $hasPaidBool = $p['hasPaid'] ? 'true' : 'false';
             $participantRows .= <<<ROW
             <tr>
-                <td>{$name}</td>
-                <td>{$userBadge}</td>
+                <td>{$name} {$userBadge}</td>
                 <td>{$paidBadge}</td>
-                <td><button class="btn btn-sm btn-danger" onclick="removeParticipant('{$args['id']}', '{$p['id']}')">Entfernen</button></td>
+                <td>
+                    <button class="btn btn-sm" onclick="togglePaidStatus('{$p['id']}', {$hasPaidBool})">Status ändern</button>
+                    <button class="btn btn-sm btn-danger" onclick="removeParticipant('{$args['id']}', '{$p['id']}')">Entfernen</button>
+                </td>
             </tr>
 ROW;
         }
 
+        $start = date('d.m.Y', strtotime($subscription['billingPeriodStart']));
+        $end = date('d.m.Y', strtotime($subscription['billingPeriodEnd']));
+
         $contentHtml = $this->renderTemplate('subscription_detail.php', [
             'subscriptionId' => $args['id'],
             'subscriptionName' => htmlspecialchars($subscription['name']),
-            'billingPeriodStart' => $subscription['billingPeriodStart'],
-            'billingPeriodEnd' => $subscription['billingPeriodEnd'],
+            'billingPeriodStart' => $start,
+            'billingPeriodEnd' => $end,
             'basePrice' => number_format($subscription['basePrice'], 2, ',', '.'),
             'participantRows' => $participantRows,
         ]);

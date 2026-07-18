@@ -154,6 +154,30 @@ final readonly class SubscriptionRepository
         return $result ?: null;
     }
 
+    public function updateParticipant(string $id, array $data): void
+    {
+        $fields = [];
+        $params = [];
+
+        foreach (['hasPaid'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $fields[] = "`$field` = ?";
+                $params[] = $data[$field];
+            }
+        }
+
+        if ($fields === []) {
+            return;
+        }
+
+        $params[] = $id;
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE SubscriptionRelation SET ' . implode(', ', $fields) . ' WHERE id = ?'
+        );
+        $stmt->execute($params);
+    }
+
     public function hasAccess(string $subscriptionId, string $userId): bool
     {
         $stmt = $this->pdo->prepare(

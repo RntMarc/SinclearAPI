@@ -192,9 +192,28 @@
 
 <div class="card">
     <div class="flex-between" style="margin-bottom:1rem;">
-        <h2 style="font-size:1.1rem;color:#aaa;">Events dieser Reise</h2>
+        <h2 style="font-size:1.1rem;color:#aaa;">Events dieser Reise ({{tripEventCount}})</h2>
+        <button class="btn btn-primary" onclick="showLinkEventForm()">+ Event verknüpfen</button>
     </div>
-    {{eventSection}}
+    {{tripEventRows}}
+</div>
+
+<!-- Link Event Form -->
+<div id="linkEventForm" class="card mt-2" style="display:none;">
+    <h2 style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Event verknüpfen</h2>
+    <form id="linkEventFormEl" onsubmit="submitLinkEvent(event)">
+        <div class="form-group">
+            <label for="linkEventSelect">Event *</label>
+            <select id="linkEventSelect" name="eventId" required>
+                <option value="">– Bitte wählen –</option>
+                {{availableEventOptions}}
+            </select>
+        </div>
+        <div class="flex" style="gap:0.5rem;">
+            <button type="submit" class="btn btn-success">Verknüpfen</button>
+            <button type="button" class="btn" onclick="hideLinkEventForm()">Abbrechen</button>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -362,5 +381,49 @@
             if (res.ok) { showToast('Unterkunft gelöscht'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Löschen', 'error'); }
+    }
+
+    // Event link/unlink
+    function showLinkEventForm() {
+        hideAddParticipantForm(); hideCreateAccommodationForm(); hideEditAccommodationForm();
+        document.getElementById('linkEventForm').style.display = 'block';
+        document.getElementById('linkEventSelect').focus();
+    }
+    function hideLinkEventForm() {
+        document.getElementById('linkEventForm').style.display = 'none';
+        document.getElementById('linkEventFormEl').reset();
+    }
+
+    async function submitLinkEvent(event) {
+        event.preventDefault();
+        const eventId = document.getElementById('linkEventSelect').value;
+        if (!eventId) { showToast('Bitte ein Event wählen.', 'error'); return; }
+
+        try {
+            const res = await fetch('/api/v2/admin/travel/events/' + eventId, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trip: tripId }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Event verknüpft'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Verknüpfen', 'error'); }
+    }
+
+    async function unlinkEvent(eventId, eventName) {
+        if (!confirm('Event "' + eventName + '" wirklich von dieser Reise trennen?')) return;
+        try {
+            const res = await fetch('/api/v2/admin/travel/events/' + eventId, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trip: null }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Event getrennt'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Trennen', 'error'); }
     }
 </script>

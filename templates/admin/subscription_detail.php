@@ -31,7 +31,7 @@
             <tr>
                 <th>Name / Nutzer-ID</th>
                 <th>Typ</th>
-                <th>Status</th>
+                <th>Bezahltstatus</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
@@ -112,6 +112,28 @@
         }
 
         return false;
+    }
+
+    async function togglePaidStatus(participantId, currentStatus) {
+        const newStatus = !currentStatus;
+
+        try {
+            const response = await fetch('/api/v2/admin/subscriptions/' + subscriptionId + '/participants/' + participantId, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hasPaid: newStatus }),
+            });
+
+            if (response.ok) {
+                showToast(newStatus ? 'Als bezahlt markiert' : 'Als offen markiert');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                const err = await response.json();
+                showToast(err.error || 'Fehler', 'error');
+            }
+        } catch (e) {
+            showToast('Netzwerkfehler', 'error');
+        }
     }
 
     async function removeParticipant(subId, participantId) {
