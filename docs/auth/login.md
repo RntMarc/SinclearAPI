@@ -166,6 +166,13 @@ sequenceDiagram
                     API-->>Browser: HTML-Fehlerseite (E-Mail bereits registriert)
                 else E-Mail frei
                     API->>DB: Neuen User anlegen (email, displayName, discordId)
+                    alt Discord-Avatar vorhanden
+                        API->>Discord: Avatar von CDN herunterladen ({id}/{hash}.png?size=256)
+                        API->>API: Base64-kodieren + via ImageService validieren
+                        API->>DB: User.image aktualisieren
+                    else Kein Avatar
+                        API->>API: Überspringen (image bleibt NULL)
+                    end
                     API->>DB: 6-stelligen Pairing-Code in OtpToken speichern<br/>(expiresAt = now + 2 min)
                     API-->>Browser: HTML-Seite mit Pairing-Code
                 end
@@ -271,6 +278,11 @@ Der Nutzer kopiert diesen Code in die App und verwendet ihn an `/auth/login/otp/
 **Response (200):** HTML-Seite mit 6-stelligem Pairing-Code.
 Der Nutzer kopiert diesen Code in die App und verwendet ihn an `/auth/login/otp/verify`.
 
+Sofern der Discord-Account ein Profilbild besitzt, wird dieses automatisch von Discord CDN heruntergeladen
+(`https://cdn.discordapp.com/avatars/{id}/{hash}.png?size=256`), base64-kodiert, via `ImageService` validiert und
+in `User.image` gespeichert. Schlägt der Import fehl (z. B. Netzwerkfehler, ungültiges Format), wird die
+Registration trotzdem ohne Bild abgeschlossen.
+
 **Fehler:** `Ungültiger State`, `Discord-Account bereits verknüpft`, `E-Mail bereits registriert`, `Guild-Mitgliedschaft fehlt`
 
 ### POST /api/v2/auth/refresh
@@ -311,7 +323,7 @@ Der Nutzer kopiert diesen Code in die App und verwendet ihn an `/auth/login/otp/
 
 | Tabelle | Verwendung |
 |---------|-----------|
-| `User` | Nutzerstammdaten (email, discordId, displayName, isAdmin) |
+| `User` | Nutzerstammdaten (email, discordId, displayName, isAdmin, image) |
 | `OtpToken` | 6-stellige Codes (E-Mail-OTP + Discord-Pairing) |
 | `RefreshToken` | Gehashte Refresh-Tokens mit Family-Zuordnung |
 | `RefreshTokenFamily` | Gruppen zusammengehöriger Refresh-Tokens |

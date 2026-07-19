@@ -5,10 +5,12 @@ namespace Sinclear\Api\Services\Auth;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use PDO;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Services\ImageService;
 
 final readonly class DiscordOAuthService
 {
@@ -21,6 +23,8 @@ final readonly class DiscordOAuthService
         private Settings $settings,
         private PDO $pdo,
         private OtpTokenRepository $otpTokenRepo,
+        private ImageService $imageService,
+        private LoggerInterface $logger,
     ) {
         $this->httpClient = new Client();
     }
@@ -271,6 +275,33 @@ final readonly class DiscordOAuthService
 
         $displayName = $discordUser['username'] ?? 'User';
         $user = $repo->create($email, $displayName, $discordUser['id']);
+
+        if (!empty($discordUser['avatar'])) {
+            try {
+                $avatarUrl = sprintf(
+                    'https://cdn.discordapp.com/avatars/%s/%s.png?size=256',
+                    $discordUser['id'],
+                    $discordUser['avatar']
+                );
+                $avatarResponse = $this->httpClient->get($avatarUrl);
+                $rawImage = (string) $avatarResponse->getBody();
+                $avatarBase64 = base64_encode($rawImage);
+
+                $validated = $this->imageService->validate($avatarBase64);
+
+                $stmt = $this->pdo->prepare('UPDATE User SET image = ? WHERE id = ?');
+                $stmt->execute([$validated, $user['id']]);
+
+                $this->logger->info('Discord avatar imported for user', [
+                    'userId' => $user['id'],
+                ]);
+            } catch (\Throwable $e) {
+                $this->logger->warning('Failed to import Discord avatar', [
+                    'userId' => $user['id'],
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         $pairingCode = $this->generatePairingCode();
         $expiresAt = new \DateTimeImmutable('+' . self::PAIRING_CODE_TTL . ' seconds');

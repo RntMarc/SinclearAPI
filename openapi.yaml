@@ -3318,6 +3318,11 @@ paths:
         in der DB und zeigt einen 6-stelligen Pairing-Code an.
         Der Nutzer kopiert diesen Code in die App und verwendet ihn
         am Endpunkt `/auth/login/otp/verify`.
+
+
+        Sofern der Discord-Account ein Profilbild besitzt, wird dieses
+        automatisch von Discord CDN heruntergeladen, base64-kodiert,
+        validiert und unter `User.image` gespeichert.
       tags: [Authentication]
       parameters:
         - name: code
