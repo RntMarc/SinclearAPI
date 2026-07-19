@@ -105,6 +105,12 @@ sequenceDiagram
             alt Kein User mit dieser Discord-ID
                 API-->>Browser: HTML-Fehlerseite (nicht registriert)
             else User gefunden
+                alt syncAvatarFromDiscord aktiviert
+                    API->>Discord: Avatar von CDN herunterladen ({id}/{hash}.png?size=256)
+                    API->>DB: User.image + discordAvatarHash aktualisieren
+                else Sync deaktiviert
+                    API->>API: Profilbild überspringen (bleibt unverändert)
+                end
                 API->>DB: 6-stelligen Pairing-Code in OtpToken speichern<br/>(expiresAt = now + 2 min)
                 API-->>Browser: HTML-Seite mit Pairing-Code
             end
@@ -262,6 +268,11 @@ sequenceDiagram
 **Response (200):** HTML-Seite mit 6-stelligem Pairing-Code.
 Der Nutzer kopiert diesen Code in die App und verwendet ihn an `/auth/login/otp/verify`.
 
+Sofern der Nutzer die Einstellung `syncAvatarFromDiscord` aktiviert hat (Standard),
+wird bei jedem Login das Discord-Profilbild heruntergeladen und in `User.image`
+gespeichert sowie der `discordAvatarHash` aktualisiert. Ist die Einstellung
+deaktiviert, bleibt das Profilbild unverändert.
+
 ### POST /api/v2/auth/register/discord/start
 
 **Response (200):**
@@ -280,7 +291,9 @@ Der Nutzer kopiert diesen Code in die App und verwendet ihn an `/auth/login/otp/
 
 Sofern der Discord-Account ein Profilbild besitzt, wird dieses automatisch von Discord CDN heruntergeladen
 (`https://cdn.discordapp.com/avatars/{id}/{hash}.png?size=256`), base64-kodiert, via `ImageService` validiert und
-in `User.image` gespeichert. Schlägt der Import fehl (z. B. Netzwerkfehler, ungültiges Format), wird die
+in `User.image` gespeichert. Zusätzlich wird der `discordAvatarHash` in der User-Tabelle gespeichert,
+damit Clients die Profilbild-URL jederzeit selbst konstruieren können (`https://cdn.discordapp.com/avatars/{discordId}/{discordAvatarHash}.png`).
+Schlägt der Import fehl (z. B. Netzwerkfehler, ungültiges Format), wird die
 Registration trotzdem ohne Bild abgeschlossen.
 
 **Fehler:** `Ungültiger State`, `Discord-Account bereits verknüpft`, `E-Mail bereits registriert`, `Guild-Mitgliedschaft fehlt`

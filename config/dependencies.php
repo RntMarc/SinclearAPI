@@ -26,6 +26,7 @@ use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
+use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\LocationSharingSessionRepository;
@@ -41,6 +42,7 @@ use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Security\Policy\UserPolicy;
 use Sinclear\Api\Services\UserService;
+use Sinclear\Api\Services\UserPreferenceService;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -66,6 +68,7 @@ use Sinclear\Api\Repository\FeedPostVoteRepository;
 use Sinclear\Api\Repository\FeedPostCommentRepository;
 use Sinclear\Api\Repository\UserDeviceRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
@@ -261,6 +264,7 @@ return [
     CloseFriendRepository::class => autowire(),
 
     UserUpdateRepository::class => autowire(),
+    UserPreferenceRepository::class => autowire(),
 
     UserPolicy::class => autowire(),
     UserService::class => autowire(),
@@ -268,6 +272,9 @@ return [
 
     ProfileService::class => autowire(),
     ProfileController::class => autowire(),
+
+    UserPreferenceService::class => autowire(),
+    UserPreferenceController::class => autowire(),
 
     RequireHttpsMiddleware::class => create(),
     SecurityHeadersMiddleware::class => create(),

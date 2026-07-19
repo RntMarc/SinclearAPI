@@ -18,6 +18,7 @@ use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
+use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -83,8 +84,12 @@ return function (App $app): void {
         $group->post('/me/discord/start', [ProfileController::class, 'startDiscordRelink']);
         $group->get('/me/discord/callback', [ProfileController::class, 'discordCallback']);
         $group->post('/me/discord/verify', [ProfileController::class, 'verifyDiscordRelink']);
+        // @deprecated since 2026-07-19 — use PUT /user/me/preferences instead. Remove until 2026-09-19.
+        $group->put('/me/discord/sync-avatar', [ProfileController::class, 'updateDiscordSyncAvatar']);
         $group->put('/me/visibility', [ProfileController::class, 'updateVisibility']);
         $group->put('/me/onboarding/complete', [ProfileController::class, 'completeOnboarding']);
+        $group->get('/me/preferences', [UserPreferenceController::class, 'getPreferences']);
+        $group->put('/me/preferences', [UserPreferenceController::class, 'updatePreferences']);
         $group->get('/{userId}', [UserController::class, 'get']);
         $group->get('/{userId}/base', [UserController::class, 'getBase']);
         $group->get('/{userId}/social', [UserController::class, 'getSocial']);

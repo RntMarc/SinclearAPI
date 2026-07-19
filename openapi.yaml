@@ -1362,6 +1362,13 @@ components:
         discordId:
           type: string
           nullable: true
+        discordAvatarHash:
+          type: string
+          nullable: true
+          description: Discord-Avatar-Hash zum Erstellen der Profilbild-URL
+        syncAvatarFromDiscord:
+          type: boolean
+          description: Ob das Profilbild bei jedem Discord-Login automatisch synchronisiert wird
         isAdmin:
           type: boolean
         createdAt:
@@ -1379,57 +1386,114 @@ components:
           enum: [0, 1, 2]
           description: Sichtbarkeit des Geburtstags
 
+    UserPreferences:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        language:
+          type: string
+          description: Bevorzugte Sprache (z.B. "de", "en")
+        theme:
+          type: string
+          description: Bevorzugtes Theme (z.B. "light", "dark")
+        primaryColor:
+          type: string
+          description: Bevorzugte Akzentfarbe (Hex)
+        timezone:
+          type: string
+          description: Bevorzugte Zeitzone (z.B. "Europe/Berlin")
+        emailVisibility:
+          type: integer
+          enum: [0, 1, 2]
+          description: Sichtbarkeit der E-Mail
+        birthdayVisibility:
+          type: integer
+          enum: [0, 1, 2]
+          description: Sichtbarkeit des Geburtstags
+        syncAvatarFromDiscord:
+          type: boolean
+          description: Ob das Profilbild bei jedem Discord-Login automatisch synchronisiert wird
+        onboardingCompleted:
+          type: boolean
+          description: Ob das Onboarding abgeschlossen wurde
+        discordVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        fluxerVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        matrixVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        signalVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        whatsappVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        unsplashVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        instagramVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        mastodonVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        pixelfedVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        blueskyVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        youtubeVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        twitchVisibility:
+          type: integer
+          enum: [0, 1, 2]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
     UserSocialInfo:
       type: object
       properties:
         unsplashHandle:
           type: string
           nullable: true
-        unsplashVisibility:
-          type: integer
-          enum: [0, 1, 2]
         instagramHandle:
           type: string
           nullable: true
-        instagramVisibility:
-          type: integer
-          enum: [0, 1, 2]
         mastodonUser:
           type: string
           nullable: true
         mastodonServer:
           type: string
           nullable: true
-        mastodonVisibility:
-          type: integer
-          enum: [0, 1, 2]
         pixelfedUser:
           type: string
           nullable: true
         pixelfedServer:
           type: string
           nullable: true
-        pixelfedVisibility:
-          type: integer
-          enum: [0, 1, 2]
         blueskyHandle:
           type: string
           nullable: true
-        blueskyVisibility:
-          type: integer
-          enum: [0, 1, 2]
         youtubeHandle:
           type: string
           nullable: true
-        youtubeVisibility:
-          type: integer
-          enum: [0, 1, 2]
         twitchHandle:
           type: string
           nullable: true
-        twitchVisibility:
-          type: integer
-          enum: [0, 1, 2]
 
     UserContactInfo:
       type: object
@@ -1437,36 +1501,21 @@ components:
         discordHandle:
           type: string
           nullable: true
-        discordVisibility:
-          type: integer
-          enum: [0, 1, 2]
         fluxerHandle:
           type: string
           nullable: true
-        fluxerVisibility:
-          type: integer
-          enum: [0, 1, 2]
         signalNumber:
           type: string
           nullable: true
-        signalVisibility:
-          type: integer
-          enum: [0, 1, 2]
         whatsappNumber:
           type: string
           nullable: true
-        whatsappVisibility:
-          type: integer
-          enum: [0, 1, 2]
         matrixUser:
           type: string
           nullable: true
         matrixHomeserver:
           type: string
           nullable: true
-        matrixVisibility:
-          type: integer
-          enum: [0, 1, 2]
 
     UserMe:
       type: object
@@ -1497,6 +1546,13 @@ components:
         discordId:
           type: string
           nullable: true
+        discordAvatarHash:
+          type: string
+          nullable: true
+          description: Discord-Avatar-Hash zum Erstellen der Profilbild-URL
+        syncAvatarFromDiscord:
+          type: boolean
+          description: Ob das Profilbild bei jedem Discord-Login automatisch synchronisiert wird
         isAdmin:
           type: boolean
         createdAt:
@@ -1661,6 +1717,7 @@ components:
 
     VisibilityUpdateRequest:
       type: object
+      description: Deprecated — use PUT /user/me/preferences instead. Remove until 2026-09-19.
       properties:
         emailVisibility:
           type: integer
@@ -3897,13 +3954,54 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /user/me/discord/sync-avatar:
+    put:
+      summary: "[DEPRECATED – Use PUT /user/me/preferences] Discord-Profilbild-Sync ein-/ausschalten"
+      deprecated: true
+      description: >
+        **Deprecated since 2026-07-19. Remove until 2026-09-19.**
+        Use `PUT /user/me/preferences` with `{ "syncAvatarFromDiscord": true/false }` instead.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+                  description: true = Sync aktiv, false = Sync deaktiviert
+      responses:
+        '200':
+          description: Einstellung aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Ungültige Anfrage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /user/me/visibility:
     put:
-      summary: Sichtbarkeitseinstellungen aktualisieren
+      summary: "[DEPRECATED – Use PUT /user/me/preferences] Sichtbarkeitseinstellungen aktualisieren"
+      deprecated: true
       description: >
-        Aktualisiert die Sichtbarkeitseinstellungen für beliebig viele
-        Profilfelder gleichzeitig. Erlaubte Werte: 0 (nur ich), 1 (alle),
-        2 (nur enge Freunde).
+        **Deprecated since 2026-07-19. Remove until 2026-09-19.**
+        Use `PUT /user/me/preferences` with any `*Visibility` keys instead.
       tags: [User]
       security:
         - BearerAuth: []
@@ -3935,11 +4033,11 @@ paths:
 
   /user/me/onboarding/complete:
     put:
-      summary: Onboarding als abgeschlossen markieren
+      summary: "[DEPRECATED – Use PUT /user/me/preferences] Onboarding als abgeschlossen markieren"
+      deprecated: true
       description: >
-        Setzt das Feld `onboardingCompleted` des angemeldeten Nutzers
-        auf `true`. Wird vom Client aufgerufen, nachdem der Nutzer den
-        Onboarding-Prozess durchlaufen hat.
+        **Deprecated since 2026-07-19. Remove until 2026-09-19.**
+        Use `PUT /user/me/preferences` with `{ "onboardingCompleted": true }` instead.
       tags: [User]
       security:
         - BearerAuth: []
@@ -3950,6 +4048,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/preferences:
+    get:
+      summary: Benutzereinstellungen abrufen
+      description: Gibt alle Einstellungen des authentifizierten Benutzers zurück.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Benutzereinstellungen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPreferences'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Benutzereinstellungen aktualisieren
+      description: >
+        Aktualisiert beliebig viele Einstellungen des authentifizierten Benutzers.
+        Erlaubte Felder: language, theme, primaryColor, timezone,
+        emailVisibility, birthdayVisibility, syncAvatarFromDiscord,
+        onboardingCompleted, discordVisibility, fluxerVisibility, matrixVisibility,
+        signalVisibility, whatsappVisibility, unsplashVisibility, instagramVisibility,
+        mastodonVisibility, pixelfedVisibility, blueskyVisibility, youtubeVisibility,
+        twitchVisibility.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Benutzereinstellungen aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserPreferences'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Nicht autorisiert
           content:

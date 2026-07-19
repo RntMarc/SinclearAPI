@@ -10,6 +10,7 @@ use Ramsey\Uuid\Uuid;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Services\ImageService;
 
 final readonly class DiscordOAuthService
@@ -23,6 +24,7 @@ final readonly class DiscordOAuthService
         private Settings $settings,
         private PDO $pdo,
         private OtpTokenRepository $otpTokenRepo,
+        private UserPreferenceRepository $userPreferenceRepo,
         private ImageService $imageService,
         private LoggerInterface $logger,
     ) {
@@ -76,6 +78,19 @@ final readonly class DiscordOAuthService
         $user = $this->findOrFailUser($discordUser);
         if ($user === null) {
             throw new \RuntimeException('No account linked to this Discord account');
+        }
+
+        $preferences = $this->userPreferenceRepo->findByUserId($user['id']);
+        $syncAvatar = $preferences !== null && !empty($preferences['syncAvatarFromDiscord']);
+
+        if ($syncAvatar && !empty($discordUser['avatar'])) {
+            $this->pdo->prepare('UPDATE User SET discordAvatarHash = ?, image = ? WHERE id = ?')
+                ->execute([$discordUser['avatar'], $this->downloadDiscordAvatar($discordUser['id'], $discordUser['avatar']), $user['id']]);
+            $user['discordAvatarHash'] = $discordUser['avatar'];
+        } elseif ($syncAvatar) {
+            $this->pdo->prepare('UPDATE User SET discordAvatarHash = ? WHERE id = ?')
+                ->execute([$discordUser['avatar'] ?? null, $user['id']]);
+            $user['discordAvatarHash'] = $discordUser['avatar'] ?? null;
         }
 
         $pairingCode = $this->generatePairingCode();
@@ -181,6 +196,7 @@ final readonly class DiscordOAuthService
             'type' => 'discord_relink',
             'userId' => $userId,
             'newDiscordId' => $discordUser['id'],
+            'discordAvatarHash' => $discordUser['avatar'] ?? null,
         ]);
         $this->otpTokenRepo->create($metadata, $pairingCode, $expiresAt);
 
@@ -274,7 +290,7 @@ final readonly class DiscordOAuthService
         }
 
         $displayName = $discordUser['username'] ?? 'User';
-        $user = $repo->create($email, $displayName, $discordUser['id']);
+        $user = $repo->create($email, $displayName, $discordUser['id'], $discordUser['avatar'] ?? null);
 
         if (!empty($discordUser['avatar'])) {
             try {
@@ -414,5 +430,27 @@ final readonly class DiscordOAuthService
     private function generatePairingCode(): string
     {
         return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    }
+
+    private function downloadDiscordAvatar(string $discordId, string $avatarHash): ?string
+    {
+        try {
+            $avatarUrl = sprintf(
+                'https://cdn.discordapp.com/avatars/%s/%s.png?size=256',
+                $discordId,
+                $avatarHash
+            );
+            $avatarResponse = $this->httpClient->get($avatarUrl);
+            $rawImage = (string) $avatarResponse->getBody();
+            $avatarBase64 = base64_encode($rawImage);
+
+            return $this->imageService->validate($avatarBase64);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to download Discord avatar during login', [
+                'discordId' => $discordId,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
     }
 }

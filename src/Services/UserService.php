@@ -34,6 +34,7 @@ final readonly class UserService
         private UserRepository $userRepo,
         private ContactInfoRepository $contactInfoRepo,
         private SocialInfoRepository $socialInfoRepo,
+        private UserPreferenceService $preferenceService,
         private UserPolicy $policy,
     ) {}
 
@@ -68,39 +69,46 @@ final readonly class UserService
     /** @param array<string, mixed> $user */
     public function formatUserBase(array $user): array
     {
+        $prefs = $this->preferenceService->getAll($user['id']);
+
         return [
             'id' => $user['id'],
             'email' => $user['email'],
-            'emailVisibility' => (int) $user['emailVisibility'],
+            'emailVisibility' => (int) ($prefs['emailVisibility'] ?? 1),
             'displayName' => $user['displayName'],
             'image' => $user['image'],
             'discordId' => $user['discordId'],
+            'discordAvatarHash' => $user['discordAvatarHash'],
+            'syncAvatarFromDiscord' => (bool) ($prefs['syncAvatarFromDiscord'] ?? 1),
             'isAdmin' => (bool) $user['isAdmin'],
             'createdAt' => $user['createdAt'],
-            'onboardingCompleted' => (bool) $user['onboardingCompleted'],
+            'onboardingCompleted' => (bool) ($prefs['onboardingCompleted'] ?? 0),
             'birthday' => $user['birthday'],
-            'birthdayVisibility' => (int) $user['birthdayVisibility'],
+            'birthdayVisibility' => (int) ($prefs['birthdayVisibility'] ?? 1),
         ];
     }
 
     /** @param array<string, mixed> $user */
     public function formatUserBaseFiltered(array $user, AuthenticatedUser $requester): array
     {
+        $prefs = $this->preferenceService->getAll($user['id']);
+
         $result = [
             'id' => $user['id'],
             'displayName' => $user['displayName'],
             'image' => $user['image'],
             'discordId' => $user['discordId'],
+            'discordAvatarHash' => $user['discordAvatarHash'],
             'isAdmin' => (bool) $user['isAdmin'],
             'createdAt' => $user['createdAt'],
-            'onboardingCompleted' => (bool) $user['onboardingCompleted'],
+            'onboardingCompleted' => (bool) ($prefs['onboardingCompleted'] ?? 0),
         ];
 
-        if ($this->policy->canView($requester, (string) $user['id'], (int) $user['emailVisibility'])) {
+        if ($this->policy->canView($requester, (string) $user['id'], (int) ($prefs['emailVisibility'] ?? 1))) {
             $result['email'] = $user['email'];
         }
 
-        if ($this->policy->canView($requester, (string) $user['id'], (int) $user['birthdayVisibility'])) {
+        if ($this->policy->canView($requester, (string) $user['id'], (int) ($prefs['birthdayVisibility'] ?? 1))) {
             $result['birthday'] = $user['birthday'];
         }
 
@@ -108,17 +116,18 @@ final readonly class UserService
     }
 
     /** @param array<string, mixed> $social */
-    public function formatSocialInfo(array $social): array
+    public function formatSocialInfo(string $userId, array $social): array
     {
+        $prefs = $this->preferenceService->getAll($userId);
         $result = [];
         foreach (self::SOCIAL_FIELDS as $handle => $visibility) {
             $result[$handle] = $social[$handle] ?? null;
-            $result[$visibility] = (int) ($social[$visibility] ?? 1);
+            $result[$visibility] = (int) ($prefs[$visibility] ?? 1);
         }
 
         foreach (self::FEDIVERSE_FIELDS as $handle => $visibility) {
             $combined = $social[$handle] ?? null;
-            $result[$visibility] = (int) ($social[$visibility] ?? 1);
+            $result[$visibility] = (int) ($prefs[$visibility] ?? 1);
             if ($combined !== null && str_contains($combined, '@')) {
                 $parts = explode('@', $combined, 2);
                 $result[str_replace('Handle', 'User', lcfirst(ucfirst($handle)))] = $parts[0];
@@ -143,16 +152,17 @@ final readonly class UserService
             return [];
         }
 
+        $prefs = $this->preferenceService->getAll($targetUserId);
         $result = [];
         foreach (self::SOCIAL_FIELDS as $handle => $visibility) {
-            $visibilityLevel = (int) ($social[$visibility] ?? 1);
+            $visibilityLevel = (int) ($prefs[$visibility] ?? 1);
             if ($this->policy->canView($requester, $targetUserId, $visibilityLevel)) {
                 $result[$handle] = $social[$handle];
             }
         }
 
         foreach (self::FEDIVERSE_FIELDS as $handle => $visibility) {
-            $visibilityLevel = (int) ($social[$visibility] ?? 1);
+            $visibilityLevel = (int) ($prefs[$visibility] ?? 1);
             if ($this->policy->canView($requester, $targetUserId, $visibilityLevel)) {
                 $combined = $social[$handle] ?? null;
                 $fieldPrefix = match ($handle) {
@@ -174,17 +184,18 @@ final readonly class UserService
     }
 
     /** @param array<string, mixed> $contact */
-    public function formatContactInfo(array $contact): array
+    public function formatContactInfo(string $userId, array $contact): array
     {
+        $prefs = $this->preferenceService->getAll($userId);
         $result = [];
         foreach (self::CONTACT_FIELDS as $field => $visibility) {
             $result[$field] = $contact[$field] ?? null;
-            $result[$visibility] = (int) ($contact[$visibility] ?? 1);
+            $result[$visibility] = (int) ($prefs[$visibility] ?? 1);
         }
 
         $result['matrixUser'] = $contact['matrixUser'] ?? null;
         $result['matrixHomeserver'] = $contact['matrixHomeserver'] ?? null;
-        $result['matrixVisibility'] = (int) ($contact['matrixVisibility'] ?? 1);
+        $result['matrixVisibility'] = (int) ($prefs['matrixVisibility'] ?? 1);
 
         return $result;
     }
@@ -196,15 +207,16 @@ final readonly class UserService
             return [];
         }
 
+        $prefs = $this->preferenceService->getAll($targetUserId);
         $result = [];
         foreach (self::CONTACT_FIELDS as $field => $visibility) {
-            $visibilityLevel = (int) ($contact[$visibility] ?? 1);
+            $visibilityLevel = (int) ($prefs[$visibility] ?? 1);
             if ($this->policy->canView($requester, $targetUserId, $visibilityLevel)) {
                 $result[$field] = $contact[$field];
             }
         }
 
-        $matrixVisibility = (int) ($contact['matrixVisibility'] ?? 1);
+        $matrixVisibility = (int) ($prefs['matrixVisibility'] ?? 1);
         if ($this->policy->canView($requester, $targetUserId, $matrixVisibility)) {
             $result['matrixUser'] = $contact['matrixUser'];
             $result['matrixHomeserver'] = $contact['matrixHomeserver'];

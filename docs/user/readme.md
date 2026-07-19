@@ -2,7 +2,7 @@
 
 Die User-Module-API ermöglicht den Zugriff auf Benutzerprofildaten,
 aufgeschlüsselt nach Basis-Profil, Social-Media-Handles und Kontaktinformationen,
-sowie die Bearbeitung des eigenen Profils.
+sowie die Bearbeitung des eigenen Profils und der zentralen Benutzereinstellungen.
 
 ## Authentifizierung
 
@@ -36,39 +36,44 @@ gefiltert nach den Sichtbarkeitseinstellungen des jeweiligen Benutzers
 Diese Endpunkte geben **alle Felder** inklusive der Visibility-Werte zurück.
 Der angemeldete Nutzer sieht seine eigenen Einstellungen.
 
-### Sichtbarkeitseinstellungen ändern
+### Eigene Einstellungen (`/me/preferences`)
 
 | Methode | Pfad | Beschreibung |
 |---------|------|-------------|
-| `PUT` | `/user/me/visibility` | Sichtbarkeit beliebig vieler Felder gleichzeitig setzen |
+| `GET` | `/user/me/preferences` | Alle Benutzereinstellungen aus der `UserPreferences`-Tabelle |
 
-### Onboarding abschließen
+Gibt ein flaches Objekt mit allen Preferences zurück:
 
-| Methode | Pfad | Beschreibung |
-|---------|------|-------------|
-| `PUT` | `/user/me/onboarding/complete` | Onboarding als abgeschlossen markieren |
-
-Setzt `onboardingCompleted` auf `true`. Kein Request Body erforderlich.
-
-**Response (200):**
 ```json
-{ "message": "onboarding_completed" }
+{
+  "data": {
+    "id": "…",
+    "userId": "…",
+    "language": "de",
+    "theme": "light",
+    "primaryColor": "#6366f1",
+    "timezone": "Europe/Berlin",
+    "emailVisibility": 1,
+    "birthdayVisibility": 1,
+    "syncAvatarFromDiscord": true,
+    "onboardingCompleted": false,
+    "discordVisibility": 1,
+    "fluxerVisibility": 1,
+    "matrixVisibility": 1,
+    "signalVisibility": 1,
+    "whatsappVisibility": 1,
+    "unsplashVisibility": 1,
+    "instagramVisibility": 1,
+    "mastodonVisibility": 1,
+    "pixelfedVisibility": 1,
+    "blueskyVisibility": 1,
+    "youtubeVisibility": 1,
+    "twitchVisibility": 1,
+    "createdAt": "2026-07-19 12:00:00",
+    "updatedAt": "2026-07-19 12:00:00"
+  }
+}
 ```
-
-Der Request Body kann eine beliebige Kombination der folgenden Felder enthalten:
-
-**User-Felder:** `emailVisibility`, `birthdayVisibility`
-
-**ContactInfo-Felder:** `discordVisibility`, `fluxerVisibility`, `matrixVisibility`, `signalVisibility`, `whatsappVisibility`
-
-**SocialInfo-Felder:** `unsplashVisibility`, `instagramVisibility`, `mastodonVisibility`, `pixelfedVisibility`, `blueskyVisibility`, `youtubeVisibility`, `twitchVisibility`
-
-Erlaubte Werte:
-| Wert | Bedeutung |
-|------|-----------|
-| `0` | Niemand außer dem Eigentümer selbst |
-| `1` | Jeder eingeloggte Nutzer (Standard) |
-| `2` | Nur enge Freunde |
 
 ### Fremde Profildaten (`/{userId}`)
 
@@ -122,6 +127,42 @@ Nur die gesendeten Felder werden aktualisiert.
 
 **Response:** Die vollständigen aktualisierten Profildaten (gleiches Format wie `GET /user/me`).
 
+### Benutzereinstellungen aktualisieren
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `PUT` | `/user/me/preferences` | Teilmenge der Preferences aktualisieren |
+
+Der Request Body kann eine beliebige Kombination der folgenden Felder enthalten:
+
+**UI-Preferences:** `language`, `theme`, `primaryColor`, `timezone`
+
+**Visibility-Felder (0/1/2):** `emailVisibility`, `birthdayVisibility`, `discordVisibility`, `fluxerVisibility`, `matrixVisibility`, `signalVisibility`, `whatsappVisibility`, `unsplashVisibility`, `instagramVisibility`, `mastodonVisibility`, `pixelfedVisibility`, `blueskyVisibility`, `youtubeVisibility`, `twitchVisibility`
+
+**Toggle-Felder:** `syncAvatarFromDiscord` (bool), `onboardingCompleted` (bool)
+
+**Beispiel:**
+```json
+{
+  "emailVisibility": 2,
+  "syncAvatarFromDiscord": false
+}
+```
+
+**Response:** Das vollständige aktualisierte Preferences-Objekt (gleiches Format wie `GET /user/me/preferences`).
+
+**Validierungsregeln:**
+
+| Feld | Erlaubte Werte |
+|------|---------------|
+| `*Visibility` | `0` (nur ich), `1` (alle, Standard), `2` (nur enge Freunde) |
+| `syncAvatarFromDiscord` | `true` / `false` |
+| `onboardingCompleted` | `true` / `false` |
+| `language` | String (z.B. `"de"`, `"en"`) |
+| `theme` | String (z.B. `"light"`, `"dark"`) |
+| `primaryColor` | Hex-String (z.B. `"#6366f1"`) |
+| `timezone` | IANA-Timezone (z.B. `"Europe/Berlin"`) |
+
 ### E-Mail-Änderung (mit OTP-Bestätigung)
 
 | Methode | Pfad | Beschreibung |
@@ -158,9 +199,21 @@ Nur die gesendeten Felder werden aktualisiert.
 **Hinweis:** Die Redirect-URI `/api/v2/user/me/discord/callback` muss im Discord Developer Portal
 als zusätzliche Redirect-URI eingetragen werden (neben der Login-URI).
 
+### Deprecated Endpunkte
+
+> **Deprecated since 2026-07-19. Entfernen bis 2026-09-19.**
+
+Die folgenden Endpunkte werden durch `PUT /user/me/preferences` ersetzt und entfernt:
+
+| Methode | Pfad | Ersetzt durch |
+|---------|------|---------------|
+| `PUT` | `/user/me/discord/sync-avatar` | `PUT /user/me/preferences` mit `{ "syncAvatarFromDiscord": … }` |
+| `PUT` | `/user/me/visibility` | `PUT /user/me/preferences` mit beliebigen `*Visibility`-Keys |
+| `PUT` | `/user/me/onboarding/complete` | `PUT /user/me/preferences` mit `{ "onboardingCompleted": true }` |
+
 ### Profilbild
 
-Das Profilbild wird als Base64-codierter String über das `image` Feld im `PUT /user/me/endpoint` übermittelt.
+Das Profilbild wird als Base64-codierter String über das `image` Feld im `PUT /user/me/profile` übermittelt.
 
 **Anforderungen:**
 
@@ -198,7 +251,8 @@ Das Profilbild wird als Base64-codierter String über das `image` Feld im `PUT /
 
 ## Sichtbarkeitssystem
 
-Jedes Informationselement hat einen Sichtbarkeitswert (`Visibility`):
+Jedes Informationselement hat einen Sichtbarkeitswert (`Visibility`).
+Alle Visibility-Werte werden zentral in der `UserPreferences`-Tabelle gespeichert.
 
 | Wert | Bedeutung |
 |------|-----------|
@@ -208,13 +262,13 @@ Jedes Informationselement hat einen Sichtbarkeitswert (`Visibility`):
 
 ### Felder mit Sichtbarkeitssteuerung
 
-**User-Tabelle:**
+**User-Profil:**
 - `email` – gesteuert durch `emailVisibility`
 - `birthday` – gesteuert durch `birthdayVisibility`
 
-**SocialInfo-Tabelle:** Jeder Handle hat eine eigene `*Visibility`-Spalte.
+**SocialInfo:** Jeder Handle hat eine eigene `*Visibility`-Einstellung in `UserPreferences`.
 
-**ContactInfo-Tabelle:** Jeder Kontaktwert hat eine eigene `*Visibility`-Spalte.
+**ContactInfo:** Jeder Kontaktwert hat eine eigene `*Visibility`-Einstellung in `UserPreferences`.
 Die Matrix-Felder (`matrixUser`, `matrixHomeserver`) werden gemeinsam durch `matrixVisibility` gesteuert.
 
 **Hinweis:** Bei Mastodon und Pixelfed wird der Handle im Format `user@server.de` in der Datenbank
@@ -233,7 +287,8 @@ level-2-Daten sehen kann.
 
 ## Datenbanktabellen
 
-- **`User`** – Basis-Profil (E-Mail, Anzeigename, Geburtstag, Bild, Discord-ID, ...)
+- **`User`** – Basis-Profil (E-Mail, Anzeigename, Geburtstag, Bild, Discord-ID, Discord-Avatar-Hash, …)
+- **`UserPreferences`** – Zentrale Benutzereinstellungen: Sichtbarkeit (14 Felder), Sprache, Theme, Akzentfarbe, Zeitzone, Discord-Sync, Onboarding-Status
 - **`SocialInfo`** – Social-Media-Handles (7 Plattformen)
 - **`ContactInfo`** – Kontaktmöglichkeiten (Discord, Fluxer, Signal, WhatsApp, Matrix)
 - **`CloseFriend`** – Enge-Freunde-Beziehungen für Sichtbarkeit Level 2

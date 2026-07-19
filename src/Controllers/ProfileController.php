@@ -126,6 +126,22 @@ final readonly class ProfileController
         return ResponseFactory::json(['message' => 'discord_updated'], 200, $response);
     }
 
+    public function updateDiscordSyncAvatar(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        if (!is_array($body) || !isset($body['enabled'])) {
+            return ResponseFactory::json(['error' => 'invalid_request'], 400, $response);
+        }
+
+        $this->profileService->updateDiscordSyncAvatar($user, (bool) $body['enabled']);
+
+        return ResponseFactory::json(['message' => 'discord_sync_avatar_updated'], 200, $response);
+    }
+
     public function completeOnboarding(
         ServerRequestInterface $request,
         ResponseInterface $response,

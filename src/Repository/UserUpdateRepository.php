@@ -63,6 +63,15 @@ final readonly class UserUpdateRepository
         ]);
     }
 
+    public function updateDiscordAvatarHash(string $userId, ?string $discordAvatarHash): void
+    {
+        $this->logger->debug('UserUpdateRepository: updateDiscordAvatarHash', [
+            'userId' => $userId,
+        ]);
+        $stmt = $this->pdo->prepare('UPDATE User SET discordAvatarHash = ? WHERE id = ?');
+        $stmt->execute([$discordAvatarHash, $userId]);
+    }
+
     /** @param string|int $value */
     public function updateField(string $userId, string $field, mixed $value): void
     {
@@ -70,7 +79,7 @@ final readonly class UserUpdateRepository
             'userId' => $userId,
             'field' => $field,
         ]);
-        $allowed = ['displayName', 'birthday', 'email', 'discordId', 'emailVisibility', 'birthdayVisibility', 'image', 'onboardingCompleted'];
+        $allowed = ['displayName', 'birthday', 'email', 'discordId', 'discordAvatarHash', 'image'];
         if (!in_array($field, $allowed, true)) {
             throw new \InvalidArgumentException("Invalid field: $field");
         }

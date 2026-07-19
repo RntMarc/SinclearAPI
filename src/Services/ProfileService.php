@@ -62,6 +62,7 @@ final readonly class ProfileService
         private RefreshTokenRepository $refreshTokenRepo,
         private UserService $userService,
         private DiscordOAuthService $discordOAuthService,
+        private UserPreferenceService $preferenceService,
         private MailerInterface $mailer,
         private LoggerInterface $logger,
         private Settings $settings,
@@ -287,6 +288,13 @@ final readonly class ProfileService
         $newDiscordId = $metadata['newDiscordId'];
         $this->userUpdateRepo->updateDiscordId($user->id, $newDiscordId);
 
+        $discordAvatarHash = $metadata['discordAvatarHash'] ?? null;
+        $this->userUpdateRepo->updateDiscordAvatarHash($user->id, $discordAvatarHash);
+
+        if ($discordAvatarHash !== null) {
+            $this->preferenceService->update($user->id, ['syncAvatarFromDiscord' => 1]);
+        }
+
         $this->sendDiscordRelinkNotification($user->email);
         $this->sendAdminAlert('discord_relink', [
             'userId' => $user->id,
@@ -298,9 +306,7 @@ final readonly class ProfileService
     /** @param array<string, mixed> $data */
     public function updateVisibility(AuthenticatedUser $user, array $data): void
     {
-        $userUpdates = [];
-        $contactUpdates = [];
-        $socialUpdates = [];
+        $preferenceUpdates = [];
 
         foreach ($data as $field => $value) {
             if (!in_array($field, self::VISIBILITY_FIELDS, true)) {
@@ -310,27 +316,22 @@ final readonly class ProfileService
             if (!in_array($intValue, [0, 1, 2], true)) {
                 throw new \InvalidArgumentException('invalid_visibility_value');
             }
-            match (true) {
-                in_array($field, ['emailVisibility', 'birthdayVisibility']) => $userUpdates[$field] = $intValue,
-                in_array($field, ['discordVisibility', 'fluxerVisibility', 'matrixVisibility', 'signalVisibility', 'whatsappVisibility']) => $contactUpdates[$field] = $intValue,
-                default => $socialUpdates[$field] = $intValue,
-            };
+            $preferenceUpdates[$field] = $intValue;
         }
 
-        foreach ($userUpdates as $field => $value) {
-            $this->userUpdateRepo->updateField($user->id, $field, $value);
+        if ($preferenceUpdates !== []) {
+            $this->preferenceService->update($user->id, $preferenceUpdates);
         }
-        if ($contactUpdates !== []) {
-            $this->contactInfoUpdateRepo->upsert($user->id, $contactUpdates);
-        }
-        if ($socialUpdates !== []) {
-            $this->socialInfoUpdateRepo->upsert($user->id, $socialUpdates);
-        }
+    }
+
+    public function updateDiscordSyncAvatar(AuthenticatedUser $user, bool $enabled): void
+    {
+        $this->preferenceService->update($user->id, ['syncAvatarFromDiscord' => $enabled]);
     }
 
     public function completeOnboarding(AuthenticatedUser $user): void
     {
-        $this->userUpdateRepo->updateField($user->id, 'onboardingCompleted', 1);
+        $this->preferenceService->update($user->id, ['onboardingCompleted' => 1]);
     }
 
     private function buildProfileResponse(string $userId): array
@@ -340,8 +341,8 @@ final readonly class ProfileService
         $contact = $this->contactInfoRepo->findByUserId($userId);
 
         $data = $this->userService->formatUserBase($userData);
-        $data['social'] = $social !== null ? $this->userService->formatSocialInfo($social) : null;
-        $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($contact) : null;
+        $data['social'] = $social !== null ? $this->userService->formatSocialInfo($userId, $social) : null;
+        $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($userId, $contact) : null;
 
         $this->logger->debug('buildProfileResponse', [
             'image_returned' => isset($data['image']),

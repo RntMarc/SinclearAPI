@@ -34,8 +34,8 @@ final readonly class UserController
         $contact = $this->userService->getContactInfo($user->id);
 
         $data = $this->userService->formatUserBase($userData);
-        $data['social'] = $social !== null ? $this->userService->formatSocialInfo($social) : [];
-        $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($contact) : [];
+        $data['social'] = $social !== null ? $this->userService->formatSocialInfo($user->id, $social) : [];
+        $data['contact'] = $contact !== null ? $this->userService->formatContactInfo($user->id, $contact) : [];
 
         return ResponseFactory::json(['data' => $data], 200, $response);
     }
@@ -61,7 +61,7 @@ final readonly class UserController
             return ResponseFactory::json(['data' => []], 200, $response);
         }
 
-        return ResponseFactory::json(['data' => $this->userService->formatSocialInfo($social)], 200, $response);
+        return ResponseFactory::json(['data' => $this->userService->formatSocialInfo($user->id, $social)], 200, $response);
     }
 
     public function meContact(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -73,7 +73,7 @@ final readonly class UserController
             return ResponseFactory::json(['data' => []], 200, $response);
         }
 
-        return ResponseFactory::json(['data' => $this->userService->formatContactInfo($contact)], 200, $response);
+        return ResponseFactory::json(['data' => $this->userService->formatContactInfo($user->id, $contact)], 200, $response);
     }
 
     /** @param array<string, string> $args */
