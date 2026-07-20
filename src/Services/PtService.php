@@ -44,8 +44,9 @@ final readonly class PtService
     {
         $response = $this->transitiousRequest('GET', '/v1/geocode', [
             'query' => [
-                'q' => $query,
-                'language' => 'de',
+                'text' => $query,
+                'language' => ['de'],
+                'numResults' => $limit,
             ],
         ]);
 
@@ -99,12 +100,11 @@ final readonly class PtService
      */
     public function getDepartures(string $stopId, int $limit = 10, bool $arriveBy = false): array
     {
-        $response = $this->transitiousRequest('GET', '/v5/stoptimes', [
+        $response = $this->transitiousRequest('GET', '/v6/stoptimes', [
             'query' => [
                 'stopId' => $stopId,
                 'n' => $limit,
-                'arriveBy' => $arriveBy ? 'true' : 'false',
-                'language' => 'de',
+                'arriveBy' => $arriveBy,
             ],
         ]);
 
@@ -142,8 +142,8 @@ final readonly class PtService
             'fromPlace' => $fromPlace,
             'toPlace' => $toPlace,
             'numItineraries' => $numItineraries,
-            'arriveBy' => $arriveBy ? 'true' : 'false',
-            'language' => 'de',
+            'arriveBy' => $arriveBy,
+            'language' => ['de'],
         ];
 
         if ($departure !== null) {
@@ -183,10 +183,9 @@ final readonly class PtService
      */
     public function getTripDetails(string $tripId, string $time): ?array
     {
-        $response = $this->transitiousRequest('GET', '/v5/trip', [
+        $response = $this->transitiousRequest('GET', '/v6/trip', [
             'query' => [
                 'tripId' => $tripId,
-                'time' => $time,
             ],
         ]);
 

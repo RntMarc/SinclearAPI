@@ -6,7 +6,7 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use Sinclear\Api\Helpers\ResponseFactory;
+use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\PtService;
 
