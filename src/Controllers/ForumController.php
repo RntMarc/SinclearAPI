@@ -48,8 +48,9 @@ final readonly class ForumController
         $params = $request->getQueryParams();
         $page = max(1, (int) ($params['page'] ?? 1));
         $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+        $includeAll = isset($params['all']) && $params['all'] === '1';
 
-        $result = $this->forumService->listForums($page, $limit);
+        $result = $this->forumService->listForums($page, $limit, $includeAll);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 

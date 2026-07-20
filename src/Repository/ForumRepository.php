@@ -19,13 +19,20 @@ final readonly class ForumRepository
         return $result ?: null;
     }
 
-    public function list(int $page, int $limit): array
+    public function list(int $page, int $limit, bool $excludeTripLinked = false): array
     {
-        $total = (int) $this->pdo->query('SELECT COUNT(*) FROM Forum')->fetchColumn();
+        $where = '';
+        if ($excludeTripLinked) {
+            $where = ' WHERE f.id NOT IN (SELECT forumId FROM TravelTrip WHERE forumId IS NOT NULL)';
+        }
+
+        $total = (int) $this->pdo->query(
+            'SELECT COUNT(*) FROM Forum f' . $where
+        )->fetchColumn();
 
         $offset = ($page - 1) * $limit;
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM Forum ORDER BY createdAt DESC LIMIT ? OFFSET ?'
+            'SELECT f.* FROM Forum f' . $where . ' ORDER BY f.createdAt DESC LIMIT ? OFFSET ?'
         );
         $stmt->execute([$limit, $offset]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

@@ -76,6 +76,7 @@ use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
+use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\LocationSharingService;
@@ -233,6 +234,7 @@ return [
     TravelAccommodationRepository::class => autowire(),
     TravelRelationRepository::class => autowire(),
     EventRelationRepository::class => autowire(),
+    TravelTripSubscriptionRepository::class => autowire(),
 
     TravelService::class => autowire(),
     TravelController::class => autowire(),

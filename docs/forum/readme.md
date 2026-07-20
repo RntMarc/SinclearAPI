@@ -64,7 +64,7 @@ Nutzer können beitreten und eigene Beiträge verfassen.
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
-| `GET` | `/forums` | JWT | Alle Foren auflisten |
+| `GET` | `/forums` | JWT | Alle Foren auflisten (`all=1` für inkl. Reise-Foren) |
 | `POST` | `/forums` | JWT + Admin | Neues Forum erstellen |
 | `GET` | `/forums/{id}` | JWT | Forum-Details abrufen |
 | `PUT` | `/forums/{id}` | JWT + Admin | Forum bearbeiten |
@@ -84,6 +84,21 @@ Nutzer können beitreten und eigene Beiträge verfassen.
 | `POST` | `/forums/{id}/posts/{postId}/comments` | JWT | Kommentar erstellen |
 | `PUT` | `/forums/{id}/posts/{postId}/comments/{commentId}` | JWT | Kommentar bearbeiten |
 | `DELETE` | `/forums/{id}/posts/{postId}/comments/{commentId}` | JWT | Kommentar löschen |
+
+## Reise-verknüpfte Foren
+
+Foren können mit einer Reise verknüpft werden (über `TravelTrip.forumId`).
+Diese Foren werden in der öffentlichen Foren-Liste (`GET /forums`) **nicht**
+angezeigt, es sei denn, der `all=1`-Parameter wird gesetzt (nur Administratoren).
+
+**Verhalten:**
+- Mitreisende der Reise sind automatisch Mitglieder des verknüpften Forums.
+- Sie sehen das Forum in ihrer persönlichen Foren-Ansicht (wenn sie die
+  entsprechende Forum-ID besitzen) und können dort normal posten.
+- Nicht-Mitglieder der Reise können dem Forum nicht beitreten, da es in
+  der öffentlichen Liste nicht auftaucht.
+- Die Reise-Detail-API (`GET /trips/{id}`) gibt `forumId` und `forum`-Objekt
+  zurück, damit der Client den Forum-Tab anzeigen kann.
 
 ## Foren verwalten
 

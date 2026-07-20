@@ -6,6 +6,8 @@ use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
+use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
+use Sinclear\Api\Repository\ForumRepository;
 
 final readonly class TravelService
 {
@@ -14,11 +16,18 @@ final readonly class TravelService
         private TravelEventRepository $eventRepo,
         private TravelAccommodationRepository $accommodationRepo,
         private TravelRelationRepository $relationRepo,
+        private TravelTripSubscriptionRepository $tripSubscriptionRepo,
+        private ForumRepository $forumRepo,
     ) {}
 
     public function listTrips(string $userId, int $page, int $limit): array
     {
-        return $this->tripRepo->findByParticipant($userId, $page, $limit);
+        $result = $this->tripRepo->findByParticipant($userId, $page, $limit);
+        $result['data'] = array_map(
+            fn(array $t) => $this->enrichTrip($t),
+            $result['data'],
+        );
+        return $result;
     }
 
     public function getTrip(string $id, string $userId): array
@@ -32,7 +41,7 @@ final readonly class TravelService
             throw new \RuntimeException('Trip not found');
         }
 
-        return $trip;
+        return $this->enrichTrip($trip);
     }
 
     public function listEvents(string $tripId, string $userId): array
@@ -135,6 +144,58 @@ final readonly class TravelService
         }
 
         return $this->relationRepo->findParticipantsByTrip($tripId);
+    }
+
+    public function getEventById(string $eventId, string $userId): array
+    {
+        $event = $this->eventRepo->findByIdWithAccess($eventId, $userId);
+        if ($event === null) {
+            throw new \RuntimeException('Event not found');
+        }
+
+        return $this->enrichEvent($event);
+    }
+
+    public function getTripSubscriptions(string $tripId, string $userId): array
+    {
+        if (!$this->relationRepo->isParticipant($userId, $tripId)) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            throw new \RuntimeException('Trip not found');
+        }
+
+        return $this->tripSubscriptionRepo->findByTripWithUserAccess($tripId, $userId);
+    }
+
+    private function enrichTrip(array $trip): array
+    {
+        $forumId = $trip['forumId'] ?? null;
+        if ($forumId !== null) {
+            $forum = $this->forumRepo->findById($forumId);
+            if ($forum === null) {
+                $forumId = null;
+            }
+        }
+
+        $trip['forumId'] = $forumId;
+
+        if ($forumId !== null && isset($forum)) {
+            $trip['forum'] = [
+                'id' => $forum['id'],
+                'name' => $forum['name'],
+                'description' => $forum['description'],
+                'image' => $forum['image'],
+            ];
+        } else {
+            $trip['forum'] = null;
+        }
+
+        $trip['subscriptionCount'] = $this->tripSubscriptionRepo->countByTrip($trip['id']);
+
+        return $trip;
     }
 
     private function enrichEvent(array $event): array

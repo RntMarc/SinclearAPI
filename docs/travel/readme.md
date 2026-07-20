@@ -76,24 +76,58 @@ Jede `TravelAccommodation` kann mehreren Nutzern zugeordnet sein (über
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
 | `GET` | `/trips` | JWT | Paginierte Liste der eigenen Reisen |
-| `GET` | `/trips/{id}` | JWT | Reisedetails |
+| `GET` | `/trips/{id}` | JWT | Reisedetails (inkl. `forumId`, `forum`, `subscriptionCount`) |
 | `GET` | `/trips/{id}/events` | JWT | Alle Events einer Reise (mit Teilnehmern) |
 | `GET` | `/trips/{id}/events/{eventId}` | JWT | Event-Details (mit Teilnehmern) |
 | `GET` | `/trips/{id}/accommodations` | JWT | Alle Unterkünfte einer Reise (mit Nutzern) |
 | `GET` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunfts-Details (mit Nutzern) |
 | `GET` | `/trips/{id}/participants` | JWT | Alle Teilnehmer einer Reise |
+| `GET` | `/trips/{id}/subscriptions` | JWT | Mit Reise verknüpfte Abos (nur bei Zugriff) |
 | `GET` | `/trips/standaloneevents` | JWT | Standalone-Events des Nutzers (paginiert, mit Teilnehmern) |
 | `GET` | `/trips/standaloneevents/{eventId}` | JWT | Standalone-Event-Details (mit Teilnehmern) |
+| `GET` | `/trips/events/{eventId}` | JWT | **Unified** Event-Details via ID (Standalone + Reise-Events) |
+
+## Reise-Trip Response (erweitert)
+
+Die Response von `GET /trips` und `GET /trips/{id}` enthält zusätzliche Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `forumId` | string\|null | ID des verknüpften Forums (falls vorhanden) |
+| `forum` | object\|null | Kurzinfo des verknüpften Forums (`id`, `name`, `description`, `image`) |
+| `subscriptionCount` | integer | Anzahl der mit dieser Reise verknüpften Abos |
+
+## Unified Event Endpoint
+
+`GET /trips/events/{eventId}` ist ein neuer Endpunkt, der Event-Details
+unabhängig vom Kontext liefert:
+
+- **Standalone-Event:** Der Nutzer muss in `EventRelation` eingetragen sein.
+- **Reise-Event:** Der Nutzer muss Teilnehmer der zugehörigen Reise sein.
+- Die Erkennung erfolgt automatisch anhand des `trip`-Feldes des Events.
+
+## Reise-Forum-Verknüpfung
+
+Ein Forum kann mit einer Reise verknüpft werden (über `TravelTrip.forumId`).
+Wenn verknüpft:
+- Alle Teilnehmer der Reise werden automatisch Mitglieder des Forums.
+- Das Forum wird in der öffentlichen Foren-Liste **ausgeblendet**.
+- Der Client zeigt einen "Forum"-Tab in der Reise-Detailansicht an.
+- Die Forum-Inhalte werden über die bestehenden Forum-Endpunkte geladen.
+
+## Reise-Abo-Verknüpfung
+
+Abonnements können mit einer Reise verknüpft werden (über
+`TravelTripSubscription`-Junction-Tabelle). Wenn verknüpft:
+- Der Client zeigt einen "Zahlungen"-Tab an, sofern der Nutzer
+  bei mindestens einem verknüpften Abo in `SubscriptionRelation` steht.
+- `GET /trips/{id}/subscriptions` filtert automatisch nur die Abos,
+  auf die der Nutzer Zugriff hat.
 
 ## Standalone-Events
 
 Standalone-Events sind `TravelEvent`-Einträge ohne Reise-Bezug (`trip IS NULL`).
 Sie werden unter `/trips/standaloneevents` abgerufen.
-
-- **Listen-Endpunkt:** Nur Events, bei denen der Nutzer via `EventRelation`
-  als Teilnehmer eingetragen ist.
-- **Detail-Endpunkt:** Nutzer muss in `EventRelation` sein → sonst `404`.
-- Die Response enthält ebenfalls das `participants`-Array mit allen Teilnehmern.
 
 ## Datenbank-Kompatibilität
 

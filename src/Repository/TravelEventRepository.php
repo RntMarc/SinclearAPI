@@ -45,6 +45,26 @@ final readonly class TravelEventRepository
         return $result ?: null;
     }
 
+    public function findByIdWithAccess(string $eventId, string $userId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT e.*
+             FROM TravelEvent e
+             LEFT JOIN EventRelation er ON er.eventId = e.ID AND er.userId = ?
+             LEFT JOIN TravelTrip t ON t.id = e.trip
+             LEFT JOIN TravelRelation tr ON tr.tripid = t.id AND tr.userid = ?
+             WHERE e.ID = ?
+               AND (
+                   (e.trip IS NULL AND er.userId IS NOT NULL)
+                   OR (e.trip IS NOT NULL AND tr.userid IS NOT NULL)
+               )
+             LIMIT 1'
+        );
+        $stmt->execute([$userId, $userId, $eventId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
     public function findStandaloneByParticipant(string $userId, int $page, int $limit): array
     {
         $params = [$userId];

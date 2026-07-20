@@ -103,12 +103,16 @@ return function (App $app): void {
         $group->get('/standaloneevents', [TravelController::class, 'listStandaloneEvents']);
         $group->get('/standaloneevents/{eventId}', [TravelController::class, 'getStandaloneEvent']);
 
+        // Unified event lookup (standalone + trip events) MUST come before /{id}
+        $group->get('/events/{eventId}', [TravelController::class, 'getEventById']);
+
         $group->get('/{id}', [TravelController::class, 'getTrip']);
         $group->get('/{id}/events', [TravelController::class, 'listEvents']);
         $group->get('/{id}/events/{eventId}', [TravelController::class, 'getEvent']);
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
         $group->get('/{id}/accommodations/{accommodationId}', [TravelController::class, 'getAccommodation']);
         $group->get('/{id}/participants', [TravelController::class, 'listParticipants']);
+        $group->get('/{id}/subscriptions', [TravelController::class, 'getTripSubscriptions']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/calendar', function (RouteCollectorProxy $group) {
@@ -285,6 +289,9 @@ return function (App $app): void {
         $group->post('/travel/trips/{id}/participants', [AdminController::class, 'addTripParticipant']);
         $group->delete('/travel/trips/{id}/participants/{userId}', [AdminController::class, 'removeTripParticipant']);
         $group->put('/travel/trips/{id}/participants/{userId}/accommodation', [AdminController::class, 'updateParticipantAccommodation']);
+        $group->put('/travel/trips/{id}/forum', [AdminController::class, 'linkTripForum']);
+        $group->post('/travel/trips/{id}/subscriptions', [AdminController::class, 'linkTripSubscription']);
+        $group->delete('/travel/trips/{id}/subscriptions/{subscriptionId}', [AdminController::class, 'unlinkTripSubscription']);
         $group->post('/travel/trips/{id}/accommodations', [AdminController::class, 'createTripAccommodation']);
         $group->put('/travel/trips/{id}/accommodations/{accId}', [AdminController::class, 'updateTripAccommodation']);
         $group->delete('/travel/trips/{id}/accommodations/{accId}', [AdminController::class, 'deleteTripAccommodation']);

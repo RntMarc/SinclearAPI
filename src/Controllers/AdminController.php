@@ -12,6 +12,7 @@ use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
+use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
@@ -51,6 +52,7 @@ final readonly class AdminController
         private ForumMemberRepository $forumMemberRepo,
         private SubscriptionRepository $subscriptionRepo,
         private SubscriptionService $subscriptionService,
+        private TravelTripSubscriptionRepository $tripSubscriptionRepo,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -511,6 +513,86 @@ ROW;
         return ResponseFactory::noContent($response);
     }
 
+    public function linkTripForum(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $body = $request->getParsedBody();
+
+        $forumId = isset($body['forumId']) && is_string($body['forumId']) && $body['forumId'] !== ''
+            ? trim($body['forumId']) : null;
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        if ($forumId !== null) {
+            $forum = $this->forumRepo->findById($forumId);
+            if ($forum === null) {
+                return ResponseFactory::json(['error' => 'forum_not_found'], 404, $response);
+            }
+
+            $existingTrip = $this->tripRepo->findByForumId($forumId);
+            if ($existingTrip !== null && $existingTrip['id'] !== $tripId) {
+                return ResponseFactory::json(['error' => 'forum_already_linked'], 409, $response);
+            }
+        }
+
+        $this->tripRepo->update($tripId, ['forumId' => $forumId]);
+
+        if ($forumId !== null) {
+            $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
+            foreach ($participants as $p) {
+                $existingMember = $this->forumMemberRepo->findByForumAndUser($forumId, $p['id']);
+                if ($existingMember === null) {
+                    $this->forumMemberRepo->join($forumId, $p['id']);
+                }
+            }
+        }
+
+        return ResponseFactory::json(['data' => ['forumId' => $forumId]], 200, $response);
+    }
+
+    public function linkTripSubscription(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $body = $request->getParsedBody();
+
+        $subscriptionId = isset($body['subscriptionId']) && is_string($body['subscriptionId']) && $body['subscriptionId'] !== ''
+            ? trim($body['subscriptionId']) : null;
+
+        if ($subscriptionId === null) {
+            return ResponseFactory::json(['error' => 'subscriptionId_required'], 400, $response);
+        }
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $subscription = $this->subscriptionRepo->findById($subscriptionId);
+        if ($subscription === null) {
+            return ResponseFactory::json(['error' => 'subscription_not_found'], 404, $response);
+        }
+
+        $this->tripSubscriptionRepo->add($tripId, $subscriptionId);
+
+        return ResponseFactory::json(['message' => 'subscription_linked'], 200, $response);
+    }
+
+    public function unlinkTripSubscription(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $subscriptionId = $args['subscriptionId'];
+
+        $this->tripSubscriptionRepo->remove($tripId, $subscriptionId);
+
+        return ResponseFactory::noContent($response);
+    }
+
     public function tripDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);
@@ -653,6 +735,51 @@ ROW;
         $tripStart = date('d.m.Y H:i', strtotime($trip['start']));
         $tripEnd = date('d.m.Y H:i', strtotime($trip['end']));
 
+        // Forum linking
+        $forumId = $trip['forumId'] ?? null;
+        $forumInfo = '';
+        if ($forumId !== null) {
+            $forum = $this->forumRepo->findById($forumId);
+            if ($forum !== null) {
+                $forumName = htmlspecialchars($forum['name']);
+                $forumInfo = <<<HTML
+                <div class="flex" style="gap:0.5rem;align-items:center;">
+                    <span>{$forumName}</span>
+                    <button class="btn btn-sm btn-danger" onclick="unlinkForum()">Trennen</button>
+                </div>
+HTML;
+            }
+        }
+        $allForumsResult = $this->forumRepo->list(1, 99999);
+        $forumOptions = '<option value="">– Kein Forum –</option>';
+        foreach ($allForumsResult['data'] as $f) {
+            $fId = htmlspecialchars($f['id']);
+            $fName = htmlspecialchars($f['name']);
+            $selected = $fId === $forumId ? ' selected' : '';
+            $forumOptions .= "<option value=\"{$fId}\"{$selected}>{$fName}</option>";
+        }
+
+        // Subscriptions linking
+        $linkedSubscriptionIds = $this->tripSubscriptionRepo->findByTrip($id);
+        $allSubscriptions = $this->subscriptionRepo->findAll();
+        $subscriptionRows = '';
+        $availableSubscriptionOptions = '';
+        foreach ($allSubscriptions as $sub) {
+            $sId = htmlspecialchars($sub['id']);
+            $sName = htmlspecialchars($sub['name']);
+            if (in_array($sub['id'], $linkedSubscriptionIds, true)) {
+                $subscriptionRows .= <<<ROW
+                <tr>
+                    <td>{$sName}</td>
+                    <td>{$sub['id']}</td>
+                    <td><button class="btn btn-sm btn-danger" onclick="unlinkSubscription('{$sId}')">Trennen</button></td>
+                </tr>
+ROW;
+            } else {
+                $availableSubscriptionOptions .= "<option value=\"{$sId}\">{$sName}</option>";
+            }
+        }
+
         $contentHtml = $this->renderTemplate('trip_detail.php', [
             'tripId' => $id,
             'tripName' => $tripName,
@@ -667,6 +794,10 @@ ROW;
             'tripEventRows' => $tripEventRows,
             'tripEventCount' => $tripEventCount,
             'availableEventOptions' => $availableEventOptions,
+            'forumInfo' => $forumInfo,
+            'forumOptions' => $forumOptions,
+            'subscriptionRows' => $subscriptionRows,
+            'availableSubscriptionOptions' => $availableSubscriptionOptions,
         ]);
         $html = $this->renderLayout("Reise: {$tripName}", $contentHtml, $user->email);
 

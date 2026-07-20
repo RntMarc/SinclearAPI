@@ -15,6 +15,8 @@ final readonly class TravelController
         'Trip not found' => ['trip_not_found', 404],
         'Event not found' => ['event_not_found', 404],
         'Accommodation not found' => ['accommodation_not_found', 404],
+        'Forum not found' => ['forum_not_found', 404],
+        'Not a member' => ['forbidden', 403],
     ];
 
     public function __construct(
@@ -110,6 +112,30 @@ final readonly class TravelController
         try {
             $accommodation = $this->travelService->getAccommodation($args['id'], $args['accommodationId'], $user->id);
             return ResponseFactory::json(['data' => $accommodation], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
+    public function getEventById(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $event = $this->travelService->getEventById($args['eventId'], $user->id);
+            return ResponseFactory::json(['data' => $event], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
+    public function getTripSubscriptions(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $subscriptions = $this->travelService->getTripSubscriptions($args['id'], $user->id);
+            return ResponseFactory::json(['data' => $subscriptions], 200, $response);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e, $response);
         }

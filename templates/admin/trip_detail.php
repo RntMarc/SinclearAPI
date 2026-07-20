@@ -190,6 +190,70 @@
     </form>
 </div>
 
+<div class="card" style="margin-bottom:1rem;">
+    <div class="flex-between" style="margin-bottom:1rem;">
+        <h2 style="font-size:1.1rem;color:#aaa;">Verknüpftes Forum</h2>
+        <button class="btn btn-primary" onclick="showLinkForumForm()">Forum ändern</button>
+    </div>
+    {{forumInfo}}
+    <p style="color:#666;{{forumInfo ? 'display:none;' : ''}}" id="noForumText">Kein Forum verknüpft.</p>
+</div>
+
+<!-- Link Forum Form -->
+<div id="linkForumForm" class="card mt-2" style="display:none;">
+    <h2 style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Forum verknüpfen</h2>
+    <form id="linkForumFormEl" onsubmit="submitLinkForum(event)">
+        <div class="form-group">
+            <label for="forumSelect">Forum</label>
+            <select id="forumSelect" name="forumId">
+                {{forumOptions}}
+            </select>
+        </div>
+        <div class="flex" style="gap:0.5rem;">
+            <button type="submit" class="btn btn-success">Speichern</button>
+            <button type="button" class="btn" onclick="hideLinkForumForm()">Abbrechen</button>
+        </div>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="flex-between" style="margin-bottom:1rem;">
+        <h2 style="font-size:1.1rem;color:#aaa;">Verknüpfte Abos</h2>
+        <button class="btn btn-primary" onclick="showLinkSubscriptionForm()">+ Abo verknüpfen</button>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>ID</th>
+                <th>Aktionen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{subscriptionRows}}
+        </tbody>
+    </table>
+    <p style="color:#666;" id="noSubscriptionText">Keine Abos verknüpft.</p>
+</div>
+
+<!-- Link Subscription Form -->
+<div id="linkSubscriptionForm" class="card mt-2" style="display:none;">
+    <h2 style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Abo verknüpfen</h2>
+    <form id="linkSubscriptionFormEl" onsubmit="submitLinkSubscription(event)">
+        <div class="form-group">
+            <label for="subscriptionSelect">Abo *</label>
+            <select id="subscriptionSelect" name="subscriptionId" required>
+                <option value="">– Bitte wählen –</option>
+                {{availableSubscriptionOptions}}
+            </select>
+        </div>
+        <div class="flex" style="gap:0.5rem;">
+            <button type="submit" class="btn btn-success">Verknüpfen</button>
+            <button type="button" class="btn" onclick="hideLinkSubscriptionForm()">Abbrechen</button>
+        </div>
+    </form>
+</div>
+
 <div class="card">
     <div class="flex-between" style="margin-bottom:1rem;">
         <h2 style="font-size:1.1rem;color:#aaa;">Events dieser Reise ({{tripEventCount}})</h2>
@@ -410,6 +474,85 @@
             if (res.ok) { showToast('Event verknüpft'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Verknüpfen', 'error'); }
+    }
+
+    // Forum link/unlink
+    function showLinkForumForm() {
+        document.getElementById('linkForumForm').style.display = 'block';
+    }
+    function hideLinkForumForm() {
+        document.getElementById('linkForumForm').style.display = 'none';
+        document.getElementById('linkForumFormEl').reset();
+    }
+
+    async function submitLinkForum(event) {
+        event.preventDefault();
+        const forumId = document.getElementById('forumSelect').value || null;
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/forum', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ forumId }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Forum verknüpft'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Verknüpfen', 'error'); }
+    }
+
+    async function unlinkForum() {
+        if (!confirm('Forum wirklich von dieser Reise trennen?')) return;
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/forum', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ forumId: null }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Forum getrennt'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Trennen', 'error'); }
+    }
+
+    // Subscription link/unlink
+    function showLinkSubscriptionForm() {
+        document.getElementById('linkSubscriptionForm').style.display = 'block';
+    }
+    function hideLinkSubscriptionForm() {
+        document.getElementById('linkSubscriptionForm').style.display = 'none';
+        document.getElementById('linkSubscriptionFormEl').reset();
+    }
+
+    async function submitLinkSubscription(event) {
+        event.preventDefault();
+        const subscriptionId = document.getElementById('subscriptionSelect').value;
+        if (!subscriptionId) { showToast('Bitte ein Abo wählen.', 'error'); return; }
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/subscriptions', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriptionId }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Abo verknüpft'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Verknüpfen', 'error'); }
+    }
+
+    async function unlinkSubscription(subscriptionId) {
+        if (!confirm('Abo wirklich von dieser Reise trennen?')) return;
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/subscriptions/' + subscriptionId, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Abo getrennt'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Trennen', 'error'); }
     }
 
     async function unlinkEvent(eventId, eventName) {

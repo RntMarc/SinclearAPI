@@ -54,6 +54,19 @@ Gibt die Details eines bestimmten Abonnements zurück. Der Nutzer muss beteiligt
 ### GET /subscriptions/{id}/participants
 Gibt alle Teilnehmer eines Abonnements zurück.
 
+## Reise-verknüpfte Abos
+
+Abonnements können mit einer Reise verknüpft werden (über die
+`TravelTripSubscription`-Junction-Tabelle). Die Verknüpfung erfolgt über das
+Admin-Dashboard in der Reise-Detailansicht.
+
+**Verhalten:**
+- `GET /trips/{id}/subscriptions` gibt nur die Abos zurück, bei denen der
+  authentifizierte Nutzer in `SubscriptionRelation` eingetragen ist.
+- Hat der Nutzer bei keinem verknüpften Abo Zugriff, bleibt der Tab
+  "Zahlungen" im Client ausgeblendet.
+- Die Abos erscheinen weiterhin auf dem normalen Abo-Screen des Nutzers.
+
 ## Admin-Dashboard Endpunkte (Session-authentifiziert)
 
 ### GET /admin/subscriptions

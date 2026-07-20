@@ -72,8 +72,8 @@ final readonly class TravelTripRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelTrip (id, name, description, start, end, hastickets, ticket, ticketUrl)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelTrip (id, name, description, start, end, hastickets, ticket, ticketUrl, forumId)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -84,6 +84,7 @@ final readonly class TravelTripRepository
             $data['hastickets'] ?? '0',
             $data['ticket'] ?? null,
             $data['ticketUrl'] ?? null,
+            $data['forumId'] ?? null,
         ]);
         return $id;
     }
@@ -93,7 +94,7 @@ final readonly class TravelTripRepository
         $sets = [];
         $values = [];
 
-        foreach (['name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl'] as $field) {
+        foreach (['name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'forumId'] as $field) {
             if (array_key_exists($field, $data)) {
                 $sets[] = "$field = ?";
                 $values[] = $data[$field];
@@ -114,5 +115,13 @@ final readonly class TravelTripRepository
     {
         $stmt = $this->pdo->prepare('DELETE FROM TravelTrip WHERE id = ?');
         $stmt->execute([$id]);
+    }
+
+    public function findByForumId(string $forumId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM TravelTrip WHERE forumId = ? LIMIT 1');
+        $stmt->execute([$forumId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
     }
 }

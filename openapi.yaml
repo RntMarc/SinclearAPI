@@ -729,6 +729,30 @@ components:
           type: string
           format: uri
           nullable: true
+        forumId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des verknüpften Forums (falls vorhanden)
+        forum:
+          type: object
+          nullable: true
+          description: Kurzinfo des verknüpften Forums
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            description:
+              type: string
+              nullable: true
+            image:
+              type: string
+              nullable: true
+        subscriptionCount:
+          type: integer
+          description: Anzahl der mit dieser Reise verknüpften Abos
 
     TravelTripListResponse:
       type: object
@@ -6464,7 +6488,56 @@ components:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Teilnehmer nicht gefunden
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/subscriptions:
+    get:
+      summary: Mit Reise verknüpfte Abos abrufen
+      description: >
+        Gibt alle Abonnements zurück, die mit einer Reise verknüpft sind,
+        bei denen der authentifizierte Nutzer über SubscriptionRelation
+        beteiligt ist. Der Nutzer muss Teilnehmer der Reise sein.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+      responses:
+        '200':
+          description: Liste der zugänglichen Abos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Subscription'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Teilnehmer dieser Reise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
           content:
             application/json:
               schema:
@@ -7070,6 +7143,44 @@ components:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /trips/events/{eventId}:
+    get:
+      summary: Event-Details via ID abrufen (unified)
+      description: >
+        Gibt die Details eines Events zurück, unabhängig davon, ob es sich
+        um ein Standalone-Event oder ein Event innerhalb einer Reise handelt.
+        Die Zugriffsprüfung erfolgt automatisch: bei Standalone-Events wird
+        die EventRelation geprüft, bei Reise-Events die TravelRelation.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event-Details mit Teilnehmern
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden oder kein Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /feedback/bug-report:
     post:
       summary: Bug-Report senden
@@ -7573,9 +7684,11 @@ components:
     get:
       summary: Alle Foren auflisten
       description: >
-        Gibt eine paginierte Liste aller existierenden Foren zurück,
-        sortiert nach Erstellungsdatum (absteigend). Jeder Eintrag
-        enthält die Anzahl der Mitglieder.
+        Gibt eine paginierte Liste der Foren zurück, sortiert nach
+        Erstellungsdatum (absteigend). Standardmäßig werden nur öffentliche
+        Foren angezeigt (keine Reise-verknüpften). Mit `all=1` werden alle
+        Foren inklusive Reise-verknüpfter angezeigt. Jeder Eintrag enthält
+        die Anzahl der Mitglieder.
       tags: [Forum]
       security:
         - BearerAuth: []
@@ -7595,6 +7708,15 @@ components:
             minimum: 1
             maximum: 100
           description: Einträge pro Seite
+        - name: all
+          in: query
+          schema:
+            type: string
+            enum: ['0', '1']
+            default: '0'
+          description: >
+            Nur für Administratoren: Gibt alle Foren zurück inklusive
+            Reise-verknüpfter (standardmäßig ausgeblendet).
       responses:
         '200':
           description: Paginierte Liste der Foren

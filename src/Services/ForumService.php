@@ -94,9 +94,9 @@ final readonly class ForumService
         $this->forumRepo->delete($id);
     }
 
-    public function listForums(int $page, int $limit): array
+    public function listForums(int $page, int $limit, bool $includeAll = false): array
     {
-        $result = $this->forumRepo->list($page, $limit);
+        $result = $this->forumRepo->list($page, $limit, !$includeAll);
         $forumIds = array_column($result['data'], 'id');
         $memberCounts = $this->memberRepo->countByForums($forumIds);
 

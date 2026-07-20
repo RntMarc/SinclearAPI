@@ -52,6 +52,10 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Unterkunftszuweisung pro Teilnehmer änderbar
 - Unterkünfte können erstellt, bearbeitet und gelöscht werden
 - Dropdown mit allen registrierten Nutzern zum Hinzufügen
+- **Forum-Verknüpfung:** Forum auswählen und mit Reise verknüpfen/trennen.
+  Beim Verknüpfen werden alle Teilnehmer automatisch in das Forum eingetragen.
+- **Abo-Verknüpfung:** Abonnements mit der Reise verknüpfen/trennen.
+  Die Abos erscheinen dann auf dem "Zahlungen"-Tab im Client.
 
 ### Eventdetail (`/travel/events/{id}`) – **voll implementiert**
 - Zeigt Eventinformationen und Teilnehmer
@@ -76,6 +80,12 @@ Nicht-Admins erhalten einen 403-Fehler.
 | `admin.test` | `{ "deepLink": "..." }` | Test-Ping |
 | `admin.custom` | `{ "deepLink": "...", "title": "...", "body": "..." }` | Freie Nachricht |
 
+### Abos (`/subscriptions`) – **voll implementiert**
+- Listet alle Abonnements mit Preisen und Teilnehmeranzahl
+- CRUD für Abonnements
+- Teilnehmerverwaltung pro Abo (hinzufügen, entfernen, Bezahlstatus ändern)
+- Abos können über die Reisedetail-Seite mit Reisen verknüpft werden
+
 ## API-Endpoints
 
 | Methode | Pfad | Beschreibung |
@@ -98,6 +108,9 @@ Nicht-Admins erhalten einen 403-Fehler.
 | POST | `/admin/travel/trips/{id}/participants` | Teilnehmer zu Reise hinzufügen (geschützt) |
 | DELETE | `/admin/travel/trips/{id}/participants/{userId}` | Teilnehmer von Reise entfernen (geschützt) |
 | PUT | `/admin/travel/trips/{id}/participants/{userId}/accommodation` | Unterkunftszuweisung ändern (geschützt) |
+| PUT | `/admin/travel/trips/{id}/forum` | Forum mit Reise verknüpfen/trennen (geschützt) |
+| POST | `/admin/travel/trips/{id}/subscriptions` | Abo mit Reise verknüpfen (geschützt) |
+| DELETE | `/admin/travel/trips/{id}/subscriptions/{subscriptionId}` | Abo von Reise trennen (geschützt) |
 | POST | `/admin/travel/trips/{id}/accommodations` | Unterkunft erstellen (geschützt) |
 | PUT | `/admin/travel/trips/{id}/accommodations/{accId}` | Unterkunft bearbeiten (geschützt) |
 | DELETE | `/admin/travel/trips/{id}/accommodations/{accId}` | Unterkunft löschen (geschützt) |
