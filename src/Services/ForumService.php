@@ -94,9 +94,9 @@ final readonly class ForumService
         $this->forumRepo->delete($id);
     }
 
-    public function listForums(int $page, int $limit, bool $includeAll = false): array
+    public function listForums(int $page, int $limit, ?string $userId = null): array
     {
-        $result = $this->forumRepo->list($page, $limit, !$includeAll);
+        $result = $this->forumRepo->list($page, $limit, $userId);
         $forumIds = array_column($result['data'], 'id');
         $memberCounts = $this->memberRepo->countByForums($forumIds);
 
@@ -166,6 +166,10 @@ final readonly class ForumService
         $forum = $this->forumRepo->findById($forumId);
         if ($forum === null) {
             throw new \RuntimeException('forum_not_found');
+        }
+
+        if ($this->forumRepo->isTripLinked($forumId)) {
+            throw new \RuntimeException('cannot_leave_trip_forum');
         }
 
         $existing = $this->memberRepo->findByForumAndUser($forumId, $userId);

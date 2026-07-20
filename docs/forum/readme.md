@@ -88,15 +88,17 @@ Nutzer können beitreten und eigene Beiträge verfassen.
 ## Reise-verknüpfte Foren
 
 Foren können mit einer Reise verknüpft werden (über `TravelTrip.forumId`).
-Diese Foren werden in der öffentlichen Foren-Liste (`GET /forums`) **nicht**
-angezeigt, es sei denn, der `all=1`-Parameter wird gesetzt (nur Administratoren).
 
-**Verhalten:**
-- Mitreisende der Reise sind automatisch Mitglieder des verknüpften Forums.
-- Sie sehen das Forum in ihrer persönlichen Foren-Ansicht (wenn sie die
-  entsprechende Forum-ID besitzen) und können dort normal posten.
-- Nicht-Mitglieder der Reise können dem Forum nicht beitreten, da es in
-  der öffentlichen Liste nicht auftaucht.
+**Verhalten in der Foren-Liste (`GET /forums`):**
+- Mitreisende der Reise (die automatisch Mitglieder sind) sehen das
+  verknüpfte Forum in der Liste.
+- Nicht-Mitglieder der Reise sehen das Forum **nicht** in der Liste.
+- Mit `all=1` kann die Filterung übersprungen werden (alle Foren sichtbar).
+
+**Mitgliedschaft:**
+- Mitreisende der Reise werden automatisch in das Forum eingetragen.
+- Einmal verknüpft, kann das Forum **nicht verlassen** werden
+  (liefert `403 cannot_leave_trip_forum`).
 - Die Reise-Detail-API (`GET /trips/{id}`) gibt `forumId` und `forum`-Objekt
   zurück, damit der Client den Forum-Tab anzeigen kann.
 

@@ -19,22 +19,41 @@ final readonly class ForumRepository
         return $result ?: null;
     }
 
-    public function list(int $page, int $limit, bool $excludeTripLinked = false): array
+    public function list(int $page, int $limit, ?string $userId = null): array
     {
-        $where = '';
-        if ($excludeTripLinked) {
-            $where = ' WHERE f.id NOT IN (SELECT forumId FROM TravelTrip WHERE forumId IS NOT NULL)';
+        if ($userId !== null) {
+            $where = ' WHERE f.id NOT IN (
+                SELECT tt.forumId FROM TravelTrip tt
+                WHERE tt.forumId IS NOT NULL
+                AND tt.forumId NOT IN (SELECT fm.forumId FROM ForumMember fm WHERE fm.userId = ?)
+            )';
+            $params = [$userId];
+
+            $totalStmt = $this->pdo->prepare(
+                'SELECT COUNT(*) FROM Forum f' . $where
+            );
+            $totalStmt->execute($params);
+            $total = (int) $totalStmt->fetchColumn();
+
+            $offset = ($page - 1) * $limit;
+            $params[] = $limit;
+            $params[] = $offset;
+            $stmt = $this->pdo->prepare(
+                'SELECT f.* FROM Forum f' . $where . ' ORDER BY f.createdAt DESC LIMIT ? OFFSET ?'
+            );
+            $stmt->execute($params);
+        } else {
+            $total = (int) $this->pdo->query(
+                'SELECT COUNT(*) FROM Forum f'
+            )->fetchColumn();
+
+            $offset = ($page - 1) * $limit;
+            $stmt = $this->pdo->prepare(
+                'SELECT f.* FROM Forum f ORDER BY f.createdAt DESC LIMIT ? OFFSET ?'
+            );
+            $stmt->execute([$limit, $offset]);
         }
 
-        $total = (int) $this->pdo->query(
-            'SELECT COUNT(*) FROM Forum f' . $where
-        )->fetchColumn();
-
-        $offset = ($page - 1) * $limit;
-        $stmt = $this->pdo->prepare(
-            'SELECT f.* FROM Forum f' . $where . ' ORDER BY f.createdAt DESC LIMIT ? OFFSET ?'
-        );
-        $stmt->execute([$limit, $offset]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return [
@@ -46,6 +65,15 @@ final readonly class ForumRepository
                 'totalPages' => (int) ceil($total / $limit),
             ],
         ];
+    }
+
+    public function isTripLinked(string $forumId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM TravelTrip WHERE forumId = ? LIMIT 1'
+        );
+        $stmt->execute([$forumId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
     public function create(array $data): string

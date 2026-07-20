@@ -24,6 +24,7 @@ final readonly class ForumController
         'invalid_url' => ['error' => 'invalid_url', 'status' => 400],
         'already_member' => ['error' => 'already_member', 'status' => 409],
         'not_member' => ['error' => 'not_member', 'status' => 409],
+        'cannot_leave_trip_forum' => ['error' => 'cannot_leave_trip_forum', 'status' => 403],
         'already_voted' => ['error' => 'already_voted', 'status' => 409],
         'edit_window_expired' => ['error' => 'edit_window_expired', 'status' => 403],
         'not_found' => ['error' => 'not_found', 'status' => 404],
@@ -44,13 +45,13 @@ final readonly class ForumController
 
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $this->requireUser($request);
+        $user = $this->requireUser($request);
         $params = $request->getQueryParams();
         $page = max(1, (int) ($params['page'] ?? 1));
         $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
-        $includeAll = isset($params['all']) && $params['all'] === '1';
 
-        $result = $this->forumService->listForums($page, $limit, $includeAll);
+        $effectiveUserId = (isset($params['all']) && $params['all'] === '1') ? null : $user->id;
+        $result = $this->forumService->listForums($page, $limit, $effectiveUserId);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 

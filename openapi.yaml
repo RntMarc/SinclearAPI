@@ -7715,8 +7715,8 @@ components:
             enum: ['0', '1']
             default: '0'
           description: >
-            Nur für Administratoren: Gibt alle Foren zurück inklusive
-            Reise-verknüpfter (standardmäßig ausgeblendet).
+            Überschreibt die Filterung: Gibt alle Foren zurück inklusive
+            Reise-verknüpfter, bei denen der Nutzer kein Mitglied ist.
       responses:
         '200':
           description: Paginierte Liste der Foren
