@@ -255,6 +255,7 @@ return function (App $app): void {
         $group->post('/journeys', [PtController::class, 'saveJourney']);
         $group->get('/journeys/list', [PtController::class, 'listJourneys']);
         $group->get('/journeys/{id}', [PtController::class, 'getJourney']);
+        $group->patch('/journeys/{id}', [PtController::class, 'updateJourney']);
         $group->delete('/journeys/{id}', [PtController::class, 'deleteJourney']);
 
         // Refresh

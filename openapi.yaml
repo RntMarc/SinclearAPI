@@ -6898,6 +6898,52 @@ components:
           description: Kein Teilnehmer
         '404':
           description: Nicht gefunden
+    patch:
+      summary: Verbindung bearbeiten
+      description: >
+        Ändert Felder einer gespeicherten Verbindung (z. B. `tripId`).
+        Nur der Ersteller darf bearbeiten.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tripId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: >
+                    UUID der Reise zum Anheften, oder `null` zum Lösen.
+              example:
+                tripId: 019f106e-18d6-73bf-a8e9-c67b6dbe5a1e
+      responses:
+        '200':
+          description: Aktualisierte Verbindung
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PtSavedJourney'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Nur der Ersteller darf bearbeiten
+        '404':
+          description: Nicht gefunden
     delete:
       summary: Verbindung löschen
       description: >

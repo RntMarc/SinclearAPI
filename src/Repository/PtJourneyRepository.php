@@ -254,4 +254,34 @@ final readonly class PtJourneyRepository
         );
         $stmt->execute($params);
     }
+
+    /**
+     * Update specific fields of a journey
+     *
+     * @param list<string> $allowedFields
+     */
+    public function updateJourney(string $id, array $data, array $allowedFields = ['tripId']): void
+    {
+        $sets = [];
+        $params = [];
+
+        foreach ($allowedFields as $field) {
+            if (array_key_exists($field, $data)) {
+                $sets[] = "{$field} = ?";
+                $params[] = $data[$field];
+            }
+        }
+
+        if (empty($sets)) {
+            return;
+        }
+
+        $sets[] = 'updatedAt = NOW(3)';
+        $params[] = $id;
+
+        $stmt = $this->pdo->prepare(
+            'UPDATE PtJourney SET ' . implode(', ', $sets) . ' WHERE id = ?'
+        );
+        $stmt->execute($params);
+    }
 }

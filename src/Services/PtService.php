@@ -255,6 +255,25 @@ final readonly class PtService
     }
 
     /**
+     * Update a journey (partial update, creator only)
+     */
+    public function updateJourney(string $id, string $userId, array $data): array
+    {
+        $journey = $this->journeyRepo->findById($id);
+        if ($journey === null) {
+            throw new \RuntimeException('Journey not found');
+        }
+
+        if (!$this->journeyRepo->isCreator($id, $userId)) {
+            throw new \RuntimeException('Not the creator');
+        }
+
+        $this->journeyRepo->updateJourney($id, $data);
+
+        return $this->formatJourneyFull($this->journeyRepo->findById($id));
+    }
+
+    /**
      * Refresh a single journey's legs
      */
     public function refreshJourney(string $id, string $userId): array

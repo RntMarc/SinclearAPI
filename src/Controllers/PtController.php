@@ -168,6 +168,22 @@ final readonly class PtController
         }
     }
 
+    public function updateJourney(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $data = (array) $request->getParsedBody();
+
+        try {
+            $journey = $this->ptService->updateJourney($args['id'], $user->id, $data);
+            return ResponseFactory::json(['data' => $journey], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
     public function deleteJourney(
         ServerRequestInterface $request,
         ResponseInterface $response,
