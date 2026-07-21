@@ -164,7 +164,7 @@ final readonly class PtJourneyRepository
                     $leg['tripId'] ?? null,
                     $leg['plannedDeparture'],
                     $leg['plannedArrival'],
-                    $leg['cancelled'] ?? false,
+                    (int) ($leg['cancelled'] ?? false),
                     isset($leg['rawResponse']) ? json_encode($leg['rawResponse']) : null,
                 ]);
             }
