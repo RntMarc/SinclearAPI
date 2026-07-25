@@ -56,6 +56,13 @@ final readonly class UserRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** @return list<string> */
+    public function findAdminIds(): array
+    {
+        $stmt = $this->pdo->query('SELECT id FROM User WHERE isAdmin = 1');
+        return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+    }
+
     public function countAll(): int
     {
         $stmt = $this->pdo->query('SELECT COUNT(*) FROM User');

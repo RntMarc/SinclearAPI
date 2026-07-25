@@ -18,6 +18,7 @@ use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
+use Sinclear\Api\Controllers\PlaceSubmissionController;
 use Sinclear\Api\Controllers\ForumController;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
@@ -57,6 +58,7 @@ use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\DiscoverBookmarkRepository;
 use Sinclear\Api\Repository\DiscoverGastronomyRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
+use Sinclear\Api\Repository\DiscoverPlaceSubmissionRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedbackVoteRepository;
@@ -95,6 +97,7 @@ use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ExploreService;
 use Sinclear\Api\Services\FeedbackService;
+use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\ForumService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
@@ -195,6 +198,10 @@ return [
 
     ExploreService::class => autowire(),
     ExplorePolicy::class => autowire(),
+
+    DiscoverPlaceSubmissionRepository::class => autowire(),
+    PlaceSubmissionService::class => autowire(),
+    PlaceSubmissionController::class => autowire(),
     ReviewPolicy::class => autowire(),
     ReviewService::class => autowire(),
     ReviewController::class => autowire(),

@@ -125,6 +125,7 @@
             <a href="/api/v2/admin/forums" class="nav-link" data-path="/api/v2/admin/forums">Foren</a>
             <a href="/api/v2/admin/travel" class="nav-link" data-path="/api/v2/admin/travel">Reisen & Events</a>
             <a href="/api/v2/admin/subscriptions" class="nav-link" data-path="/api/v2/admin/subscriptions">Abonnements</a>
+            <a href="/api/v2/admin/explore/submissions" class="nav-link" data-path="/api/v2/admin/explore/submissions">Orte-Einreichungen</a>
             <a href="/api/v2/admin/notifications" class="nav-link" data-path="/api/v2/admin/notifications">Benachrichtigungen</a>
         </nav>
         <div class="user-info">

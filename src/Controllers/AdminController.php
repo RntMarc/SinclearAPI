@@ -19,6 +19,7 @@ use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\SubscriptionService;
 
 final readonly class AdminController
@@ -53,6 +54,7 @@ final readonly class AdminController
         private SubscriptionRepository $subscriptionRepo,
         private SubscriptionService $subscriptionService,
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
+        private PlaceSubmissionService $submissionService,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -1584,6 +1586,182 @@ ROW;
             $replacements['{{' . $key . '}}'] = $value;
         }
         return strtr($html, $replacements);
+    }
+
+    public function submissions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $status = !empty($params['status']) ? $params['status'] : null;
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        $result = $this->submissionService->listAllSubmissions($status, $page, $limit);
+        $counts = $this->submissionService->getStatusCounts();
+
+        $rows = '';
+        foreach ($result['data'] as $s) {
+            $photoHtml = $s['photo'] !== null
+                ? '<img src="data:image/jpeg;base64,' . htmlspecialchars($s['photo']) . '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">'
+                : '<span style="color:#555">—</span>';
+
+            $statusBadge = match ($s['status']) {
+                'pending' => '<span class="badge" style="background:#f59e0b;color:#000">pending</span>',
+                'transferred' => '<span class="badge" style="background:#22c55e;color:#000">transferred</span>',
+                'rejected' => '<span class="badge" style="background:#ef4444;color:#fff">rejected</span>',
+                'approved' => '<span class="badge" style="background:#5865F2;color:#fff">approved</span>',
+                default => htmlspecialchars($s['status']),
+            };
+
+            $createdAt = date('d.m.Y H:i', strtotime($s['createdAt']));
+
+            $rows .= '<tr>';
+            $rows .= '<td>' . $photoHtml . '</td>';
+            $rows .= '<td>' . htmlspecialchars($s['name']) . '</td>';
+            $rows .= '<td>' . htmlspecialchars($s['address'] ?? '') . '</td>';
+            $rows .= '<td>' . $statusBadge . '</td>';
+            $rows .= '<td>' . $createdAt . '</td>';
+            $rows .= '<td>';
+            $rows .= '<a href="/api/v2/admin/explore/submissions/' . htmlspecialchars($s['id']) . '" class="btn btn-sm">Details</a>';
+            $rows .= '</td>';
+            $rows .= '</tr>';
+        }
+
+        if ($rows === '') {
+            $rows = '<tr><td colspan="6" style="text-align:center;color:#666;padding:2rem;">Keine Einreichungen gefunden</td></tr>';
+        }
+
+        $statusFilterOptions = '';
+        foreach (['' => 'Alle', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'transferred' => 'Transferred'] as $val => $label) {
+            $sel = $status === $val || ($status === null && $val === '') ? 'selected' : '';
+            $statusFilterOptions .= '<option value="' . $val . '" ' . $sel . '>' . $label . '</option>';
+        }
+
+        $content = $this->renderTemplate('submissions.php', [
+            'rows' => $rows,
+            'statusFilterOptions' => $statusFilterOptions,
+            'pendingCount' => $counts['pending'],
+            'transferredCount' => $counts['transferred'],
+            'rejectedCount' => $counts['rejected'],
+        ]);
+
+        $html = $this->renderLayout('Orte-Einreichungen', $content, $user->email);
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function submissionDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $submission = $this->submissionService->getSubmission($args['id']);
+
+        if ($submission === null) {
+            $html = $this->renderLayout('Nicht gefunden', '<h1>Einreichung nicht gefunden</h1><a href="/api/v2/admin/explore/submissions" class="btn">Zurück</a>', $user->email);
+            $response->getBody()->write($html);
+            return $response->withStatus(404)->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $photoHtml = $submission['photo'] !== null
+            ? '<img src="data:image/jpeg;base64,' . htmlspecialchars($submission['photo']) . '" style="max-width:300px;max-height:300px;border-radius:8px;margin-top:0.5rem;">'
+            : '<span style="color:#555">Kein Foto</span>';
+
+        $ratingHtml = $submission['rating'] !== null ? str_repeat('★', (int) $submission['rating']) . str_repeat('☆', 5 - (int) $submission['rating']) : '—';
+
+        $statusBadge = match ($submission['status']) {
+            'pending' => '<span class="badge" style="background:#f59e0b;color:#000">pending</span>',
+            'transferred' => '<span class="badge" style="background:#22c55e;color:#000">transferred</span>',
+            'rejected' => '<span class="badge" style="background:#ef4444;color:#fff">rejected</span>',
+            'approved' => '<span class="badge" style="background:#5865F2;color:#fff">approved</span>',
+            default => htmlspecialchars($submission['status']),
+        };
+
+        $targetLink = '';
+        if ($submission['targetPlaceId'] !== null) {
+            $targetLink = '<p><strong>Überführt zu:</strong> <code>' . htmlspecialchars($submission['targetPlaceId']) . '</code></p>';
+        }
+
+        $adminNote = $submission['adminNote'] !== null
+            ? '<p><strong>Admin-Notiz:</strong> ' . htmlspecialchars($submission['adminNote']) . '</p>'
+            : '';
+
+        $showActions = $submission['status'] === 'pending';
+
+        $vars = [
+            'id' => htmlspecialchars($submission['id']),
+            'userId' => htmlspecialchars($submission['userId']),
+            'name' => htmlspecialchars($submission['name']),
+            'address' => htmlspecialchars($submission['address'] ?? ''),
+            'latitude' => $submission['latitude'],
+            'longitude' => $submission['longitude'],
+            'photoHtml' => $photoHtml,
+            'mapLink' => htmlspecialchars($submission['mapLink'] ?? ''),
+            'website' => htmlspecialchars($submission['website'] ?? ''),
+            'ratingHtml' => $ratingHtml,
+            'comment' => htmlspecialchars($submission['comment'] ?? ''),
+            'note' => htmlspecialchars($submission['note'] ?? ''),
+            'statusBadge' => $statusBadge,
+            'createdAt' => date('d.m.Y H:i', strtotime($submission['createdAt'])),
+            'updatedAt' => date('d.m.Y H:i', strtotime($submission['updatedAt'])),
+            'targetLink' => $targetLink,
+            'adminNote' => $adminNote,
+            'showActions' => $showActions ? 'block' : 'none',
+        ];
+
+        $content = $this->renderTemplate('submission_detail.php', $vars);
+        $html = $this->renderLayout('Einreichung: ' . htmlspecialchars($submission['name']), $content, $user->email);
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function submissionApprove(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $osmId = (int) ($body['osmId'] ?? 0);
+        $osmType = strtoupper(trim($body['osmType'] ?? ''));
+        $adminNote = trim($body['adminNote'] ?? '');
+
+        if ($osmId <= 0 || !in_array($osmType, ['N', 'W', 'R'], true)) {
+            return ResponseFactory::json(['error' => 'invalid_osm_data'], 400, $response);
+        }
+
+        try {
+            $result = $this->submissionService->approveSubmission($args['id'], $osmId, $osmType, $adminNote);
+            return ResponseFactory::json(['data' => $result], 200, $response);
+        } catch (\RuntimeException $e) {
+            $code = match ($e->getMessage()) {
+                'Submission not found' => 'submission_not_found',
+                'Submission is not pending' => 'submission_not_pending',
+                default => 'approve_failed',
+            };
+            $status = $code === 'submission_not_found' ? 404 : 400;
+            return ResponseFactory::json(['error' => $code], $status, $response);
+        }
+    }
+
+    public function submissionReject(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+        $adminNote = trim($body['adminNote'] ?? '');
+
+        if ($adminNote === '') {
+            return ResponseFactory::json(['error' => 'admin_note_required'], 400, $response);
+        }
+
+        try {
+            $result = $this->submissionService->rejectSubmission($args['id'], $adminNote);
+            return ResponseFactory::json(['data' => $result], 200, $response);
+        } catch (\RuntimeException $e) {
+            $code = match ($e->getMessage()) {
+                'Submission not found' => 'submission_not_found',
+                'Submission is not pending' => 'submission_not_pending',
+                default => 'reject_failed',
+            };
+            $status = $code === 'submission_not_found' ? 404 : 400;
+            return ResponseFactory::json(['error' => $code], $status, $response);
+        }
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

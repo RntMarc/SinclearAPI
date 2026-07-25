@@ -212,6 +212,135 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 | `POST` | `/explore/{placeId}/reviews` | JWT | Bewertung erstellen |
 | `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
 | `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
+| `GET` | `/explore/submissions` | JWT | Eigene Ort-Einreichungen (paginated) |
+| `POST` | `/explore/submissions` | JWT | Ort manuell einreichen (Missing Place) |
+| `GET` | `/explore/submissions/{id}` | JWT | Details einer eigenen Einreichung |
+| `PUT` | `/explore/submissions/{id}` | JWT | Eigene pending-Einreichung bearbeiten |
+
+## Manuelle Ort-Einreichung (Missing Place)
+
+Wenn ein Nutzer einen Ort in OpenStreetMap nicht findet (nicht existent, falscher
+Name, veralteter Eintrag, Suche liefert keine Ergebnisse), kann er den Ort manuell
+zur Prüfung einreichen. Ein Administrator prüft die Einreichung und überführt sie
+in den regulären Bestand.
+
+### Datenbanktabelle
+
+| Tabelle | Beschreibung |
+|---------|-------------|
+| `DiscoverPlaceSubmission` | Eingereichte Orte mit Status und Admin-Notizen |
+
+### Endpunkte (User)
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|-------------|
+| `POST` | `/explore/submissions` | JWT | Ort einreichen (Name, Koordinaten, Bewertung Pflicht) |
+| `GET` | `/explore/submissions` | JWT | Eigene Einreichungen (paginated) |
+| `GET` | `/explore/submissions/{id}` | JWT | Detail einer eigenen Einreichung |
+| `PUT` | `/explore/submissions/{id}` | JWT | Eigene pending-Einreichung bearbeiten |
+
+### Endpunkte (Admin)
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|-------------|
+| `GET` | `/admin/explore/submissions` | Admin | Alle Einreichungen (HTML, optional `?status=pending`) |
+| `GET` | `/admin/explore/submissions/{id}` | Admin | Detailansicht (HTML) |
+| `POST` | `/admin/explore/submissions/{id}/approve` | Admin | Freigeben & in DiscoverPlace übernehmen |
+| `POST` | `/admin/explore/submissions/{id}/reject` | Admin | Ablehnen (Bewertung wird gelöscht) |
+
+### Create-Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant API
+    participant Admin
+    participant DB
+    participant OSM
+
+    User->>API: POST /explore/submissions { name, lat, lon, rating, comment }
+    API->>DB: INSERT INTO DiscoverPlaceSubmission (status: pending)
+    API-->>User: 201 { id, status: "pending" }
+
+    Admin->>API: GET /admin/explore/submissions?status=pending
+    API-->>Admin: [{ id, name, lat, lon, photo, ... }]
+
+    Admin->>API: POST /admin/explore/submissions/{id}/approve { osmId, osmType }
+    API->>OSM: GET /lookup?osm_ids=N12345
+    OSM-->>API: { name, lat, lon, address, extratags }
+    API->>DB: INSERT INTO DiscoverPlace (OSM-Daten)
+    alt rating vorhanden
+        API->>DB: INSERT INTO DiscoverReview (placeId, userId, rating, comment)
+    end
+    API->>DB: UPDATE DiscoverPlaceSubmission SET status='transferred', targetPlaceId=?
+    API-->>Admin: 200 { placeId, status: "transferred" }
+```
+
+### Request/Response
+
+**Einreichen:**
+```json
+POST /explore/submissions
+{
+    "name": "Mein Lieblingsrestaurant",
+    "address": "Musterstraße 1, 12345 Berlin",
+    "latitude": 52.5200,
+    "longitude": 13.4050,
+    "photo": "<base64>",
+    "mapLink": "https://maps.google.com/?q=...",
+    "website": "https://example.com",
+    "rating": 5,
+    "comment": "Super Ort!",
+    "note": "In OSM nicht gefunden"
+}
+→ 201 { "data": { "id": "...", "status": "pending", ... } }
+```
+
+**Validierung:**
+- `name`: Pflicht, max 255 Zeichen
+- `latitude`/`longitude`: Pflicht, gültiger Bereich
+- `rating`: Pflicht, 1–5
+- `photo`: Base64, 200 KB max, JPEG/PNG/WebP, 1000×1000 px max
+- `mapLink`, `website`: optional
+- `comment`, `note`: optional
+
+### Admin-Approve
+
+Der Admin findet den echten OSM-Eintrag und gibt `osmId` + `osmType` an:
+
+```json
+POST /admin/explore/submissions/{id}/approve
+{
+    "osmId": 123456789,
+    "osmType": "N",
+    "adminNote": "In OSM gefunden als Restaurant Beispiel"
+}
+→ 200 { "data": { "placeId": "...", "status": "transferred" } }
+```
+
+**Ablauf beim Approve:**
+1. `ExploreService::createPlace()` ruft OSM-Daten von Nominatim ab
+2. Ort wird in `DiscoverPlace` angelegt
+3. Existiert `rating` in der Submission → `DiscoverReview` wird für den neuen Place übernommen (als Bewertung des Einreichers)
+4. Submission-Status → `transferred`, `targetPlaceId` wird gesetzt
+
+### Admin-Reject
+
+```json
+POST /admin/explore/submissions/{id}/reject
+{
+    "adminNote": "Doppelter Eintrag, existiert bereits als ..."
+}
+→ 200 { "data": { "id": "...", "status": "rejected", ... } }
+```
+
+Beim Ablehnen werden Bewertung, Foto und optionale Felder gelöscht.
+Name und Koordinaten bleiben für Nachvollziehbarkeit erhalten.
+
+### Benachrichtigungen
+
+- **`submission.created`** an den Einreicher bei erfolgreicher Einreichung
+- **`submission.status_changed`** an den Einreicher bei Approve/Reject
 
 ## Sortierung (GET /explore und GET /explore/search)
 

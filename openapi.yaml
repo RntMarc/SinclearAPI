@@ -632,6 +632,181 @@ components:
         data:
           $ref: '#/components/schemas/ExplorePlace'
 
+    ExploreSubmission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: float
+        longitude:
+          type: number
+          format: float
+        photo:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Foto
+        mapLink:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, rejected, transferred]
+        adminNote:
+          type: string
+          nullable: true
+        targetPlaceId:
+          type: string
+          format: uuid
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ExploreSubmissionCreateRequest:
+      type: object
+      required: [name, latitude, longitude, rating]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        address:
+          type: string
+        latitude:
+          type: number
+          format: float
+        longitude:
+          type: number
+          format: float
+        photo:
+          type: string
+          description: Base64-kodiertes Foto (optional)
+        mapLink:
+          type: string
+        website:
+          type: string
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+        note:
+          type: string
+
+    ExploreSubmissionUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: float
+        longitude:
+          type: number
+          format: float
+        photo:
+          type: string
+          nullable: true
+        mapLink:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+
+    ExploreSubmissionListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExploreSubmission'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ExploreSubmissionDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/ExploreSubmission'
+
+    ExploreSubmissionApproveRequest:
+      type: object
+      required: [osmId, osmType]
+      properties:
+        osmId:
+          type: integer
+        osmType:
+          type: string
+          enum: [N, W, R]
+        adminNote:
+          type: string
+
+    ExploreSubmissionRejectRequest:
+      type: object
+      required: [adminNote]
+      properties:
+        adminNote:
+          type: string
+
+    ExploreSubmissionApproveResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [placeId, status]
+          properties:
+            placeId:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [transferred]
+
     ReviewResponse:
       type: object
       required: [data]
@@ -4252,6 +4427,175 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /explore/submissions:
+    get:
+      summary: Eigene Ort-Einreichungen abrufen
+      description: >
+        Gibt eine paginierte Liste aller eigenen manuellen
+        Ort-Einreichungen des authentifizierten Nutzers zurück.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der eigenen Einreichungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSubmissionListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Ort manuell einreichen
+      description: >
+        Reicht einen manuell erfassten Ort zur Admin-Prüfung ein.
+        Dies ist der Weg für Nutzer, die einen Ort in OSM nicht
+        gefunden haben. Name, Koordinaten und Bewertung sind Pflicht.
+        Ein Foto kann als Base64 angehängt werden.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreSubmissionCreateRequest'
+      responses:
+        '201':
+          description: Einreichung wurde erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSubmissionDetailResponse'
+        '400':
+          description: Ungültige Eingabedaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/submissions/{id}:
+    get:
+      summary: Einreichungs-Details abrufen
+      description: >
+        Gibt die Details einer eigenen Ort-Einreichung zurück.
+        Nur der Einreicher selbst kann seine Einreichungen einsehen.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Details der Einreichung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSubmissionDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung (nicht der Einreicher)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Einreichung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Einreichung bearbeiten
+      description: >
+        Aktualisiert eine eigene, noch ausstehende Einreichung.
+        Nur pending-Einreichungen können bearbeitet werden.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreSubmissionUpdateRequest'
+      responses:
+        '200':
+          description: Einreichung wurde aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSubmissionDetailResponse'
+        '400':
+          description: Ungültige Eingabedaten oder Einreichung nicht mehr pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Einreichung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /explore/search:
     get:
       summary: Orte durchsuchen
@@ -6542,6 +6886,117 @@ components:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /admin/explore/submissions:
+    get:
+      summary: Admin-Übersicht Ort-Einreichungen (HTML)
+      description: >
+        Gibt die HTML-Seite mit allen manuellen Ort-Einreichungen zurück.
+        Optional filterbar nach Status.
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected, transferred]
+      responses:
+        '200':
+          description: HTML-Seite
+
+  /admin/explore/submissions/{id}:
+    get:
+      summary: Admin-Detailansicht Einreichung (HTML)
+      description: >
+        Gibt die HTML-Detailseite einer Ort-Einreichung zurück.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: HTML-Seite
+        '404':
+          description: Einreichung nicht gefunden
+
+  /admin/explore/submissions/{id}/approve:
+    post:
+      summary: Einreichung freigeben & übernehmen
+      description: >
+        Approvt eine Ort-Einreichung: Der Admin gibt die OSM-ID und den
+        OSM-Typ des korrespondierenden OSM-Objekts an. Die API lädt die
+        OSM-Daten, legt den Ort in DiscoverPlace an und übernimmt eine
+        ggf. vorhandene Bewertung des Einreichers.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreSubmissionApproveRequest'
+      responses:
+        '200':
+          description: Einreichung wurde freigegeben und übernommen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSubmissionApproveResponse'
+        '400':
+          description: Ungültige OSM-Daten oder Einreichung nicht pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Einreichung nicht gefunden
+
+  /admin/explore/submissions/{id}/reject:
+    post:
+      summary: Einreichung ablehnen
+      description: >
+        Lehnt eine Ort-Einreichung ab. Bewertung und optionale Felder
+        werden gelöscht, Name und Koordinaten bleiben erhalten.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreSubmissionRejectRequest'
+      responses:
+        '200':
+          description: Einreichung wurde abgelehnt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreSubmissionDetailResponse'
+        '400':
+          description: Admin-Notiz erforderlich oder Einreichung nicht pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Einreichung nicht gefunden
 
   /admin/notifications:
     get:
