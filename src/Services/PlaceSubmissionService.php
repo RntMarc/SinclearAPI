@@ -279,7 +279,6 @@ final readonly class PlaceSubmissionService
             'address' => $submission['address'],
             'latitude' => (float) $submission['latitude'],
             'longitude' => (float) $submission['longitude'],
-            'photo' => $submission['photo'],
             'mapLink' => $submission['mapLink'],
             'website' => $submission['website'],
             'rating' => $submission['rating'] !== null ? (int) $submission['rating'] : null,

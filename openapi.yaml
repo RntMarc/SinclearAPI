@@ -655,7 +655,8 @@ components:
         photo:
           type: string
           nullable: true
-          description: Base64-kodiertes Foto
+          writeOnly: true
+          description: Base64-kodiertes Foto (wird nicht in der Antwort zurückgegeben)
         mapLink:
           type: string
           nullable: true
