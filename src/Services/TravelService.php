@@ -5,6 +5,7 @@ namespace Sinclear\Api\Services;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\TravelTicketRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\ForumRepository;
@@ -18,6 +19,7 @@ final readonly class TravelService
         private TravelRelationRepository $relationRepo,
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
         private ForumRepository $forumRepo,
+        private TravelTicketRepository $ticketRepo,
     ) {}
 
     public function listTrips(string $userId, int $page, int $limit): array
@@ -168,6 +170,125 @@ final readonly class TravelService
         }
 
         return $this->tripSubscriptionRepo->findByTripWithUserAccess($tripId, $userId);
+    }
+
+    public function listTripTickets(string $tripId, string $userId): array
+    {
+        if (!$this->relationRepo->isParticipant($userId, $tripId)) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            throw new \RuntimeException('Trip not found');
+        }
+
+        return array_merge(
+            $this->ticketRepo->findByTrip($tripId),
+            $this->ticketRepo->findByUserAndTrip($userId, $tripId),
+        );
+    }
+
+    public function listEventTickets(string $eventId, string $userId): array
+    {
+        $event = $this->eventRepo->findByIdWithAccess($eventId, $userId);
+        if ($event === null) {
+            throw new \RuntimeException('Event not found');
+        }
+
+        return array_merge(
+            $this->ticketRepo->findByEvent($eventId),
+            $this->ticketRepo->findByUserAndEvent($userId, $eventId),
+        );
+    }
+
+    public function listUserTickets(string $userId): array
+    {
+        return $this->ticketRepo->findByUser($userId);
+    }
+
+    public function createUserTicket(string $userId, array $data): array
+    {
+        $event = $data['event'] ?? null;
+        $trip = $data['trip'] ?? null;
+
+        if ($event !== null && $trip !== null) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        $id = $this->ticketRepo->create([
+            'type' => 'user',
+            'user' => $userId,
+            'event' => $event,
+            'trip' => $trip,
+            'qrcode' => $data['qrcode'] ?? null,
+            'image' => $data['image'] ?? null,
+        ]);
+
+        $ticket = $this->ticketRepo->findById($id);
+        if ($ticket === null) {
+            throw new \RuntimeException('Ticket creation failed');
+        }
+
+        return $ticket;
+    }
+
+    public function updateUserTicket(string $ticketId, string $userId, array $data): array
+    {
+        $ticket = $this->ticketRepo->findById($ticketId);
+        if ($ticket === null) {
+            throw new \RuntimeException('Ticket not found');
+        }
+
+        if ($ticket['type'] !== 'user' || ($ticket['user'] ?? null) !== $userId) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        $event = $data['event'] ?? null;
+        $trip = $data['trip'] ?? null;
+
+        if ($event !== null && $trip !== null) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        $update = [];
+        if (array_key_exists('qrcode', $data)) {
+            $update['qrcode'] = $data['qrcode'];
+        }
+        if (array_key_exists('image', $data)) {
+            $update['image'] = $data['image'];
+        }
+        if (array_key_exists('event', $data)) {
+            $update['event'] = $data['event'];
+        }
+        if (array_key_exists('trip', $data)) {
+            $update['trip'] = $data['trip'];
+        }
+
+        if ($update !== []) {
+            $this->ticketRepo->update($ticketId, $update);
+        }
+
+        $updated = $this->ticketRepo->findById($ticketId);
+        if ($updated === null) {
+            throw new \RuntimeException('Ticket not found after update');
+        }
+
+        return $updated;
+    }
+
+    public function deleteUserTicket(string $ticketId, string $userId): void
+    {
+        $ticket = $this->ticketRepo->findById($ticketId);
+        if ($ticket === null) {
+            throw new \RuntimeException('Ticket not found');
+        }
+
+        if ($ticket['type'] !== 'user' || ($ticket['user'] ?? null) !== $userId) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        $this->ticketRepo->delete($ticketId);
     }
 
     private function enrichTrip(array $trip): array

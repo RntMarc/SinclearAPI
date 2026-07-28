@@ -108,12 +108,21 @@ return function (App $app): void {
         $group->get('/standaloneevents', [TravelController::class, 'listStandaloneEvents']);
         $group->get('/standaloneevents/{eventId}', [TravelController::class, 'getStandaloneEvent']);
 
+        // Ticket routes (static routes MUST come before parameterized routes)
+        $group->get('/tickets/user', [TravelController::class, 'listUserTickets']);
+        $group->post('/tickets/user', [TravelController::class, 'createUserTicket']);
+        $group->put('/tickets/user/{ticketId}', [TravelController::class, 'updateUserTicket']);
+        $group->delete('/tickets/user/{ticketId}', [TravelController::class, 'deleteUserTicket']);
+
         // Unified event lookup (standalone + trip events) MUST come before /{id}
         $group->get('/events/{eventId}', [TravelController::class, 'getEventById']);
+        // Event tickets
+        $group->get('/events/{eventId}/tickets', [TravelController::class, 'listEventTickets']);
 
         $group->get('/{id}', [TravelController::class, 'getTrip']);
         $group->get('/{id}/events', [TravelController::class, 'listEvents']);
         $group->get('/{id}/events/{eventId}', [TravelController::class, 'getEvent']);
+        $group->get('/{id}/tickets', [TravelController::class, 'listTripTickets']);
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
         $group->get('/{id}/accommodations/{accommodationId}', [TravelController::class, 'getAccommodation']);
         $group->get('/{id}/participants', [TravelController::class, 'listParticipants']);
@@ -307,6 +316,9 @@ return function (App $app): void {
         $group->get('/travel/events/{id}', [AdminController::class, 'eventDetail']);
         $group->post('/travel/events/{id}/participants', [AdminController::class, 'addEventParticipant']);
         $group->delete('/travel/events/{id}/participants/{userId}', [AdminController::class, 'removeEventParticipant']);
+        $group->post('/travel/tickets', [AdminController::class, 'createTicket']);
+        $group->put('/travel/tickets/{id}', [AdminController::class, 'updateTicket']);
+        $group->delete('/travel/tickets/{id}', [AdminController::class, 'deleteTicket']);
         $group->get('/explore/submissions', [AdminController::class, 'submissions']);
         $group->get('/explore/submissions/{id}', [AdminController::class, 'submissionDetail']);
         $group->post('/explore/submissions/{id}/approve', [AdminController::class, 'submissionApprove']);

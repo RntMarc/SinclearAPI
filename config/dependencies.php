@@ -74,6 +74,7 @@ use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\TravelTicketRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
@@ -241,6 +242,7 @@ return [
     TravelAccommodationRepository::class => autowire(),
     TravelRelationRepository::class => autowire(),
     EventRelationRepository::class => autowire(),
+    TravelTicketRepository::class => autowire(),
     TravelTripSubscriptionRepository::class => autowire(),
 
     TravelService::class => autowire(),

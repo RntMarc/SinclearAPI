@@ -11,6 +11,7 @@ use Sinclear\Api\Repository\ForumRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\TravelTicketRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\UserRepository;
@@ -54,6 +55,7 @@ final readonly class AdminController
         private SubscriptionRepository $subscriptionRepo,
         private SubscriptionService $subscriptionService,
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
+        private TravelTicketRepository $ticketRepo,
         private PlaceSubmissionService $submissionService,
     ) {}
 
@@ -1762,6 +1764,79 @@ ROW;
             $status = $code === 'submission_not_found' ? 404 : 400;
             return ResponseFactory::json(['error' => $code], $status, $response);
         }
+    }
+
+    public function createTicket(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $type = isset($body['type']) && is_string($body['type'])
+            ? trim($body['type']) : null;
+
+        if (!in_array($type, ['event', 'trip', 'user'], true)) {
+            return ResponseFactory::json(['error' => 'invalid_type'], 400, $response);
+        }
+
+        $data = [
+            'type' => $type,
+            'event' => isset($body['event']) && is_string($body['event']) && $body['event'] !== ''
+                ? trim($body['event']) : null,
+            'trip' => isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
+                ? trim($body['trip']) : null,
+            'user' => isset($body['user']) && is_string($body['user']) && $body['user'] !== ''
+                ? trim($body['user']) : null,
+            'qrcode' => isset($body['qrcode']) && is_string($body['qrcode'])
+                ? trim($body['qrcode']) : null,
+            'image' => isset($body['image']) && is_string($body['image'])
+                ? trim($body['image']) : null,
+        ];
+
+        $id = $this->ticketRepo->create($data);
+        $ticket = $this->ticketRepo->findById($id);
+        return ResponseFactory::json(['data' => $ticket], 201, $response);
+    }
+
+    public function updateTicket(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+        $body = $request->getParsedBody();
+
+        $ticket = $this->ticketRepo->findById($id);
+        if ($ticket === null) {
+            return ResponseFactory::json(['error' => 'ticket_not_found'], 404, $response);
+        }
+
+        $data = [];
+        foreach (['type', 'event', 'trip', 'user', 'qrcode', 'image'] as $field) {
+            if (isset($body[$field])) {
+                $data[$field] = is_string($body[$field])
+                    ? trim($body[$field]) : null;
+            }
+        }
+
+        if ($data === []) {
+            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
+        }
+
+        $this->ticketRepo->update($id, $data);
+        $updated = $this->ticketRepo->findById($id);
+        return ResponseFactory::json(['data' => $updated], 200, $response);
+    }
+
+    public function deleteTicket(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+
+        $ticket = $this->ticketRepo->findById($id);
+        if ($ticket === null) {
+            return ResponseFactory::json(['error' => 'ticket_not_found'], 404, $response);
+        }
+
+        $this->ticketRepo->delete($id);
+        return ResponseFactory::noContent($response);
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

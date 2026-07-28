@@ -476,6 +476,67 @@ components:
         data:
           $ref: '#/components/schemas/TravelAccommodation'
 
+    AdminCreateTicketRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: ['event', 'trip', 'user']
+          description: Ticket-Typ
+        event:
+          type: string
+          format: uuid
+          nullable: true
+          description: Event-ID (bei type=event)
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reise-ID (bei type=trip)
+        user:
+          type: string
+          format: uuid
+          nullable: true
+          description: User-ID (bei type=user)
+        qrcode:
+          type: string
+          nullable: true
+          description: QR-Code-Daten
+        image:
+          type: string
+          nullable: true
+          description: URL zum Ticket-Bild
+
+    AdminUpdateTicketRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: ['event', 'trip', 'user']
+          description: Ticket-Typ
+        event:
+          type: string
+          format: uuid
+          nullable: true
+          description: Event-ID oder null
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reise-ID oder null
+        user:
+          type: string
+          format: uuid
+          nullable: true
+          description: User-ID oder null
+        qrcode:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+
     RefreshRequest:
       type: object
       required: [refresh_token]
@@ -1132,6 +1193,50 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/TravelParticipant'
+
+    TravelEventTicket:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: ['event', 'trip', 'user']
+        event:
+          type: string
+          format: uuid
+          nullable: true
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+        user:
+          type: string
+          format: uuid
+          nullable: true
+        qrcode:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+
+    TravelEventTicketListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TravelEventTicket'
+
+    TravelEventTicketDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/TravelEventTicket'
 
     # =========================================================================
     # Public Transport (Transitious)
@@ -6842,6 +6947,137 @@ components:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /admin/travel/tickets:
+    post:
+      summary: Admin-Ticket erstellen
+      description: >
+        Erstellt ein neues Ticket beliebigen Typs (event/trip/user).
+        Admin-Endpunkt, volle Kontrolle über alle Felder.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateTicketRequest'
+      responses:
+        '201':
+          description: Ticket erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketDetailResponse'
+        '400':
+          description: Ungültiger Typ oder fehlende Felder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/tickets/{id}:
+    put:
+      summary: Admin-Ticket aktualisieren
+      description: >
+        Aktualisiert ein bestehendes Ticket. Alle Felder optional,
+        nur übergebene Felder werden geändert.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateTicketRequest'
+      responses:
+        '200':
+          description: Ticket aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketDetailResponse'
+        '400':
+          description: Keine Felder zum Aktualisieren
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ticket nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Admin-Ticket löschen
+      description: >
+        Löscht ein Ticket endgültig.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Ticket gelöscht (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ticket nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /trips/{id}/subscriptions:
     get:
       summary: Mit Reise verknüpfte Abos abrufen
@@ -7681,6 +7917,213 @@ components:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Event nicht gefunden oder kein Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/events/{eventId}/tickets:
+    get:
+      summary: Tickets eines Events auflisten
+      description: >
+        Gibt alle Gruppen-Tickets (type='event') des Events sowie die persönlichen
+        User-Tickets (type='user') des aktuellen Nutzers für dieses Event zurück.
+        Der Nutzer muss Teilnehmer des Events oder der zugehörigen Reise sein.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Liste der Tickets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden oder kein Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/tickets/user:
+    get:
+      summary: Eigene Tickets auflisten
+      description: >
+        Gibt alle persönlichen Tickets (type='user') des aktuellen Nutzers zurück.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der eigenen Tickets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Eigenes Ticket erstellen
+      description: >
+        Erstellt ein neues persönliches Ticket (type='user') für den aktuellen Nutzer.
+        Optional kann es mit einem Event ODER einer Reise verknüpft werden (nicht beides).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                qrcode:
+                  type: string
+                  nullable: true
+                  description: QR-Code-Daten
+                image:
+                  type: string
+                  nullable: true
+                  description: URL zum Ticket-Bild
+                event:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Event-ID (nur wenn mit einem Event verknüpft)
+                trip:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Reise-ID (nur wenn mit einer Reise verknüpft)
+      responses:
+        '201':
+          description: Ticket erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/tickets/user/{ticketId}:
+    put:
+      summary: Eigenes Ticket aktualisieren
+      description: >
+        Aktualisiert ein persönliches Ticket (type='user') des aktuellen Nutzers.
+        Optional kann die Event-/Reise-Verknüpfung geändert werden.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                qrcode:
+                  type: string
+                  nullable: true
+                image:
+                  type: string
+                  nullable: true
+                event:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Event-ID oder null zum Entfernen
+                trip:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Reise-ID oder null zum Entfernen
+      responses:
+        '200':
+          description: Ticket aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Zugriff auf dieses Ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ticket nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Eigenes Ticket löschen
+      description: >
+        Löscht ein persönliches Ticket (type='user') des aktuellen Nutzers.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Ticket erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Zugriff auf dieses Ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ticket nicht gefunden
           content:
             application/json:
               schema:
@@ -11256,6 +11699,49 @@ components:
             application/json:
               schema:
                 $ref: '#/components/schemas/TravelParticipantListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Teilnehmer dieser Reise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/tickets:
+    get:
+      summary: Tickets einer Reise auflisten
+      description: >
+        Gibt alle Gruppen-Tickets (type='trip') der Reise sowie die persönlichen
+        User-Tickets (type='user') des aktuellen Nutzers für diese Reise zurück.
+        Der Nutzer muss selbst Teilnehmer der Reise sein.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Liste der Tickets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventTicketListResponse'
         '401':
           description: Nicht autorisiert
           content:
