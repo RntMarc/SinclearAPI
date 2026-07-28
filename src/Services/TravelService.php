@@ -218,6 +218,7 @@ final readonly class TravelService
 
         $id = $this->ticketRepo->create([
             'type' => 'user',
+            'title' => $data['title'] ?? null,
             'user' => $userId,
             'event' => $event,
             'trip' => $trip,
@@ -252,6 +253,9 @@ final readonly class TravelService
         }
 
         $update = [];
+        if (array_key_exists('title', $data)) {
+            $update['title'] = $data['title'];
+        }
         if (array_key_exists('qrcode', $data)) {
             $update['qrcode'] = $data['qrcode'];
         }

@@ -187,6 +187,8 @@ final readonly class TravelController
 
         try {
             $ticket = $this->travelService->createUserTicket($user->id, [
+                'title' => isset($body['title']) && is_string($body['title'])
+                    ? trim($body['title']) : null,
                 'qrcode' => isset($body['qrcode']) && is_string($body['qrcode'])
                     ? trim($body['qrcode']) : null,
                 'image' => isset($body['image']) && is_string($body['image'])
@@ -209,6 +211,9 @@ final readonly class TravelController
         $body = $request->getParsedBody();
         $data = [];
 
+        if (isset($body['title'])) {
+            $data['title'] = is_string($body['title']) ? trim($body['title']) : null;
+        }
         if (isset($body['qrcode'])) {
             $data['qrcode'] = is_string($body['qrcode']) ? trim($body['qrcode']) : null;
         }
