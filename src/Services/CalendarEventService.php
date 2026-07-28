@@ -46,7 +46,7 @@ final readonly class CalendarEventService
         if ($event === null) {
             throw new \RuntimeException('Event not found');
         }
-        if ($event['creatorId'] !== $userId) {
+        if (!$this->canModify($userId, $event)) {
             throw new \RuntimeException('Forbidden');
         }
 
@@ -56,8 +56,9 @@ final readonly class CalendarEventService
         $event = $this->enrich($event);
 
         $participantIds = $this->eventRepo->findParticipantIdsByEvent($id);
+        $allNotifyIds = array_unique([...$participantIds, $event['creatorId']]);
         $this->notifyParticipants(
-            $participantIds,
+            $allNotifyIds,
             'calendar.event_updated',
             $event,
             $userId,
@@ -72,7 +73,7 @@ final readonly class CalendarEventService
         if ($event === null) {
             throw new \RuntimeException('Event not found');
         }
-        if ($event['creatorId'] !== $userId) {
+        if (!$this->canModify($userId, $event)) {
             throw new \RuntimeException('Forbidden');
         }
 
@@ -111,7 +112,7 @@ final readonly class CalendarEventService
         if ($event === null) {
             throw new \RuntimeException('Event not found');
         }
-        if ($event['creatorId'] !== $actorId) {
+        if (!$this->canModify($actorId, $event)) {
             throw new \RuntimeException('Forbidden');
         }
 
@@ -142,11 +143,19 @@ final readonly class CalendarEventService
         if ($event === null) {
             throw new \RuntimeException('Event not found');
         }
-        if ($event['creatorId'] !== $actorId) {
+        if (!$this->canModify($actorId, $event)) {
             throw new \RuntimeException('Forbidden');
         }
 
         $this->eventRepo->removeParticipant($eventId, $participantId);
+    }
+
+    private function canModify(string $userId, array $event): bool
+    {
+        if ($event['creatorId'] === $userId) {
+            return true;
+        }
+        return $this->eventRepo->isParticipant($event['id'], $userId);
     }
 
     private function canSee(string $userId, array $event): bool

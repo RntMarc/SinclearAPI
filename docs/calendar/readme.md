@@ -4,6 +4,8 @@ Die Kalender-Funktion erlaubt Nutzern das Verwalten von persönlichen
 Kalender-Einträgen (Kalender-Events, nicht zu verwechseln mit Reise-Events
 aus `TravelEvent`). Jeder Nutzer kann eigene Einträge erstellen, ändern und
 löschen, andere Nutzer hinzufügen und die Sichtbarkeit festlegen.
+Hinzugefügte Teilnehmer haben die gleichen Bearbeitungsrechte wie
+der Ersteller (Event ändern, löschen, Teilnehmer verwalten).
 
 > **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Das Format ist `YYYY-MM-DD HH:MM:SS` (24h, ohne Millisekunden, ohne Zeitzonenindikatoren). Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
 
@@ -33,10 +35,10 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 | `POST /calendar` | Authentifizierter Nutzer |
 | `GET /calendar` | Events, die der Nutzer sehen darf (siehe Sichtbarkeit) |
 | `GET /calendar/{id}` | Nutzer muss das Event sehen dürfen → sonst `404` |
-| `PUT /calendar/{id}` | Nur der Ersteller (oder Admin) → sonst `403` |
-| `DELETE /calendar/{id}` | Nur der Ersteller (oder Admin) → sonst `403` |
-| `POST /calendar/{id}/participants` | Nur der Ersteller (oder Admin) |
-| `DELETE /calendar/{id}/participants/{userId}` | Nur der Ersteller (oder Admin) |
+| `PUT /calendar/{id}` | Ersteller und alle Teilnehmer (oder Admin) → sonst `403` |
+| `DELETE /calendar/{id}` | Ersteller und alle Teilnehmer (oder Admin) → sonst `403` |
+| `POST /calendar/{id}/participants` | Ersteller und alle Teilnehmer (oder Admin) |
+| `DELETE /calendar/{id}/participants/{userId}` | Ersteller und alle Teilnehmer (oder Admin) |
 
 ## API-Endpunkte
 
@@ -118,7 +120,7 @@ Nur die zu ändernden Felder mitsenden:
 }
 ```
 
-Alle Teilnehmer erhalten eine Push-Benachrichtigung über die Änderung.
+Alle Teilnehmer und der Ersteller erhalten eine Push-Benachrichtigung über die Änderung.
 
 ### `POST /calendar/{id}/participants` – Request
 
@@ -137,7 +139,7 @@ Folgende Benachrichtigungs-Codes werden von der Kalender-Funktion verwendet:
 | Code | Auslöser | Empfänger |
 |------|----------|-----------|
 | `calendar.event_created` | Neues Event mit Teilnehmern | Hinzugefügte Teilnehmer |
-| `calendar.event_updated` | Event geändert | Alle Teilnehmer (außer dem Ersteller) |
+| `calendar.event_updated` | Event geändert | Alle Teilnehmer und der Ersteller (außer dem Ausführenden) |
 | `calendar.participant_added` | Teilnehmer hinzugefügt | Der hinzugefügte Nutzer |
 
 Beim Löschen (`DELETE /calendar/{id}`) wird keine Benachrichtigung versendet.

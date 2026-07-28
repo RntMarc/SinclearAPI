@@ -5540,9 +5540,9 @@ paths:
     put:
       summary: Kalender-Event ändern
       description: >
-        Ändert ein bestehendes Kalender-Event. Nur der Ersteller (oder
-        Admin) darf ändern. Alle Teilnehmer erhalten eine
-        Push-Benachrichtigung über die Änderung.
+        Ändert ein bestehendes Kalender-Event. Der Ersteller und alle
+        Teilnehmer (oder Admin) dürfen ändern. Alle Teilnehmer und der
+        Ersteller erhalten eine Push-Benachrichtigung über die Änderung.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -5579,7 +5579,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Ersteller dieses Events
+          description: Weder Ersteller noch Teilnehmer dieses Events
           content:
             application/json:
               schema:
@@ -5594,8 +5594,9 @@ paths:
     delete:
       summary: Kalender-Event löschen
       description: >
-        Löscht ein Kalender-Event. Nur der Ersteller (oder Admin) darf
-        löschen. Es wird keine Benachrichtigung versendet.
+        Löscht ein Kalender-Event. Der Ersteller und alle Teilnehmer
+        (oder Admin) dürfen löschen. Es wird keine Benachrichtigung
+        versendet.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -5616,7 +5617,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Ersteller dieses Events
+          description: Weder Ersteller noch Teilnehmer dieses Events
           content:
             application/json:
               schema:
@@ -5633,8 +5634,9 @@ paths:
       summary: Teilnehmer zu Kalender-Event hinzufügen
       description: >
         Fügt einen Nutzer als Teilnehmer zu einem Kalender-Event hinzu.
-        Nur der Ersteller (oder Admin) darf Teilnehmer hinzufügen.
-        Der hinzugefügte Nutzer erhält eine Push-Benachrichtigung.
+        Der Ersteller und alle Teilnehmer (oder Admin) dürfen Teilnehmer
+        hinzufügen. Der hinzugefügte Nutzer erhält eine
+        Push-Benachrichtigung.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -5671,7 +5673,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Ersteller dieses Events
+          description: Weder Ersteller noch Teilnehmer dieses Events
           content:
             application/json:
               schema:
@@ -5688,7 +5690,8 @@ paths:
       summary: Teilnehmer aus Kalender-Event entfernen
       description: >
         Entfernt einen Nutzer aus der Teilnehmer-Liste eines Kalender-Events.
-        Nur der Ersteller (oder Admin) darf Teilnehmer entfernen.
+        Der Ersteller und alle Teilnehmer (oder Admin) dürfen Teilnehmer
+        entfernen.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -5715,7 +5718,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Ersteller dieses Events
+          description: Weder Ersteller noch Teilnehmer dieses Events
           content:
             application/json:
               schema:
