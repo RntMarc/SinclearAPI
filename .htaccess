@@ -12,6 +12,13 @@
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^ public/index.php [L]
 
+    # Bekannte statische Dateien direkt aus public/ ausliefern
+    RewriteRule ^favicon\.ico$ public/favicon.ico [L]
+    RewriteRule ^robots\.txt$ public/robots.txt [L]
+
+    # .well-known (z.B. ACME-Challenge) nicht an PHP weiterleiten
+    RewriteRule ^\.well-known/ - [L]
+
     # Verzeichnisse blockieren
     RewriteRule ^bin/ - [F,L]
     RewriteRule ^config/ - [F,L]

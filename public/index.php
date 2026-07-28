@@ -42,18 +42,27 @@ $customErrorHandler = function (
     bool $logErrorDetails,
 ) use ($app, $container) {
     $logger = $container->get(LoggerInterface::class);
-    $logger->error($exception->getMessage(), ['exception' => $exception]);
 
     $statusCode = 500;
     if ($exception instanceof \Slim\Exception\HttpNotFoundException) {
         $statusCode = 404;
+        $logger->info($exception->getMessage(), ['exception' => $exception]);
     } elseif ($exception instanceof \Slim\Exception\HttpMethodNotAllowedException) {
         $statusCode = 405;
+        $logger->error($exception->getMessage(), ['exception' => $exception]);
     } elseif ($exception instanceof \Slim\Exception\HttpBadRequestException) {
         $statusCode = 400;
+        $logger->error($exception->getMessage(), ['exception' => $exception]);
+    } else {
+        $logger->error($exception->getMessage(), ['exception' => $exception]);
     }
 
-    $payload = ['error' => 'internal_error'];
+    $payload = match ($statusCode) {
+        404 => ['error' => 'not_found'],
+        405 => ['error' => 'method_not_allowed'],
+        400 => ['error' => 'bad_request'],
+        default => ['error' => 'internal_error'],
+    };
     if ($displayErrorDetails) {
         $payload['message'] = $exception->getMessage();
     }
