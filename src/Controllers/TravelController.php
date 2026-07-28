@@ -4,6 +4,7 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\TravelService;
@@ -23,6 +24,7 @@ final readonly class TravelController
 
     public function __construct(
         private TravelService $travelService,
+        private LoggerInterface $logger,
     ) {}
 
     public function listTrips(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -163,6 +165,10 @@ final readonly class TravelController
             $tickets = $this->travelService->listEventTickets($args['eventId'], $user->id);
             return ResponseFactory::json(['data' => $tickets], 200, $response);
         } catch (\RuntimeException $e) {
+            $this->logger->error('createUserTicket failed', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return $this->errorResponse($e, $response);
         }
     }
@@ -222,6 +228,10 @@ final readonly class TravelController
             $ticket = $this->travelService->updateUserTicket($args['ticketId'], $user->id, $data);
             return ResponseFactory::json(['data' => $ticket], 200, $response);
         } catch (\RuntimeException $e) {
+            $this->logger->error('updateUserTicket failed', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return $this->errorResponse($e, $response);
         }
     }
