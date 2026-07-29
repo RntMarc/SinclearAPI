@@ -29,6 +29,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 1 | `cleanup_otp_tokens` | 1 Stunde | Löscht abgelaufene und benutzte OTP-Codes |
 | 2 | `cleanup_notifications` | 24 Stunden | Löscht Notifications älter als 30 Tage |
 | 3 | `cleanup_location_sharing` | 24 Stunden | Bereinigt alte Location-Sharing-Sessions |
+| 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
 
 ## Details
 
@@ -46,6 +47,13 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Task-Name:** `cleanup_location_sharing`
 - **Intervall:** 86400 Sekunden (24 Stunden)
 - **Aktion:** Löscht Sessions ohne Location-Updates seit >7 Tagen (mit zugehörigen Locations und Recipients)
+
+### PT Refresh Stale Legs
+- **Task-Name:** `pt_refresh_stale_legs`
+- **Intervall:** 300 Sekunden (5 Minuten)
+- **Aktion:** Ruft für alle Legs mit `tripId`, deren `lastCheckedAt` älter als 5 Minuten ist, aktuelle Echtzeitdaten von Transitious `/v6/trip` ab und aktualisiert `actualDeparture`, `actualArrival`, `departureDelay`, `arrivalDelay`, `departurePlatform`, `arrivalPlatform`, `cancelled`, `realTimeState` und `lastCheckedAt`.
+- **Rate-Limit:** Max. 8 Legs pro Batch, 2 Sekunden Pause zwischen den Batches.
+- **Datei:** `src/Services/Cron/Tasks/PtRefreshStaleLegsTask.php`
 
 ## CronSchedule-Tabelle
 

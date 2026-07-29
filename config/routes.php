@@ -275,6 +275,9 @@ return function (App $app): void {
         // Refresh
         $group->post('/journeys/{id}/refresh', [PtController::class, 'refreshJourney']);
 
+        // Legs (individual leg updates)
+        $group->patch('/legs/{id}', [PtController::class, 'updateLeg']);
+
         // Participants
         $group->post('/journeys/{id}/participants', [PtController::class, 'addParticipant']);
         $group->delete('/journeys/{id}/participants/{userId}', [PtController::class, 'removeParticipant']);

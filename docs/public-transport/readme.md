@@ -21,8 +21,8 @@ Sinclear API (PHP 8.4, Slim 4)
     └── Transitious API (HTTP via Guzzle)
         ├── /api/v1/geocode (Stationssuche)
         ├── /api/v6/plan (Routenplanung)
-        ├── /api/v5/stoptimes (Abfahrtsplan)
-        └── /api/v5/trip (Trip-Details)
+        ├── /api/v6/stoptimes (Abfahrtsplan)
+        └── /api/v6/trip (Trip-Details)
 ```
 
 ## API-Endpunkte
@@ -42,10 +42,17 @@ Sinclear API (PHP 8.4, Slim 4)
 | `POST` | `/public-transport/journeys` | Verbindung speichern |
 | `GET` | `/public-transport/journeys/list` | Eigene Verbindungen |
 | `GET` | `/public-transport/journeys/{id}` | Verbindungsdetails |
+| `PATCH` | `/public-transport/journeys/{id}` | Verbindung aktualisieren |
 | `DELETE` | `/public-transport/journeys/{id}` | Verbindung löschen |
-| `POST` | `/public-transport/journeys/{id}/refresh` | Verbindung aktualisieren |
+| `POST` | `/public-transport/journeys/{id}/refresh` | Verbindung aktualisieren (Echtzeit) |
 | `POST` | `/public-transport/journeys/{id}/participants` | Teilnehmer hinzufügen |
 | `DELETE` | `/public-transport/journeys/{id}/participants/{userId}` | Teilnehmer entfernen |
+
+### Legs
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `PATCH` | `/public-transport/legs/{id}` | Leg aktualisieren (Verknüpfung/Trip-ID ändern) |
 
 ## Beispiele
 
@@ -134,6 +141,10 @@ Einzelner Fahrtabschnitt.
 Teilnehmer-Verknüpfung.
 
 ## Technische Hinweise
+
+### Automatischer Echtzeit-Refresh (Cron)
+Alle 5 Minuten aktualisiert der Cron-Task `pt_refresh_stale_legs` automatisch
+veraltete Legs mit aktuellen Daten von Transitious. Details siehe `docs/CRON.md`.
 
 ### Transitious API
 - **Kein API-Key** nötig

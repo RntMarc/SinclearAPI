@@ -215,6 +215,15 @@ final readonly class PtJourneyRepository
         $stmt->execute([$journeyId, $userId]);
     }
 
+    public function findLegById(string $legId): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM PtLeg WHERE id = ?');
+        $stmt->execute([$legId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ?: null;
+    }
+
     /**
      * Find legs that need refresh (stale legs with status not arrived/cancelled)
      *

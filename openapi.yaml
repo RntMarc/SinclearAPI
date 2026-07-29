@@ -1313,6 +1313,17 @@ components:
     PtLeg:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Leg-ID (UUID v7)
+        journeyId:
+          type: string
+          format: uuid
+          description: Zugehörige Reise-ID
+        legIndex:
+          type: integer
+          description: Reihenfolge innerhalb der Reise
         mode:
           type: string
           description: Verkehrsmittel (WALK, BUS, RAIL, TRAM, etc.)
@@ -7660,6 +7671,54 @@ components:
           description: Nicht autorisiert
         '403':
           description: Nicht der Ersteller
+        '404':
+          description: Nicht gefunden
+
+  /public-transport/legs/{id}:
+    patch:
+      summary: Leg aktualisieren (Verknüpfung ändern)
+      description: >
+        Aktualisiert ein einzelnes Leg. Erlaubt das Verschieben eines Legs
+        zu einer anderen Reise oder das Setzen der Transitious Trip-ID.
+      tags: [Public Transport]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                journeyId:
+                  type: string
+                  format: uuid
+                  description: ID der Ziel-Reise (Leg wird verschoben)
+                tripId:
+                  type: string
+                  nullable: true
+                  description: Transitious Trip-ID (null zum Entfernen)
+      responses:
+        '200':
+          description: Aktualisiertes Leg
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PtLeg'
+        '401':
+          description: Nicht autorisiert
+        '403':
+          description: Kein Teilnehmer
         '404':
           description: Nicht gefunden
 

@@ -13,9 +13,12 @@ use Sinclear\Api\Services\PtService;
 final readonly class PtController
 {
     private const array ERROR_MAP = [
-        'Not a participant'    => ['not_participant', 403],
-        'Not the creator'      => ['not_creator', 403],
-        'Journey not found'    => ['journey_not_found', 404],
+        'Not a participant'          => ['not_participant', 403],
+        'Not the creator'            => ['not_creator', 403],
+        'Journey not found'          => ['journey_not_found', 404],
+        'Target journey not found'   => ['target_journey_not_found', 404],
+        'Leg not found'              => ['leg_not_found', 404],
+        'Not a participant of target journey' => ['not_participant_target', 403],
     ];
 
     public function __construct(
@@ -194,6 +197,26 @@ final readonly class PtController
         try {
             $this->ptService->deleteJourney($args['id'], $user->id);
             return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
+    // =========================================================================
+    // Legs
+    // =========================================================================
+
+    public function updateLeg(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $data = (array) $request->getParsedBody();
+
+        try {
+            $leg = $this->ptService->updateLeg($args['id'], $user->id, $data);
+            return ResponseFactory::json(['data' => $leg], 200, $response);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e, $response);
         }

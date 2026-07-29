@@ -274,6 +274,74 @@ final readonly class PtService
     }
 
     /**
+     * Refresh a single leg by its tripId (used by cron and manual refresh)
+     */
+    public function refreshSingleLeg(string $legId): bool
+    {
+        $legs = $this->journeyRepo->findLegById($legId);
+        if ($legs === null || $legs['tripId'] === null) {
+            return false;
+        }
+
+        $tripData = $this->getTripDetails($legs['tripId'], $legs['plannedDeparture']);
+        if ($tripData === null) {
+            return false;
+        }
+
+        $this->updateLegFromTrip($legId, $tripData);
+
+        return true;
+    }
+
+    /**
+     * Update a leg's journey association (move leg to another journey)
+     */
+    public function updateLeg(string $legId, string $userId, array $data): array
+    {
+        $leg = $this->journeyRepo->findLegById($legId);
+        if ($leg === null) {
+            throw new \RuntimeException('Leg not found');
+        }
+
+        // Check if user is participant of the source journey
+        if (!$this->journeyRepo->isParticipant($leg['journeyId'], $userId)) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        // If moving to another journey, check participation there too
+        if (isset($data['journeyId']) && $data['journeyId'] !== $leg['journeyId']) {
+            $targetJourney = $this->journeyRepo->findById($data['journeyId']);
+            if ($targetJourney === null) {
+                throw new \RuntimeException('Target journey not found');
+            }
+
+            if (!$this->journeyRepo->isParticipant($data['journeyId'], $userId)) {
+                throw new \RuntimeException('Not a participant of target journey');
+            }
+
+            // Get next legIndex for target journey
+            $existingLegs = $this->journeyRepo->findLegsByJourney($data['journeyId']);
+            $nextIndex = count($existingLegs);
+
+            $this->journeyRepo->updateLeg($legId, [
+                'journeyId' => $data['journeyId'],
+                'legIndex' => $nextIndex,
+            ]);
+        }
+
+        // Allow updating tripId
+        if (array_key_exists('tripId', $data)) {
+            $this->journeyRepo->updateLeg($legId, [
+                'tripId' => $data['tripId'] ?: null,
+            ]);
+        }
+
+        $updatedLeg = $this->journeyRepo->findLegById($legId);
+
+        return $this->formatLeg($updatedLeg);
+    }
+
+    /**
      * Refresh a single journey's legs
      */
     public function refreshJourney(string $id, string $userId): array
