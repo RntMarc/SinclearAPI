@@ -143,6 +143,16 @@ final readonly class ReviewService
         ];
     }
 
+    public function sanitizeReviewPublic(array $review): array
+    {
+        return [
+            'id' => $review['id'],
+            'placeId' => $review['placeId'],
+            'rating' => $review['rating'],
+            'createdAt' => $review['createdAt'],
+        ];
+    }
+
     private function formatPhoto(array $row): array
     {
         return [

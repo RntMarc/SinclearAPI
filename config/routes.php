@@ -60,11 +60,9 @@ return function (App $app): void {
         });
     });
 
+    // Explore — authenticated routes (write, bookmarks, submissions, review CRUD, photos)
     $app->group('/explore', function (RouteCollectorProxy $group) use ($container) {
-        $group->get('/search', [ExploreController::class, 'search']);
-        $group->get('/random', [ExploreController::class, 'random']);
         $group->get('/bookmarks', [ExploreController::class, 'listBookmarks']);
-        $group->get('', [ExploreController::class, 'list']);
         $group->post('', [ExploreController::class, 'create']);
         $group->get('/submissions', [PlaceSubmissionController::class, 'list']);
         $group->post('/submissions', [PlaceSubmissionController::class, 'create']);
@@ -77,13 +75,21 @@ return function (App $app): void {
         $group->get('/{placeId}/reviews/{reviewId}/photo', [ReviewController::class, 'getPhoto']);
         $group->put('/{placeId}/reviews/{reviewId}/photo', [ReviewController::class, 'setPhoto']);
         $group->get('/{placeId}/photos', [ReviewController::class, 'listPlacePhotos']);
-        $group->get('/{id}', [ExploreController::class, 'get']);
         $group->put('/{id}', [ExploreController::class, 'update']);
         $group->delete('/{id}', [ExploreController::class, 'delete']);
         $group->get('/{id}/bookmark', [ExploreController::class, 'getBookmark']);
         $group->post('/{id}/bookmark', [ExploreController::class, 'setBookmark']);
         $group->delete('/{id}/bookmark', [ExploreController::class, 'removeBookmark']);
     })->add($container->get(AuthenticationMiddleware::class));
+
+    // Explore — public read-only routes (no auth required, sensitive data stripped for anonymous users)
+    $app->group('/explore', function (RouteCollectorProxy $group) {
+        $group->get('/search', [ExploreController::class, 'search']);
+        $group->get('/random', [ExploreController::class, 'random']);
+        $group->get('', [ExploreController::class, 'list']);
+        $group->get('/{placeId}/reviews', [ReviewController::class, 'list']);
+        $group->get('/{id}', [ExploreController::class, 'get']);
+    })->add($container->get('auth.optional'));
 
     $app->group('/user', function (RouteCollectorProxy $group) {
         $group->get('', [UserController::class, 'list']);
@@ -149,13 +155,12 @@ return function (App $app): void {
         $group->delete('/{id}/participants/{userId}', [CalendarEventController::class, 'removeParticipant']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    // Recipes — authenticated routes (write, bookmarks, review CRUD)
     $app->group('/recipes', function (RouteCollectorProxy $group) {
         // List bookmarks MUST come before /{id} to avoid route capture
         $group->get('/bookmarks', [RecipeController::class, 'listBookmarks']);
 
-        $group->get('', [RecipeController::class, 'list']);
         $group->post('', [RecipeController::class, 'create']);
-        $group->get('/{id}', [RecipeController::class, 'get']);
         $group->patch('/{id}', [RecipeController::class, 'update']);
         $group->delete('/{id}', [RecipeController::class, 'delete']);
 
@@ -170,6 +175,12 @@ return function (App $app): void {
         $group->patch('/{id}/reviews/{reviewId}', [RecipeController::class, 'updateReview']);
         $group->delete('/{id}/reviews/{reviewId}', [RecipeController::class, 'deleteReview']);
     })->add($container->get(AuthenticationMiddleware::class));
+
+    // Recipes — public read-only routes (no auth required, sensitive data stripped for anonymous users)
+    $app->group('/recipes', function (RouteCollectorProxy $group) {
+        $group->get('', [RecipeController::class, 'list']);
+        $group->get('/{id}', [RecipeController::class, 'get']);
+    })->add($container->get('auth.optional'));
 
     $app->group('/location-sharing', function (RouteCollectorProxy $group) {
         // Static route MUST come before /{id}

@@ -4778,9 +4778,9 @@ paths:
       description: >
         Gibt eine paginierte Liste aller Entdecken-Orte zurück.
         Optional filterbar nach Kategorie.
+        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: category
           in: query
@@ -4826,12 +4826,6 @@ paths:
                 $ref: '#/components/schemas/ExploreListResponse'
         '400':
           description: Ungültige Kategorie oder Sortierung
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Nicht autorisiert (fehlender oder ungültiger Token)
           content:
             application/json:
               schema:
@@ -5056,9 +5050,9 @@ paths:
         oder geografischer Lage. Die Umkreissuche verwendet die
         Haversine-Formel. Alternativ kann ein Ortsname (`location`)
         übergeben werden, der automatisch über Nominatim geocoded wird.
+        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: q
           in: query
@@ -5148,12 +5142,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
   /explore/random:
     get:
@@ -5161,9 +5149,9 @@ paths:
       description: >
         Gibt eine Liste zufälliger Entdecken-Orte zurück.
         Optional filterbar nach Kategorie.
+        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: limit
           in: query
@@ -5189,12 +5177,6 @@ paths:
                 $ref: '#/components/schemas/ExploreListResponse'
         '400':
           description: Ungültige Kategorie
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Nicht autorisiert
           content:
             application/json:
               schema:
@@ -5339,9 +5321,9 @@ paths:
       summary: Ortsdetails abrufen
       description: >
         Gibt die Detaildaten eines einzelnen Entdecken-Ortes zurück.
+        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: id
           in: path
@@ -5357,12 +5339,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExploreDetailResponse'
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '404':
           description: Ort nicht gefunden
           content:
@@ -5449,10 +5425,10 @@ paths:
       summary: Bewertungen eines Ortes abrufen
       description: >
         Gibt eine paginierte Liste aller Bewertungen zu einem
-        Entdecken-Ort zurück. Authentifizierung erforderlich.
+        Entdecken-Ort zurück. Ohne Authentifizierung: userId,
+        userDisplayName, userImage, comment, photo werden ausgeblendet.
       tags: [Explore]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: placeId
           in: path
@@ -5483,12 +5459,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReviewListResponse'
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '404':
           description: Ort nicht gefunden
           content:
@@ -9971,9 +9941,9 @@ paths:
       description: >
         Gibt eine paginierte Liste aller Rezepte zurück.
         Unterstützt Volltextsuche in Titel und Zutaten.
+        Ohne Authentifizierung: creatorId, creatorDisplayName, creatorImage werden ausgeblendet.
       tags: [Recipe]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: page
           in: query
@@ -10009,12 +9979,6 @@ paths:
                 $ref: '#/components/schemas/RecipeListResponse'
         '400':
           description: Ungültige Parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Nicht autorisiert
           content:
             application/json:
               schema:
@@ -10093,9 +10057,10 @@ paths:
       description: >
         Gibt die vollständigen Details eines Rezepts zurück,
         einschließlich Zutaten, Schritte, Durchschnittsbewertung und Lesezeichen-Status.
+        Ohne Authentifizierung: creatorId, creatorDisplayName, creatorImage werden ausgeblendet.
+        isBookmarked ist immer false für anonyme Nutzer.
       tags: [Recipe]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: id
           in: path
@@ -10111,12 +10076,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecipeDetailResponse'
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '404':
           description: Rezept nicht gefunden
           content:
@@ -10314,10 +10273,11 @@ paths:
   /recipes/{id}/reviews:
     get:
       summary: Bewertungen eines Rezepts auflisten
-      description: Gibt eine paginierte Liste aller Bewertungen für ein Rezept zurück.
+      description: >
+        Gibt eine paginierte Liste aller Bewertungen für ein Rezept zurück.
+        Ohne Authentifizierung: userId, userDisplayName, userImage, comment werden ausgeblendet.
       tags: [Recipe]
-      security:
-        - BearerAuth: []
+      security: []
       parameters:
         - name: id
           in: path
@@ -10344,12 +10304,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecipeReviewListResponse'
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
     post:
       summary: Bewertung abgeben

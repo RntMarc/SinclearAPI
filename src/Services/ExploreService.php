@@ -467,4 +467,10 @@ final readonly class ExploreService
 
         return $result;
     }
+
+    public function sanitizePlacePublic(array $place): array
+    {
+        unset($place['creatorId']);
+        return $place;
+    }
 }

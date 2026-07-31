@@ -298,4 +298,20 @@ final readonly class RecipeService
             'createdAt' => $review['createdAt'],
         ];
     }
+
+    public function sanitizeRecipePublic(array $recipe): array
+    {
+        unset($recipe['creatorId'], $recipe['creatorDisplayName'], $recipe['creatorImage']);
+        return $recipe;
+    }
+
+    public function sanitizeReviewPublic(array $review): array
+    {
+        return [
+            'id' => $review['id'],
+            'recipeId' => $review['recipeId'],
+            'rating' => $review['rating'],
+            'createdAt' => $review['createdAt'],
+        ];
+    }
 }

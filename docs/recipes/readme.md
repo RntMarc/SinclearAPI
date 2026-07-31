@@ -147,10 +147,25 @@ Löscht das Rezept und alle zugehörigen Zutaten, Schritte, Bewertungen und Lese
 | Rezept erstellen | Jeder authentifizierte Nutzer |
 | Rezept bearbeiten | Eigentümer oder Administrator |
 | Rezept löschen | Eigentümer oder Administrator |
-| Rezept ansehen | Jeder authentifizierte Nutzer |
+| Rezept ansehen | Öffentlich (optional: JWT für Lesezeichen-Status) |
 | Bewertung abgeben | Jeder authentifizierte Nutzer |
 | Bewertung bearbeiten | Eigentümer der Bewertung |
 | Bewertung löschen | Eigentümer der Bewertung oder Administrator |
+| Bewertungen ansehen | Öffentlich (ohne Auth: sensible Daten ausgeblendet) |
+
+## Öffentlicher Zugriff (ohne Authentifizierung)
+
+Lesende Endpunkte (`GET /recipes`, `GET /recipes/{id}`, `GET /recipes/{id}/reviews`)
+sind auch ohne Authentifizierung zugänglich. Die API verwendet `auth.optional` Middleware:
+Wenn ein gültiger JWT übergeben wird, werden alle Felder zurückgegeben.
+Ohne Token werden folgende sensible Felder ausgeblendet:
+
+- **Rezepte:** `creatorId`, `creatorDisplayName`, `creatorImage` werden nicht zurückgegeben
+- **Bewertungen:** `userId`, `userDisplayName`, `userImage`, `comment` werden nicht zurückgegeben — nur `id`, `recipeId`, `rating`, `createdAt`
+- **Detail-Ansicht:** `isBookmarked` ist immer `false` für anonyme Nutzer
+
+Dies schützt die Privatsphäre der Nutzer, während die Inhalte (Rezepte, Zutaten,
+Schritte, Durchschnittsbewertungen) für alle sichtbar bleiben.
 
 ## Kategorien
 

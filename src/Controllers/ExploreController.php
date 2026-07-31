@@ -37,6 +37,15 @@ final readonly class ExploreController
         }
 
         $result = $this->exploreService->listPlaces($category, $page, $limit, $sort, $cuisine);
+
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if (!$authUser instanceof AuthenticatedUser) {
+            $result['data'] = array_map(
+                fn(array $p) => $this->exploreService->sanitizePlacePublic($p),
+                $result['data'],
+            );
+        }
+
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 
@@ -51,6 +60,15 @@ final readonly class ExploreController
         }
 
         $places = $this->exploreService->randomPlaces($limit, $category);
+
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if (!$authUser instanceof AuthenticatedUser) {
+            $places = array_map(
+                fn(array $p) => $this->exploreService->sanitizePlacePublic($p),
+                $places,
+            );
+        }
+
         return ResponseFactory::json(['data' => $places], 200, $response);
     }
 
@@ -96,6 +114,11 @@ final readonly class ExploreController
         $place = $this->exploreService->getPlace($args['id']);
         if ($place === null) {
             return ResponseFactory::json(['error' => 'place_not_found'], 404, $response);
+        }
+
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if (!$authUser instanceof AuthenticatedUser) {
+            $place = $this->exploreService->sanitizePlacePublic($place);
         }
 
         return ResponseFactory::json(['data' => $place], 200, $response);
@@ -184,6 +207,15 @@ final readonly class ExploreController
         }
 
         $result = $this->exploreService->searchPlaces($params);
+
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if (!$authUser instanceof AuthenticatedUser) {
+            $result['data'] = array_map(
+                fn(array $p) => $this->exploreService->sanitizePlacePublic($p),
+                $result['data'],
+            );
+        }
+
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 

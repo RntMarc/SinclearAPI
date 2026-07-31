@@ -25,6 +25,15 @@ final readonly class ReviewController
 
         try {
             $result = $this->reviewService->listReviews($placeId, $page, $limit);
+
+            $authUser = $request->getAttribute(AuthenticatedUser::class);
+            if (!$authUser instanceof AuthenticatedUser) {
+                $result['data'] = array_map(
+                    fn(array $r) => $this->reviewService->sanitizeReviewPublic($r),
+                    $result['data'],
+                );
+            }
+
             return ResponseFactory::paginated($result['data'], $result['meta'], $response);
         } catch (\RuntimeException $e) {
             return ResponseFactory::json(['error' => 'place_not_found'], 404, $response);

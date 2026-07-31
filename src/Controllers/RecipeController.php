@@ -50,6 +50,15 @@ final readonly class RecipeController
         }
 
         $result = $this->recipeService->listRecipes($page, $limit, $search, $sort);
+
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if (!$authUser instanceof AuthenticatedUser) {
+            $result['data'] = array_map(
+                fn(array $r) => $this->recipeService->sanitizeRecipePublic($r),
+                $result['data'],
+            );
+        }
+
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 
@@ -64,6 +73,10 @@ final readonly class RecipeController
         $recipe = $this->recipeService->getRecipe($args['id'], $userId);
         if ($recipe === null) {
             return ResponseFactory::json(['error' => 'recipe_not_found'], 404, $response);
+        }
+
+        if (!$authUser instanceof AuthenticatedUser) {
+            $recipe = $this->recipeService->sanitizeRecipePublic($recipe);
         }
 
         return ResponseFactory::json(['data' => $recipe], 200, $response);
@@ -233,6 +246,15 @@ final readonly class RecipeController
         $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
 
         $result = $this->recipeService->listReviews($recipeId, $page, $limit);
+
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if (!$authUser instanceof AuthenticatedUser) {
+            $result['data'] = array_map(
+                fn(array $r) => $this->recipeService->sanitizeReviewPublic($r),
+                $result['data'],
+            );
+        }
+
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 
