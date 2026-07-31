@@ -147,11 +147,11 @@ final readonly class RecipeController
                 $parts[] = htmlspecialchars($ing['unit']) . ' ';
             }
             $parts[] = htmlspecialchars((string) $ing['name']);
-            return '<li>' . implode('', $parts) . '</li>';
+            return '<li itemprop="recipeIngredient ingredients">' . implode('', $parts) . '</li>';
         });
 
         $stepsHtml = $renderList($recipe['steps'] ?? [], static function (array $step): string {
-            return '<li>' . htmlspecialchars((string) $step['description']) . '</li>';
+            return '<li itemprop="recipeInstructions">' . htmlspecialchars((string) $step['description']) . '</li>';
         });
 
         $jsonLd = [
@@ -178,6 +178,7 @@ final readonly class RecipeController
                 static fn(array $step): string => (string) $step['description'],
                 $recipe['steps'] ?? [],
             ),
+            'author' => $recipe['creatorDisplayName'] ?? null,
             'aggregateRating' => $recipe['avgRating'] !== null && $recipe['ratingCount'] !== null
                 ? [
                     '@type' => 'AggregateRating',
@@ -185,8 +186,8 @@ final readonly class RecipeController
                     'reviewCount' => (int) $recipe['ratingCount'],
                 ]
                 : null,
-            'datePublished' => $recipe['createdAt'] ?? null,
-            'dateModified' => $recipe['updatedAt'] ?? null,
+            'datePublished' => $recipe['createdAt'] !== null ? substr($recipe['createdAt'], 0, 10) : null,
+            'dateModified' => $recipe['updatedAt'] !== null ? substr($recipe['updatedAt'], 0, 10) : null,
         ];
         $jsonLd = array_filter($jsonLd, static fn(mixed $v): bool => $v !== null);
         $jsonLdHtml = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
@@ -211,11 +212,16 @@ final readonly class RecipeController
             ? number_format((float) $recipe['avgRating'], 1, '.', '') . ' / 5'
             : '';
         $ratingCount = $recipe['ratingCount'] !== null ? (string) $recipe['ratingCount'] : '';
+        $author = ($recipe['creatorDisplayName'] ?? null) !== null ? (string) $recipe['creatorDisplayName'] : '';
+        $ratingValue = $recipe['avgRating'] !== null ? (string) round((float) $recipe['avgRating'], 2) : '';
+        $datePublished = $recipe['createdAt'] !== null ? substr((string) $recipe['createdAt'], 0, 10) : '';
+        $dateModified = $recipe['updatedAt'] !== null ? substr((string) $recipe['updatedAt'], 0, 10) : '';
 
         $html = file_get_contents(__DIR__ . '/../../templates/public-recipe.php') ?: '';
         $html = $renderConditional($html, 'description', $description);
         $html = $renderConditional($html, 'dietaryTags', $dietaryTags);
         $html = $renderConditional($html, 'rating', $rating);
+        $html = $renderConditional($html, 'author', $author);
         $html = strtr($html, [
             '{{title}}' => htmlspecialchars((string) $recipe['title']),
             '{{description}}' => $description,
@@ -227,7 +233,11 @@ final readonly class RecipeController
             '{{ingredients}}' => $ingredientsHtml,
             '{{steps}}' => $stepsHtml,
             '{{rating}}' => $rating,
+            '{{ratingValue}}' => $ratingValue,
             '{{ratingCount}}' => $ratingCount,
+            '{{author}}' => htmlspecialchars($author),
+            '{{datePublished}}' => $datePublished,
+            '{{dateModified}}' => $dateModified,
             '{{jsonLd}}' => $jsonLdHtml,
         ]);
 

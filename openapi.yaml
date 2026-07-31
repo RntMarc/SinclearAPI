@@ -10188,6 +10188,14 @@ paths:
         enthält Titel, Bild (Data-URI), Zutatenliste (`<ul>`) und
         Zubereitungsschritte (`<ol>`) sowie eine Schema.org-Rezeptstruktur
         (JSON-LD) für maschinelle Extraktion.
+        Zusätzlich ist die HTML-Struktur mit Schema.org-Microdata annotiert
+        (`itemscope`/`itemtype="https://schema.org/Recipe"`): `itemprop="name"`,
+        `"description"`, `"image"`, `"recipeCategory"`, `"recipeYield"`,
+        `"keywords"`, `"aggregateRating"` (AggregateRating), `"author"`,
+        `"datePublished"`, `"dateModified"`, Zutaten als
+        `<li itemprop="recipeIngredient ingredients">` und Schritte als
+        `<li itemprop="recipeInstructions">` – kompatibel mit dem Schema.org-
+        Parser von Bring.
         Es wird exakt derselbe Datenpfad wie GET /public/recipes/{id} verwendet
         (RecipeService + Sanitization). Für anonyme Nutzer werden creatorId,
         creatorDisplayName und creatorImage ausgeblendet; mit gültigem JWT

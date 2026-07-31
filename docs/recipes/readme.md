@@ -57,6 +57,16 @@ https://sinclear.de/api/v2/html/public/recipe?id=550e8400-e29b-41d4-a716-4466554
 - Schema.org-Struktur als JSON-LD (`application/ld+json`) mit `@type: Recipe`
   (name, description, recipeIngredient, recipeInstructions, image, recipeYield,
   aggregateRating, datePublished) – Standard für automatische Extraktion
+- Zusätzlich Schema.org-**Microdata** direkt in der HTML-Struktur
+  (`<article itemscope itemtype="https://schema.org/Recipe">`): `itemprop`
+  auf `name`, `description`/`tagline`, `image`, `recipeCategory`,
+  `recipeYield`/`yield`, `keywords`, `aggregateRating` (mit `ratingValue`/
+  `reviewCount`), `author`, `datePublished`/`dateModified` sowie
+  `<li itemprop="recipeIngredient ingredients">` (Zutaten, hier parst Bring
+  ItemId/Spec) und `<li itemprop="recipeInstructions">` (Schritte) –
+  abgestimmt auf das Microdata-Markup, das der Bring-Parser erwartet
+- Der Autor (`itemprop="author"`) erscheint nur, wenn die Rezeptdaten den
+  Ersteller enthalten (d.h. bei Abruf mit gültigem JWT)
 - Liefert exakt dieselben Daten wie `GET /public/recipes/{id}`
   (gleicher Service-Pfad inkl. Anonymisierung): ohne Token werden
   `creatorId`, `creatorDisplayName`, `creatorImage` nicht ausgegeben

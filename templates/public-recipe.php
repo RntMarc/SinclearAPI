@@ -9,30 +9,40 @@
     <script type="application/ld+json">{{jsonLd}}</script>
 </head>
 <body>
-    <article>
+    <article itemscope itemtype="https://schema.org/Recipe">
         <header>
-            <h1>{{title}}</h1>
+            <h1 itemprop="name">{{title}}</h1>
             {{#description}}
-            <p>{{description}}</p>
+            <p itemprop="description tagline">{{description}}</p>
             {{/description}}
         </header>
 
-        <img src="{{imageSrc}}" alt="{{imageAlt}}">
+        <img itemprop="image" src="{{imageSrc}}" alt="{{imageAlt}}">
 
         <dl>
             <dt>Kategorie</dt>
-            <dd>{{category}}</dd>
+            <dd itemprop="recipeCategory">{{category}}</dd>
             <dt>Portionen</dt>
-            <dd>{{servings}}</dd>
+            <dd itemprop="recipeYield yield">{{servings}}</dd>
             {{#dietaryTags}}
             <dt>Ernährung</dt>
-            <dd>{{dietaryTags}}</dd>
+            <dd itemprop="keywords">{{dietaryTags}}</dd>
             {{/dietaryTags}}
             {{#rating}}
             <dt>Bewertung</dt>
-            <dd>{{rating}} ({{ratingCount}} Bewertungen)</dd>
+            <dd itemprop="aggregateRating" itemscope itemtype="https://schema.org/AggregateRating">
+                <span itemprop="ratingValue">{{ratingValue}}</span> / 5
+                (<span itemprop="reviewCount">{{ratingCount}}</span> Bewertungen)
+            </dd>
             {{/rating}}
+            {{#author}}
+            <dt>Autor</dt>
+            <dd itemprop="author">{{author}}</dd>
+            {{/author}}
         </dl>
+
+        <meta itemprop="datePublished" content="{{datePublished}}">
+        <meta itemprop="dateModified" content="{{dateModified}}">
 
         <h2>Zutaten</h2>
         <ul>
