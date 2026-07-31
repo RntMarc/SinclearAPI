@@ -186,7 +186,7 @@ final readonly class CalendarEventService
         foreach (['startTime', 'endTime', 'createdAt', 'updatedAt'] as $field) {
             if (isset($event[$field])) {
                 $event[$field] = (new DateTimeImmutable($event[$field], new DateTimeZone('UTC')))
-                    ->format('Y-m-d\TH:i:s.v\Z');
+                    ->format('Y-m-d H:i:s');
             }
         }
 

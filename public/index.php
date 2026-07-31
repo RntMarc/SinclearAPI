@@ -8,6 +8,8 @@ require __DIR__ . '/../vendor/autoload.php';
 
 $rootDir = dirname(__DIR__);
 
+date_default_timezone_set('UTC');
+
 $dotenv = Dotenv\Dotenv::createImmutable($rootDir);
 $dotenv->safeLoad();
 

@@ -157,13 +157,13 @@ final readonly class CalendarEventController
                 $dayOfWeek = (int) $now->format('N');
                 $monday = $now->modify('-' . ($dayOfWeek - 1) . ' days')->setTime(0, 0, 0);
                 $sunday = $monday->modify('+6 days')->setTime(23, 59, 59);
-                $start = $monday->format('Y-m-d\TH:i:s\Z');
-                $end = $sunday->format('Y-m-d\TH:i:s\Z');
+                $start = $monday->format('Y-m-d H:i:s');
+                $end = $sunday->format('Y-m-d H:i:s');
             } elseif ($range === 'month') {
                 $firstDay = $now->modify('first day of this month')->setTime(0, 0, 0);
                 $lastDay = $now->modify('last day of this month')->setTime(23, 59, 59);
-                $start = $firstDay->format('Y-m-d\TH:i:s\Z');
-                $end = $lastDay->format('Y-m-d\TH:i:s\Z');
+                $start = $firstDay->format('Y-m-d H:i:s');
+                $end = $lastDay->format('Y-m-d H:i:s');
             }
         }
 
