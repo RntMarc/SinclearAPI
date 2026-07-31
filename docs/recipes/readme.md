@@ -18,7 +18,22 @@ Zubereitungsschritte, die direkt im API-Response verschachtelt zurückgegeben we
 
 ## Endpunkte
 
-### Rezepte auflisten
+### Öffentliche Endpunkte (ohne Authentifizierung)
+
+Lesende Grunddaten sind über dedizierte öffentliche Endpunkte ohne Login erreichbar.
+Alle privaten Endpunkte (siehe unten) erfordern ein gültiges JWT.
+
+| Methode | Endpunkt | Beschreibung |
+|---------|----------|-------------|
+| `GET` | `/public/recipes` | Rezepte auflisten (Seiten, Suche, Sortierung) |
+| `GET` | `/public/recipes/{id}` | Rezept-Details abrufen |
+
+> **Anonymisierung:** Ohne Token werden `creatorId`, `creatorDisplayName` und
+> `creatorImage` ausgeblendet und `isBookmarked` ist immer `false`.
+> Wird ein gültiges JWT im Bearer-Header mitgesendet (die Endpunkte nutzen
+> `auth.optional`), werden alle Felder geliefert.
+
+### Rezepte auflisten (privat)
 
 ```
 GET /recipes?page=&limit=&search=&sort=
@@ -96,7 +111,7 @@ Werte werden mit `invalid_servings` (HTTP 400) abgelehnt.
 | `unsupported_image_format` | Format nicht erlaubt (nur JPEG, PNG, WebP) |
 | `image_dimensions_too_large` | Abmessungen überschreiten 1000x1000 Pixel |
 
-### Rezept-Details abrufen
+### Rezept-Details abrufen (privat)
 
 ```
 GET /recipes/{id}
@@ -147,25 +162,29 @@ Löscht das Rezept und alle zugehörigen Zutaten, Schritte, Bewertungen und Lese
 | Rezept erstellen | Jeder authentifizierte Nutzer |
 | Rezept bearbeiten | Eigentümer oder Administrator |
 | Rezept löschen | Eigentümer oder Administrator |
-| Rezept ansehen | Öffentlich (optional: JWT für Lesezeichen-Status) |
+| Rezept ansehen (privat) | Jeder authentifizierte Nutzer |
+| Rezept ansehen (öffentlich) | `/public/recipes`, `/public/recipes/{id}` ohne Login, anonymisiert |
 | Bewertung abgeben | Jeder authentifizierte Nutzer |
 | Bewertung bearbeiten | Eigentümer der Bewertung |
 | Bewertung löschen | Eigentümer der Bewertung oder Administrator |
-| Bewertungen ansehen | Öffentlich (ohne Auth: sensible Daten ausgeblendet) |
+| Bewertungen ansehen | Jeder authentifizierte Nutzer (privat) |
 
 ## Öffentlicher Zugriff (ohne Authentifizierung)
 
-Lesende Endpunkte (`GET /recipes`, `GET /recipes/{id}`, `GET /recipes/{id}/reviews`)
-sind auch ohne Authentifizierung zugänglich. Die API verwendet `auth.optional` Middleware:
+Die privaten lesenden Endpunkte (`GET /recipes`, `GET /recipes/{id}`,
+`GET /recipes/{id}/reviews`) erfordern ein gültiges JWT.
+
+Für Gäste ohne Login stehen die öffentlichen Endpunkte `GET /public/recipes` und
+`GET /public/recipes/{id}` bereit. Sie nutzen die `auth.optional` Middleware:
 Wenn ein gültiger JWT übergeben wird, werden alle Felder zurückgegeben.
 Ohne Token werden folgende sensible Felder ausgeblendet:
 
 - **Rezepte:** `creatorId`, `creatorDisplayName`, `creatorImage` werden nicht zurückgegeben
-- **Bewertungen:** `userId`, `userDisplayName`, `userImage`, `comment` werden nicht zurückgegeben — nur `id`, `recipeId`, `rating`, `createdAt`
 - **Detail-Ansicht:** `isBookmarked` ist immer `false` für anonyme Nutzer
 
 Dies schützt die Privatsphäre der Nutzer, während die Inhalte (Rezepte, Zutaten,
-Schritte, Durchschnittsbewertungen) für alle sichtbar bleiben.
+Schritte, Durchschnittsbewertungen) für alle sichtbar bleiben. Bewertungen sind
+nur für angemeldete Nutzer einsehbar.
 
 ## Kategorien
 

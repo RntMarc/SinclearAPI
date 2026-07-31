@@ -4772,15 +4772,228 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /public/explore:
+    get:
+      summary: Orte auflisten (öffentlich)
+      description: >
+        Öffentlicher Endpunkt ohne Authentifizierung. Gibt eine paginierte Liste
+        aller Entdecken-Orte zurück. Optional filterbar nach Kategorie.
+        Für anonyme Nutzer wird das Feld creatorId ausgeblendet. Mit gültigem
+        JWT (Bearer-Header) werden alle Felder geliefert.
+      tags: [Explore]
+      security: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Einträge pro Seite
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [gastronomy, leisure]
+          description: Filter nach Kategorie
+      responses:
+        '200':
+          description: Liste der Orte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '400':
+          description: Ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /public/explore/search:
+    get:
+      summary: Orte durchsuchen (öffentlich)
+      description: >
+        Öffentlicher Endpunkt ohne Authentifizierung. Durchsucht die
+        Entdecken-Orte nach Namen, Kategorie, Küche oder geografischer Lage.
+        Für anonyme Nutzer wird das Feld creatorId ausgeblendet. Mit gültigem
+        JWT (Bearer-Header) werden alle Felder geliefert.
+      tags: [Explore]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Volltextsuche im Namen
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [gastronomy, leisure]
+        - name: cuisine
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Küchen-Typ (nur bei Gastronomie)
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [name_asc, name_desc, created_asc, created_desc, rating_asc, rating_desc]
+          description: Sortierung der Ergebnisse
+        - name: city
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filtert nach Stadt (LIKE-Suche in der address-Spalte)
+        - name: lat
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+          description: Breitengrad für Umkreissuche
+        - name: lon
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+          description: Längengrad für Umkreissuche
+        - name: radius
+          in: query
+          required: false
+          schema:
+            type: number
+            format: float
+            default: 10
+          description: Suchradius in Kilometern (nur mit lat/lon)
+        - name: location
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Ortsname, der über Nominatim geocoded wird
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Suchergebnisse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '400':
+          description: Ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /public/explore/random:
+    get:
+      summary: Zufällige Orte abrufen (öffentlich)
+      description: >
+        Öffentlicher Endpunkt ohne Authentifizierung. Gibt eine Liste
+        zufälliger Entdecken-Orte zurück. Optional filterbar nach Kategorie.
+        Für anonyme Nutzer wird das Feld creatorId ausgeblendet.
+      tags: [Explore]
+      security: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [gastronomy, leisure]
+          description: Filter nach Kategorie
+      responses:
+        '200':
+          description: Liste zufälliger Orte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreListResponse'
+        '400':
+          description: Ungültige Kategorie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /public/explore/{id}:
+    get:
+      summary: Ortsdetails abrufen (öffentlich)
+      description: >
+        Öffentlicher Endpunkt ohne Authentifizierung. Gibt die Detaildaten eines
+        einzelnen Entdecken-Ortes zurück. Für anonyme Nutzer wird das Feld
+        creatorId ausgeblendet. Mit gültigem JWT (Bearer-Header) werden alle
+        Felder geliefert.
+      tags: [Explore]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+      responses:
+        '200':
+          description: Detaildaten des Ortes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExploreDetailResponse'
+        '404':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /explore:
     get:
       summary: Orte auflisten
       description: >
         Gibt eine paginierte Liste aller Entdecken-Orte zurück.
         Optional filterbar nach Kategorie.
-        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: category
           in: query
@@ -4826,6 +5039,12 @@ paths:
                 $ref: '#/components/schemas/ExploreListResponse'
         '400':
           description: Ungültige Kategorie oder Sortierung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert (fehlender oder ungültiger Token)
           content:
             application/json:
               schema:
@@ -5050,9 +5269,9 @@ paths:
         oder geografischer Lage. Die Umkreissuche verwendet die
         Haversine-Formel. Alternativ kann ein Ortsname (`location`)
         übergeben werden, der automatisch über Nominatim geocoded wird.
-        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: q
           in: query
@@ -5142,6 +5361,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /explore/random:
     get:
@@ -5149,9 +5374,9 @@ paths:
       description: >
         Gibt eine Liste zufälliger Entdecken-Orte zurück.
         Optional filterbar nach Kategorie.
-        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: limit
           in: query
@@ -5177,6 +5402,12 @@ paths:
                 $ref: '#/components/schemas/ExploreListResponse'
         '400':
           description: Ungültige Kategorie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:
@@ -5321,9 +5552,9 @@ paths:
       summary: Ortsdetails abrufen
       description: >
         Gibt die Detaildaten eines einzelnen Entdecken-Ortes zurück.
-        Ohne Authentifizierung: creatorId wird ausgeblendet.
       tags: [Explore]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: id
           in: path
@@ -5339,6 +5570,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExploreDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Ort nicht gefunden
           content:
@@ -5425,10 +5662,10 @@ paths:
       summary: Bewertungen eines Ortes abrufen
       description: >
         Gibt eine paginierte Liste aller Bewertungen zu einem
-        Entdecken-Ort zurück. Ohne Authentifizierung: userId,
-        userDisplayName, userImage, comment, photo werden ausgeblendet.
+        Entdecken-Ort zurück.
       tags: [Explore]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: placeId
           in: path
@@ -5459,6 +5696,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReviewListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Ort nicht gefunden
           content:
@@ -9935,13 +10178,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /recipes:
+  /public/recipes:
     get:
-      summary: Rezepte auflisten
+      summary: Rezepte auflisten (öffentlich)
       description: >
-        Gibt eine paginierte Liste aller Rezepte zurück.
-        Unterstützt Volltextsuche in Titel und Zutaten.
-        Ohne Authentifizierung: creatorId, creatorDisplayName, creatorImage werden ausgeblendet.
+        Öffentlicher Endpunkt ohne Authentifizierung. Gibt eine paginierte Liste
+        aller Rezepte zurück. Unterstützt Volltextsuche in Titel und Zutaten.
+        Für anonyme Nutzer werden die Felder creatorId, creatorDisplayName und
+        creatorImage ausgeblendet. Mit gültigem JWT (Bearer-Header) werden alle
+        Felder geliefert.
       tags: [Recipe]
       security: []
       parameters:
@@ -9979,6 +10224,95 @@ paths:
                 $ref: '#/components/schemas/RecipeListResponse'
         '400':
           description: Ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /public/recipes/{id}:
+    get:
+      summary: Rezept-Details abrufen (öffentlich)
+      description: >
+        Öffentlicher Endpunkt ohne Authentifizierung. Gibt die vollständigen
+        Details eines Rezepts zurück, einschließlich Zutaten, Schritte,
+        Durchschnittsbewertung (avgRating, ratingCount). Für anonyme Nutzer
+        werden die Felder creatorId, creatorDisplayName und creatorImage
+        ausgeblendet; isBookmarked ist immer false. Mit gültigem JWT
+        (Bearer-Header) werden alle Felder geliefert.
+      tags: [Recipe]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '200':
+          description: Rezept-Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeDetailResponse'
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /recipes:
+    get:
+      summary: Rezepte auflisten
+      description: >
+        Gibt eine paginierte Liste aller Rezepte zurück.
+        Unterstützt Volltextsuche in Titel und Zutaten.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Einträge pro Seite
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Suchbegriff (durchsucht Titel und Zutaten)
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_asc, created_desc, rating_asc, rating_desc]
+            default: created_desc
+          description: Sortierung
+      responses:
+        '200':
+          description: Liste der Rezepte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListResponse'
+        '400':
+          description: Ungültige Parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:
@@ -10057,10 +10391,9 @@ paths:
       description: >
         Gibt die vollständigen Details eines Rezepts zurück,
         einschließlich Zutaten, Schritte, Durchschnittsbewertung und Lesezeichen-Status.
-        Ohne Authentifizierung: creatorId, creatorDisplayName, creatorImage werden ausgeblendet.
-        isBookmarked ist immer false für anonyme Nutzer.
       tags: [Recipe]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: id
           in: path
@@ -10076,6 +10409,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecipeDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Rezept nicht gefunden
           content:
@@ -10273,11 +10612,10 @@ paths:
   /recipes/{id}/reviews:
     get:
       summary: Bewertungen eines Rezepts auflisten
-      description: >
-        Gibt eine paginierte Liste aller Bewertungen für ein Rezept zurück.
-        Ohne Authentifizierung: userId, userDisplayName, userImage, comment werden ausgeblendet.
+      description: Gibt eine paginierte Liste aller Bewertungen für ein Rezept zurück.
       tags: [Recipe]
-      security: []
+      security:
+        - BearerAuth: []
       parameters:
         - name: id
           in: path
@@ -10304,6 +10642,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RecipeReviewListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     post:
       summary: Bewertung abgeben

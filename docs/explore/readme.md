@@ -195,20 +195,34 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 
 ## API-Endpunkte
 
+### Öffentliche Endpunkte (ohne Authentifizierung)
+
+Lesende Grunddaten sind über dedizierte öffentliche Endpunkte ohne Login erreichbar.
+Sie nutzen `auth.optional`: Wird ein gültiges JWT mitgesendet, werden alle Felder geliefert.
+
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
-| `GET` | `/explore` | Optional | Paginierte Liste (optional mit `sort`, `cuisine`) — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore` | Optional | Paginierte Liste — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore/search` | Optional | Suche + Umkreissuche — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore/random` | Optional | Zufällige Orte (optional nach Kategorie) — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore/{id}` | Optional | Detailansicht — ohne Auth: `creatorId` ausgeblendet |
+
+### Private Endpunkte (JWT erforderlich)
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|-------------|
+| `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`, `cuisine`) |
 | `POST` | `/explore` | JWT | Neuen Ort anlegen |
-| `GET` | `/explore/search` | Optional | Suche + Umkreissuche — ohne Auth: `creatorId` ausgeblendet |
-| `GET` | `/explore/random` | Optional | Zufällige Orte (optional nach Kategorie) — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/explore/search` | JWT | Suche + Umkreissuche |
+| `GET` | `/explore/random` | JWT | Zufällige Orte (optional nach Kategorie) |
 | `GET` | `/explore/bookmarks` | JWT | Eigene Lesezeichen (paginated) |
-| `GET` | `/explore/{id}` | Optional | Detailansicht — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/explore/{id}` | JWT | Detailansicht |
 | `PUT` | `/explore/{id}` | JWT | OSM-Refresh |
 | `DELETE` | `/explore/{id}` | JWT | Löschen (policy-gesteuert) |
 | `GET` | `/explore/{id}/bookmark` | JWT | Lesezeichen-Status prüfen |
 | `POST` | `/explore/{id}/bookmark` | JWT | Lesezeichen setzen |
 | `DELETE` | `/explore/{id}/bookmark` | JWT | Lesezeichen entfernen |
-| `GET` | `/explore/{placeId}/reviews` | Optional | Bewertungen eines Ortes (paginated) — ohne Auth: userId, userDisplayName, userImage, comment, photo ausgeblendet |
+| `GET` | `/explore/{placeId}/reviews` | JWT | Bewertungen eines Ortes (paginated) |
 | `POST` | `/explore/{placeId}/reviews` | JWT | Bewertung erstellen |
 | `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
 | `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
@@ -222,16 +236,19 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 
 ## Öffentlicher Zugriff (ohne Authentifizierung)
 
-Lesende Endpunkte (`GET /explore`, `GET /explore/search`, `GET /explore/random`,
-`GET /explore/{id}`, `GET /explore/{placeId}/reviews`) sind auch ohne
-Authentifizierung zugänglich. Die API verwendet `auth.optional` Middleware:
+Die privaten lesenden Endpunkte (`GET /explore`, `GET /explore/search`,
+`GET /explore/random`, `GET /explore/{id}`, `GET /explore/{placeId}/reviews`)
+erfordern ein gültiges JWT.
+
+Für Gäste ohne Login stehen die öffentlichen Endpunkte unter `/public/explore`
+bereit (Liste, Suche, Zufall, Details). Sie nutzen die `auth.optional` Middleware:
 Wenn ein gültiger JWT übergeben wird, werden alle Felder zurückgegeben.
 Ohne Token werden folgende sensible Felder ausgeblendet:
 
 - **Orte:** `creatorId` wird nicht zurückgegeben
-- **Bewertungen:** `userId`, `userDisplayName`, `userImage`, `comment`, `photo` werden nicht zurückgegeben — nur `id`, `placeId`, `rating`, `createdAt`
 
-Dies schützt die Privatsphäre der Nutzer, während die Inhalte für alle sichtbar bleiben.
+Dies schützt die Privatsphäre der Nutzer, während die Inhalte für alle sichtbar
+bleiben. Bewertungen sind nur für angemeldete Nutzer einsehbar.
 
 ## Manuelle Ort-Einreichung (Missing Place)
 
@@ -419,7 +436,7 @@ Ein Nutzer kann mehrere Bewertungen zu demselben Ort abgeben.
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
-| `GET` | `/explore/{placeId}/reviews` | Optional | Alle Bewertungen zu einem Ort (paginated) — ohne Auth: sensible Daten ausgeblendet |
+| `GET` | `/explore/{placeId}/reviews` | JWT | Alle Bewertungen zu einem Ort (paginated) |
 | `POST` | `/explore/{placeId}/reviews` | JWT | Neue Bewertung erstellen |
 | `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
 | `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
