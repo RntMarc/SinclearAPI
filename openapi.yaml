@@ -10178,6 +10178,50 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /html/public/recipe:
+    get:
+      summary: Rezept als HTML-Seite abrufen (öffentlich)
+      description: >
+        Öffentlicher Endpunkt ohne Authentifizierung. Liefert ein Rezept als
+        reine, ungestylte HTML-Seite (Content-Type text/html), die für externe
+        Parser optimiert ist (z.B. die Einkaufslisten-App Bring). Die Seite
+        enthält Titel, Bild (Data-URI), Zutatenliste (`<ul>`) und
+        Zubereitungsschritte (`<ol>`) sowie eine Schema.org-Rezeptstruktur
+        (JSON-LD) für maschinelle Extraktion.
+        Es wird exakt derselbe Datenpfad wie GET /public/recipes/{id} verwendet
+        (RecipeService + Sanitization). Für anonyme Nutzer werden creatorId,
+        creatorDisplayName und creatorImage ausgeblendet; mit gültigem JWT
+        (Bearer-Header) werden alle Felder geliefert.
+      tags: [Recipe]
+      security: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Rezepts
+      responses:
+        '200':
+          description: Rezept als HTML-Seite
+          content:
+            text/html:
+              schema:
+                type: string
+        '400':
+          description: Parameter id fehlt
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            text/html:
+              schema:
+                type: string
+
   /public/recipes:
     get:
       summary: Rezepte auflisten (öffentlich)

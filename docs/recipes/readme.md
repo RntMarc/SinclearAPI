@@ -27,11 +27,43 @@ Alle privaten Endpunkte (siehe unten) erfordern ein gültiges JWT.
 |---------|----------|-------------|
 | `GET` | `/public/recipes` | Rezepte auflisten (Seiten, Suche, Sortierung) |
 | `GET` | `/public/recipes/{id}` | Rezept-Details abrufen |
+| `GET` | `/html/public/recipe?id={id}` | Rezept als reine HTML-Seite für externe Parser (z.B. Bring) |
 
 > **Anonymisierung:** Ohne Token werden `creatorId`, `creatorDisplayName` und
 > `creatorImage` ausgeblendet und `isBookmarked` ist immer `false`.
 > Wird ein gültiges JWT im Bearer-Header mitgesendet (die Endpunkte nutzen
 > `auth.optional`), werden alle Felder geliefert.
+
+### HTML-Rezeptseite für externe Parser (Bring & Co.)
+
+Der Flutter-Client rendert Rezeptinhalte dynamisch im Canvas – für externe
+Dienste, die eine URL öffnen und den HTML-Code parsen (z.B. die
+Einkaufslisten-App **Bring**), ist deshalb eine statische HTML-Variante
+notwendig:
+
+```
+GET /html/public/recipe?id=REZEPT_ID
+```
+
+**Beispiel (Produktion):**
+```
+https://sinclear.de/api/v2/html/public/recipe?id=550e8400-e29b-41d4-a716-446655440000
+```
+
+**Eigenschaften:**
+- Reines, ungestyltes und semantisches HTML – ohne JavaScript
+- Zutatenliste als `<ul>`, Zubereitungsschritte als `<ol>`
+- Rezeptbild als `data:`-URI (`<img>`), nur wenn vorhanden
+- Schema.org-Struktur als JSON-LD (`application/ld+json`) mit `@type: Recipe`
+  (name, description, recipeIngredient, recipeInstructions, image, recipeYield,
+  aggregateRating, datePublished) – Standard für automatische Extraktion
+- Liefert exakt dieselben Daten wie `GET /public/recipes/{id}`
+  (gleicher Service-Pfad inkl. Anonymisierung): ohne Token werden
+  `creatorId`, `creatorDisplayName`, `creatorImage` nicht ausgegeben
+- `Content-Type: text/html; charset=utf-8`
+
+**Fehlerfälle:** fehlender `id`-Parameter → `400`, unbekannte Rezept-ID → `404`
+(beide als einfache HTML-Fehlerseite).
 
 ### Rezepte auflisten (privat)
 

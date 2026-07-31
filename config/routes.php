@@ -164,6 +164,10 @@ return function (App $app): void {
         $group->get('/{id}', [RecipeController::class, 'get']);
     })->add($container->get('auth.optional'));
 
+    // Public recipe HTML page for external parsers (e.g. Bring) — same data path as /public/recipes/{id}
+    $app->get('/html/public/recipe', [RecipeController::class, 'publicHtml'])
+        ->add($container->get('auth.optional'));
+
     // Recipes — authenticated routes
     $app->group('/recipes', function (RouteCollectorProxy $group) {
         // List bookmarks MUST come before /{id} to avoid route capture

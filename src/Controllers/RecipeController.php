@@ -82,6 +82,159 @@ final readonly class RecipeController
         return ResponseFactory::json(['data' => $recipe], 200, $response);
     }
 
+    public function publicHtml(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $params = $request->getQueryParams();
+        $id = trim((string) ($params['id'] ?? ''));
+
+        if ($id === '') {
+            $response->getBody()->write(
+                '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Ungültige Anfrage</title></head>'
+                . '<body><h1>Ungültige Anfrage</h1><p>Es fehlt der Parameter <code>id</code>.</p></body></html>'
+            );
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(400);
+        }
+
+        $userId = null;
+        $authUser = $request->getAttribute(AuthenticatedUser::class);
+        if ($authUser instanceof AuthenticatedUser) {
+            $userId = $authUser->id;
+        }
+
+        // Gleicher Datenpfad wie GET /public/recipes/{id}: RecipeService + Sanitize
+        $recipe = $this->recipeService->getRecipe($id, $userId);
+        if ($recipe === null) {
+            $response->getBody()->write(
+                '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Rezept nicht gefunden</title></head>'
+                . '<body><h1>Rezept nicht gefunden</h1></body></html>'
+            );
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(404);
+        }
+
+        if (!$authUser instanceof AuthenticatedUser) {
+            $recipe = $this->recipeService->sanitizeRecipePublic($recipe);
+        }
+
+        $imageSrc = null;
+        if (!empty($recipe['image']) && is_string($recipe['image'])) {
+            $mime = 'image/png';
+            $info = @getimagesizefromstring(base64_decode($recipe['image'], true));
+            if (is_array($info) && isset($info['mime'])) {
+                $mime = $info['mime'];
+            }
+            $imageSrc = 'data:' . $mime . ';base64,' . $recipe['image'];
+        }
+
+        $renderList = static function (array $items, callable $render): string {
+            if ($items === []) {
+                return '';
+            }
+            return implode('', array_map($render, $items));
+        };
+
+        $formatAmount = static function (float $amount): string {
+            return rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
+        };
+
+        $ingredientsHtml = $renderList($recipe['ingredients'] ?? [], static function (array $ing) use ($formatAmount): string {
+            $parts = [];
+            if (!empty($ing['amount']) && (float) $ing['amount'] > 0) {
+                $parts[] = $formatAmount((float) $ing['amount']) . ' ';
+                if (!empty($ing['unit'])) {
+                    $parts[] = htmlspecialchars($ing['unit']) . ' ';
+                }
+            } elseif (!empty($ing['unit'])) {
+                $parts[] = htmlspecialchars($ing['unit']) . ' ';
+            }
+            $parts[] = htmlspecialchars((string) $ing['name']);
+            return '<li>' . implode('', $parts) . '</li>';
+        });
+
+        $stepsHtml = $renderList($recipe['steps'] ?? [], static function (array $step): string {
+            return '<li>' . htmlspecialchars((string) $step['description']) . '</li>';
+        });
+
+        $jsonLd = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Recipe',
+            'name' => $recipe['title'],
+            'description' => $recipe['description'] ?? null,
+            'recipeCategory' => $recipe['category'],
+            'keywords' => $recipe['dietaryTags'] ?? null,
+            'recipeYield' => $recipe['servings'],
+            'image' => $imageSrc !== null ? [$imageSrc] : null,
+            'recipeIngredient' => array_map(
+                static fn(array $ing): string => trim(
+                    (($ing['amount'] ?? 0) > 0
+                        ? $formatAmount((float) $ing['amount']) . ' '
+                        : '')
+                    . ($ing['unit'] ?? '')
+                    . ' '
+                    . $ing['name']
+                ),
+                $recipe['ingredients'] ?? [],
+            ),
+            'recipeInstructions' => array_map(
+                static fn(array $step): string => (string) $step['description'],
+                $recipe['steps'] ?? [],
+            ),
+            'aggregateRating' => $recipe['avgRating'] !== null && $recipe['ratingCount'] !== null
+                ? [
+                    '@type' => 'AggregateRating',
+                    'ratingValue' => round((float) $recipe['avgRating'], 2),
+                    'reviewCount' => (int) $recipe['ratingCount'],
+                ]
+                : null,
+            'datePublished' => $recipe['createdAt'] ?? null,
+            'dateModified' => $recipe['updatedAt'] ?? null,
+        ];
+        $jsonLd = array_filter($jsonLd, static fn(mixed $v): bool => $v !== null);
+        $jsonLdHtml = json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+
+        $renderConditional = static function (string $html, string $key, string $value): string {
+            $open = '{{#' . $key . '}}';
+            $close = '{{/' . $key . '}}';
+            if ($value !== '') {
+                return str_replace([$open, $close], '', $html);
+            }
+            $pattern = '/\{\{#' . preg_quote($key, '/') . '\}\}.*?\{\{\/' . preg_quote($key, '/') . '\}\}/s';
+            return preg_replace($pattern, '', $html);
+        };
+
+        $description = $recipe['description'] !== null
+            ? htmlspecialchars((string) $recipe['description'])
+            : '';
+        $dietaryTags = $recipe['dietaryTags'] !== null
+            ? htmlspecialchars((string) $recipe['dietaryTags'])
+            : '';
+        $rating = $recipe['avgRating'] !== null
+            ? number_format((float) $recipe['avgRating'], 1, '.', '') . ' / 5'
+            : '';
+        $ratingCount = $recipe['ratingCount'] !== null ? (string) $recipe['ratingCount'] : '';
+
+        $html = file_get_contents(__DIR__ . '/../../templates/public-recipe.php') ?: '';
+        $html = $renderConditional($html, 'description', $description);
+        $html = $renderConditional($html, 'dietaryTags', $dietaryTags);
+        $html = $renderConditional($html, 'rating', $rating);
+        $html = strtr($html, [
+            '{{title}}' => htmlspecialchars((string) $recipe['title']),
+            '{{description}}' => $description,
+            '{{imageSrc}}' => $imageSrc ?? '',
+            '{{imageAlt}}' => htmlspecialchars((string) $recipe['title']),
+            '{{category}}' => htmlspecialchars((string) $recipe['category']),
+            '{{dietaryTags}}' => $dietaryTags,
+            '{{servings}}' => (string) $recipe['servings'],
+            '{{ingredients}}' => $ingredientsHtml,
+            '{{steps}}' => $stepsHtml,
+            '{{rating}}' => $rating,
+            '{{ratingCount}}' => $ratingCount,
+            '{{jsonLd}}' => $jsonLdHtml,
+        ]);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);
