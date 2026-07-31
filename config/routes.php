@@ -13,6 +13,7 @@ use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
+use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -32,6 +33,10 @@ return function (App $app): void {
 
     // Public app routes (no auth required)
     $app->get('/app/version', [AppController::class, 'version']);
+
+    // MCP documentation endpoint (public, read-only, no auth required)
+    $app->get('/mcp', [McpController::class, 'get']);
+    $app->post('/mcp', [McpController::class, 'post']);
 
     $app->group('/auth', function (RouteCollectorProxy $group) use ($container) {
         $group->group('/login', function (RouteCollectorProxy $login) use ($container) {

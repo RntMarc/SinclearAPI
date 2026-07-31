@@ -16,6 +16,7 @@ use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
+use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\PlaceSubmissionController;
@@ -24,6 +25,7 @@ use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
+use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -39,8 +41,11 @@ use Sinclear\Api\Repository\RecipeIngredientRepository;
 use Sinclear\Api\Repository\RecipeReviewRepository;
 use Sinclear\Api\Repository\RecipeStepRepository;
 use Sinclear\Api\Repository\ContactInfoRepository;
+use Sinclear\Api\Repository\ContactInfoUpdateRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
+use Sinclear\Api\Repository\SocialInfoUpdateRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
+use Sinclear\Api\Repository\UserUpdateRepository;
 use Sinclear\Api\Security\Policy\UserPolicy;
 use Sinclear\Api\Services\UserService;
 use Sinclear\Api\Services\UserPreferenceService;
@@ -93,6 +98,8 @@ use Sinclear\Api\Security\Policy\FeedbackPolicy;
 use Sinclear\Api\Security\Policy\RecipePolicy;
 use Sinclear\Api\Security\Policy\ForumPolicy;
 use Sinclear\Api\Security\Policy\NotificationPolicy;
+use Sinclear\Api\Security\Policy\ReviewPolicy;
+use Sinclear\Api\Security\Policy\SubscriptionPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
@@ -103,7 +110,11 @@ use Sinclear\Api\Services\ForumService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\ProfileService;
+use Sinclear\Api\Services\Mcp\DocumentationProvider;
+use Sinclear\Api\Services\Mcp\McpServer;
 use Sinclear\Api\Services\RecipeService;
+use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\PushService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
@@ -370,4 +381,8 @@ return [
             logger: $c->get(LoggerInterface::class),
         );
     },
+
+    DocumentationProvider::class => autowire(),
+    McpServer::class => autowire(),
+    McpController::class => autowire(),
 ];

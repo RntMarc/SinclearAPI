@@ -3661,7 +3661,220 @@ components:
           type: boolean
           description: Ob der Teilnehmer bereits bezahlt hat
 
+    McpJsonRpcMessage:
+      type: object
+      description: JSON-RPC-2.0-Nachricht (Request oder Notification) des MCP-Protokolls
+      required: [jsonrpc, method]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+          description: JSON-RPC-Version
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+          description: Request-ID (bei Notifications weggelassen)
+        method:
+          type: string
+          description: >
+            MCP-Methode, z.B. `initialize`, `notifications/initialized`,
+            `ping`, `tools/list`, `tools/call`
+        params:
+          type: object
+          description: Methodenspezifische Parameter
+  
+    McpJsonRpcResult:
+      type: object
+      description: JSON-RPC-2.0-Antwort des MCP-Servers
+      required: [jsonrpc, id]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ['2.0']
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+            - type: 'null'
+          description: Korrespondierende Request-ID
+        result:
+          description: Ergebnis (bei Erfolg)
+        error:
+          description: JSON-RPC-Fehler (bei Misserfolg)
+          properties:
+            code:
+              type: integer
+              description: JSON-RPC-Fehlercode (z.B. -32601 Method not found)
+            message:
+              type: string
+  
+    McpInitializeResult:
+      type: object
+      description: Ergebnis von `initialize` (Handshake)
+      required: [protocolVersion, capabilities, serverInfo]
+      properties:
+        protocolVersion:
+          type: string
+          example: '2025-06-18'
+          description: Ausgehandelte MCP-Protokollversion
+        capabilities:
+          type: object
+          properties:
+            tools:
+              type: object
+              properties:
+                listChanged:
+                  type: boolean
+                  example: false
+        serverInfo:
+          type: object
+          required: [name, version]
+          properties:
+            name:
+              type: string
+              example: sinclear-docs-mcp
+            version:
+              type: string
+  
+    McpTool:
+      type: object
+      description: Tool-Definition für `tools/list`
+      required: [name, description, inputSchema]
+      properties:
+        name:
+          type: string
+          example: get_documentation
+        description:
+          type: string
+        inputSchema:
+          type: object
+          description: JSON-Schema der Tool-Argumente
+  
+    McpToolsListResult:
+      type: object
+      description: Ergebnis von `tools/list`
+      required: [tools]
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpTool'
+  
+    McpToolCallResult:
+      type: object
+      description: Ergebnis von `tools/call`
+      required: [content]
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+            required: [type, text]
+            properties:
+              type:
+                type: string
+                enum: [text]
+              text:
+                type: string
+                description: Dokumentationsinhalt (Markdown oder JSON)
+        isError:
+          type: boolean
+          default: false
+          description: true, wenn das Tool keine Dokumentation zum Thema findet
+  
+    McpSseEnvelope:
+      type: string
+      description: >
+        SSE-Ereignis (`event: message`, `data: <JSON-RPC-Nachricht>`), falls der
+        Client ausschließlich `text/event-stream` akzeptiert
+
 paths:
+  /mcp:
+    get:
+      summary: MCP-Endpunkt – SSE-Stream öffnen
+      description: >
+        Öffnet einen SSE-Stream für Server-initiiierte Nachrichten
+        (Streamable HTTP). Dieser Server pusht keine Nachrichten und
+        antwortet daher mit 405 Method Not Allowed, was die
+        MCP-Spezifikation ausdrücklich erlaubt. Ohne Authentifizierung.
+      tags: [MCP]
+      responses:
+        '405':
+          description: >
+            Kein SSE-Push verfügbar – ausschließlich POST wird unterstützt
+            (Header `Allow: POST`)
+    post:
+      summary: MCP-JSON-RPC-Nachricht verarbeiten
+      description: >
+        Einziger Zugang zum MCP-Dokumentations-Server (Streamable HTTP).
+        Empfängt genau eine JSON-RPC-2.0-Nachricht und beantwortet
+        Requests mit einer JSON-RPC-Antwort (JSON oder SSE) bzw.
+        Notifications mit 202 Accepted (leerer Body).
+
+        Unterstützte Methoden:
+        - `initialize` – Handshake (Protokollversion aushandeln)
+        - `notifications/initialized` – Handshake-Abschluss (Notification)
+        - `ping` – Health-Check
+        - `tools/list` – verfügbare Tools auflisten
+        - `tools/call` – Tool `get_documentation` ausführen
+
+        Der Endpunkt ist öffentlich (keine Authentifizierung) und ausschließlich
+        lesend: Er liefert API-Dokumentation (Markdown aus `docs/` sowie eine
+        strukturierte Übersicht aus `openapi.yaml`) und erlaubt keinerlei
+        Interaktion mit der API.
+      tags: [MCP]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpJsonRpcMessage'
+            examples:
+              initialize:
+                summary: Handshake
+                value:
+                  jsonrpc: '2.0'
+                  id: 1
+                  method: initialize
+                  params:
+                    protocolVersion: '2025-06-18'
+                    capabilities: {}
+                    clientInfo:
+                      name: example-client
+                      version: 1.0.0
+              tools_call:
+                summary: Dokumentation abrufen
+                value:
+                  jsonrpc: '2.0'
+                  id: 2
+                  method: tools/call
+                  params:
+                    name: get_documentation
+                    arguments:
+                      topic: openapi
+                      format: json
+      responses:
+        '200':
+          description: JSON-RPC-Antwort (JSON oder SSE je nach Accept-Header)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpJsonRpcResult'
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/McpSseEnvelope'
+        '202':
+          description: >
+            Notification akzeptiert (z.B. `notifications/initialized`) –
+            leerer Body, kein JSON-RPC-Response
+        '400':
+          description: Ungültiger Body (kein JSON oder kein JSON-RPC-Objekt)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpJsonRpcResult'
+
   /auth/login/otp/request:
     post:
       summary: E-Mail-OTP anfordern
