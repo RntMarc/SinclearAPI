@@ -3013,6 +3013,8 @@ components:
             WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
         servings:
           type: integer
+          minimum: 1
+          maximum: 127
           description: Anzahl der Portionen
           example: 4
         creatorId:
@@ -3108,6 +3110,8 @@ components:
             JPEG, PNG, WebP. Maximal 200 KB, max. Abmessungen 1000x1000 Pixel.
         servings:
           type: integer
+          minimum: 1
+          maximum: 127
           default: 4
           description: Anzahl der Portionen
         ingredients:
@@ -3149,6 +3153,8 @@ components:
             Setze null, um das Bild zu entfernen.
         servings:
           type: integer
+          minimum: 1
+          maximum: 127
           description: Anzahl der Portionen
         ingredients:
           type: array

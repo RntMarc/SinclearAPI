@@ -16,6 +16,7 @@ final readonly class RecipeController
         'category_required' => ['error' => 'category_required', 'status' => 400],
         'invalid_category' => ['error' => 'invalid_category', 'status' => 400],
         'invalid_unit' => ['error' => 'invalid_unit', 'status' => 400],
+        'invalid_servings' => ['error' => 'invalid_servings', 'status' => 400],
         'recipe_not_found' => ['error' => 'recipe_not_found', 'status' => 404],
         'review_not_found' => ['error' => 'review_not_found', 'status' => 404],
         'review_exists' => ['error' => 'review_exists', 'status' => 409],

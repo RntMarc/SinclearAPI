@@ -54,7 +54,9 @@ final readonly class RecipeService
             'dietaryTags' => $data['dietaryTags'] ?? null,
             'image' => $validatedImage,
             'creatorId' => $creatorId,
-            'servings' => $data['servings'] ?? 4,
+            'servings' => array_key_exists('servings', $data)
+                ? $this->validateServings($data['servings'])
+                : 4,
         ]);
 
         if (!empty($data['ingredients'])) {
@@ -91,7 +93,9 @@ final readonly class RecipeService
             'category' => $data['category'] ?? $recipe['category'],
             'dietaryTags' => array_key_exists('dietaryTags', $data) ? $data['dietaryTags'] : $recipe['dietaryTags'],
             'image' => $validatedImage,
-            'servings' => $data['servings'] ?? $recipe['servings'],
+            'servings' => array_key_exists('servings', $data)
+                ? $this->validateServings($data['servings'])
+                : $recipe['servings'],
         ]);
 
         if (array_key_exists('ingredients', $data)) {
@@ -195,6 +199,14 @@ final readonly class RecipeService
         $result = $this->bookmarkRepo->listByUser($userId, $page, $limit);
         $result['data'] = array_map(fn(array $r) => $this->formatRecipe($r), $result['data']);
         return $result;
+    }
+
+    private function validateServings(mixed $servings): int
+    {
+        if (!is_int($servings) || $servings < 1 || $servings > 127) {
+            throw new \InvalidArgumentException('invalid_servings');
+        }
+        return $servings;
     }
 
     private function validateIngredients(mixed $ingredients): void

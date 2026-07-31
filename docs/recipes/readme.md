@@ -71,6 +71,11 @@ Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild.
 }
 ```
 
+**Portionen (`servings`):**
+`servings` ist optional (Standard: 4) und muss eine ganze Zahl zwischen 1 und
+127 sein (entspricht der DB-Spalte `TINYINT`). Größere oder nicht ganzzahlige
+Werte werden mit `invalid_servings` (HTTP 400) abgelehnt.
+
 **Bild entfernen:**
 ```json
 {
@@ -82,6 +87,7 @@ Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild.
 
 | Code | Beschreibung |
 |------|-------------|
+| `invalid_servings` | Ungültige Portionsanzahl (ganzzahlig, 1–127) |
 | `invalid_unit` | Ungültige Mengeneinheit (erlaubte Werte siehe unten) |
 | `invalid_image` | Ungültiges Bild oder leerer String |
 | `invalid_image_encoding` | Base64-Dekodierung fehlgeschlagen |
