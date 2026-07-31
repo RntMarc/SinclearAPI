@@ -96,4 +96,48 @@ final readonly class DiscoverReviewRepository
         $avg = $stmt->fetchColumn();
         return $avg !== false && $avg !== null ? (float) $avg : null;
     }
+
+    public function getPhoto(string $id): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT photo, userId, createdAt FROM DiscoverReview WHERE id = ?');
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    public function setPhoto(string $id, ?string $photo): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE DiscoverReview SET photo = ? WHERE id = ?');
+        $stmt->execute([$photo, $id]);
+    }
+
+    public function listPhotosByPlace(string $placeId, int $page, int $limit): array
+    {
+        $countStmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM DiscoverReview WHERE placeId = ? AND photo IS NOT NULL'
+        );
+        $countStmt->execute([$placeId]);
+        $total = (int) $countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+        $dataStmt = $this->pdo->prepare(
+            'SELECT r.id, r.photo, r.rating, r.createdAt, u.displayName AS userDisplayName, u.image AS userImage
+             FROM DiscoverReview r
+             LEFT JOIN User u ON u.id = r.userId
+             WHERE r.placeId = ? AND r.photo IS NOT NULL
+             ORDER BY r.createdAt DESC LIMIT ? OFFSET ?'
+        );
+        $dataStmt->execute([$placeId, $limit, $offset]);
+        $photos = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'data' => $photos,
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
 }

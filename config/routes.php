@@ -69,6 +69,9 @@ return function (App $app): void {
         $group->post('/{placeId}/reviews', [ReviewController::class, 'create']);
         $group->put('/{placeId}/reviews/{reviewId}', [ReviewController::class, 'update']);
         $group->delete('/{placeId}/reviews/{reviewId}', [ReviewController::class, 'delete']);
+        $group->get('/{placeId}/reviews/{reviewId}/photo', [ReviewController::class, 'getPhoto']);
+        $group->put('/{placeId}/reviews/{reviewId}/photo', [ReviewController::class, 'setPhoto']);
+        $group->get('/{placeId}/photos', [ReviewController::class, 'listPlacePhotos']);
         $group->get('/{id}', [ExploreController::class, 'get']);
         $group->put('/{id}', [ExploreController::class, 'update']);
         $group->delete('/{id}', [ExploreController::class, 'delete']);

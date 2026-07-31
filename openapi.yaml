@@ -894,6 +894,10 @@ components:
             comment:
               type: string
               nullable: true
+            photo:
+              type: string
+              nullable: true
+              description: Base64-kodiertes Foto (JPEG/PNG/WebP, max 200 KB, max 1000x1000 px)
             createdAt:
               type: string
               format: date-time
@@ -935,6 +939,64 @@ components:
           type: string
           nullable: true
           description: Kommentar (null löscht vorhandenen Kommentar)
+
+    SetReviewPhotoRequest:
+      type: object
+      required: [photo]
+      properties:
+        photo:
+          type: string
+          description: Base64-kodiertes Foto (JPEG/PNG/WebP, max 200 KB, max 1000x1000 px)
+
+    ReviewPhotoResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [photo]
+          properties:
+            photo:
+              type: string
+              description: Base64-kodiertes Foto
+
+    PlacePhotoItem:
+      type: object
+      required: [id, photo, rating, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID der Bewertung
+        photo:
+          type: string
+          description: Base64-kodiertes Foto
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        userDisplayName:
+          type: string
+          nullable: true
+        userImage:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Profilbild des Nutzers
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt (UTC)
+
+    PlacePhotoListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlacePhotoItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
 
     TravelTrip:
       type: object
@@ -5326,6 +5388,171 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/{placeId}/reviews/{reviewId}/photo:
+    get:
+      summary: Foto einer Bewertung abrufen
+      description: >
+        Gibt das Base64-kodierte Foto einer Bewertung zurück.
+        Nur der Ersteller der Bewertung darf das Foto abrufen.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Bewertung
+      responses:
+        '200':
+          description: Foto wurde abgerufen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewPhotoResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung (nur der Ersteller darf das Foto abrufen)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bewertung nicht gefunden oder kein Foto vorhanden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Foto zu einer Bewertung hinzufügen oder aktualisieren
+      description: >
+        Setzt oder aktualisiert das Foto einer Bewertung. Nur der Ersteller
+        der Bewertung darf das Foto ändern. Das Foto kann nur innerhalb
+        von 24 Stunden nach der Erstellung der Bewertung gesetzt werden.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+        - name: reviewId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Bewertung
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetReviewPhotoRequest'
+      responses:
+        '200':
+          description: Foto wurde gesetzt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResponse'
+        '400':
+          description: Ungültiges Foto (Format, Größe oder Abmessungen)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung oder Frist überschritten (max. 24h nach Review-Erstellung)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Bewertung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/{placeId}/photos:
+    get:
+      summary: Alle Fotos eines Ortes abrufen
+      description: >
+        Gibt eine paginierte Liste aller Fotos zurück, die Nutzer zu
+        Bewertungen dieses Ortes hochgeladen haben. Ideal für eine
+        Bildergalerie im Client.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Ortes
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Paginierte Liste der Fotos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacePhotoListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Ort nicht gefunden
           content:
             application/json:
               schema:

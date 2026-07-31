@@ -108,6 +108,73 @@ final readonly class ReviewController
         return ResponseFactory::noContent($response);
     }
 
+    public function getPhoto(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $reviewId = $args['reviewId'];
+
+        try {
+            $photo = $this->reviewService->getReviewPhoto($reviewId, $user->id);
+            if ($photo === null) {
+                return ResponseFactory::json(['error' => 'no_photo'], 404, $response);
+            }
+            return ResponseFactory::json(['data' => ['photo' => $photo]], 200, $response);
+        } catch (\RuntimeException $e) {
+            $code = match ($e->getMessage()) {
+                'review_not_found' => 404,
+                'forbidden' => 403,
+                default => 500,
+            };
+            return ResponseFactory::json(['error' => $e->getMessage()], $code, $response);
+        }
+    }
+
+    public function setPhoto(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $reviewId = $args['reviewId'];
+        $body = $request->getParsedBody();
+
+        if (!isset($body['photo']) || !is_string($body['photo'])) {
+            return ResponseFactory::json(['error' => 'invalid_photo'], 400, $response);
+        }
+
+        $photo = trim($body['photo']);
+        if ($photo === '') {
+            return ResponseFactory::json(['error' => 'invalid_photo'], 400, $response);
+        }
+
+        try {
+            $review = $this->reviewService->setReviewPhoto($reviewId, $user->id, $photo);
+            return ResponseFactory::json(['data' => $review], 200, $response);
+        } catch (\InvalidArgumentException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+        } catch (\RuntimeException $e) {
+            $code = match ($e->getMessage()) {
+                'review_not_found' => 404,
+                'forbidden' => 403,
+                'photo_deadline_exceeded' => 403,
+                default => 500,
+            };
+            return ResponseFactory::json(['error' => $e->getMessage()], $code, $response);
+        }
+    }
+
+    public function listPlacePhotos(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $placeId = $args['placeId'];
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        try {
+            $result = $this->reviewService->listPlacePhotos($placeId, $page, $limit);
+            return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => 'place_not_found'], 404, $response);
+        }
+    }
+
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser
     {
         $user = $request->getAttribute(AuthenticatedUser::class);

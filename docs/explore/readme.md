@@ -12,7 +12,7 @@ mit **OpenStreetMap** (Nominatim), um Ortsdaten automatisch abzurufen.
 |---------|-------------|
 | `DiscoverPlace` | Haupttabelle mit allen Orten |
 | `DiscoverGastronomy` | Zusatzdaten für Gastronomie (cuisine) |
-| `DiscoverReview` | Bewertungen (für Löschberechtigung) |
+| `DiscoverReview` | Bewertungen (mit optionalem Foto) |
 | `DiscoverBookmark` | Lesezeichen (für zukünftige Nutzung) |
 
 ## Create-Flow (Ort anlegen)
@@ -212,6 +212,9 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 | `POST` | `/explore/{placeId}/reviews` | JWT | Bewertung erstellen |
 | `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
 | `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
+| `GET` | `/explore/{placeId}/reviews/{reviewId}/photo` | JWT | Foto einer Bewertung abrufen |
+| `PUT` | `/explore/{placeId}/reviews/{reviewId}/photo` | JWT | Foto zu Bewertung hinzufügen/aktualisieren |
+| `GET` | `/explore/{placeId}/photos` | JWT | Alle Fotos eines Ortes (Bildergalerie) |
 | `GET` | `/explore/submissions` | JWT | Eigene Ort-Einreichungen (paginated) |
 | `POST` | `/explore/submissions` | JWT | Ort manuell einreichen (Missing Place) |
 | `GET` | `/explore/submissions/{id}` | JWT | Details einer eigenen Einreichung |
@@ -407,6 +410,9 @@ Ein Nutzer kann mehrere Bewertungen zu demselben Ort abgeben.
 | `POST` | `/explore/{placeId}/reviews` | JWT | Neue Bewertung erstellen |
 | `PUT` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung aktualisieren |
 | `DELETE` | `/explore/{placeId}/reviews/{reviewId}` | JWT | Eigene Bewertung löschen |
+| `GET` | `/explore/{placeId}/reviews/{reviewId}/photo` | JWT | Foto einer Bewertung abrufen |
+| `PUT` | `/explore/{placeId}/reviews/{reviewId}/photo` | JWT | Foto zu einer Bewertung hinzufügen/aktualisieren |
+| `GET` | `/explore/{placeId}/photos` | JWT | Alle Fotos eines Ortes (Bildergalerie) |
 
 ### Parameter
 
@@ -417,6 +423,17 @@ Ein Nutzer kann mehrere Bewertungen zu demselben Ort abgeben.
 | | `comment` | string | Optional. Kommentar |
 | `PUT /explore/{placeId}/reviews/{reviewId}` | `rating` | int (1-5) | Optional. Bewertung |
 | | `comment` | string/null | Optional. Kommentar (`null` löscht ihn) |
+| `PUT /explore/{placeId}/reviews/{reviewId}/photo` | `photo` | string | **Pflicht.** Base64-kodiertes Foto |
+| `GET /explore/{placeId}/photos` | `page` / `limit` | int | Paginierung |
+
+### Foto-Regeln
+
+- **Format:** JPEG, PNG oder WebP
+- **Maximale Dateigröße:** 200 KB (nach Base64-Dekodierung)
+- **Maximale Abmessungen:** 1000 x 1000 Pixel
+- **Frist:** Das Foto kann nur innerhalb von **24 Stunden** nach der Erstellung der Bewertung gesetzt oder aktualisiert werden
+- **Berechtigung:** Nur der Ersteller der Bewertung darf das Foto abrufen oder ändern
+- **Speicherung:** Das Foto wird als Base64-String direkt in der Datenbank gespeichert (Spalte `photo` in `DiscoverReview`)
 
 ### Beispiele
 
@@ -437,6 +454,19 @@ Body: { "rating": 5 }
 # Bewertung löschen
 DELETE /explore/550e8400-e29b-41d4-a716-446655440000/reviews/660e8400-e29b-41d4-a716-446655440001
 → 204
+
+# Foto zu einer Bewertung hinzufügen
+PUT /explore/550e8400-e29b-41d4-a716-446655440000/reviews/660e8400-e29b-41d4-a716-446655440001/photo
+Body: { "photo": "<base64>" }
+→ 200 { "data": { ... } }
+
+# Foto einer Bewertung abrufen
+GET /explore/550e8400-e29b-41d4-a716-446655440000/reviews/660e8400-e29b-41d4-a716-446655440001/photo
+→ 200 { "data": { "photo": "<base64>" } }
+
+# Alle Fotos eines Ortes abrufen (Bildergalerie)
+GET /explore/550e8400-e29b-41d4-a716-446655440000/photos
+→ 200 { "data": [...], "meta": { "page": 1, "limit": 20, "total": 5, "totalPages": 1 } }
 ```
 
 ### Response-Format
@@ -451,7 +481,18 @@ Einzelne Bewertung:
     "userId": "770e8400-e29b-41d4-a716-446655440002",
     "rating": 4,
     "comment": "Tolles Restaurant!",
+    "photo": null,
     "createdAt": "2026-06-23 12:00:00"
+  }
+}
+```
+
+Foto-Response:
+
+```json
+{
+  "data": {
+    "photo": "/9j/4AAQSkZJRg..."
   }
 }
 ```
@@ -465,6 +506,29 @@ Listen-Response (paginated):
     "page": 1,
     "limit": 20,
     "total": 5,
+    "totalPages": 1
+  }
+}
+```
+
+Foto-Galerie-Response (paginated):
+
+```json
+{
+  "data": [
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "photo": "/9j/4AAQSkZJRg...",
+      "rating": 4,
+      "userDisplayName": "Max",
+      "userImage": null,
+      "createdAt": "2026-06-23 12:00:00"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 3,
     "totalPages": 1
   }
 }
