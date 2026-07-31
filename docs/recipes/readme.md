@@ -82,6 +82,7 @@ Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild.
 
 | Code | Beschreibung |
 |------|-------------|
+| `invalid_unit` | Ungültige Mengeneinheit (erlaubte Werte siehe unten) |
 | `invalid_image` | Ungültiges Bild oder leerer String |
 | `invalid_image_encoding` | Base64-Dekodierung fehlgeschlagen |
 | `image_too_large` | Dateigröße überschreitet 200 KB |
@@ -168,3 +169,28 @@ Löscht das Rezept und alle zugehörigen Zutaten, Schritte, Bewertungen und Lese
 | `beilage` | Beilage |
 | `garnierung` | Garnierung |
 | `sonstiges` | Sonstiges |
+
+## Mengeneinheiten
+
+Das Feld `unit` einer Zutat ist ein Enum. **Kanonisch ist ausschließlich die
+kleingeschriebene Schreibweise** (z.B. `tl`, `el`, `stk`), die alle Clients
+senden und anzeigen müssen. Ungültige Werte werden mit dem Fehlercode
+`invalid_unit` (HTTP 400) abgelehnt.
+
+| Wert | Beschreibung |
+|------|-------------|
+| `g` | Gramm |
+| `kg` | Kilogramm |
+| `ml` | Milliliter |
+| `l` | Liter |
+| `tl` | Teelöffel |
+| `el` | Esslöffel |
+| `prise` | Prise |
+| `stk` | Stück |
+| `bund` | Bund |
+| `zehe` | Zehe |
+| `scheibe` | Scheibe |
+| `tasse` | Tasse |
+| `dose` | Dose |
+| `packung` | Packung |
+| `tropfen` | Tropfen |

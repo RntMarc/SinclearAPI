@@ -379,7 +379,7 @@ components:
           type: string
           format: uuid
 
-    AdminUpdateAccommodationRequest:
+    AdminParticipantAccommodationRequest:
       type: object
       properties:
         accommodation:
@@ -2100,15 +2100,6 @@ components:
           format: email
           description: Neue E-Mail-Adresse (wie bei request)
 
-    DiscordStartResponse:
-      type: object
-      required: [url]
-      properties:
-        url:
-          type: string
-          format: uri
-          description: Discord-OAuth-URL zur Autorisierung
-
     DiscordVerifyRequest:
       type: object
       required: [code]
@@ -2913,7 +2904,9 @@ components:
           example: 250
         unit:
           type: string
-          description: Mengeneinheit (g, ml, stk, el, tl, etc.)
+          enum: [g, kg, ml, l, tl, el, prise, stk, bund, zehe, scheibe, tasse, dose, packung, tropfen]
+          description: >-
+            Mengeneinheit (immer kleingeschrieben, ohne Punkt am Ende)
           example: "g"
         name:
           type: string
@@ -3179,7 +3172,9 @@ components:
           example: 250
         unit:
           type: string
-          description: Mengeneinheit
+          enum: [g, kg, ml, l, tl, el, prise, stk, bund, zehe, scheibe, tasse, dose, packung, tropfen]
+          description: >-
+            Mengeneinheit (immer kleingeschrieben, ohne Punkt am Ende)
           example: "g"
         name:
           type: string
@@ -3538,6 +3533,66 @@ components:
               lastLocation:
                 $ref: '#/components/schemas/LocationSharingLocation'
 
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Identifikationsnummer
+        name:
+          type: string
+          description: Name des Abonnements
+        billingPeriodStart:
+          type: string
+          format: date
+          description: Beginn des Abrechnungszeitraums (YYYY-MM-DD)
+        billingPeriodEnd:
+          type: string
+          format: date
+          description: Ende des Abrechnungszeitraums (YYYY-MM-DD)
+        basePrice:
+          type: number
+          format: double
+          description: Grundpreis des Abonnements
+        hasPaid:
+          type: boolean
+          description: Ob der Nutzer bereits bezahlt hat
+        userName:
+          type: string
+          description: Name des Teilnehmers (nur bei Nicht-Nutzern)
+
+    SubscriptionParticipant:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Identifikationsnummer der Teilnehmer-Relation
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Nutzer-ID (null bei Nicht-Nutzern)
+        userName:
+          type: string
+          nullable: true
+          description: Name des Teilnehmers (bei Nicht-Nutzern)
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Angezeigter Name des Nutzers (aus User-Tabelle)
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Nutzers (Base64)
+        isUser:
+          type: boolean
+          description: Ob es sich um einen registrierten Nutzer handelt
+        hasPaid:
+          type: boolean
+          description: Ob der Teilnehmer bereits bezahlt hat
+
 paths:
   /auth/login/otp/request:
     post:
@@ -3691,7 +3746,6 @@ paths:
         in der DB und zeigt einen 6-stelligen Pairing-Code an.
         Der Nutzer kopiert diesen Code in die App und verwendet ihn
         am Endpunkt `/auth/login/otp/verify`.
-
 
         Sofern der Discord-Account ein Profilbild besitzt, wird dieses
         automatisch von Discord CDN heruntergeladen, base64-kodiert,
@@ -6314,7 +6368,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /admin/travel/trips/{id}:
     get:
       summary: Admin-Reisedetail
       description: >
@@ -6468,7 +6521,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AdminUpdateAccommodationRequest'
+              $ref: '#/components/schemas/AdminParticipantAccommodationRequest'
       responses:
         '200':
           description: Unterkunft aktualisiert
@@ -6640,7 +6693,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /admin/travel/events/{id}:
     get:
       summary: Admin-Eventdetail
       description: >
@@ -6847,75 +6899,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
-components:
-  schemas:
-    Subscription:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Eindeutige Identifikationsnummer
-        name:
-          type: string
-          description: Name des Abonnements
-        billingPeriodStart:
-          type: string
-          format: date
-          description: Beginn des Abrechnungszeitraums (YYYY-MM-DD)
-        billingPeriodEnd:
-          type: string
-          format: date
-          description: Ende des Abrechnungszeitraums (YYYY-MM-DD)
-        basePrice:
-          type: number
-          format: double
-          description: Grundpreis des Abonnements
-        hasPaid:
-          type: boolean
-          description: Ob der Nutzer bereits bezahlt hat
-        userName:
-          type: string
-          description: Name des Teilnehmers (nur bei Nicht-Nutzern)
-
-    SubscriptionParticipant:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Eindeutige Identifikationsnummer der Teilnehmer-Relation
-        userId:
-          type: string
-          format: uuid
-          nullable: true
-          description: Nutzer-ID (null bei Nicht-Nutzern)
-        userName:
-          type: string
-          nullable: true
-          description: Name des Teilnehmers (bei Nicht-Nutzern)
-        userDisplayName:
-          type: string
-          nullable: true
-          description: Angezeigter Name des Nutzers (aus User-Tabelle)
-        userImage:
-          type: string
-          nullable: true
-          description: Profilbild des Nutzers (Base64)
-        isUser:
-          type: boolean
-          description: Ob es sich um einen registrierten Nutzer handelt
-        hasPaid:
-          type: boolean
-          description: Ob der Teilnehmer bereits bezahlt hat
-
-    Error:
-      type: object
-      properties:
-        error:
-          type: string
-          description: Fehlercode
 
   /admin/travel/events/{id}/participants/{userId}:
     delete:
@@ -11120,7 +11103,6 @@ components:
         '404':
           description: Session nicht gefunden oder abgelaufen
 
-  /location-sharing/log/traccar/{token}/{name}:
     post:
       summary: Standort via Traccar (POST) übermitteln
       description: >
@@ -11226,7 +11208,6 @@ components:
         '404':
           description: Session nicht gefunden oder abgelaufen
 
-  /location-sharing/log/traccar/{token}:
     post:
       summary: Standort via Traccar (POST) übermitteln (ohne Name)
       description: >

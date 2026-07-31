@@ -10,6 +10,11 @@ use Sinclear\Api\Repository\RecipeBookmarkRepository;
 
 final readonly class RecipeService
 {
+    public const array VALID_UNITS = [
+        'g', 'kg', 'ml', 'l', 'tl', 'el', 'prise', 'stk',
+        'bund', 'zehe', 'scheibe', 'tasse', 'dose', 'packung', 'tropfen',
+    ];
+
     public function __construct(
         private RecipeRepository $recipeRepo,
         private RecipeIngredientRepository $ingredientRepo,
@@ -53,6 +58,7 @@ final readonly class RecipeService
         ]);
 
         if (!empty($data['ingredients'])) {
+            $this->validateIngredients($data['ingredients']);
             $this->ingredientRepo->replaceByRecipe($id, $data['ingredients']);
         }
 
@@ -89,6 +95,7 @@ final readonly class RecipeService
         ]);
 
         if (array_key_exists('ingredients', $data)) {
+            $this->validateIngredients($data['ingredients']);
             $this->ingredientRepo->replaceByRecipe($id, $data['ingredients']);
         }
 
@@ -188,6 +195,18 @@ final readonly class RecipeService
         $result = $this->bookmarkRepo->listByUser($userId, $page, $limit);
         $result['data'] = array_map(fn(array $r) => $this->formatRecipe($r), $result['data']);
         return $result;
+    }
+
+    private function validateIngredients(mixed $ingredients): void
+    {
+        if (!is_array($ingredients)) {
+            throw new \InvalidArgumentException('invalid_unit');
+        }
+        foreach ($ingredients as $ing) {
+            if (!is_array($ing) || empty($ing['unit']) || !in_array($ing['unit'], self::VALID_UNITS, true)) {
+                throw new \InvalidArgumentException('invalid_unit');
+            }
+        }
     }
 
     private function formatRecipe(array $recipe): array
