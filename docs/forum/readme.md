@@ -231,10 +231,13 @@ DELETE /forums/{id}/posts/{postId} → 204
 | Bedingung | Erlaubt? |
 |-----------|----------|
 | Admin | Ja (immer) |
-| Eigentümer + ≤10 Min. | Ja |
-| Eigentümer + >10 Min. + keine Kommentare | Ja |
-| Eigentümer + >10 Min. + Kommentare vorhanden | Nein |
+| Eigentümer + ≤30 Min. | Ja |
+| Eigentümer + >30 Min. | Nein |
 | Fremder Nutzer | Nein |
+
+Nach Ablauf des 30-Minuten-Fensters kann eine Lösch-Anfrage über
+`POST /moderation-requests` gestellt werden
+(siehe `docs/moderation-requests/readme.md`).
 
 ## Upvotes
 
@@ -286,5 +289,6 @@ DELETE /forums/{id}/posts/{postId}/comments/{commentId} → 204
 - Leere Eltern-Kommentare werden rekursiv mitgelöscht
 
 **Löschberechtigung:**
-- Eigentümer des Kommentars (≤10 Min. oder keine Antworten)
-- Administratoren (immer)
+- Admin: Ja (immer)
+- Eigentümer: nur innerhalb von 30 Minuten nach Erstellung
+- Nach Ablauf des Fensters: Nein (stattdessen Lösch-Anfrage über `POST /moderation-requests`)

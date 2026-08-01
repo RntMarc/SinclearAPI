@@ -6,7 +6,9 @@ use Sinclear\Api\Security\Auth\AuthenticatedUser;
 
 final readonly class ExplorePolicy
 {
-    public function canDelete(AuthenticatedUser $user, string $creatorId, bool $hasReviews): bool
+    private const int DELETE_WINDOW_SECONDS = 1800;
+
+    public function canDelete(AuthenticatedUser $user, string $creatorId, bool $hasReviews, string $createdAt): bool
     {
         if ($user->isAdmin) {
             return true;
@@ -20,6 +22,10 @@ final readonly class ExplorePolicy
             return false;
         }
 
-        return true;
+        $created = new \DateTimeImmutable($createdAt, new \DateTimeZone('UTC'));
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $diff = $now->getTimestamp() - $created->getTimestamp();
+
+        return $diff <= self::DELETE_WINDOW_SECONDS;
     }
 }

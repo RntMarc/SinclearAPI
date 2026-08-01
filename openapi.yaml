@@ -2329,6 +2329,110 @@ components:
             - "Neue Kalenderfunktion"
             - "Performance-Verbesserungen"
 
+    ModerationRequest:
+      type: object
+      required: [id, userId, requestType, objectType, objectId, message, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          description: ID des Nutzers, der die Anfrage abgeschickt hat
+        userDisplayName:
+          type: string
+          nullable: true
+          description: Anzeigename des Absenders
+        userImage:
+          type: string
+          nullable: true
+          description: Profilbild des Absenders (Base64)
+        requestType:
+          type: string
+          enum: [report, deletion, other]
+          description: Art der Anfrage
+        objectType:
+          type: string
+          enum: [user, forum_post, recipe, explore_place]
+          description: Art des referenzierten Objekts
+        objectId:
+          type: string
+          format: uuid
+          description: ID des Objekts, auf das sich die Anfrage bezieht
+        message:
+          type: string
+          description: Ausführliche Beschreibung des Anliegens
+        status:
+          type: string
+          enum: [unread, read, in_work, external_contact, public_decision, accepted, denied, postponed]
+          description: Bearbeitungsstatus
+        adminComment:
+          type: string
+          nullable: true
+          description: Kommentar/Anmerkung des Admins als Rückmeldung an den Nutzer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ModerationRequestListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModerationRequest'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ModerationRequestCreateRequest:
+      type: object
+      required: [requestType, objectType, objectId, message]
+      properties:
+        requestType:
+          type: string
+          enum: [report, deletion, other]
+          description: >
+            Art der Anfrage. `report` meldet fremde Inhalte, `deletion` beantragt
+            die Löschung eigener Inhalte, `other` ist für sonstige Anliegen.
+        objectType:
+          type: string
+          enum: [user, forum_post, recipe, explore_place]
+          description: Art des Objekts, auf das sich die Anfrage bezieht
+        objectId:
+          type: string
+          format: uuid
+          description: ID des Objekts
+        message:
+          type: string
+          minLength: 1
+          description: Ausführliches Anliegen für den Admin
+          example: "Der Beitrag enthält veraltete Informationen und sollte entfernt werden."
+
+    ModerationRequestCreateResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/ModerationRequest'
+
+    ModerationRequestUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [unread, read, in_work, external_contact, public_decision, accepted, denied, postponed]
+          description: Neuer Bearbeitungsstatus
+        adminComment:
+          type: string
+          nullable: true
+          description: Kommentar/Anmerkung des Admins für den Nutzer
+
     FeedbackSuggestion:
       type: object
       required: [id, userId, title, status, upvoteCount, createdAt, updatedAt]
@@ -5622,9 +5726,11 @@ paths:
     delete:
       summary: Ort löschen
       description: >
-        Löscht einen Entdecken-Ort. Nur der Ersteller darf löschen,
-        und auch nur dann, wenn noch keine Bewertungen (Reviews)
-        zu diesem Ort existieren. Administratoren können immer löschen.
+        Löscht einen Entdecken-Ort. Nur der Ersteller darf löschen – und nur
+        innerhalb von 30 Minuten nach dem Erstellen, sofern noch keine
+        Bewertungen (Reviews) zu diesem Ort existieren. Danach ist keine
+        Löschung mehr möglich; stattdessen kann eine Moderations-Anfrage
+        gestellt werden. Administratoren können immer löschen.
       tags: [Explore]
       security:
         - BearerAuth: []
@@ -5645,7 +5751,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Keine Berechtigung zum Löschen
+          description: Keine Berechtigung zum Löschen oder Löschfenster (30 Min.) abgelaufen
           content:
             application/json:
               schema:
@@ -5979,6 +6085,97 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /moderation-requests:
+    post:
+      summary: Moderations-Anfrage erstellen
+      description: >
+        Sendet eine Meldung (report), einen Löschwunsch (deletion) oder eine
+        sonstige Anfrage (other) an den Administrator. Das Objekt wird über
+        `objectType` und `objectId` referenziert. Eigene Inhalte dürfen nicht
+        gemeldet werden, fremde Inhalte dürfen nicht zum Löschen beantragt
+        werden.
+      tags: [Moderation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationRequestCreateRequest'
+      responses:
+        '201':
+          description: Anfrage wurde erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationRequestCreateResponse'
+        '400':
+          description: Ungültige Eingabe (fehlende oder ungültige Felder)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Eigene Inhalte melden oder fremde Inhalte zum Löschen beantragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Objekt nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /moderation-requests/mine:
+    get:
+      summary: Eigene Moderations-Anfragen abrufen
+      description: >
+        Gibt alle Anfragen des authentifizierten Nutzers zurück – inklusive
+        Bearbeitungsstatus und Admin-Kommentar. Paginiert.
+      tags: [Moderation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Liste der eigenen Anfragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationRequestListResponse'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:
@@ -7890,6 +8087,112 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Einreichung nicht gefunden
+
+  /admin/moderation-requests:
+    get:
+      summary: Admin-Übersicht der Moderations-Anfragen
+      description: >
+        Gibt die HTML-Seite mit allen Moderations-Anfragen zurück.
+        Filterbar nach Bearbeitungsstatus, Art des Objekts und Art der Anfrage.
+      tags: [Admin]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [unread, read, in_work, external_contact, public_decision, accepted, denied, postponed]
+          description: Bearbeitungsstatus
+        - name: objectType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [user, forum_post, recipe, explore_place]
+          description: Art des referenzierten Objekts
+        - name: requestType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [report, deletion, other]
+          description: Art der Anfrage
+      responses:
+        '200':
+          description: Moderations-Anfragen HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/moderation-requests/{id}:
+    get:
+      summary: Detailseite einer Moderations-Anfrage
+      description: >
+        Gibt die HTML-Detailseite einer einzelnen Moderations-Anfrage zurück.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Anfrage
+      responses:
+        '200':
+          description: Detail-HTML-Seite
+          content:
+            text/html: {}
+        '404':
+          description: Anfrage nicht gefunden
+          content:
+            text/html: {}
+
+  /admin/moderation-requests/{id}/update:
+    post:
+      summary: Moderations-Anfrage bearbeiten
+      description: >
+        Setzt den Bearbeitungsstatus und den Admin-Kommentar einer
+        Moderations-Anfrage.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Anfrage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationRequestUpdateRequest'
+      responses:
+        '200':
+          description: Anfrage aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModerationRequestCreateResponse'
+        '400':
+          description: Ungültiger Status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Anfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/notifications:
     get:
@@ -9947,8 +10250,9 @@ paths:
       summary: Post löschen
       description: >
         Löscht einen Post. Administratoren dürfen immer löschen.
-        Eigentümer dürfen innerhalb von 10 Minuten löschen oder
-        danach nur, wenn keine Kommentare vorhanden sind.
+        Eigentümer dürfen nur innerhalb von 30 Minuten nach dem
+        Erstellen löschen. Danach ist keine Löschung mehr möglich;
+        stattdessen kann eine Moderations-Anfrage gestellt werden.
       tags: [Forum]
       security:
         - BearerAuth: []
@@ -9977,7 +10281,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Recht zum Löschen
+          description: Kein Recht zum Löschen oder Löschfenster (30 Min.) abgelaufen
           content:
             application/json:
               schema:
@@ -10541,8 +10845,11 @@ paths:
       summary: Rezept löschen
       description: >
         Löscht ein Rezept und alle zugehörigen Zutaten, Schritte,
-        Bewertungen und Lesezeichen. Nur der Eigentümer oder ein
-        Administrator darf löschen.
+        Bewertungen und Lesezeichen. Nur der Eigentümer darf löschen –
+        und nur innerhalb von 30 Minuten nach dem Erstellen. Danach ist
+        keine Löschung mehr möglich; stattdessen kann eine
+        Moderations-Anfrage gestellt werden. Administratoren können
+        jederzeit löschen.
       tags: [Recipe]
       security:
         - BearerAuth: []
@@ -10564,7 +10871,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Recht zum Löschen
+          description: Kein Recht zum Löschen oder Löschfenster (30 Min.) abgelaufen
           content:
             application/json:
               schema:
@@ -10940,8 +11247,8 @@ paths:
       summary: Kommentar löschen
       description: >
         Löscht einen Kommentar. Administratoren dürfen immer löschen.
-        Eigentümer dürfen innerhalb von 10 Minuten löschen oder
-        danach nur, wenn keine Antworten vorhanden sind.
+        Eigentümer dürfen nur innerhalb von 30 Minuten nach dem
+        Erstellen löschen. Danach ist keine Löschung mehr möglich.
         Hat der Kommentar Antworten, wird er nur "soft-gelöscht"
         (text auf NULL gesetzt), die Struktur bleibt erhalten.
       tags: [Forum]

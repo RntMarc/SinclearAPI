@@ -21,4 +21,9 @@
         <div class="label">Benachrichtigungen</div>
         <a href="/api/v2/admin/notifications" class="btn btn-sm mt-2">Senden</a>
     </div>
+    <div class="card stat-card">
+        <div class="number">{{openModerationCount}}</div>
+        <div class="label">Offene Moderations-Anfragen</div>
+        <a href="/api/v2/admin/moderation-requests" class="btn btn-sm mt-2">Bearbeiten</a>
+    </div>
 </div>

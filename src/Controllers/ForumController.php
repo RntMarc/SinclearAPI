@@ -381,11 +381,8 @@ final readonly class ForumController
                 return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
             }
 
-            if ($user->id === $comment['userId'] && $diff > 600) {
-                $hasReplies = $comment['hasReplies'] ?? false;
-                if ($hasReplies) {
-                    return ResponseFactory::json(['error' => 'edit_window_expired'], 403, $response);
-                }
+            if ($user->id === $comment['userId'] && $diff > 1800) {
+                return ResponseFactory::json(['error' => 'edit_window_expired'], 403, $response);
             }
 
             $this->forumService->deleteComment($args['postId'], $args['commentId']);

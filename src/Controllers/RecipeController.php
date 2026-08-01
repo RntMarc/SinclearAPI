@@ -23,6 +23,7 @@ final readonly class RecipeController
         'review_exists' => ['error' => 'review_exists', 'status' => 409],
         'invalid_rating' => ['error' => 'invalid_rating', 'status' => 400],
         'forbidden' => ['error' => 'forbidden', 'status' => 403],
+        'edit_window_expired' => ['error' => 'edit_window_expired', 'status' => 403],
         'bookmark_exists' => ['error' => 'bookmark_exists', 'status' => 409],
         'invalid_image' => ['error' => 'invalid_image', 'status' => 400],
         'invalid_image_encoding' => ['error' => 'invalid_image_encoding', 'status' => 400],
@@ -342,8 +343,11 @@ final readonly class RecipeController
             return ResponseFactory::noContent($response);
         }
 
-        if (!$this->policy->canModify($user, $existing['creatorId'])) {
-            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        if (!$this->policy->canDelete($user, $existing['creatorId'], $existing['createdAt'])) {
+            if ($user->id !== $existing['creatorId']) {
+                return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+            }
+            return ResponseFactory::json(['error' => 'edit_window_expired'], 403, $response);
         }
 
         $this->recipeService->deleteRecipe($id);

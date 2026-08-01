@@ -193,6 +193,14 @@ DELETE /recipes/{id}
 
 Löscht das Rezept und alle zugehörigen Zutaten, Schritte, Bewertungen und Lesezeichen.
 
+**Einschränkung (30-Minuten-Fenster):** Der Eigentümer kann ein Rezept nur
+innerhalb von 30 Minuten nach dem Erstellen löschen. Danach ist keine Löschung
+mehr möglich – stattdessen kann über `POST /moderation-requests`
+(eine Lösch-Anfrage, siehe `docs/moderation-requests/readme.md`) gestellt werden.
+Administratoren (`isAdmin = true`) können jederzeit löschen.
+
+Nach Ablauf des Fensters antwortet der Endpunkt mit `edit_window_expired` (HTTP 403).
+
 ## Lesezeichen
 
 | Methode | Endpunkt | Beschreibung |
@@ -217,7 +225,7 @@ Löscht das Rezept und alle zugehörigen Zutaten, Schritte, Bewertungen und Lese
 |--------|-------------|
 | Rezept erstellen | Jeder authentifizierte Nutzer |
 | Rezept bearbeiten | Eigentümer oder Administrator |
-| Rezept löschen | Eigentümer oder Administrator |
+| Rezept löschen | Eigentümer (nur 30 Min. nach Erstellung) oder Administrator |
 | Rezept ansehen (privat) | Jeder authentifizierte Nutzer |
 | Rezept ansehen (öffentlich) | `/public/recipes`, `/public/recipes/{id}` ohne Login, anonymisiert |
 | Bewertung abgeben | Jeder authentifizierte Nutzer |

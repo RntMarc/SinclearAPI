@@ -20,6 +20,7 @@ use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\ModerationRequestService;
 use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\SubscriptionService;
 
@@ -57,6 +58,7 @@ final readonly class AdminController
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
         private TravelTicketRepository $ticketRepo,
         private PlaceSubmissionService $submissionService,
+        private ModerationRequestService $moderationRequestService,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -154,10 +156,13 @@ final readonly class AdminController
         $user = $this->requireUser($request);
         $userCount = $this->userRepo->countAll();
         $tripCount = $this->tripRepo->countAll();
+        $moderationCounts = $this->moderationRequestService->getStatusCounts();
+        $openModerationCount = $moderationCounts['unread'] + $moderationCounts['read'] + $moderationCounts['in_work'];
 
         $contentHtml = $this->renderTemplate('dashboard.php', [
             'userCount' => $userCount,
             'tripCount' => $tripCount,
+            'openModerationCount' => $openModerationCount,
         ]);
         $html = $this->renderLayout('Dashboard', $contentHtml, $user->email);
 
@@ -1763,6 +1768,201 @@ ROW;
             };
             $status = $code === 'submission_not_found' ? 404 : 400;
             return ResponseFactory::json(['error' => $code], $status, $response);
+        }
+    }
+
+    public function moderationRequests(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $status = !empty($params['status']) ? trim($params['status']) : null;
+        $objectType = !empty($params['objectType']) ? trim($params['objectType']) : null;
+        $requestType = !empty($params['requestType']) ? trim($params['requestType']) : null;
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        try {
+            $result = $this->moderationRequestService->listAll($page, $limit, $status, $objectType, $requestType);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+        }
+        $counts = $this->moderationRequestService->getStatusCounts();
+
+        $requestTypeLabels = [
+            'report' => 'Meldung',
+            'deletion' => 'Löschwunsch',
+            'other' => 'Sonstiges',
+        ];
+        $objectTypeLabels = [
+            'user' => 'Nutzer',
+            'forum_post' => 'Forumsbeitrag',
+            'recipe' => 'Rezept',
+            'explore_place' => 'Entdecken-Ort',
+        ];
+        $statusLabels = [
+            'unread' => 'Ungelesen',
+            'read' => 'Gelesen',
+            'in_work' => 'In Bearbeitung',
+            'external_contact' => 'Externer Kontakt',
+            'public_decision' => 'Öffentliche Entscheidung',
+            'accepted' => 'Akzeptiert',
+            'denied' => 'Abgelehnt',
+            'postponed' => 'Verschoben',
+        ];
+
+        $rows = '';
+        foreach ($result['data'] as $r) {
+            $statusBadge = match ($r['status']) {
+                'unread' => '<span class="badge" style="background:#f59e0b;color:#000">ungelesen</span>',
+                'read' => '<span class="badge" style="background:#64748b;color:#fff">gelesen</span>',
+                'in_work' => '<span class="badge" style="background:#3b82f6;color:#fff">in Arbeit</span>',
+                'external_contact' => '<span class="badge" style="background:#a855f7;color:#fff">externer Kontakt</span>',
+                'public_decision' => '<span class="badge" style="background:#0ea5e9;color:#fff">öffentliche Entscheidung</span>',
+                'accepted' => '<span class="badge" style="background:#22c55e;color:#000">akzeptiert</span>',
+                'denied' => '<span class="badge" style="background:#ef4444;color:#fff">abgelehnt</span>',
+                'postponed' => '<span class="badge" style="background:#64748b;color:#fff">verschoben</span>',
+                default => htmlspecialchars($r['status']),
+            };
+            $createdAt = date('d.m.Y H:i', strtotime($r['createdAt']));
+
+            $rows .= '<tr>';
+            $rows .= '<td>' . htmlspecialchars($requestTypeLabels[$r['requestType']] ?? $r['requestType']) . '</td>';
+            $rows .= '<td>' . htmlspecialchars($objectTypeLabels[$r['objectType']] ?? $r['objectType']) . '</td>';
+            $rows .= '<td><code>' . htmlspecialchars($r['objectId']) . '</code></td>';
+            $rows .= '<td>' . htmlspecialchars($r['userDisplayName'] ?? $r['userId']) . '</td>';
+            $rows .= '<td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' . htmlspecialchars($r['message']) . '</td>';
+            $rows .= '<td>' . $statusBadge . '</td>';
+            $rows .= '<td>' . $createdAt . '</td>';
+            $rows .= '<td>';
+            $rows .= '<a href="/api/v2/admin/moderation-requests/' . htmlspecialchars($r['id']) . '" class="btn btn-sm">Details</a>';
+            $rows .= '</td>';
+            $rows .= '</tr>';
+        }
+
+        if ($rows === '') {
+            $rows = '<tr><td colspan="8" style="text-align:center;color:#666;padding:2rem;">Keine Anfragen gefunden</td></tr>';
+        }
+
+        $statusFilterOptions = '';
+        foreach (['' => 'Alle'] + $statusLabels as $val => $label) {
+            $sel = $status === $val || ($status === null && $val === '') ? 'selected' : '';
+            $statusFilterOptions .= '<option value="' . $val . '" ' . $sel . '>' . $label . '</option>';
+        }
+
+        $objectFilterOptions = '';
+        foreach (['' => 'Alle'] + $objectTypeLabels as $val => $label) {
+            $sel = $objectType === $val || ($objectType === null && $val === '') ? 'selected' : '';
+            $objectFilterOptions .= '<option value="' . $val . '" ' . $sel . '>' . $label . '</option>';
+        }
+
+        $requestFilterOptions = '';
+        foreach (['' => 'Alle'] + $requestTypeLabels as $val => $label) {
+            $sel = $requestType === $val || ($requestType === null && $val === '') ? 'selected' : '';
+            $requestFilterOptions .= '<option value="' . $val . '" ' . $sel . '>' . $label . '</option>';
+        }
+
+        $countLinks = '';
+        foreach ($statusLabels as $key => $label) {
+            $countLinks .= '<a href="/api/v2/admin/moderation-requests?status=' . $key . '" class="badge" style="background:#0f3460;color:#fff;margin-right:0.4rem;text-decoration:none;">'
+                . htmlspecialchars($label) . ': ' . $counts[$key] . '</a>';
+        }
+
+        $content = $this->renderTemplate('moderation_requests.php', [
+            'rows' => $rows,
+            'statusFilterOptions' => $statusFilterOptions,
+            'objectFilterOptions' => $objectFilterOptions,
+            'requestFilterOptions' => $requestFilterOptions,
+            'countLinks' => $countLinks,
+        ]);
+
+        $html = $this->renderLayout('Moderations-Anfragen', $content, $user->email);
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function moderationRequestDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $r = $this->moderationRequestService->getById($args['id']);
+
+        if ($r === null) {
+            $html = $this->renderLayout('Nicht gefunden', '<h1>Anfrage nicht gefunden</h1><a href="/api/v2/admin/moderation-requests" class="btn">Zurück</a>', $user->email);
+            $response->getBody()->write($html);
+            return $response->withStatus(404)->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $requestTypeLabels = [
+            'report' => 'Meldung',
+            'deletion' => 'Löschwunsch',
+            'other' => 'Sonstiges',
+        ];
+        $objectTypeLabels = [
+            'user' => 'Nutzer',
+            'forum_post' => 'Forumsbeitrag',
+            'recipe' => 'Rezept',
+            'explore_place' => 'Entdecken-Ort',
+        ];
+        $statusLabels = [
+            'unread' => 'Ungelesen',
+            'read' => 'Gelesen',
+            'in_work' => 'In Bearbeitung',
+            'external_contact' => 'Externer Kontakt',
+            'public_decision' => 'Öffentliche Entscheidung',
+            'accepted' => 'Akzeptiert',
+            'denied' => 'Abgelehnt',
+            'postponed' => 'Verschoben',
+        ];
+
+        $statusOptions = '';
+        foreach ($statusLabels as $val => $label) {
+            $sel = $r['status'] === $val ? 'selected' : '';
+            $statusOptions .= '<option value="' . $val . '" ' . $sel . '>' . $label . '</option>';
+        }
+
+        $objectLink = match ($r['objectType']) {
+            'recipe' => '<a href="/api/v2/recipes/' . htmlspecialchars($r['objectId']) . '" target="_blank">Rezept ansehen</a>',
+            default => '<code>' . htmlspecialchars($r['objectId']) . '</code>',
+        };
+
+        $content = $this->renderTemplate('moderation_request_detail.php', [
+            'id' => htmlspecialchars($r['id']),
+            'requester' => htmlspecialchars($r['userDisplayName'] ?? $r['userId']),
+            'requesterId' => htmlspecialchars($r['userId']),
+            'requestType' => htmlspecialchars($requestTypeLabels[$r['requestType']] ?? $r['requestType']),
+            'objectType' => htmlspecialchars($objectTypeLabels[$r['objectType']] ?? $r['objectType']),
+            'objectLink' => $objectLink,
+            'message' => htmlspecialchars($r['message']),
+            'adminComment' => htmlspecialchars($r['adminComment'] ?? ''),
+            'statusOptions' => $statusOptions,
+            'createdAt' => date('d.m.Y H:i', strtotime($r['createdAt'])),
+            'updatedAt' => date('d.m.Y H:i', strtotime($r['updatedAt'])),
+        ]);
+
+        $html = $this->renderLayout('Anfrage: ' . $requestTypeLabels[$r['requestType']] . ' (' . $objectTypeLabels[$r['objectType']] . ')', $content, $user->email);
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function moderationRequestUpdate(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $status = isset($body['status']) && is_string($body['status']) ? trim($body['status']) : '';
+        $adminComment = isset($body['adminComment']) && is_string($body['adminComment'])
+            ? trim($body['adminComment'])
+            : null;
+
+        if ($status === '') {
+            return ResponseFactory::json(['error' => 'status_required'], 400, $response);
+        }
+
+        try {
+            $result = $this->moderationRequestService->updateRequest($args['id'], $status, $adminComment);
+            return ResponseFactory::json(['data' => $result], 200, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'request_not_found' ? 404 : 400;
+            return ResponseFactory::json(['error' => $e->getMessage()], $code, $response);
         }
     }
 

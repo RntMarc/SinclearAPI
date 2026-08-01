@@ -171,8 +171,11 @@ final readonly class ExploreController
 
         $hasReviews = $this->reviewRepo->hasReviews($args['id']);
 
-        if (!$this->policy->canDelete($user, $place['creatorId'], $hasReviews)) {
-            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        if (!$this->policy->canDelete($user, $place['creatorId'], $hasReviews, $place['createdAt'])) {
+            if ($user->id !== $place['creatorId']) {
+                return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+            }
+            return ResponseFactory::json(['error' => 'edit_window_expired'], 403, $response);
         }
 
         $this->exploreService->deletePlace($args['id']);

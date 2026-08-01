@@ -68,14 +68,19 @@ PUT /explore/{id}
 ## Delete-Flow (Löschberechtigung)
 
 Nur der **Ersteller** des Ortes darf diesen löschen – und auch nur dann,
-wenn noch keine Bewertungen (Reviews) zu diesem Ort existieren.
+wenn keine Bewertungen (Reviews) zu diesem Ort existieren und das
+**30-Minuten-Fenster** nach dem Erstellen noch nicht abgelaufen ist.
+Danach ist keine Löschung mehr möglich; stattdessen kann eine
+Lösch-Anfrage über `POST /moderation-requests` gestellt werden
+(siehe `docs/moderation-requests/readme.md`).
 **Administratoren** (`isAdmin = true`) dürfen jederzeit löschen.
 
 ```php
-canDelete(user, creatorId, hasReviews):
+canDelete(user, creatorId, hasReviews, createdAt):
   if user.isAdmin → true
   if user.id !== creatorId → false
   if hasReviews → false
+  if now - createdAt > 30 Minuten → false
   → true
 ```
 

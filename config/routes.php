@@ -14,6 +14,7 @@ use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\McpController;
+use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -251,6 +252,12 @@ return function (App $app): void {
         $group->delete('/suggestions/{id}/comments/{commentId}', [FeedbackController::class, 'deleteComment']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    // Moderation requests — Melde- und Anfragensystem (Nutzer)
+    $app->group('/moderation-requests', function (RouteCollectorProxy $group) {
+        $group->post('', [ModerationRequestController::class, 'create']);
+        $group->get('/mine', [ModerationRequestController::class, 'listMine']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
     $app->group('/forums', function (RouteCollectorProxy $group) {
         // Forum CRUD
         $group->get('', [ForumController::class, 'list']);
@@ -364,5 +371,8 @@ return function (App $app): void {
         $group->post('/subscriptions/{id}/participants', [AdminController::class, 'addSubscriptionParticipant']);
         $group->put('/subscriptions/{id}/participants/{participantId}', [AdminController::class, 'updateSubscriptionParticipant']);
         $group->delete('/subscriptions/{id}/participants/{participantId}', [AdminController::class, 'removeSubscriptionParticipant']);
+        $group->get('/moderation-requests', [AdminController::class, 'moderationRequests']);
+        $group->get('/moderation-requests/{id}', [AdminController::class, 'moderationRequestDetail']);
+        $group->post('/moderation-requests/{id}/update', [AdminController::class, 'moderationRequestUpdate']);
     })->add($container->get(AdminMiddleware::class));
 };
