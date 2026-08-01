@@ -116,6 +116,32 @@ final readonly class RecipeController
         }
 
         $imageSrc = null;
+        if (!empty($recipe['image']) && is_string($recipe['image'])) {
+            $mime = 'image/png';
+            $info = @getimagesizefromstring(base64_decode($recipe['image'], true));
+            if (is_array($info) && isset($info['mime'])) {
+                $mime = $info['mime'];
+            }
+            $imageSrc = 'data:' . $mime . ';base64,' . $recipe['image'];
+        }
+
+        $unitDisplay = [
+            'g' => 'g',
+            'kg' => 'kg',
+            'ml' => 'ml',
+            'l' => 'l',
+            'tl' => 'TL',
+            'el' => 'EL',
+            'prise' => 'Prise',
+            'stk' => 'Stk.',
+            'bund' => 'Bund',
+            'zehe' => 'Zehe',
+            'scheibe' => 'Scheibe',
+            'tasse' => 'Tasse',
+            'dose' => 'Dose',
+            'packung' => 'Packung',
+            'tropfen' => 'Tropfen',
+        ];
 
         $renderList = static function (array $items, callable $render): string {
             if ($items === []) {
@@ -128,15 +154,17 @@ final readonly class RecipeController
             return rtrim(rtrim(number_format($amount, 2, '.', ''), '0'), '.');
         };
 
-        $ingredientsHtml = $renderList($recipe['ingredients'] ?? [], static function (array $ing) use ($formatAmount): string {
+        $ingredientsHtml = $renderList($recipe['ingredients'] ?? [], static function (array $ing) use ($formatAmount, $unitDisplay): string {
             $parts = [];
             if (!empty($ing['amount']) && (float) $ing['amount'] > 0) {
                 $parts[] = $formatAmount((float) $ing['amount']) . ' ';
                 if (!empty($ing['unit'])) {
-                    $parts[] = htmlspecialchars($ing['unit']) . ' ';
+                    $displayUnit = $unitDisplay[$ing['unit']] ?? $ing['unit'];
+                    $parts[] = htmlspecialchars($displayUnit) . ' ';
                 }
             } elseif (!empty($ing['unit'])) {
-                $parts[] = htmlspecialchars($ing['unit']) . ' ';
+                $displayUnit = $unitDisplay[$ing['unit']] ?? $ing['unit'];
+                $parts[] = htmlspecialchars($displayUnit) . ' ';
             }
             $parts[] = htmlspecialchars((string) $ing['name']);
             return '<li itemprop="ingredients">' . implode('', $parts) . '</li>';
@@ -154,7 +182,7 @@ final readonly class RecipeController
             'recipeCategory' => $recipe['category'],
             'keywords' => $recipe['dietaryTags'] ?? null,
             'recipeYield' => (string) $recipe['servings'],
-            'image' => $imageSrc !== null ? $imageSrc : null,
+            'image' => null,
             'recipeIngredient' => array_map(
                 static fn(array $ing): string => trim(
                     (($ing['amount'] ?? 0) > 0
