@@ -5,6 +5,7 @@ namespace Sinclear\Api\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\RecipePolicy;
 use Sinclear\Api\Services\RecipeService;
@@ -34,6 +35,7 @@ final readonly class RecipeController
     public function __construct(
         private RecipeService $recipeService,
         private RecipePolicy $policy,
+        private Settings $settings,
     ) {}
 
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -186,9 +188,9 @@ final readonly class RecipeController
             'recipeIngredient' => array_map(
                 static fn(array $ing): string => trim(
                     (($ing['amount'] ?? 0) > 0
-                        ? $formatAmount((float) $ing['amount']) . ' '
+                        ? $formatAmount((float) $ing['amount'])
                         : '')
-                    . ($ing['unit'] ?? '')
+                    . (($ing['unit'] ?? '') !== '' ? ' ' . ($unitDisplay[$ing['unit']] ?? $ing['unit']) : '')
                     . ' '
                     . $ing['name']
                 ),
@@ -240,6 +242,9 @@ final readonly class RecipeController
         $datePublished = $recipe['createdAt'] !== null ? substr((string) $recipe['createdAt'], 0, 10) : '';
         $dateModified = $recipe['updatedAt'] !== null ? substr((string) $recipe['updatedAt'], 0, 10) : '';
 
+        $clientUrl = rtrim($this->settings->app['client_url'] ?? '', '/');
+        $openUrl = $clientUrl . '/rezepte/' . rawurlencode((string) $recipe['id']);
+
         $html = file_get_contents(__DIR__ . '/../../templates/public-recipe.php') ?: '';
         $html = $renderConditional($html, 'description', $description);
         $html = $renderConditional($html, 'imageSrc', $imageSrc ?? '');
@@ -263,6 +268,7 @@ final readonly class RecipeController
             '{{datePublished}}' => $datePublished,
             '{{dateModified}}' => $dateModified,
             '{{jsonLd}}' => $jsonLdHtml,
+            '{{openUrl}}' => htmlspecialchars($openUrl),
         ]);
 
         $response->getBody()->write($html);

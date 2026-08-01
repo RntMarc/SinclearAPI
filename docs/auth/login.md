@@ -214,7 +214,7 @@ sequenceDiagram
 | `GET` | `/api/v2/auth/login/discord/callback` | – | Discord-Redirect verarbeiten (Login) |
 | `POST` | `/api/v2/auth/register/discord/start` | – | Discord OAuth-URL generieren (Registrierung) |
 | `GET` | `/api/v2/auth/register/discord/callback` | – | Discord-Redirect verarbeiten (Registrierung) |
-| `POST` | `/api/v2/auth/refresh` | 10 req/60s | Access-Token erneuern |
+| `POST` | `/api/v2/auth/refresh` | – | Access-Token erneuern (kein Rate-Limit: Refresh-Tokens sind kryptografisch stark, kein Brute-Force-Vektor; aggressive Limits würden legitime Clients hinter geteilter IP blockieren) |
 
 ### POST /api/v2/auth/login/otp/request
 
@@ -322,7 +322,7 @@ Registration trotzdem ohne Bild abgeschlossen.
 | Mechanismus | Beschreibung |
 |-------------|-------------|
 | **HTTPS erforderlich** | Nicht-TLS-Verbindungen werden mit 403 abgewiesen |
-| **Rate-Limiting** | 100 req/60s global, 10 req/60s auf Auth-Endpunkten |
+| **Rate-Limiting** | 100 req/60s global, 10 req/60s auf Login/OTP-Endpunkten (nicht auf `/auth/refresh`) |
 | **OTP-Einschränkung** | Max. 3 Code-Anfragen pro E-Mail pro 60 Sekunden |
 | **Code-Gültigkeit** | E-Mail-OTP: 10 Min, Discord-Pairing: 2 Min (einmalig) |
 | **Refresh-Rotation** | Jeder Refresh wird rotiert; alte Tokens werden ungültig |

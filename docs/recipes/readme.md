@@ -53,9 +53,18 @@ https://sinclear.de/api/v2/html/public/recipe?id=550e8400-e29b-41d4-a716-4466554
 **Eigenschaften:**
 - Reines, ungestyltes und semantisches HTML – ohne JavaScript
 - Zutatenliste als `<ul>`, Zubereitungsschritte als `<ol>`
+- Rezeptbild als `data:`-URI (`<img>`), nur wenn vorhanden – für die visuelle
+  Darstellung im Browser (Bring selbst kann `data:`-URIs nicht laden, deshalb
+  fehlt das Bild in JSON-LD/Microdata-Struktdaten)
+- Auffälliger Button **„Rezept in Beyond öffnen"** (Gradient Dunkelviolett →
+  Dunkelblau) der auf die Rezept-Detailseite im Haupt-Web-Client verlinkt
+  (`CLIENT_BASE_URL/rezepte/REZEPT_ID`). Die Client-Adresse wird über die
+  `.env`-Variable `CLIENT_BASE_URL` konfiguriert (z.B. `https://sinclear.de`).
 - Schema.org-Struktur als JSON-LD (`application/ld+json`) mit `@type: Recipe`
   (name, description, recipeIngredient, recipeInstructions als HowToStep-Objekte,
   recipeYield als String, aggregateRating, datePublished) – Standard für automatische Extraktion
+- Maßeinheiten in Zutaten werden für die Anzeige formatiert (`stk` → `Stk.`,
+  `tl` → `TL`, `el` → `EL`, …) – sowohl im HTML als auch im JSON-LD
 - Zusätzlich Schema.org-**Microdata** direkt in der HTML-Struktur
   (`<article itemscope itemtype="http://schema.org/Recipe">`): `itemprop`
   auf `name`, `description`/`tagline`, `recipeCategory`,

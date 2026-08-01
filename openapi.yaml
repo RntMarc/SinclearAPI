@@ -10185,10 +10185,12 @@ paths:
         Öffentlicher Endpunkt ohne Authentifizierung. Liefert ein Rezept als
         reine, ungestylte HTML-Seite (Content-Type text/html), die für externe
         Parser optimiert ist (z.B. die Einkaufslisten-App Bring). Die Seite
-        enthält Titel, Zutatenliste (`<ul>`) und
-        Zubereitungsschritte (`<ol>`) sowie eine Schema.org-Rezeptstruktur
-        (JSON-LD mit `@type: Recipe`, `recipeInstructions` als HowToStep-Objekte,
-        `recipeYield` als String) für maschinelle Extraktion.
+        enthält Titel, Rezeptbild (als Data-URI, nur für die Browser-Anzeige),
+        Zutatenliste (`<ul>`) und Zubereitungsschritte (`<ol>`) sowie eine
+        Schema.org-Rezeptstruktur (JSON-LD mit `@type: Recipe`,
+        `recipeInstructions` als HowToStep-Objekte, `recipeYield` als String,
+        formatierte Maßeinheiten wie `Stk.`, `TL`, `EL`) für maschinelle
+        Extraktion.
         Zusätzlich ist die HTML-Struktur mit Schema.org-Microdata annotiert
         (`itemscope`/`itemtype="http://schema.org/Recipe"`): `itemprop="name"`,
         `"description"/"tagline"`, `"recipeCategory"`, `"yield"`,
@@ -10202,6 +10204,10 @@ paths:
         (`//platform.getbring.com/widgets/import.js` mit
         `<div data-bring-import>` und Attributionslink); Bring bestätigt die
         Kompatibilität des Imports.
+        Ein hervorgehobener Button „Rezept in Beyond öffnen" (Gradient
+        Dunkelviolett → Dunkelblau) verlinkt auf die Rezept-Detailseite im
+        Haupt-Web-Client. Dessen Basis-Adresse wird über die Env-Variable
+        `CLIENT_BASE_URL` konfiguriert (Pfad: `CLIENT_BASE_URL/rezepte/{id}`).
         Es wird exakt derselbe Datenpfad wie GET /public/recipes/{id} verwendet
         (RecipeService + Sanitization). Für anonyme Nutzer werden creatorId,
         creatorDisplayName und creatorImage ausgeblendet; mit gültigem JWT

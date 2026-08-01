@@ -18,6 +18,10 @@
             {{/description}}
         </header>
 
+        <a href="{{openUrl}}" class="beyond-open-btn" style="display:inline-block;margin:16px 0;padding:14px 28px;background:linear-gradient(135deg,#4b1e6d 0%,#1a2a6c 100%);color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:17px;font-weight:600;text-decoration:none;border-radius:10px;box-shadow:0 4px 14px rgba(27,20,90,0.35);transition:filter 0.2s ease;" onmouseover="this.style.filter='brightness(1.15)'" onmouseout="this.style.filter=''">
+            Rezept in Beyond &ouml;ffnen
+        </a>
+
         <div data-bring-import="" style="display:none"></div>
         <a href="https://www.getbring.com">Bring! Einkaufslisten App f&uuml;r Android und iPhone</a>
         <p>Achtung: Bring verwendet Tracker von Google und Facebook. Benutzung auf eigene Gefahr!</p>

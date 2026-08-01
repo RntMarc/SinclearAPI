@@ -51,8 +51,7 @@ return function (App $app): void {
 
         });
 
-        $group->post('/refresh', [AuthController::class, 'refresh'])
-            ->add($container->get(LoginThrottleMiddleware::class));
+        $group->post('/refresh', [AuthController::class, 'refresh']);
 
         $group->group('/register', function (RouteCollectorProxy $register) use ($container) {
             $register->post('/discord/start', [AuthController::class, 'registerDiscordStart']);
