@@ -10196,6 +10196,10 @@ paths:
         `<li itemprop="recipeIngredient ingredients">` und Schritte als
         `<li itemprop="recipeInstructions">` – kompatibel mit dem Schema.org-
         Parser von Bring.
+        Zusätzlich ist das offizielle Bring-Import-Widget eingebunden
+        (`//platform.getbring.com/widgets/import.js` mit
+        `<div data-bring-import>` und Attributionslink); Bring bestätigt die
+        Kompatibilität des Imports.
         Es wird exakt derselbe Datenpfad wie GET /public/recipes/{id} verwendet
         (RecipeService + Sanitization). Für anonyme Nutzer werden creatorId,
         creatorDisplayName und creatorImage ausgeblendet; mit gültigem JWT

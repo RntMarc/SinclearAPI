@@ -6,6 +6,7 @@
     <title>{{title}} – Sinclear Beyond Rezept</title>
     <meta name="description" content="{{description}}">
     <meta name="robots" content="noindex">
+    <script async="async" src="//platform.getbring.com/widgets/import.js"></script>
     <script type="application/ld+json">{{jsonLd}}</script>
 </head>
 <body>
@@ -16,6 +17,10 @@
             <p itemprop="description tagline">{{description}}</p>
             {{/description}}
         </header>
+
+        <div data-bring-import="" style="display:none"></div>
+        <a href="https://www.getbring.com">Bring! Einkaufslisten App f&uuml;r Android und iPhone</a>
+        <p>Achtung: Bring verwendet Tracker von Google und Facebook. Benutzung auf eigene Gefahr!</p>
 
         <img itemprop="image" src="{{imageSrc}}" alt="{{imageAlt}}">
 

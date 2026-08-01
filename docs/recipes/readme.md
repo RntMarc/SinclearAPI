@@ -67,6 +67,11 @@ https://sinclear.de/api/v2/html/public/recipe?id=550e8400-e29b-41d4-a716-4466554
   abgestimmt auf das Microdata-Markup, das der Bring-Parser erwartet
 - Der Autor (`itemprop="author"`) erscheint nur, wenn die Rezeptdaten den
   Ersteller enthalten (d.h. bei Abruf mit gültigem JWT)
+- Bring-Import-Widget eingebunden (offizielles Snippet):
+  `<script async src="//platform.getbring.com/widgets/import.js">`,
+  `<div data-bring-import style="display:none">` (Platzhalter für den
+  Import-Button) und Bring-Attributionslink – Bring bestätigt die
+  Kompatibilität mit dem Import
 - Liefert exakt dieselben Daten wie `GET /public/recipes/{id}`
   (gleicher Service-Pfad inkl. Anonymisierung): ohne Token werden
   `creatorId`, `creatorDisplayName`, `creatorImage` nicht ausgegeben
