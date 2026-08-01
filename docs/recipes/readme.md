@@ -53,18 +53,18 @@ https://sinclear.de/api/v2/html/public/recipe?id=550e8400-e29b-41d4-a716-4466554
 **Eigenschaften:**
 - Reines, ungestyltes und semantisches HTML – ohne JavaScript
 - Zutatenliste als `<ul>`, Zubereitungsschritte als `<ol>`
-- Rezeptbild als `data:`-URI (`<img>`), nur wenn vorhanden
 - Schema.org-Struktur als JSON-LD (`application/ld+json`) mit `@type: Recipe`
-  (name, description, recipeIngredient, recipeInstructions, image, recipeYield,
-  aggregateRating, datePublished) – Standard für automatische Extraktion
+  (name, description, recipeIngredient, recipeInstructions als HowToStep-Objekte,
+  recipeYield als String, aggregateRating, datePublished) – Standard für automatische Extraktion
 - Zusätzlich Schema.org-**Microdata** direkt in der HTML-Struktur
-  (`<article itemscope itemtype="https://schema.org/Recipe">`): `itemprop`
-  auf `name`, `description`/`tagline`, `image`, `recipeCategory`,
-  `recipeYield`/`yield`, `keywords`, `aggregateRating` (mit `ratingValue`/
+  (`<article itemscope itemtype="http://schema.org/Recipe">`): `itemprop`
+  auf `name`, `description`/`tagline`, `recipeCategory`,
+  `yield`, `keywords`, `aggregateRating` (mit `ratingValue`/
   `reviewCount`), `author`, `datePublished`/`dateModified` sowie
-  `<li itemprop="recipeIngredient ingredients">` (Zutaten, hier parst Bring
-  ItemId/Spec) und `<li itemprop="recipeInstructions">` (Schritte) –
+  `<li itemprop="ingredients">` (Zutaten) und `<li itemprop="instructions">` (Schritte) –
   abgestimmt auf das Microdata-Markup, das der Bring-Parser erwartet
+  (`itemprop="ingredients"` statt `recipeIngredient`,
+  `http://` statt `https://` im itemtype, `yield` statt `recipeYield`)
 - Der Autor (`itemprop="author"`) erscheint nur, wenn die Rezeptdaten den
   Ersteller enthalten (d.h. bei Abruf mit gültigem JWT)
 - Bring-Import-Widget eingebunden (offizielles Snippet):

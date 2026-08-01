@@ -10185,17 +10185,19 @@ paths:
         Öffentlicher Endpunkt ohne Authentifizierung. Liefert ein Rezept als
         reine, ungestylte HTML-Seite (Content-Type text/html), die für externe
         Parser optimiert ist (z.B. die Einkaufslisten-App Bring). Die Seite
-        enthält Titel, Bild (Data-URI), Zutatenliste (`<ul>`) und
+        enthält Titel, Zutatenliste (`<ul>`) und
         Zubereitungsschritte (`<ol>`) sowie eine Schema.org-Rezeptstruktur
-        (JSON-LD) für maschinelle Extraktion.
+        (JSON-LD mit `@type: Recipe`, `recipeInstructions` als HowToStep-Objekte,
+        `recipeYield` als String) für maschinelle Extraktion.
         Zusätzlich ist die HTML-Struktur mit Schema.org-Microdata annotiert
-        (`itemscope`/`itemtype="https://schema.org/Recipe"`): `itemprop="name"`,
-        `"description"`, `"image"`, `"recipeCategory"`, `"recipeYield"`,
+        (`itemscope`/`itemtype="http://schema.org/Recipe"`): `itemprop="name"`,
+        `"description"/"tagline"`, `"recipeCategory"`, `"yield"`,
         `"keywords"`, `"aggregateRating"` (AggregateRating), `"author"`,
         `"datePublished"`, `"dateModified"`, Zutaten als
-        `<li itemprop="recipeIngredient ingredients">` und Schritte als
-        `<li itemprop="recipeInstructions">` – kompatibel mit dem Schema.org-
-        Parser von Bring.
+        `<li itemprop="ingredients">` und Schritte als
+        `<li itemprop="instructions">` – abgestimmt auf das Microdata-Markup,
+        das der Bring-Parser erwartet (`http://` statt `https://` im itemtype,
+        `ingredients` statt `recipeIngredient`, `yield` statt `recipeYield`).
         Zusätzlich ist das offizielle Bring-Import-Widget eingebunden
         (`//platform.getbring.com/widgets/import.js` mit
         `<div data-bring-import>` und Attributionslink); Bring bestätigt die

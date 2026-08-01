@@ -116,14 +116,6 @@ final readonly class RecipeController
         }
 
         $imageSrc = null;
-        if (!empty($recipe['image']) && is_string($recipe['image'])) {
-            $mime = 'image/png';
-            $info = @getimagesizefromstring(base64_decode($recipe['image'], true));
-            if (is_array($info) && isset($info['mime'])) {
-                $mime = $info['mime'];
-            }
-            $imageSrc = 'data:' . $mime . ';base64,' . $recipe['image'];
-        }
 
         $renderList = static function (array $items, callable $render): string {
             if ($items === []) {
@@ -147,22 +139,22 @@ final readonly class RecipeController
                 $parts[] = htmlspecialchars($ing['unit']) . ' ';
             }
             $parts[] = htmlspecialchars((string) $ing['name']);
-            return '<li itemprop="recipeIngredient ingredients">' . implode('', $parts) . '</li>';
+            return '<li itemprop="ingredients">' . implode('', $parts) . '</li>';
         });
 
         $stepsHtml = $renderList($recipe['steps'] ?? [], static function (array $step): string {
-            return '<li itemprop="recipeInstructions">' . htmlspecialchars((string) $step['description']) . '</li>';
+            return '<li itemprop="instructions">' . htmlspecialchars((string) $step['description']) . '</li>';
         });
 
         $jsonLd = [
-            '@context' => 'https://schema.org',
+            '@context' => 'http://schema.org',
             '@type' => 'Recipe',
             'name' => $recipe['title'],
             'description' => $recipe['description'] ?? null,
             'recipeCategory' => $recipe['category'],
             'keywords' => $recipe['dietaryTags'] ?? null,
-            'recipeYield' => $recipe['servings'],
-            'image' => $imageSrc !== null ? [$imageSrc] : null,
+            'recipeYield' => (string) $recipe['servings'],
+            'image' => $imageSrc !== null ? $imageSrc : null,
             'recipeIngredient' => array_map(
                 static fn(array $ing): string => trim(
                     (($ing['amount'] ?? 0) > 0
@@ -175,7 +167,10 @@ final readonly class RecipeController
                 $recipe['ingredients'] ?? [],
             ),
             'recipeInstructions' => array_map(
-                static fn(array $step): string => (string) $step['description'],
+                static fn(array $step): array => [
+                    '@type' => 'HowToStep',
+                    'text' => (string) $step['description'],
+                ],
                 $recipe['steps'] ?? [],
             ),
             'author' => $recipe['creatorDisplayName'] ?? null,
@@ -219,6 +214,7 @@ final readonly class RecipeController
 
         $html = file_get_contents(__DIR__ . '/../../templates/public-recipe.php') ?: '';
         $html = $renderConditional($html, 'description', $description);
+        $html = $renderConditional($html, 'imageSrc', $imageSrc ?? '');
         $html = $renderConditional($html, 'dietaryTags', $dietaryTags);
         $html = $renderConditional($html, 'rating', $rating);
         $html = $renderConditional($html, 'author', $author);

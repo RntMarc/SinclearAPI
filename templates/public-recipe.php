@@ -10,7 +10,7 @@
     <script type="application/ld+json">{{jsonLd}}</script>
 </head>
 <body>
-    <article itemscope itemtype="https://schema.org/Recipe">
+    <article itemscope itemtype="http://schema.org/Recipe">
         <header>
             <h1 itemprop="name">{{title}}</h1>
             {{#description}}
@@ -22,20 +22,22 @@
         <a href="https://www.getbring.com">Bring! Einkaufslisten App f&uuml;r Android und iPhone</a>
         <p>Achtung: Bring verwendet Tracker von Google und Facebook. Benutzung auf eigene Gefahr!</p>
 
+        {{#imageSrc}}
         <img itemprop="image" src="{{imageSrc}}" alt="{{imageAlt}}">
+        {{/imageSrc}}
 
         <dl>
             <dt>Kategorie</dt>
             <dd itemprop="recipeCategory">{{category}}</dd>
             <dt>Portionen</dt>
-            <dd itemprop="recipeYield yield">{{servings}}</dd>
+            <dd itemprop="yield">{{servings}}</dd>
             {{#dietaryTags}}
             <dt>Ernährung</dt>
             <dd itemprop="keywords">{{dietaryTags}}</dd>
             {{/dietaryTags}}
             {{#rating}}
             <dt>Bewertung</dt>
-            <dd itemprop="aggregateRating" itemscope itemtype="https://schema.org/AggregateRating">
+            <dd itemprop="aggregateRating" itemscope itemtype="http://schema.org/AggregateRating">
                 <span itemprop="ratingValue">{{ratingValue}}</span> / 5
                 (<span itemprop="reviewCount">{{ratingCount}}</span> Bewertungen)
             </dd>
