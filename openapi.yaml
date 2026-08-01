@@ -10206,8 +10206,8 @@ paths:
         Kompatibilität des Imports.
         Ein hervorgehobener Button „Rezept in Beyond öffnen" (Gradient
         Dunkelviolett → Dunkelblau) verlinkt auf die Rezept-Detailseite im
-        Haupt-Web-Client. Dessen Basis-Adresse wird über die Env-Variable
-        `CLIENT_BASE_URL` konfiguriert (Pfad: `CLIENT_BASE_URL/rezepte/{id}`).
+        Haupt-Web-Client. Dessen Basis-Adresse entspricht der Env-Variable
+        `APP_URL` (Pfad: `APP_URL/rezepte/{id}`).
         Es wird exakt derselbe Datenpfad wie GET /public/recipes/{id} verwendet
         (RecipeService + Sanitization). Für anonyme Nutzer werden creatorId,
         creatorDisplayName und creatorImage ausgeblendet; mit gültigem JWT

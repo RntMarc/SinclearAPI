@@ -58,8 +58,8 @@ https://sinclear.de/api/v2/html/public/recipe?id=550e8400-e29b-41d4-a716-4466554
   fehlt das Bild in JSON-LD/Microdata-Struktdaten)
 - Auffälliger Button **„Rezept in Beyond öffnen"** (Gradient Dunkelviolett →
   Dunkelblau) der auf die Rezept-Detailseite im Haupt-Web-Client verlinkt
-  (`CLIENT_BASE_URL/rezepte/REZEPT_ID`). Die Client-Adresse wird über die
-  `.env`-Variable `CLIENT_BASE_URL` konfiguriert (z.B. `https://sinclear.de`).
+  (`APP_URL/rezepte/REZEPT_ID`). Die Client-Adresse entspricht der
+  `.env`-Variable `APP_URL` (z.B. `https://sinclear.de`).
 - Schema.org-Struktur als JSON-LD (`application/ld+json`) mit `@type: Recipe`
   (name, description, recipeIngredient, recipeInstructions als HowToStep-Objekte,
   recipeYield als String, aggregateRating, datePublished) – Standard für automatische Extraktion

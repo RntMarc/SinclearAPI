@@ -242,7 +242,7 @@ final readonly class RecipeController
         $datePublished = $recipe['createdAt'] !== null ? substr((string) $recipe['createdAt'], 0, 10) : '';
         $dateModified = $recipe['updatedAt'] !== null ? substr((string) $recipe['updatedAt'], 0, 10) : '';
 
-        $clientUrl = rtrim($this->settings->app['client_url'] ?? '', '/');
+        $clientUrl = rtrim($this->settings->app['url'] ?? '', '/');
         $openUrl = $clientUrl . '/rezepte/' . rawurlencode((string) $recipe['id']);
 
         $html = file_get_contents(__DIR__ . '/../../templates/public-recipe.php') ?: '';

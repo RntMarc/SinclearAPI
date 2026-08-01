@@ -5,8 +5,7 @@ $settings = [];
 $settings['app'] = [
     'env' => $_ENV['APP_ENV'] ?? 'production',
     'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
-    'url' => $_ENV['APP_URL'] ?? 'https://api.example.com',
-    'client_url' => rtrim($_ENV['CLIENT_BASE_URL'] ?? 'https://app.example.com', '/'),
+    'url' => rtrim($_ENV['APP_URL'] ?? 'https://api.example.com', '/'),
 ];
 
 $settings['db'] = [
