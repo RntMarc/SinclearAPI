@@ -25,6 +25,7 @@ use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
+use Sinclear\Api\Middleware\McpApiKeyMiddleware;
 use Slim\App;
 use Slim\Routing\RouteCollectorProxy;
 
@@ -37,7 +38,15 @@ return function (App $app): void {
 
     // MCP documentation endpoint (public, read-only, no auth required)
     $app->get('/mcp', [McpController::class, 'get']);
-    $app->post('/mcp', [McpController::class, 'post']);
+    $app->post('/mcp', [McpController::class, 'post'])
+        ->add($container->get(McpApiKeyMiddleware::class));
+
+    // MCP API key management (JWT auth required)
+    $app->group('/mcp', function (RouteCollectorProxy $group) {
+        $group->post('/keys', [McpController::class, 'createKey']);
+        $group->get('/keys', [McpController::class, 'listKeys']);
+        $group->delete('/keys/{id}', [McpController::class, 'deleteKey']);
+    })->add($container->get(AuthenticationMiddleware::class));
 
     $app->group('/auth', function (RouteCollectorProxy $group) use ($container) {
         $group->group('/login', function (RouteCollectorProxy $login) use ($container) {
@@ -170,14 +179,16 @@ return function (App $app): void {
 
     // Recipes — authenticated routes
     $app->group('/recipes', function (RouteCollectorProxy $group) {
-        // List bookmarks MUST come before /{id} to avoid route capture
+        // List bookmarks and drafts MUST come before /{id} to avoid route capture
         $group->get('/bookmarks', [RecipeController::class, 'listBookmarks']);
+        $group->get('/drafts', [RecipeController::class, 'listDrafts']);
 
         $group->get('', [RecipeController::class, 'list']);
         $group->post('', [RecipeController::class, 'create']);
         $group->get('/{id}', [RecipeController::class, 'get']);
         $group->patch('/{id}', [RecipeController::class, 'update']);
         $group->delete('/{id}', [RecipeController::class, 'delete']);
+        $group->post('/{id}/publish', [RecipeController::class, 'publish']);
 
         // Bookmarks
         $group->get('/{id}/bookmark', [RecipeController::class, 'getBookmark']);

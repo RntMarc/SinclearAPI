@@ -57,6 +57,7 @@ final readonly class RecipeService
             'servings' => array_key_exists('servings', $data)
                 ? $this->validateServings($data['servings'])
                 : 4,
+            'isDraft' => !empty($data['isDraft']) ? 1 : 0,
         ]);
 
         if (!empty($data['ingredients'])) {
@@ -201,6 +202,30 @@ final readonly class RecipeService
         return $result;
     }
 
+    public function listDrafts(string $userId, int $page, int $limit): array
+    {
+        $result = $this->recipeRepo->listByCreator($userId, $page, $limit);
+        $result['data'] = array_map(fn(array $r) => $this->formatRecipe($r), $result['data']);
+        return $result;
+    }
+
+    public function publishRecipe(string $id, string $userId): array
+    {
+        $recipe = $this->recipeRepo->findById($id);
+        if ($recipe === null) {
+            throw new \RuntimeException('recipe_not_found');
+        }
+
+        if ((int) $recipe['isDraft'] !== 1) {
+            throw new \RuntimeException('already_published');
+        }
+
+        $this->recipeRepo->publish($id);
+
+        $recipe = $this->recipeRepo->findById($id);
+        return $this->formatRecipeDetail($recipe, $userId);
+    }
+
     private function validateServings(mixed $servings): int
     {
         if (!is_int($servings) || $servings < 1 || $servings > 127) {
@@ -231,6 +256,7 @@ final readonly class RecipeService
             'dietaryTags' => $recipe['dietaryTags'],
             'image' => $recipe['image'],
             'servings' => (int) $recipe['servings'],
+            'isDraft' => (bool) $recipe['isDraft'],
             'creatorId' => $recipe['creatorId'],
             'creatorDisplayName' => $recipe['creatorDisplayName'] ?? null,
             'creatorImage' => $recipe['creatorImage'] ?? null,

@@ -28,8 +28,8 @@ final readonly class RecipeRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO Recipe (id, title, description, category, dietaryTags, image, creatorId, createdAt, updatedAt, servings)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3), ?)'
+            'INSERT INTO Recipe (id, title, description, category, dietaryTags, image, creatorId, createdAt, updatedAt, servings, isDraft)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3), ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -40,6 +40,7 @@ final readonly class RecipeRepository
             $data['image'] ?? null,
             $data['creatorId'],
             $data['servings'] ?? 4,
+            $data['isDraft'] ?? 1,
         ]);
         return $id;
     }
@@ -48,7 +49,7 @@ final readonly class RecipeRepository
     {
         $stmt = $this->pdo->prepare(
             'UPDATE Recipe
-             SET title = ?, description = ?, category = ?, dietaryTags = ?, image = ?, servings = ?, updatedAt = NOW(3)
+             SET title = ?, description = ?, category = ?, dietaryTags = ?, image = ?, servings = ?, isDraft = ?, updatedAt = NOW(3)
              WHERE id = ?'
         );
         $stmt->execute([
@@ -58,6 +59,7 @@ final readonly class RecipeRepository
             $data['dietaryTags'] ?? null,
             $data['image'] ?? null,
             $data['servings'] ?? 4,
+            $data['isDraft'] ?? 1,
             $id,
         ]);
     }
@@ -73,7 +75,7 @@ final readonly class RecipeRepository
 
     public function list(int $page, int $limit, ?string $search, string $sort): array
     {
-        $conditions = [];
+        $conditions = ['r.isDraft = 0'];
         $bindings = [];
 
         if ($search !== null && $search !== '') {
@@ -123,5 +125,44 @@ final readonly class RecipeRepository
                 'totalPages' => (int) ceil($total / $limit),
             ],
         ];
+    }
+
+    public function listByCreator(string $creatorId, int $page, int $limit): array
+    {
+        $countStmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM Recipe WHERE creatorId = ?'
+        );
+        $countStmt->execute([$creatorId]);
+        $total = (int) $countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+        $dataStmt = $this->pdo->prepare(
+            'SELECT r.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
+             FROM Recipe r
+             LEFT JOIN User u ON u.id = r.creatorId
+             WHERE r.creatorId = ?
+             ORDER BY r.createdAt DESC
+             LIMIT ? OFFSET ?'
+        );
+        $dataStmt->execute([$creatorId, $limit, $offset]);
+        $recipes = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'data' => $recipes,
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    public function publish(string $id): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE Recipe SET isDraft = 0, createdAt = NOW(3), updatedAt = NOW(3) WHERE id = ?'
+        );
+        $stmt->execute([$id]);
     }
 }

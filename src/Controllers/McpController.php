@@ -7,15 +7,18 @@ namespace Sinclear\Api\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
+use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Middleware\McpApiKeyMiddleware;
+use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\Mcp\McpServer;
 
 /**
- * MCP documentation endpoint (Streamable HTTP transport).
+ * MCP endpoint (Streamable HTTP transport).
  *
  * Exposes the API documentation as a single HTTP/JSON endpoint for MCP
- * clients (e.g. OpenCode). No authentication required: documentation is
- * public by design. The endpoint is read-only and never interacts with the
- * API.
+ * clients (e.g. OpenCode). Supports optional API key authentication for
+ * recipe draft creation via the create_recipe_draft tool.
  *
  * URL: {base}/mcp
  *
@@ -25,6 +28,7 @@ final class McpController
 {
     public function __construct(
         private McpServer $server,
+        private McpApiKeyService $keyService,
         private LoggerInterface $logger,
     ) {}
 
@@ -32,8 +36,6 @@ final class McpController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        // This server never pushes messages, so no persistent GET/SSE stream
-        // is offered. Returning 405 is explicitly allowed by the MCP spec.
         return $response
             ->withStatus(405)
             ->withHeader('Allow', 'POST')
@@ -62,11 +64,12 @@ final class McpController
             return $this->jsonErrorResponse($response, -32600, 'Invalid Request', null);
         }
 
-        $result = $this->server->handle($message);
+        $authenticatedUserId = $request->getAttribute(McpApiKeyMiddleware::ATTRIBUTE);
+
+        $result = $this->server->handle($message, $authenticatedUserId);
 
         $protocolVersion = $this->server->getProtocolVersion();
 
-        // Notifications (no id) are acknowledged with 202 and no body.
         if ($result === null) {
             return $response
                 ->withStatus(202)
@@ -95,6 +98,69 @@ final class McpController
             ->withStatus(200)
             ->withHeader('Content-Type', 'application/json')
             ->withHeader('Mcp-Protocol-Version', $protocolVersion);
+    }
+
+    public function createKey(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        if (empty($body['label']) || !is_string($body['label'])) {
+            return ResponseFactory::json(['error' => 'label_required'], 400, $response);
+        }
+
+        $label = trim($body['label']);
+        if ($label === '') {
+            return ResponseFactory::json(['error' => 'label_required'], 400, $response);
+        }
+
+        try {
+            $keyData = $this->keyService->createKey($user->id, $label);
+            return ResponseFactory::json(['data' => $keyData], 201, $response);
+        } catch (\RuntimeException $e) {
+            $code = $e->getMessage() === 'key_limit_reached' ? 409 : 400;
+            return ResponseFactory::json(['error' => $e->getMessage()], $code, $response);
+        }
+    }
+
+    public function listKeys(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        $result = $this->keyService->listKeys($user->id, $page, $limit);
+        return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    public function deleteKey(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $user = $this->requireUser($request);
+        $id = $args['id'];
+
+        $deleted = $this->keyService->revokeKey($id, $user->id);
+        if (!$deleted) {
+            return ResponseFactory::json(['error' => 'key_not_found'], 404, $response);
+        }
+
+        return ResponseFactory::noContent($response);
+    }
+
+    private function requireUser(ServerRequestInterface $request): AuthenticatedUser
+    {
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if (!$user instanceof AuthenticatedUser) {
+            throw new \RuntimeException('Authentication required');
+        }
+        return $user;
     }
 
     private function jsonErrorResponse(

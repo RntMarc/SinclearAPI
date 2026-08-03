@@ -56,6 +56,7 @@ use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
+use Sinclear\Api\Middleware\McpApiKeyMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
@@ -87,6 +88,7 @@ use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
+use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\LocationSharingService;
@@ -116,6 +118,7 @@ use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\ProfileService;
 use Sinclear\Api\Services\Mcp\DocumentationProvider;
 use Sinclear\Api\Services\Mcp\McpServer;
+use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\PushService;
@@ -392,4 +395,8 @@ return [
     DocumentationProvider::class => autowire(),
     McpServer::class => autowire(),
     McpController::class => autowire(),
+
+    McpApiKeyRepository::class => autowire(),
+    McpApiKeyService::class => autowire(),
+    McpApiKeyMiddleware::class => autowire(),
 ];

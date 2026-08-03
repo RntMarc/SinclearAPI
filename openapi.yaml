@@ -3148,7 +3148,7 @@ components:
 
     Recipe:
       type: object
-      required: [id, title, category, servings, creatorId, createdAt, updatedAt]
+      required: [id, title, category, servings, isDraft, creatorId, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -3183,6 +3183,11 @@ components:
           maximum: 127
           description: Anzahl der Portionen
           example: 4
+        isDraft:
+          type: boolean
+          description: >-
+            Entwurf-Status. true = Entwurf (nur für Ersteller sichtbar),
+            false = Veröffentlicht (öffentlich sichtbar)
         creatorId:
           type: string
           format: uuid
@@ -3280,6 +3285,12 @@ components:
           maximum: 127
           default: 4
           description: Anzahl der Portionen
+        isDraft:
+          type: boolean
+          default: true
+          description: >-
+            Entwurf-Status. true = Entwurf (nur für Ersteller sichtbar),
+            false = Direkt veröffentlichen. Standard: true.
         ingredients:
           type: array
           items:
@@ -3322,6 +3333,12 @@ components:
           minimum: 1
           maximum: 127
           description: Anzahl der Portionen
+        isDraft:
+          type: boolean
+          description: >-
+            Entwurf-Status ändern. true = Zurück zu Entwurf,
+            false = Veröffentlichen. Hinweis: Für das Veröffentlichen
+            empfiehlt sich der dedizierte POST /recipes/{id}/publish Endpunkt.
         ingredients:
           type: array
           items:
@@ -3893,6 +3910,74 @@ components:
         SSE-Ereignis (`event: message`, `data: <JSON-RPC-Nachricht>`), falls der
         Client ausschließlich `text/event-stream` akzeptiert
 
+    McpApiKey:
+      type: object
+      required: [id, label, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Key-ID
+        label:
+          type: string
+          description: Bezeichnung für den Key (z.B. "OpenCode KI-Assistent")
+        expiresAt:
+          type: string
+          format: date-time
+          description: Ablaufzeitpunkt des Keys. Keys sind 90 Tage gültig.
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+
+    McpApiKeyCreateRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Bezeichnung für den neuen Key
+
+    McpApiKeyCreateResponse:
+      type: object
+      required: [id, label, key, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Key-ID
+        label:
+          type: string
+          description: Bezeichnung für den Key
+        key:
+          type: string
+          description: >-
+            Der vollständige API-Key. Wird NUR bei der Erstellung einmalig
+            zurückgegeben und kann danach nicht mehr ausgelesen werden.
+            Muss vom Nutzer gespeichert werden.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Ablaufzeitpunkt (90 Tage nach Erstellung)
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+
+    McpApiKeyListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpApiKey'
+          description: Liste der API-Keys des Nutzers
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
 paths:
   /mcp:
     get:
@@ -3911,7 +3996,7 @@ paths:
     post:
       summary: MCP-JSON-RPC-Nachricht verarbeiten
       description: >
-        Einziger Zugang zum MCP-Dokumentations-Server (Streamable HTTP).
+        Einziger Zugang zum MCP-Server (Streamable HTTP).
         Empfängt genau eine JSON-RPC-2.0-Nachricht und beantwortet
         Requests mit einer JSON-RPC-Antwort (JSON oder SSE) bzw.
         Notifications mit 202 Accepted (leerer Body).
@@ -3921,13 +4006,25 @@ paths:
         - `notifications/initialized` – Handshake-Abschluss (Notification)
         - `ping` – Health-Check
         - `tools/list` – verfügbare Tools auflisten
-        - `tools/call` – Tool `get_documentation` ausführen
+        - `tools/call` – Tool ausführen
 
-        Der Endpunkt ist öffentlich (keine Authentifizierung) und ausschließlich
-        lesend: Er liefert API-Dokumentation (Markdown aus `docs/` sowie eine
-        strukturierte Übersicht aus `openapi.yaml`) und erlaubt keinerlei
-        Interaktion mit der API.
+        Ohne Authentifizierung ist nur das Tool `get_documentation` verfügbar
+        (API-Dokumentation, rein lesend).
+
+        Mit API-Key-Authentifizierung (Header `X-Mcp-Key`) zusätzlich:
+        - `tools/call` – Tool `create_recipe_draft` ausführen
+          (Rezept-Entwurf erstellen)
+
       tags: [MCP]
+      parameters:
+        - name: X-Mcp-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: >-
+            Optionaler API-Key für authentifizierte Funktionen (z.B.
+            Rezept-Entwurf erstellen). Ohne Key nur lesende Dokumentation.
       requestBody:
         required: true
         content:
@@ -3978,6 +4075,122 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpJsonRpcResult'
+
+  /mcp/keys:
+    get:
+      summary: Eigene MCP-API-Keys auflisten
+      description: >
+        Gibt eine paginierte Liste aller API-Keys des aktuellen Nutzers
+        zurück. Enthält ID, Bezeichnung, Ablaufzeitpunkt und Erstellungszeitpunkt.
+        Der vollständige Key wird aus Sicherheitsgründen nicht zurückgegeben.
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Liste der API-Keys
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpApiKeyListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neuen MCP-API-Key erstellen
+      description: >
+        Erstellt einen neuen API-Key für den MCP-Server. Der Key ermöglicht
+        die Nutzung des `create_recipe_draft` Tools über den MCP-Endpunkt.
+        Pro Nutzer sind maximal 3 aktive Keys erlaubt. Der vollständige
+        Key wird nur einmalig bei der Erstellung zurückgegeben.
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpApiKeyCreateRequest'
+      responses:
+        '201':
+          description: API-Key erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/McpApiKeyCreateResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Maximale Anzahl an Keys erreicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /mcp/keys/{id}:
+    delete:
+      summary: MCP-API-Key löschen
+      description: >
+        Löscht einen API-Key. Der Key kann danach nicht mehr verwendet
+        werden. Nur der Eigentümer darf löschen.
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Key-ID
+      responses:
+        '204':
+          description: Key erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Key nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /auth/login/otp/request:
     post:
@@ -10753,6 +10966,44 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /recipes/drafts:
+    get:
+      summary: Eigene Rezept-Entwürfe auflisten
+      description: >
+        Gibt eine paginierte Liste aller Rezept-Entwürfe des aktuellen
+        Nutzers zurück. Enthält sowohl Entwürfe als auch veröffentlichte
+        Rezepte, sortiert nach Erstellungszeitpunkt (neueste zuerst).
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Liste der Entwürfe und eigenen Rezepte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /recipes/{id}:
     get:
       summary: Rezept-Details abrufen
@@ -10845,11 +11096,10 @@ paths:
       summary: Rezept löschen
       description: >
         Löscht ein Rezept und alle zugehörigen Zutaten, Schritte,
-        Bewertungen und Lesezeichen. Nur der Eigentümer darf löschen –
-        und nur innerhalb von 30 Minuten nach dem Erstellen. Danach ist
-        keine Löschung mehr möglich; stattdessen kann eine
-        Moderations-Anfrage gestellt werden. Administratoren können
-        jederzeit löschen.
+        Bewertungen und Lesezeichen. Entwürfe können jederzeit vom
+        Eigentümer gelöscht werden. Veröffentlichte Rezepte können nur
+        innerhalb von 30 Minuten nach der Veröffentlichung gelöscht
+        werden. Administratoren können jederzeit löschen.
       tags: [Recipe]
       security:
         - BearerAuth: []
@@ -10878,6 +11128,57 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Rezept-Entwurf veröffentlichen
+      description: >
+        Veröffentlicht einen Rezept-Entwurf. Das Rezept wird von "Entwurf"
+        auf "Veröffentlicht" gesetzt und ist danach öffentlich sichtbar.
+        Der Erstellungszeitpunkt wird auf den Veröffentlichungszeitpunkt
+        gesetzt (relevant für die 30-Minuten-Löschfrist).
+        Nur der Eigentümer oder ein Administrator darf veröffentlichen.
+      tags: [Recipe]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Rezept-ID
+      responses:
+        '200':
+          description: Rezept erfolgreich veröffentlicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecipeDetailResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Recht zum Veröffentlichen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Rezept ist bereits veröffentlicht
           content:
             application/json:
               schema:

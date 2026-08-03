@@ -31,6 +31,7 @@ final readonly class RecipeController
         'invalid_image_format' => ['error' => 'invalid_image_format', 'status' => 400],
         'unsupported_image_format' => ['error' => 'unsupported_image_format', 'status' => 400],
         'image_dimensions_too_large' => ['error' => 'image_dimensions_too_large', 'status' => 400],
+        'already_published' => ['error' => 'already_published', 'status' => 409],
     ];
 
     public function __construct(
@@ -75,6 +76,10 @@ final readonly class RecipeController
 
         $recipe = $this->recipeService->getRecipe($args['id'], $userId);
         if ($recipe === null) {
+            return ResponseFactory::json(['error' => 'recipe_not_found'], 404, $response);
+        }
+
+        if ($recipe['isDraft'] && $recipe['creatorId'] !== $userId) {
             return ResponseFactory::json(['error' => 'recipe_not_found'], 404, $response);
         }
 
@@ -343,7 +348,11 @@ final readonly class RecipeController
             return ResponseFactory::noContent($response);
         }
 
-        if (!$this->policy->canDelete($user, $existing['creatorId'], $existing['createdAt'])) {
+        if ($existing['isDraft'] && $existing['creatorId'] !== $user->id && !$user->isAdmin) {
+            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        }
+
+        if (!$this->policy->canDelete($user, $existing['creatorId'], $existing['createdAt'], $existing['isDraft'])) {
             if ($user->id !== $existing['creatorId']) {
                 return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
             }
@@ -490,6 +499,39 @@ final readonly class RecipeController
 
         $result = $this->recipeService->listBookmarks($user->id, $page, $limit);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    public function listDrafts(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        $result = $this->recipeService->listDrafts($user->id, $page, $limit);
+        return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    public function publish(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $id = $args['id'];
+
+        $existing = $this->recipeService->getRecipe($id, $user->id);
+        if ($existing === null) {
+            return ResponseFactory::json(['error' => 'recipe_not_found'], 404, $response);
+        }
+
+        if (!$this->policy->canPublish($user, $existing['creatorId'])) {
+            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        }
+
+        try {
+            $recipe = $this->recipeService->publishRecipe($id, $user->id);
+            return ResponseFactory::json(['data' => $recipe], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
+        }
     }
 
     private function errorResponse(string $message, ResponseInterface $response): ResponseInterface

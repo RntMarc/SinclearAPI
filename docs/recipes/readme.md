@@ -10,11 +10,28 @@ Zubereitungsschritte, die direkt im API-Response verschachtelt zurückgegeben we
 
 | Tabelle | Beschreibung |
 |---------|-------------|
-| `Recipe` | Haupttabelle mit allen Rezeptdaten |
+| `Recipe` | Haupttabelle mit allen Rezeptdaten (inkl. `isDraft`-Status) |
 | `RecipeIngredient` | Zutaten für ein Rezept (Menge, Einheit, Name) |
 | `RecipeStep` | Zubereitungsschritte (Kategorie, Beschreibung) |
 | `RecipeReview` | Bewertungen (1-5 Sterne + optionale Anmerkung) |
 | `RecipeBookmark` | Lesezeichen der Nutzer |
+
+## Entwürfe (Drafts)
+
+Rezepte können als **Entwurf** gespeichert werden (`isDraft: true`). Entwürfe
+sind **nur für den Ersteller sichtbar** und erscheinen nicht in den öffentlichen
+Rezept-Listen. Der Nutzer kann Entwürfe jederzeit über den dedizierten Endpunkt
+abrufen, bearbeiten oder veröffentlichen.
+
+**Workflow:**
+1. Rezept erstellen mit `isDraft: true` (Standard) oder ohne `isDraft`-Feld
+2. Entwurf über `GET /recipes/drafts` einsehen
+3. Entwurf über `PATCH /recipes/{id}` bearbeiten
+4. Entwurf über `POST /recipes/{id}/publish veröffentlichen`
+5. Nach Veröffentlichung: 30-Minuten-Löschfrist beginnt
+
+**Wichtig:** Entwürfe können **jederzeit** gelöscht werden (keine Zeitbeschränkung).
+Veröffentlichte Rezepte unterliegen der 30-Minuten-Löschfrist.
 
 ## Endpunkte
 
@@ -102,6 +119,22 @@ GET /recipes?page=&limit=&search=&sort=
 | `search` | string | Volltextsuche in Titel und Zutaten |
 | `sort` | string | `created_asc`, `created_desc`, `rating_asc`, `rating_desc` |
 
+> **Hinweis:** Diese Liste zeigt nur **veröffentlichte** Rezepte (`isDraft = false`).
+
+### Rezept-Entwürfe auflisten
+
+```
+GET /recipes/drafts?page=&limit=
+```
+
+| Parameter | Typ | Beschreibung |
+|-----------|-----|-------------|
+| `page` | int | Seitennummer (Standard: 1) |
+| `limit` | int | Einträge pro Seite (max. 100, Standard: 20) |
+
+Gibt eine paginierte Liste **aller eigenen Rezepte** zurück (Entwürge und
+veröffentlichte), sortiert nach Erstellungszeitpunkt (neueste zuerst).
+
 ### Rezept erstellen
 
 ```
@@ -116,6 +149,7 @@ POST /recipes
   "dietaryTags": "vegetarisch",
   "image": "base64...",
   "servings": 12,
+  "isDraft": true,
   "ingredients": [
     { "amount": 250, "unit": "g", "name": "Mehl", "order": 0 }
   ],
@@ -124,6 +158,10 @@ POST /recipes
   ]
 }
 ```
+
+**Entwurf-Status (`isDraft`):**
+- `true` (Standard): Rezept wird als Entwurf gespeichert (nur für Ersteller sichtbar)
+- `false`: Rezept wird direkt veröffentlicht (öffentlich sichtbar)
 
 **Rezeptbild:**
 Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild.
@@ -174,7 +212,10 @@ GET /recipes/{id}
 ```
 
 Response enthält vollständige Details inkl. `ingredients`, `steps`, `avgRating`,
-`ratingCount` und `isBookmarked`.
+`ratingCount`, `isBookmarked` und `isDraft`.
+
+> **Hinweis:** Entwürfe sind nur für den Ersteller sichtbar. Für andere Nutzer
+> wird `recipe_not_found` (HTTP 404) zurückgegeben.
 
 ### Rezept aktualisieren
 
@@ -185,6 +226,31 @@ PATCH /recipes/{id}
 Nur Eigentümer oder Administrator. Zutaten und Schritte werden komplett ersetzt,
 wenn sie im Request-Body enthalten sind.
 
+Das `isDraft`-Feld kann ebenfalls aktualisiert werden:
+- `true`: Zurück zu Entwurf
+- `false`: Veröffentlichen (empfohlen: `POST /recipes/{id}/publish` verwenden)
+
+### Rezept veröffentlichen
+
+```
+POST /recipes/{id}/publish
+```
+
+Veröffentlicht einen Rezept-Entwurf. Das Rezept wird von "Entwurf" auf
+"Veröffentlicht" gesetzt und ist danach öffentlich sichtbar. Der
+Erstellungszeitpunkt wird auf den Veröffentlichungszeitpunkt gesetzt
+(relevant für die 30-Minuten-Löschfrist).
+
+Nur der Eigentümer oder ein Administrator darf veröffentlichen.
+
+**Fehlercodes:**
+
+| Code | Beschreibung |
+|------|-------------|
+| `recipe_not_found` | Rezept nicht gefunden |
+| `forbidden` | Kein Recht zum Veröffentlichen |
+| `already_published` | Rezept ist bereits veröffentlicht (HTTP 409) |
+
 ### Rezept löschen
 
 ```
@@ -193,9 +259,12 @@ DELETE /recipes/{id}
 
 Löscht das Rezept und alle zugehörigen Zutaten, Schritte, Bewertungen und Lesezeichen.
 
-**Einschränkung (30-Minuten-Fenster):** Der Eigentümer kann ein Rezept nur
-innerhalb von 30 Minuten nach dem Erstellen löschen. Danach ist keine Löschung
-mehr möglich – stattdessen kann über `POST /moderation-requests`
+**Entwürfe:** Können **jederzeit** vom Eigentümer gelöscht werden (keine
+Zeitbeschränkung).
+
+**Veröffentlichte Rezepte:** Der Eigentümer kann ein Rezept nur innerhalb
+von 30 Minuten nach der **Veröffentlichung** löschen. Danach ist keine
+Löschung mehr möglich – stattdessen kann über `POST /moderation-requests`
 (eine Lösch-Anfrage, siehe `docs/moderation-requests/readme.md`) gestellt werden.
 Administratoren (`isAdmin = true`) können jederzeit löschen.
 
@@ -225,9 +294,12 @@ Nach Ablauf des Fensters antwortet der Endpunkt mit `edit_window_expired` (HTTP 
 |--------|-------------|
 | Rezept erstellen | Jeder authentifizierte Nutzer |
 | Rezept bearbeiten | Eigentümer oder Administrator |
-| Rezept löschen | Eigentümer (nur 30 Min. nach Erstellung) oder Administrator |
-| Rezept ansehen (privat) | Jeder authentifizierte Nutzer |
+| Rezept löschen (Entwurf) | Eigentümer (jederzeit) oder Administrator |
+| Rezept löschen (veröffentlicht) | Eigentümer (nur 30 Min. nach Veröffentlichung) oder Administrator |
+| Rezept veröffentlichen | Eigentümer oder Administrator |
+| Rezept ansehen (privat) | Nur Eigentümer (Entwürfe) oder jeder authentifizierte Nutzer (veröffentlicht) |
 | Rezept ansehen (öffentlich) | `/public/recipes`, `/public/recipes/{id}` ohne Login, anonymisiert |
+| Entwürfe auflisten | Nur der Eigentümer |
 | Bewertung abgeben | Jeder authentifizierte Nutzer |
 | Bewertung bearbeiten | Eigentümer der Bewertung |
 | Bewertung löschen | Eigentümer der Bewertung oder Administrator |
