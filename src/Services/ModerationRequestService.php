@@ -2,17 +2,33 @@
 
 namespace Sinclear\Api\Services;
 
+use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
+use Sinclear\Api\Repository\DiscoverReviewRepository;
+use Sinclear\Api\Repository\FeedbackCommentRepository;
+use Sinclear\Api\Repository\FeedbackSuggestionRepository;
+use Sinclear\Api\Repository\FeedPostCommentRepository;
 use Sinclear\Api\Repository\FeedPostRepository;
 use Sinclear\Api\Repository\ModerationRequestRepository;
 use Sinclear\Api\Repository\RecipeRepository;
+use Sinclear\Api\Repository\RecipeReviewRepository;
+use Sinclear\Api\Repository\SubscriptionRepository;
+use Sinclear\Api\Repository\TravelEventRepository;
+use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\TravelTicketRepository;
 use Sinclear\Api\Repository\UserRepository;
 
 final readonly class ModerationRequestService
 {
     public const array VALID_REQUEST_TYPES = ['report', 'deletion', 'other'];
 
-    public const array VALID_OBJECT_TYPES = ['user', 'forum_post', 'recipe', 'explore_place'];
+    public const array VALID_OBJECT_TYPES = [
+        'user', 'forum_post', 'recipe', 'explore_place',
+        'recipe_review', 'forum_comment', 'explore_comment',
+        'feedback_suggestion', 'feedback_comment',
+        'travel_trip', 'travel_event', 'travel_accommodation', 'travel_ticket',
+        'subscription', 'calendar_event',
+    ];
 
     public const array VALID_STATUSES = [
         'unread', 'read', 'in_work', 'external_contact',
@@ -25,6 +41,16 @@ final readonly class ModerationRequestService
         private DiscoverPlaceRepository $placeRepo,
         private FeedPostRepository $postRepo,
         private UserRepository $userRepo,
+        private RecipeReviewRepository $recipeReviewRepo,
+        private FeedPostCommentRepository $feedPostCommentRepo,
+        private DiscoverReviewRepository $discoverReviewRepo,
+        private FeedbackSuggestionRepository $feedbackSuggestionRepo,
+        private FeedbackCommentRepository $feedbackCommentRepo,
+        private TravelEventRepository $travelEventRepo,
+        private TravelTicketRepository $travelTicketRepo,
+        private TravelRelationRepository $travelRelationRepo,
+        private SubscriptionRepository $subscriptionRepo,
+        private CalendarEventRepository $calendarEventRepo,
     ) {}
 
     public function createRequest(
@@ -143,8 +169,37 @@ final readonly class ModerationRequestService
             'explore_place' => $this->placeRepo->findById($objectId)['creatorId'] ?? null,
             'forum_post' => $this->postRepo->findById($objectId)['userId'] ?? null,
             'user' => $this->userRepo->findById($objectId) !== null ? $objectId : null,
+
+            'recipe_review' => $this->recipeReviewRepo->findById($objectId)['userId'] ?? null,
+            'forum_comment' => $this->feedPostCommentRepo->findById($objectId)['userId'] ?? null,
+            'explore_comment' => $this->discoverReviewRepo->findById($objectId)['userId'] ?? null,
+            'feedback_suggestion' => $this->feedbackSuggestionRepo->findById($objectId)['userId'] ?? null,
+            'feedback_comment' => $this->feedbackCommentRepo->findById($objectId)['userId'] ?? null,
+            'calendar_event' => $this->calendarEventRepo->findById($objectId)['creatorId'] ?? null,
+
+            'travel_ticket' => $this->travelTicketRepo->findById($objectId)['user'] ?? null,
+
+            'travel_trip' => $this->resolveFirstParticipant(
+                $this->travelRelationRepo->findParticipantsByTrip($objectId),
+            ),
+            'travel_event' => $this->resolveFirstParticipant(
+                $this->travelEventRepo->findParticipantsByEvent($objectId),
+            ),
+            'travel_accommodation' => $this->resolveFirstParticipant(
+                $this->travelRelationRepo->findUsersByAccommodation($objectId),
+            ),
+
+            'subscription' => $this->resolveFirstParticipant(
+                $this->subscriptionRepo->findParticipants($objectId),
+            ),
+
             default => null,
         };
+    }
+
+    private function resolveFirstParticipant(array $participants): ?string
+    {
+        return $participants[0]['id'] ?? $participants[0]['userId'] ?? null;
     }
 
     private function formatRequest(array $r): array

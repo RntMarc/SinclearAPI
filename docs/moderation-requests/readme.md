@@ -20,7 +20,7 @@ Schema: `events/moderation_request_schema.sql`
 | `id` | varchar(191) | Eindeutige ID (UUIDv7) |
 | `userId` | varchar(191) | ID des Nutzers, der die Anfrage abgeschickt hat |
 | `requestType` | enum | `report`, `deletion`, `other` |
-| `objectType` | enum | `user`, `forum_post`, `recipe`, `explore_place` |
+| `objectType` | enum | `user`, `forum_post`, `recipe`, `explore_place`, `recipe_review`, `forum_comment`, `explore_comment`, `feedback_suggestion`, `feedback_comment`, `travel_trip`, `travel_event`, `travel_accommodation`, `travel_ticket`, `subscription`, `calendar_event` |
 | `objectId` | varchar(191) | ID des Objekts, auf das sich die Anfrage bezieht |
 | `message` | text | Ausführliche Beschreibung des Anliegens |
 | `status` | enum | Bearbeitungsstatus (siehe unten) |
@@ -39,12 +39,23 @@ Schema: `events/moderation_request_schema.sql`
 
 **`objectType` (Art des Objekts):**
 
-| Wert | Bedeutung |
-|------|-----------|
-| `user` | Nutzerprofil |
-| `forum_post` | Forumsbeitrag |
-| `recipe` | Rezept |
-| `explore_place` | Entdecken-Ort |
+| Wert | Bedeutung | Eigentümer |
+|------|-----------|------------|
+| `user` | Nutzerprofil | Referenz-User selbst |
+| `forum_post` | Forumsbeitrag | `userId` des Beitrags |
+| `recipe` | Rezept | `creatorId` des Rezepts |
+| `explore_place` | Entdecken-Ort | `creatorId` des Orts |
+| `recipe_review` | Rezept-Bewertung | `userId` der Bewertung |
+| `forum_comment` | Forums-Kommentar | `userId` des Kommentars |
+| `explore_comment` | Orts-Kommentar | `userId` des Kommentars |
+| `feedback_suggestion` | Funktionsvorschlag | `userId` des Vorschlags |
+| `feedback_comment` | Kommentar zum Vorschlag | `userId` des Kommentars |
+| `travel_trip` | Reise | Erster Teilnehmer (Join-Tabelle `TravelRelation`) |
+| `travel_event` | Reise-Event | Erster Teilnehmer (Join-Tabelle `EventRelation`) |
+| `travel_accommodation` | Unterkunft | Erster Teilnehmer (Join-Tabelle `TravelRelation`) |
+| `travel_ticket` | Reise-Ticket | `user`-Feld des Tickets |
+| `subscription` | Abo/Zahlung | Erster Teilnehmer (Join-Tabelle `SubscriptionRelation`) |
+| `calendar_event` | Kalender-Event | `creatorId` des Events |
 
 **`status` (Bearbeitungsstatus):**
 
@@ -69,6 +80,15 @@ Schema: `events/moderation_request_schema.sql`
   `cannot_request_deletion_foreign` (403) abgelehnt.
 - `other` unterliegt keiner Besitzprüfung.
 - Das referenzierte Objekt muss existieren, sonst `object_not_found` (404).
+
+### Eigentümer-Ermittlung
+
+Für Einzelobjekte (Rezepte, Beiträge, Bewertungen, Kommentare, Vorschläge,
+Kalender-Events, Tickets) wird der Eigentümer direkt aus der Tabelle gelesen
+(`userId` oder `creatorId`). Für kollaborative Objekte (Reisen, Events,
+Unterkünfte, Abos) wird der erste Teilnehmer aus der jeweiligen Join-Tabelle
+als Eigentümer verwendet. Dies betrifft die Besitzprüfung bei `report` und
+`deletion`.
 
 ## Endpunkte
 

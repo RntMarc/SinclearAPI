@@ -223,3 +223,19 @@ mit den Nutzern und damit der Reise verknüpft.
 
 Die Tabelle `EventRelation` verknüpft Nutzer mit `TravelEvent.ID` und wird
 sowohl für Reise-Events als auch für Standalone-Events genutzt.
+
+## Moderation
+
+Reisen, Reise-Events, Unterkünfte und Tickets können über das
+Melde- und Anfragensystem gemeldet werden. Für kollaborative Objekte
+(Reisen, Events, Unterkünfte) wird der erste Teilnehmer aus der jeweiligen
+Join-Tabelle als Eigentümer verwendet.
+
+| objectType | Beschreibung | Eigentümer |
+|------------|-------------|------------|
+| `travel_trip` | Reise | Erster Teilnehmer (`TravelRelation`) |
+| `travel_event` | Reise-Event | Erster Teilnehmer (`EventRelation`) |
+| `travel_accommodation` | Unterkunft | Erster Teilnehmer (`TravelRelation`) |
+| `travel_ticket` | Reise-Ticket | `user`-Feld des Tickets |
+
+Details siehe `docs/moderation-requests/readme.md`.

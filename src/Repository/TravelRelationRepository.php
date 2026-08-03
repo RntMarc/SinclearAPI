@@ -68,6 +68,20 @@ final readonly class TravelRelationRepository
         $stmt->execute([$userId, $tripId]);
     }
 
+    /** @return list<array<string, mixed>> */
+    public function findUsersByAccommodation(string $accommodationId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT u.id, u.displayName, u.image
+             FROM TravelRelation r
+             JOIN User u ON u.id = r.userid
+             WHERE r.accommodation = ?
+             ORDER BY u.displayName ASC'
+        );
+        $stmt->execute([$accommodationId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function updateAccommodation(string $userId, string $tripId, ?string $accommodationId): void
     {
         $stmt = $this->pdo->prepare(

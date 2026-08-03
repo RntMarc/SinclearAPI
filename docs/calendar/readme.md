@@ -144,6 +144,17 @@ Folgende Benachrichtigungs-Codes werden von der Kalender-Funktion verwendet:
 
 Beim Löschen (`DELETE /calendar/{id}`) wird keine Benachrichtigung versendet.
 
+## Moderation
+
+Kalender-Events können über das Melde- und Anfragensystem gemeldet werden.
+Der Eigentümer ist der Ersteller des Events (`creatorId`).
+
+| objectType | Beschreibung | Eigentümer |
+|------------|-------------|------------|
+| `calendar_event` | Kalender-Event | `creatorId` des Events |
+
+Details siehe `docs/moderation-requests/readme.md`.
+
 ## SQL-Migration
 
 Die Migration befindet sich in `events/calendar_schema.sql`:

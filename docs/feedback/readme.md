@@ -205,6 +205,11 @@ DELETE /feedback/suggestions/{id}/comments/{commentId}
 - Eigentümer des Kommentars
 - Administratoren
 
+Fremde Kommentare können über `POST /moderation-requests` mit
+`objectType: "feedback_comment"` gemeldet werden.
+Vorschläge können mit `objectType: "feedback_suggestion"` gemeldet oder
+zur Löschung beantragt werden (siehe `docs/moderation-requests/readme.md`).
+
 ### Hinweis: Kaskaden-Löschen
 
 Wenn ein Funktionsvorschlag gelöscht wird, werden automatisch **alle**

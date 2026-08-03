@@ -122,3 +122,14 @@ Teilnehmer entfernen.
 - **Controller:** `SubscriptionController.php` (API) + `AdminController.php` (Dashboard)
 - **Policy:** `SubscriptionPolicy.php`
 - **Templates:** `templates/admin/subscriptions.php`, `templates/admin/subscription_detail.php`
+
+## Moderation
+
+Abonnements können über das Melde- und Anfragensystem gemeldet werden.
+Der Eigentümer ist der erste Teilnehmer aus der `SubscriptionRelation`-Tabelle.
+
+| objectType | Beschreibung | Eigentümer |
+|------------|-------------|------------|
+| `subscription` | Abo/Zahlung | Erster Teilnehmer (`SubscriptionRelation`) |
+
+Details siehe `docs/moderation-requests/readme.md`.

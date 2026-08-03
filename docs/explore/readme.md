@@ -437,6 +437,10 @@ Löschen von Bewertungen zu Entdecken-Orten. Der Ersteller einer Bewertung
 sowie Administratoren dürfen eine Bewertung bearbeiten oder löschen.
 Ein Nutzer kann mehrere Bewertungen zu demselben Ort abgeben.
 
+Fremde Bewertungen können über `POST /moderation-requests` mit
+`objectType: "explore_comment"` gemeldet werden
+(siehe `docs/moderation-requests/readme.md`).
+
 ### Endpunkte
 
 | Methode | Pfad | Auth | Beschreibung |

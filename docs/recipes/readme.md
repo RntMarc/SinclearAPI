@@ -288,6 +288,11 @@ Nach Ablauf des Fensters antwortet der Endpunkt mit `edit_window_expired` (HTTP 
 | `PATCH` | `/recipes/{id}/reviews/{reviewId}` | Bewertung bearbeiten (nur Eigentümer) |
 | `DELETE` | `/recipes/{id}/reviews/{reviewId}` | Bewertung löschen (Eigentümer/Admin) |
 
+Bewertungen können nicht gemeldet werden, da sie vom Eigentümer jederzeit
+gelöscht werden können. Fremde Bewertungen können über
+`POST /moderation-requests` mit `objectType: "recipe_review"` gemeldet werden
+(siehe `docs/moderation-requests/readme.md`).
+
 ## Autorisierung
 
 | Aktion | Berechtigung |

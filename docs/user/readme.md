@@ -295,3 +295,14 @@ level-2-Daten sehen kann.
 - **`OtpToken`** – 6-stellige Codes für Login und E-Mail-Änderung
 - **`WebauthnChallenge`** – OAuth2-State-Speicher für Discord-Login und Discord-Relink
 - **`RefreshToken` / `RefreshTokenFamily`** – Sitzungsverwaltung (werden bei E-Mail-Änderung gelöscht)
+
+## Moderation
+
+Nutzerprofile können über das Melde- und Anfragensystem gemeldet werden.
+Der Eigentümer ist der referenzierte Nutzer selbst.
+
+| objectType | Beschreibung | Eigentümer |
+|------------|-------------|------------|
+| `user` | Nutzerprofil | Referenz-User selbst |
+
+Details siehe `docs/moderation-requests/readme.md`.

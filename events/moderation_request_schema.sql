@@ -8,7 +8,13 @@ CREATE TABLE IF NOT EXISTS `ModerationRequest` (
   `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `requestType` enum('report','deletion','other') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `objectType` enum('user','forum_post','recipe','explore_place') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `objectType` enum(
+    'user','forum_post','recipe','explore_place',
+    'recipe_review','forum_comment','explore_comment',
+    'feedback_suggestion','feedback_comment',
+    'travel_trip','travel_event','travel_accommodation','travel_ticket',
+    'subscription','calendar_event'
+  ) COLLATE utf8mb4_unicode_ci NOT NULL,
   `objectId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `message` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` enum('unread','read','in_work','external_contact','public_decision','accepted','denied','postponed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'unread',
@@ -21,3 +27,14 @@ CREATE TABLE IF NOT EXISTS `ModerationRequest` (
   KEY `idx_moderation_object` (`objectType`, `objectId`),
   KEY `idx_moderation_request_type` (`requestType`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Für bestehende Datenbanken: objectType-Enum um neue Typen erweitern
+-- Führen Sie diesen Befehl nur aus, wenn die Tabelle bereits existiert:
+-- ALTER TABLE `ModerationRequest`
+--   MODIFY COLUMN `objectType` enum(
+--     'user','forum_post','recipe','explore_place',
+--     'recipe_review','forum_comment','explore_comment',
+--     'feedback_suggestion','feedback_comment',
+--     'travel_trip','travel_event','travel_accommodation','travel_ticket',
+--     'subscription','calendar_event'
+--   ) COLLATE utf8mb4_unicode_ci NOT NULL;
