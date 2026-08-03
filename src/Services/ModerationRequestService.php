@@ -162,22 +162,22 @@ final readonly class ModerationRequestService
         return $this->requestRepo->getStatusCounts();
     }
 
-    private function resolveOwner(string $objectType, string $objectId): ?string
+private function resolveOwner(string $objectType, string $objectId): ?string
     {
         return match ($objectType) {
-            'recipe' => $this->recipeRepo->findById($objectId)['creatorId'] ?? null,
-            'explore_place' => $this->placeRepo->findById($objectId)['creatorId'] ?? null,
-            'forum_post' => $this->postRepo->findById($objectId)['userId'] ?? null,
+            'recipe' => $this->safeGet($this->recipeRepo->findById($objectId), 'creatorId'),
+            'explore_place' => $this->safeGet($this->placeRepo->findById($objectId), 'creatorId'),
+            'forum_post' => $this->safeGet($this->postRepo->findById($objectId), 'userId'),
             'user' => $this->userRepo->findById($objectId) !== null ? $objectId : null,
 
-            'recipe_review' => $this->recipeReviewRepo->findById($objectId)['userId'] ?? null,
-            'forum_comment' => $this->feedPostCommentRepo->findById($objectId)['userId'] ?? null,
-            'explore_comment' => $this->discoverReviewRepo->findById($objectId)['userId'] ?? null,
-            'feedback_suggestion' => $this->feedbackSuggestionRepo->findById($objectId)['userId'] ?? null,
-            'feedback_comment' => $this->feedbackCommentRepo->findById($objectId)['userId'] ?? null,
-            'calendar_event' => $this->calendarEventRepo->findById($objectId)['creatorId'] ?? null,
+            'recipe_review' => $this->safeGet($this->recipeReviewRepo->findById($objectId), 'userId'),
+            'forum_comment' => $this->safeGet($this->feedPostCommentRepo->findById($objectId), 'userId'),
+            'explore_comment' => $this->safeGet($this->discoverReviewRepo->findById($objectId), 'userId'),
+            'feedback_suggestion' => $this->safeGet($this->feedbackSuggestionRepo->findById($objectId), 'userId'),
+            'feedback_comment' => $this->safeGet($this->feedbackCommentRepo->findById($objectId), 'userId'),
+            'calendar_event' => $this->safeGet($this->calendarEventRepo->findById($objectId), 'creatorId'),
 
-            'travel_ticket' => $this->travelTicketRepo->findById($objectId)['user'] ?? null,
+            'travel_ticket' => $this->safeGet($this->travelTicketRepo->findById($objectId), 'user'),
 
             'travel_trip' => $this->resolveFirstParticipant(
                 $this->travelRelationRepo->findParticipantsByTrip($objectId),
@@ -197,8 +197,16 @@ final readonly class ModerationRequestService
         };
     }
 
+    private function safeGet(?array $row, string $key): ?string
+    {
+        return $row[$key] ?? null;
+    }
+
     private function resolveFirstParticipant(array $participants): ?string
     {
+        if ($participants === []) {
+            return null;
+        }
         return $participants[0]['id'] ?? $participants[0]['userId'] ?? null;
     }
 
