@@ -346,7 +346,7 @@ final class McpServer
                 'content' => [
                     [
                         'type' => 'text',
-                        'text' => 'Authentifizierung erforderlich. Bitte senden Sie einen gültigen API-Key im X-Mcp-Key Header.',
+                        'text' => 'Authentifizierung erforderlich. Bitte senden Sie einen gültigen API-Key im Authorization Header (Bearer <key>) oder X-Mcp-Key Header.',
                     ],
                 ],
                 'isError' => true,
