@@ -3295,10 +3295,11 @@ components:
           description: Anzahl der Portionen
         isDraft:
           type: boolean
-          default: true
+          default: false
           description: >-
             Entwurf-Status. true = Entwurf (nur für Ersteller sichtbar),
-            false = Direkt veröffentlichen. Standard: true.
+            false = Direkt veröffentlichen. Standard: false.
+            Für Entwürfe via MCP wird isDraft explizit gesetzt.
         ingredients:
           type: array
           items:

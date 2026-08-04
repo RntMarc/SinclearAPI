@@ -97,6 +97,9 @@ final readonly class RecipeService
             'servings' => array_key_exists('servings', $data)
                 ? $this->validateServings($data['servings'])
                 : $recipe['servings'],
+            'isDraft' => array_key_exists('isDraft', $data)
+                ? (!empty($data['isDraft']) ? 1 : 0)
+                : (int) $recipe['isDraft'],
         ]);
 
         if (array_key_exists('ingredients', $data)) {

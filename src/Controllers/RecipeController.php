@@ -119,6 +119,14 @@ final readonly class RecipeController
             return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(404);
         }
 
+        if ($recipe['isDraft'] && $recipe['creatorId'] !== $userId) {
+            $response->getBody()->write(
+                '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>Rezept nicht gefunden</title></head>'
+                . '<body><h1>Rezept nicht gefunden</h1></body></html>'
+            );
+            return $response->withHeader('Content-Type', 'text/html; charset=utf-8')->withStatus(404);
+        }
+
         if (!$authUser instanceof AuthenticatedUser) {
             $recipe = $this->recipeService->sanitizeRecipePublic($recipe);
         }

@@ -24,7 +24,7 @@ Rezept-Listen. Der Nutzer kann Entwürfe jederzeit über den dedizierten Endpunk
 abrufen, bearbeiten oder veröffentlichen.
 
 **Workflow:**
-1. Rezept erstellen mit `isDraft: true` (Standard) oder ohne `isDraft`-Feld
+1. Rezept erstellen mit `isDraft: true` (wird als Entwurf gespeichert; ohne `isDraft`-Feld wird direkt veröffentlicht)
 2. Entwurf über `GET /recipes/drafts` einsehen
 3. Entwurf über `PATCH /recipes/{id}` bearbeiten
 4. Entwurf über `POST /recipes/{id}/publish veröffentlichen`
@@ -160,8 +160,8 @@ POST /recipes
 ```
 
 **Entwurf-Status (`isDraft`):**
-- `true` (Standard): Rezept wird als Entwurf gespeichert (nur für Ersteller sichtbar)
-- `false`: Rezept wird direkt veröffentlicht (öffentlich sichtbar)
+- `false` (Standard): Rezept wird direkt veröffentlicht (öffentlich sichtbar)
+- `true`: Rezept wird als Entwurf gespeichert (nur für Ersteller sichtbar)
 
 **Rezeptbild:**
 Das optionale `image`-Feld akzeptiert ein Base64-kodiertes Bild.

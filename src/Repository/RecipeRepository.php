@@ -59,7 +59,7 @@ final readonly class RecipeRepository
             $data['dietaryTags'] ?? null,
             $data['image'] ?? null,
             $data['servings'] ?? 4,
-            $data['isDraft'] ?? 1,
+            (int) ($data['isDraft'] ?? 1),
             $id,
         ]);
     }
