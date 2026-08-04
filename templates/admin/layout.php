@@ -123,6 +123,7 @@
             <a href="/api/v2/admin/" class="nav-link" data-path="/api/v2/admin/">Dashboard</a>
             <a href="/api/v2/admin/users" class="nav-link" data-path="/api/v2/admin/users">Nutzer</a>
             <a href="/api/v2/admin/forums" class="nav-link" data-path="/api/v2/admin/forums">Foren</a>
+            <a href="/api/v2/admin/recipes" class="nav-link" data-path="/api/v2/admin/recipes">Rezepte</a>
             <a href="/api/v2/admin/travel" class="nav-link" data-path="/api/v2/admin/travel">Reisen & Events</a>
             <a href="/api/v2/admin/subscriptions" class="nav-link" data-path="/api/v2/admin/subscriptions">Abonnements</a>
             <a href="/api/v2/admin/explore/submissions" class="nav-link" data-path="/api/v2/admin/explore/submissions">Orte-Einreichungen</a>

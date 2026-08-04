@@ -344,6 +344,8 @@ return function (App $app): void {
         $group->post('/forums', [AdminController::class, 'createForum']);
         $group->put('/forums/{id}', [AdminController::class, 'updateForum']);
         $group->delete('/forums/{id}', [AdminController::class, 'deleteForum']);
+        $group->get('/recipes', [AdminController::class, 'recipes']);
+        $group->delete('/recipes/{id}', [AdminController::class, 'deleteRecipe']);
         $group->get('/travel', [AdminController::class, 'travel']);
         $group->post('/travel/trips', [AdminController::class, 'createTrip']);
         $group->put('/travel/trips/{id}', [AdminController::class, 'updateTrip']);

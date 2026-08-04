@@ -127,6 +127,21 @@ final readonly class RecipeRepository
         ];
     }
 
+    public function listAll(): array
+    {
+        $dataStmt = $this->pdo->prepare(
+            'SELECT r.*, u.displayName AS creatorDisplayName, u.image AS creatorImage,
+                    ROUND(AVG(rv.rating), 1) AS avg_rating, COUNT(DISTINCT rv.id) AS rating_count
+             FROM Recipe r
+             LEFT JOIN User u ON u.id = r.creatorId
+             LEFT JOIN RecipeReview rv ON rv.recipeId = r.id
+             GROUP BY r.id
+             ORDER BY r.createdAt DESC'
+        );
+        $dataStmt->execute();
+        return $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function listByCreator(string $creatorId, int $page, int $limit): array
     {
         $countStmt = $this->pdo->prepare(

@@ -21,6 +21,7 @@ use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\ModerationRequestService;
+use Sinclear\Api\Repository\RecipeRepository;
 use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\SubscriptionService;
 
@@ -59,6 +60,7 @@ final readonly class AdminController
         private TravelTicketRepository $ticketRepo,
         private PlaceSubmissionService $submissionService,
         private ModerationRequestService $moderationRequestService,
+        private RecipeRepository $recipeRepo,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -1128,6 +1130,77 @@ ROW;
         $userId = $args['userId'];
 
         $this->eventRelationRepo->removeByEventAndUser($eventId, $userId);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function recipes(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $allRecipes = $this->recipeRepo->listAll();
+
+        $categoryLabels = [
+            'vorspeisen' => 'Vorspeisen',
+            'hauptgerichte' => 'Hauptgerichte',
+            'desserts' => 'Desserts',
+            'salate' => 'Salate',
+            'suppen' => 'Suppen',
+            'backen' => 'Backen',
+            'fruehstueck' => 'Frühstück',
+            'getraenke' => 'Getränke',
+            'sonstiges' => 'Sonstiges',
+        ];
+
+        $rows = '';
+        foreach ($allRecipes as $r) {
+            $id = htmlspecialchars($r['id']);
+            $title = htmlspecialchars($r['title']);
+            $category = htmlspecialchars($categoryLabels[$r['category']] ?? $r['category']);
+            $creator = htmlspecialchars($r['creatorDisplayName'] ?? 'Unbekannt');
+            $avgRating = $r['avg_rating'] !== null ? $r['avg_rating'] : '–';
+            $ratingCount = (int) ($r['rating_count'] ?? 0);
+            $ratingDisplay = $avgRating !== '–' ? "{$avgRating} ({$ratingCount})" : '–';
+            $statusBadge = ($r['isDraft'] ?? 0) == 1
+                ? '<span class="badge" style="background:#f59e0b;color:#000">Entwurf</span>'
+                : '<span class="badge" style="background:#22c55e;color:#000">Veröffentlicht</span>';
+            $createdAt = date('d.m.Y H:i', strtotime($r['createdAt']));
+            $rows .= <<<ROW
+            <tr>
+                <td>{$title}</td>
+                <td>{$category}</td>
+                <td>{$creator}</td>
+                <td>{$ratingDisplay}</td>
+                <td>{$statusBadge}</td>
+                <td>{$createdAt}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editRecipePlaceholder('{$id}', '{$title}')">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteRecipe('{$id}', '{$title}')">Löschen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        if ($rows === '') {
+            $rows = '<tr><td colspan="7" style="text-align:center;color:#666;padding:2rem;">Keine Rezepte vorhanden</td></tr>';
+        }
+
+        $contentHtml = $this->renderTemplate('recipes.php', ['rows' => $rows]);
+        $html = $this->renderLayout('Rezepte', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function deleteRecipe(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $id = $args['id'];
+
+        $recipe = $this->recipeRepo->findById($id);
+        if ($recipe === null) {
+            return ResponseFactory::json(['error' => 'recipe_not_found'], 404, $response);
+        }
+
+        $this->recipeRepo->delete($id);
         return ResponseFactory::noContent($response);
     }
 

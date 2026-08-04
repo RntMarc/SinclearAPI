@@ -7177,6 +7177,67 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /admin/recipes:
+    get:
+      summary: Admin-Rezepteverwaltung
+      description: >
+        Gibt die HTML-Seite für die Rezepteverwaltung zurück mit allen
+        Rezepten (einschließlich Entwürfen) in Tabellenansicht.
+      tags: [Admin]
+      responses:
+        '200':
+          description: Rezepte-HTML-Seite
+          content:
+            text/html: {}
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/recipes/{id}:
+    delete:
+      summary: Admin-Rezept löschen
+      description: >
+        Löscht ein Rezept inklusive aller zugehörigen Zutaten, Schritte,
+        Bewertungen und Lesezeichen.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Rezept-ID
+      responses:
+        '204':
+          description: Rezept gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Rezept nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /admin/travel:
     get:
       summary: Admin-Reisen & Events
