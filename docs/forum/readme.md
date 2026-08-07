@@ -65,6 +65,7 @@ Nutzer können beitreten und eigene Beiträge verfassen.
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
 | `GET` | `/forums` | JWT | Alle Foren auflisten (`all=1` für inkl. Reise-Foren) |
+| `GET` | `/forums/feed` | JWT | Post-Feed über alle sichtbaren Foren (neueste zuerst) |
 | `POST` | `/forums` | JWT + Admin | Neues Forum erstellen |
 | `GET` | `/forums/{id}` | JWT | Forum-Details abrufen |
 | `PUT` | `/forums/{id}` | JWT + Admin | Forum bearbeiten |
@@ -109,6 +110,20 @@ Foren können mit einer Reise verknüpft werden (über `TravelTrip.forumId`).
 GET /forums?page=1&limit=20
 → 200 { "data": [...], "meta": { "page": 1, "limit": 20, "total": 5, "totalPages": 1 } }
 ```
+
+### Post-Feed über alle Foren
+```
+GET /forums/feed?page=1&limit=20
+→ 200 { "data": [...], "meta": { "page": 1, "limit": 20, "total": 42, "totalPages": 3 } }
+```
+
+Zeigt die neuesten Posts über alle Foren gemischt, sortiert nach Erstellungsdatum
+(absteigend). Es werden nur Foren einbezogen, die der Nutzer sehen kann
+(öffentliche Foren + Reise-Foren, in denen er Mitglied ist).
+
+Jeder Eintrag enthält zusätzlich:
+- `forumName`: Name des Forums (zur Anzeige)
+- `forumId`: Forum-ID (für Navigation)
 
 ### Forum erstellen (Admin)
 ```

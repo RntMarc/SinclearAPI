@@ -2947,6 +2947,27 @@ components:
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
+    FeedPostFeedItem:
+      allOf:
+        - $ref: '#/components/schemas/FeedPost'
+        - type: object
+          required: [forumName]
+          properties:
+            forumName:
+              type: string
+              description: Name des Forums (Anzeige)
+
+    FeedPostFeedListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/FeedPostFeedItem'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
     FeedPostCreateRequest:
       type: object
       required: [content]
@@ -10004,6 +10025,48 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Kein Admin-Recht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /forums/feed:
+    get:
+      summary: Post-Feed über alle sichtbaren Foren
+      description: >
+        Gibt eine paginierte Liste der neuesten Posts über alle Foren
+        zurück, die der eingeloggte Nutzer sehen kann (öffentliche
+        Foren + Reise-Foren, in denen er Mitglied ist). Sortiert
+        nach Erstellungsdatum (absteigend). Jeder Eintrag enthält
+        zusätzlich den Namen des Forums zur Anzeige.
+      tags: [Forum]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Paginierte Liste der Feed-Posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPostFeedListResponse'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

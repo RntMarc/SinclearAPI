@@ -254,6 +254,17 @@ final readonly class ForumService
         $this->postRepo->delete($postId);
     }
 
+    public function listFeed(string $userId, int $page, int $limit): array
+    {
+        $result = $this->postRepo->listFeedPosts($page, $limit, $userId);
+        $result['data'] = array_map(
+            fn(array $p) => $this->formatPost($p, $userId),
+            $result['data']
+        );
+
+        return $result;
+    }
+
     public function listPosts(string $forumId, int $page, int $limit, ?string $userId): array
     {
         $forum = $this->forumRepo->findById($forumId);
@@ -546,6 +557,10 @@ final readonly class ForumService
         }
         if (isset($p['commentCount'])) {
             $result['commentCount'] = (int) $p['commentCount'];
+        }
+
+        if (isset($p['forumName'])) {
+            $result['forumName'] = $p['forumName'];
         }
 
         return $result;

@@ -59,6 +59,50 @@ final readonly class FeedPostRepository
         ];
     }
 
+    public function listFeedPosts(int $page, int $limit, string $userId): array
+    {
+        $forumFilter = 'p.forumId NOT IN (
+            SELECT tt.forumId FROM TravelTrip tt
+            WHERE tt.forumId IS NOT NULL
+            AND tt.forumId NOT IN (SELECT fm.forumId FROM ForumMember fm WHERE fm.userId = ?)
+        )';
+
+        $countStmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM FeedPosts p WHERE $forumFilter"
+        );
+        $countStmt->execute([$userId]);
+        $total = (int) $countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+
+        $sql = 'SELECT p.*, f.name AS forumName, u.displayName AS userDisplayName, u.image AS userImage,'
+            . ' COUNT(v.id) AS upvoteCount, COUNT(fc.id) AS commentCount,'
+            . ' COALESCE(MAX(CASE WHEN v.userId = ? THEN 1 END), 0) AS hasVoted'
+            . ' FROM FeedPosts p'
+            . ' JOIN Forum f ON f.id = p.forumId'
+            . ' LEFT JOIN FeedPostVote v ON v.postId = p.id'
+            . ' LEFT JOIN FeedPostComment fc ON fc.postId = p.id AND fc.text IS NOT NULL'
+            . ' LEFT JOIN User u ON u.id = p.userId'
+            . " WHERE $forumFilter"
+            . ' GROUP BY p.id'
+            . ' ORDER BY p.createdAt DESC'
+            . ' LIMIT ? OFFSET ?';
+
+        $dataStmt = $this->pdo->prepare($sql);
+        $dataStmt->execute([$userId, $userId, $limit, $offset]);
+        $rows = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'data' => $rows,
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function create(array $data): string
     {
         $id = Uuid::uuid7()->toString();

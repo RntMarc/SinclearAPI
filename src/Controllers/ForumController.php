@@ -43,6 +43,17 @@ final readonly class ForumController
 
     // ── Forum CRUD ─────────────────────────────────────────
 
+    public function listFeed(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        $result = $this->forumService->listFeed($user->id, $page, $limit);
+        return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);

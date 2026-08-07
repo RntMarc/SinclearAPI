@@ -272,6 +272,7 @@ return function (App $app): void {
     $app->group('/forums', function (RouteCollectorProxy $group) {
         // Forum CRUD
         $group->get('', [ForumController::class, 'list']);
+        $group->get('/feed', [ForumController::class, 'listFeed']);
         $group->post('', [ForumController::class, 'create']);
         $group->get('/{id}', [ForumController::class, 'get']);
         $group->put('/{id}', [ForumController::class, 'update']);
