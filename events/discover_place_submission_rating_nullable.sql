@@ -1,0 +1,1 @@
+ALTER TABLE DiscoverPlaceSubmission MODIFY COLUMN rating TINYINT DEFAULT NULL;

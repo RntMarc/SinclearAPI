@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS DiscoverPlaceSubmission (
     photo         TEXT,
     mapLink       TEXT,
     website       TEXT,
-    rating        TINYINT NOT NULL,
+    rating        TINYINT DEFAULT NULL,
     comment       TEXT DEFAULT NULL,
     note          TEXT DEFAULT NULL,
     status        ENUM('pending','approved','rejected','transferred') NOT NULL DEFAULT 'pending',
