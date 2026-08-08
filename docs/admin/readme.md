@@ -131,6 +131,22 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |
 
+## Responsive Layout
+
+Das Admin-Dashboard ist vollständig responsiv und passt sich jeder Displaygröße
+an (z. B. Smartphones im Hochformat):
+
+- **Desktop (≥ 992px):** Seitliche Navigation ist dauerhaft sichtbar.
+- **Mobile (< 992px):** Die Navigation wird zu einem Off-Canvas-Drawer, der über
+  den Hamburger-Button in der Topbar geöffnet wird. Ein Klick auf einen
+  Navigationslink, das Overlay oder `Escape` schließt ihn wieder.
+- Tabellen werden auf kleinen Displays horizontal scrollbar (kein Überlaufen
+  des Layouts).
+- Mehrspaltige Formulare (`.form-row`) und Detail-Grids (`.detail-grid`) stapeln
+  sich auf Mobile vertikal.
+- Modals (`.modal`) sind zentriert und bei kleinen Bildschirmen vertikal
+  scrollbar.
+
 ## Erweiterung
 
 Neue Admin-Seiten können nach dem gleichen Muster ergänzt werden:

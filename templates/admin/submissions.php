@@ -3,7 +3,7 @@
         <h1>Orte-Einreichungen</h1>
         <div class="subtitle">Manuell eingereichte Orte, die auf Admin-Prüfung warten</div>
     </div>
-    <div style="display:flex;gap:0.5rem;align-items:center;">
+    <div class="header-actions">
         <select id="statusFilter" onchange="filterStatus()" style="padding:0.5rem 0.8rem;border-radius:8px;background:#1a1a2e;border:1px solid #0f3460;color:#fff;font-size:0.9rem;">
             {{statusFilterOptions}}
         </select>

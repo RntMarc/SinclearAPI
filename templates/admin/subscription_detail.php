@@ -41,8 +41,8 @@
     </table>
 </div>
 
-<div id="addParticipantModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-    <div class="card" style="width:500px; max-width:90vw;">
+<div id="addParticipantModal" class="modal">
+    <div class="card">
         <h2 style="margin-bottom:1.5rem;">Teilnehmer hinzufügen</h2>
         <form id="addParticipantForm" onsubmit="return addParticipant(event)">
             <div class="form-group" style="position:relative;">

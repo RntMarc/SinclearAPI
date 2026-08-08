@@ -25,8 +25,8 @@
     </table>
 </div>
 
-<div id="createModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; display:none; align-items:center; justify-content:center;">
-    <div class="card" style="width:500px; max-width:90vw;">
+<div id="createModal" class="modal">
+    <div class="card">
         <h2 style="margin-bottom:1.5rem;">Neues Abo erstellen</h2>
         <form id="createForm" onsubmit="return createSubscription(event)">
             <div class="form-group">
@@ -55,8 +55,8 @@
     </div>
 </div>
 
-<div id="editModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
-    <div class="card" style="width:500px; max-width:90vw;">
+<div id="editModal" class="modal">
+    <div class="card">
         <h2 style="margin-bottom:1.5rem;">Abo bearbeiten</h2>
         <form id="editForm" onsubmit="return updateSubscription(event)">
             <input type="hidden" id="editId">

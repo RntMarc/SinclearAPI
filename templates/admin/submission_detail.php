@@ -6,7 +6,7 @@
     <a href="/api/v2/admin/explore/submissions" class="btn">← Zurück</a>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+<div class="detail-grid">
     <div class="card">
         <h2 style="font-size:1.1rem;margin-bottom:1rem;">Details</h2>
         <table>

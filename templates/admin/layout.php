@@ -15,6 +15,15 @@
             display: flex; flex-direction: column; flex-shrink: 0;
             border-right: 1px solid #0f3460;
         }
+        .sidebar-overlay { display: none; }
+        .topbar { display: none; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; }
+        .topbar .logo { margin: 0; padding: 0; border-bottom: none; font-size: 1.15rem; }
+        .sidebar-toggle {
+            display: none; background: #0f3460; border: none; color: #eee;
+            font-size: 1.3rem; line-height: 1; padding: 0.5rem 0.8rem;
+            border-radius: 8px; cursor: pointer;
+        }
+        .sidebar-toggle:hover { background: #1a4a8a; }
         .logo {
             font-size: 1.25rem; font-weight: 700; color: #5865F2;
             margin-bottom: 2rem; padding-bottom: 1rem;
@@ -32,7 +41,8 @@
             margin-top: auto; padding-top: 1rem; border-top: 1px solid #0f3460;
             font-size: 0.8rem; color: #888;
         }
-        .main { flex: 1; padding: 2rem; overflow-y: auto; }
+        .main { flex: 1; padding: 2rem; overflow-y: auto; min-width: 0; }
+        body { overflow-x: hidden; }
         .page-header {
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 2rem;
@@ -114,10 +124,53 @@
         .mb-2 { margin-bottom: 1rem; }
         .flex { display: flex; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .header-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+        .modal {
+            position: fixed; inset: 0; z-index: 1000;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.7); padding: 1rem; overflow-y: auto;
+        }
+        .modal .card { width: 100%; max-width: 500px; }
+        img { max-width: 100%; height: auto; }
+
+        @media (max-width: 991px) {
+            .topbar { display: flex; }
+            .sidebar-toggle { display: inline-block; }
+            .sidebar {
+                position: fixed; top: 0; left: 0; bottom: 0;
+                width: min(85vw, 300px);
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+                overflow-y: auto; z-index: 1100;
+                border-right: none;
+                box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+            }
+            body.sidebar-open .sidebar { transform: translateX(0); }
+            body.sidebar-open .sidebar-overlay {
+                display: block; position: fixed; inset: 0;
+                background: rgba(0,0,0,0.55); z-index: 1050;
+            }
+            .sidebar nav a { font-size: 0.95rem; padding: 0.65rem 0.8rem; }
+            .main { padding: 1rem; }
+            .card { padding: 1rem; }
+            .page-header { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+            .page-header h1 { font-size: 1.25rem; }
+            .form-row { grid-template-columns: 1fr; gap: 1rem; }
+            .detail-grid { grid-template-columns: 1fr; }
+            .flex { flex-wrap: wrap; gap: 0.5rem; }
+            .flex-between { flex-wrap: wrap; gap: 0.5rem; }
+            .card-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+            .stat-card { padding: 1.5rem 1rem; }
+            table { display: block; width: 100%; overflow-x: auto; white-space: nowrap; }
+            .toast { left: 1.25rem; right: 1.25rem; bottom: 1.25rem; text-align: center; }
+        }
     </style>
 </head>
 <body>
-    <aside class="sidebar">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <aside class="sidebar" id="sidebar">
         <div class="logo">⚙ Sinclear Admin</div>
         <nav>
             <a href="/api/v2/admin/" class="nav-link" data-path="/api/v2/admin/">Dashboard</a>
@@ -136,12 +189,33 @@
         </div>
     </aside>
     <main class="main">
+        <div class="topbar">
+            <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" aria-label="Menü öffnen">☰</button>
+            <div class="logo">⚙ Sinclear Admin</div>
+        </div>
         {{content}}
     </main>
     <script>
         function logout() {
             window.location.href = '/api/v2/admin/logout';
         }
+
+        function toggleSidebar() {
+            document.body.classList.toggle('sidebar-open');
+        }
+
+        function closeSidebar() {
+            document.body.classList.remove('sidebar-open');
+        }
+
+        // Close drawer on nav click, overlay click or Escape
+        document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
+        document.querySelectorAll('.sidebar nav a').forEach(function(link) {
+            link.addEventListener('click', closeSidebar);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeSidebar();
+        });
 
         function showToast(message, type = 'success') {
             const el = document.createElement('div');
