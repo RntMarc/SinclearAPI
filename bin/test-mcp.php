@@ -110,6 +110,18 @@ $toolNames = array_column($data['result']['tools'] ?? [], 'name');
 $hasTool = in_array('get_documentation', $toolNames, true);
 test('tools/list enthält get_documentation', $resp['status'] === 200 && $hasTool, 'Tools: ' . implode(', ', $toolNames));
 
+// --- 3b. tools/list: get_documentation enum enthält dynamische Topics ---
+$docSchema = null;
+foreach ($data['result']['tools'] ?? [] as $tool) {
+    if ($tool['name'] === 'get_documentation') {
+        $docSchema = $tool['inputSchema'];
+    }
+}
+$topicEnum = $docSchema['properties']['topic']['enum'] ?? [];
+$requiredEnum = ['notifications/list', 'travel', 'openapi', 'index'];
+$enumMissing = array_values(array_filter($requiredEnum, static fn (string $t): bool => !in_array($t, $topicEnum, true)));
+test('get_documentation enum enthält alle Topics', !empty($topicEnum) && $enumMissing === [], 'enum: ' . count($topicEnum) . ' Topics' . ($enumMissing !== [] ? ' (fehlt: ' . implode(', ', $enumMissing) . ')' : ''));
+
 // --- 4. tools/call index (Übersicht) ---
 $resp = send('POST', '', [
     'jsonrpc' => '2.0',
@@ -134,10 +146,22 @@ $text = $data['result']['content'][0]['text'] ?? '';
 $ok = $resp['status'] === 200 && ($data['result']['isError'] ?? true) === false && str_contains($text, 'Travel');
 test('tools/call topic=travel', $ok, 'Zeichen: ' . strlen($text));
 
-// --- 6. tools/call openapi als strukturiertes JSON ---
+// --- 5b. tools/call verschachteltes Markdown-Doc (notifications/list) ---
 $resp = send('POST', '', [
     'jsonrpc' => '2.0',
     'id' => 5,
+    'method' => 'tools/call',
+    'params' => ['name' => 'get_documentation', 'arguments' => ['topic' => 'notifications/list']],
+]);
+$data = json_decode($resp['body'], true);
+$text = $data['result']['content'][0]['text'] ?? '';
+$ok = $resp['status'] === 200 && ($data['result']['isError'] ?? true) === false && str_contains($text, 'Benachrichtigungen');
+test('tools/call topic=notifications/list', $ok, 'Zeichen: ' . strlen($text));
+
+// --- 6. tools/call openapi als strukturiertes JSON ---
+$resp = send('POST', '', [
+    'jsonrpc' => '2.0',
+    'id' => 6,
     'method' => 'tools/call',
     'params' => ['name' => 'get_documentation', 'arguments' => ['topic' => 'openapi', 'format' => 'json']],
 ]);
@@ -155,7 +179,7 @@ test('tools/call topic=openapi format=json', $ok, 'Endpunkte: ' . count($parsed[
 // --- 7. tools/call unbekanntes Thema → isError ---
 $resp = send('POST', '', [
     'jsonrpc' => '2.0',
-    'id' => 6,
+    'id' => 7,
     'method' => 'tools/call',
     'params' => ['name' => 'get_documentation', 'arguments' => ['topic' => 'gibt-es-nicht']],
 ]);
@@ -166,7 +190,7 @@ test('tools/call unbekanntes Thema → isError', $ok);
 // --- 8. Unbekannte Methode → JSON-RPC-Fehler -32601 ---
 $resp = send('POST', '', [
     'jsonrpc' => '2.0',
-    'id' => 7,
+    'id' => 8,
     'method' => 'resources/list',
 ]);
 $data = json_decode($resp['body'], true);

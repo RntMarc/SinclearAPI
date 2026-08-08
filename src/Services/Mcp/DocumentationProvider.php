@@ -59,9 +59,14 @@ final class DocumentationProvider
 
         foreach ($this->collectMarkdownFiles() as $relative) {
             $relative = strtolower($relative);
-            $topics[] = str_starts_with($relative, 'readme.md')
+            $topic = str_starts_with($relative, 'readme.md')
                 ? 'readme'
                 : substr($relative, 0, -3);
+            $topics[] = $topic;
+
+            if (str_ends_with($relative, '/readme.md')) {
+                $topics[] = rtrim(substr($relative, 0, -9), '/');
+            }
         }
 
         sort($topics, SORT_STRING);

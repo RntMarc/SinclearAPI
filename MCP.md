@@ -34,6 +34,12 @@ Wenn ein Topic angefordert wird, versucht der Server drei Kandidaten:
 2. Mit `.md`-Endung (z.B. `notifications/list.md`)
 3. Als `readme.md` im Unterverzeichnis (z.B. `notifications/list/readme.md`)
 
+### Tool-Schema (`get_documentation`)
+
+Die `inputSchema` des Tools `get_documentation` enthält **alle** verfügbaren Topics als `enum`-Werte, nicht nur die Kern-Themen. Das `enum` wird zur Laufzeit aus dem `docs/`-Scan generiert (`DocumentationProvider::availableTopics()`), damit MCP-Clients jede Datei direkt anfragen können.
+
+**Wichtig:** Das `enum` darf **nie** auf die Kern-Themen (`index`, `openapi`, `mcp`, `cron`) beschränkt werden. Viele MCP-Clients validieren die Argumente streng gegen das `enum` und blockieren sonst gültige Anfragen (z.B. `notifications/list`).
+
 ## Regeln für Entwickler
 
 ### Regel 1: Dokumentation bei API-Änderungen
@@ -71,7 +77,9 @@ Bei jeder Änderung an der Dokumentation oder am MCP-Server sollte geprüft werd
 1. Sind alle `docs/`-Dateien über den MCP-Server erreichbar?
 2. Wird das `index`-Topic korrekt generiert?
 3. Funktioniert die Topic-Resolution für alle Dateien?
-4. Enthält `AGENTS.md` den Verweis auf `MCP.md`?
+4. Ist das `enum` des Tools `get_documentation` dynamisch (`availableTopics()`), nicht auf Kern-Themen beschränkt?
+5. Enthält `AGENTS.md` den Verweis auf `MCP.md`?
+6. Test via `php bin/test-mcp.php` (gegen laufende API) ausgeführt?
 
 ## Fehlerbehandlung
 

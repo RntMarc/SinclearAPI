@@ -156,8 +156,8 @@ final class McpServer
                 'properties' => [
                     'topic' => [
                         'type' => 'string',
-                        'description' => 'Dokumentationsthema. Kern-Themen: index (Übersicht), openapi (OpenAPI-Spezifikation), mcp (MCP-Server), cron (Cron-Jobs). Zusätzlich jede Markdown-Datei aus docs/, z.B. "travel", "auth/login", "user", "calendar", "recipes".',
-                        'enum' => $this->provider->coreTopics(),
+                        'description' => 'Dokumentationsthema. Kern-Themen: index (Übersicht aller Themen), openapi (OpenAPI-Spezifikation), mcp (MCP-Server), cron (Cron-Jobs). Zusätzlich wird JEDE Markdown-Datei in docs/ als Thema unterstützt, z.B. "travel", "auth/login", "user", "calendar", "recipes", "notifications/list", "app/updates". "index" liefert die vollständige, dynamische Übersicht aller verfügbaren Themen.',
+                        'enum' => $this->provider->availableTopics(),
                     ],
                     'format' => [
                         'type' => 'string',
