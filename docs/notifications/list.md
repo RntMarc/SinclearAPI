@@ -44,7 +44,7 @@ Nach jeder Änderung an der Benachrichtigungslogik MUSS diese Datei aktuell geha
 
 ## Rezepte
 
-- [ ] `recipe.review_created` – Jemand bewertet ein Rezept → Rezept-Ersteller (nicht Reviewer)
+- [x] `recipe.review_created` – Jemand bewertet ein Rezept → Rezept-Ersteller (nicht Reviewer)
 
 ## Reisen
 
@@ -68,19 +68,19 @@ Nach jeder Änderung an der Benachrichtigungslogik MUSS diese Datei aktuell geha
 
 ## Entdecken / Explore
 
-- [ ] `explore.place_reviewed` – Jemand bewertet einen Ort → Orts-Ersteller (nicht Reviewer)
+- [x] `explore.place_reviewed` – Jemand bewertet einen Ort → Orts-Ersteller (nicht Reviewer)
 
 ## Feedback
 
-- [ ] `feedback.status_changed` – Admin ändert Status eines Vorschlags → Vorschlags-Autor
-- [ ] `feedback.suggestion_commented` – Kommentar zu einem Vorschlag → Vorschlags-Autor (nicht Commentator)
-- [ ] `feedback.suggestion_comment_replied` – Antwort auf Kommentar → alle Eltern-Kommentare inkl. Vorschlags-Autor (außer Antworendem)
+- [x] `feedback.status_changed` – Admin ändert Status eines Vorschlags → Vorschlags-Autor
+- [x] `feedback.suggestion_commented` – Kommentar zu einem Vorschlag → Vorschlags-Autor (nicht Commentator)
+- [x] `feedback.suggestion_comment_replied` – Antwort auf Kommentar → alle Eltern-Kommentare inkl. Vorschlags-Autor (außer Antworendem)
 
 ## Abos / Subscriptions
 
-- [ ] `subscription.participant_added` – Teilnehmer zu Abo hinzugefügt → der neue Teilnehmer
-- [ ] `subscription.billing_updated` – Abrechungsdaten geändert → alle Teilnehmer (außer Änderndem)
+- [x] `subscription.participant_added` – Teilnehmer zu Abo hinzugefügt → der neue Teilnehmer
+- [x] `subscription.billing_updated` – Abrechungsdaten geändert → alle Teilnehmer (außer Änderndem)
 
 ## Moderation
 
-- [ ] `moderation.request_resolved` – Admin bearbeitet Meldung → Meldungs-Einreicher
+- [x] `moderation.request_resolved` – Admin bearbeitet Meldung → Meldungs-Einreicher

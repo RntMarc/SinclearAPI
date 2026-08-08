@@ -8,6 +8,7 @@ final readonly class SubscriptionService
 {
     public function __construct(
         private SubscriptionRepository $subscriptionRepo,
+        private NotificationService $notificationService,
     ) {}
 
     public function listByUser(string $userId, bool $adminAll = false): array
@@ -64,6 +65,29 @@ final readonly class SubscriptionService
 
         $this->subscriptionRepo->update($id, $data);
 
+        $billingFields = ['billingPeriodStart', 'billingPeriodEnd', 'basePrice'];
+        $billingChanged = array_intersect_key($data, array_flip($billingFields)) !== [];
+
+        if ($billingChanged) {
+            try {
+                $participants = $this->subscriptionRepo->findParticipants($id);
+                foreach ($participants as $p) {
+                    if (!empty($p['userId'])) {
+                        $this->notificationService->createNotification(
+                            userId: $p['userId'],
+                            code: 'subscription.billing_updated',
+                            payload: [
+                                'subscriptionId' => $id,
+                                'subscriptionName' => $subscription['name'] ?? '',
+                            ],
+                        );
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('subscription.billing_updated notification failed: ' . $e->getMessage());
+            }
+        }
+
         $subscription = $this->subscriptionRepo->findById($id);
         return $this->enrichAdmin($subscription);
     }
@@ -97,7 +121,25 @@ final readonly class SubscriptionService
         $participantData = array_merge($data, ['subscriptionId' => $subscriptionId]);
         $participantId = $this->subscriptionRepo->addParticipant($participantData);
 
-        return $this->subscriptionRepo->findParticipantById($participantId);
+        $participant = $this->subscriptionRepo->findParticipantById($participantId);
+
+        try {
+            if (!empty($participant['userId'])) {
+                $this->notificationService->createNotification(
+                    userId: $participant['userId'],
+                    code: 'subscription.participant_added',
+                    payload: [
+                        'subscriptionId' => $subscriptionId,
+                        'subscriptionName' => $subscription['name'] ?? '',
+                        'participantId' => $participantId,
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('subscription.participant_added notification failed: ' . $e->getMessage());
+        }
+
+        return $participant;
     }
 
     public function removeParticipant(string $participantId): void

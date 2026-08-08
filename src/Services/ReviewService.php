@@ -4,6 +4,7 @@ namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
+use Sinclear\Api\Repository\UserRepository;
 
 final readonly class ReviewService
 {
@@ -13,6 +14,8 @@ final readonly class ReviewService
         private DiscoverReviewRepository $reviewRepo,
         private DiscoverPlaceRepository $placeRepo,
         private ImageService $imageService,
+        private NotificationService $notificationService,
+        private UserRepository $userRepo,
     ) {}
 
     public function listReviews(string $placeId, int $page, int $limit): array
@@ -42,6 +45,26 @@ final readonly class ReviewService
         ]);
 
         $review = $this->reviewRepo->findById($id);
+
+        try {
+            if ($place['creatorId'] !== $userId) {
+                $reviewer = $this->userRepo->findById($userId);
+                $this->notificationService->createNotification(
+                    userId: $place['creatorId'],
+                    code: 'explore.place_reviewed',
+                    payload: [
+                        'placeId' => $placeId,
+                        'placeName' => $place['name'] ?? '',
+                        'reviewId' => $id,
+                        'rating' => $rating,
+                        'actorDisplayName' => $reviewer['displayName'] ?? '',
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('explore.place_reviewed notification failed: ' . $e->getMessage());
+        }
+
         return $this->formatReview($review);
     }
 
