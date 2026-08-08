@@ -45,7 +45,6 @@ Nach jeder Änderung an der Benachrichtigungslogik MUSS diese Datei aktuell geha
 ## Rezepte
 
 - [ ] `recipe.review_created` – Jemand bewertet ein Rezept → Rezept-Ersteller (nicht Reviewer)
-- [ ] ~~`recipe.bookmarked`~~ – ~~Jemand bookmarkt ein Rezept → Rezept-Ersteller~~ **Wird nicht implementiert. Lesezeichen lösen keine Benachrichtigungen aus.**
 
 ## Reisen
 

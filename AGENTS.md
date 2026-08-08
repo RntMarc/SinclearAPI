@@ -16,6 +16,12 @@ After every change to the API (routes, controllers, DTOs, or ResourceRegistry), 
 1. Update the relevant documentation files in `docs/` to reflect the changes.
 2. Ensure that all flows, endpoints, and configuration are accurately documented.
 
+## MCP-Server
+Der MCP-Server (`sinclear-docs-mcp`) stellt die gesamte Dokumentation aus `docs/` über das Tool `get_documentation` bereit. Alle `.md`-Dateien werden automatisch als Topics gescannt.
+
+**Requirement:**
+Die Datei `MCP.md` enthält die vollständigen Regeln für MCP-Server-Pflege und Wartung. Bei jeder Änderung an der Dokumentation oder am MCP-Server MUSS `MCP.md` konsultiert und bei Bedarf aktualisiert werden.
+
 ## Cron-Jobs / Geplante Aufgaben
 Das Projekt verwendet eine zentrale `bin/cron.php` als Taktgeber. Tasks werden in `src/Services/Cron/Tasks/` als Klassen implementiert und in `bin/cron.php` registriert.
 
