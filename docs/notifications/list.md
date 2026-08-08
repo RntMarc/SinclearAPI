@@ -37,10 +37,10 @@ Nach jeder Änderung an der Benachrichtigungslogik MUSS diese Datei aktuell geha
 
 ## Forum
 
-- [ ] `forum.new_post` – Neuer Post in einem Forum → alle Mitglieder mit `notificationsEnabled=true` (außer Autor)
-- [ ] `forum.post_commented` – Kommentar zu einem Post → Post-Autor (nicht Commentator)
-- [ ] `forum.comment_replied` – Antwort auf Kommentar (Thread) → alle Eltern-Kommentare inkl. Post-Autor (außer Antworendem)
-- [ ] `forum.post_upvoted` – Upvote auf einen Post → Post-Autor (nicht Voter)
+- [x] `forum.new_post` – Neuer Post in einem Forum → alle Mitglieder mit `notificationsEnabled=true` (außer Autor)
+- [x] `forum.post_commented` – Kommentar zu einem Post → Post-Autor (nicht Commentator)
+- [x] `forum.comment_replied` – Antwort auf Kommentar (Thread) → alle Eltern-Kommentare inkl. Post-Autor (außer Antworendem)
+- [x] `forum.post_upvoted` – Upvote auf einen Post → Post-Autor (nicht Voter)
 
 ## Rezepte
 
@@ -55,17 +55,17 @@ Nach jeder Änderung an der Benachrichtigungslogik MUSS diese Datei aktuell geha
 
 ### Reise-Forum (verknüpftes Forum)
 
-- [ ] `forum.new_post` – Neuer Post im Reise-Forum → alle Reise-Teilnehmer (immer, kein Opt-out)
-- [ ] `forum.post_commented` – Kommentar im Reise-Forum → Post-Autor (nicht Commentator)
-- [ ] `forum.comment_replied` – Antwort auf Kommentar im Reise-Forum → alle Eltern-Kommentare inkl. Post-Autor (außer Antworendem)
-- [ ] `forum.post_upvoted` – Upvote im Reise-Forum → Post-Autor (nicht Voter)
+- [x] `forum.new_post` – Neuer Post im Reise-Forum → alle Reise-Teilnehmer (immer, kein Opt-out)
+- [x] `forum.post_commented` – Kommentar im Reise-Forum → Post-Autor (nicht Commentator)
+- [x] `forum.comment_replied` – Antwort auf Kommentar im Reise-Forum → alle Eltern-Kommentare inkl. Post-Autor (außer Antworendem)
+- [x] `forum.post_upvoted` – Upvote im Reise-Forum → Post-Autor (nicht Voter)
 
 ### Reise-Events & Unterkünfte
 
-- [ ] `travel.participant_added` – Teilnehmer zu Reise hinzugefügt → der neue Teilnehmer
-- [ ] `travel.event_created` – Neues Event in einer Reise → alle Teilnehmer des Events (außer Ersteller)
-- [ ] `travel.event_updated` – Reise-Event geändert → alle Teilnehmer des Events (außer Änderndem)
-- [ ] `travel.accommodation_changed` – Unterkunft geändert → alle Nutzer dieser Unterkunft (außer Änderndem)
+- [x] `travel.participant_added` – Teilnehmer zu Reise hinzugefügt → der neue Teilnehmer
+- [x] `travel.event_created` – Neues Event in einer Reise → alle Teilnehmer des Events (außer Ersteller)
+- [x] `travel.event_updated` – Reise-Event geändert → alle Teilnehmer des Events (außer Änderndem)
+- [x] `travel.accommodation_changed` – Unterkunft geändert → alle Nutzer dieser Unterkunft (außer Änderndem)
 
 ## Entdecken / Explore
 

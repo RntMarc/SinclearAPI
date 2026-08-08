@@ -9,6 +9,7 @@ use Sinclear\Api\Repository\TravelTicketRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\ForumRepository;
+use Sinclear\Api\Repository\UserRepository;
 
 final readonly class TravelService
 {
@@ -20,6 +21,8 @@ final readonly class TravelService
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
         private ForumRepository $forumRepo,
         private TravelTicketRepository $ticketRepo,
+        private NotificationService $notificationService,
+        private UserRepository $userRepo,
     ) {}
 
     public function listTrips(string $userId, int $page, int $limit): array

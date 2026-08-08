@@ -448,6 +448,28 @@ ROW;
         ]);
 
         $event = $this->eventRepo->findById($id);
+
+        if ($tripId !== null) {
+            try {
+                $trip = $this->tripRepo->findById($tripId);
+                $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
+                foreach ($participants as $p) {
+                    $this->notificationService->createNotification(
+                        userId: $p['id'],
+                        code: 'travel.event_created',
+                        payload: [
+                            'tripId' => $tripId,
+                            'tripTitle' => $trip['name'] ?? '',
+                            'eventId' => $id,
+                            'eventTitle' => $name,
+                        ],
+                    );
+                }
+            } catch (\Throwable $e) {
+                error_log('Travel event_created notification failed: ' . $e->getMessage());
+            }
+        }
+
         return ResponseFactory::json(['data' => $event], 201, $response);
     }
 
@@ -507,6 +529,28 @@ ROW;
 
         $this->eventRepo->update($id, $data);
         $updated = $this->eventRepo->findById($id);
+
+        if ($updated['trip'] !== null) {
+            try {
+                $trip = $this->tripRepo->findById($updated['trip']);
+                $participants = $this->eventRelationRepo->findParticipantsByEvent($id);
+                foreach ($participants as $p) {
+                    $this->notificationService->createNotification(
+                        userId: $p['id'],
+                        code: 'travel.event_updated',
+                        payload: [
+                            'tripId' => $updated['trip'],
+                            'tripTitle' => $trip['name'] ?? '',
+                            'eventId' => $id,
+                            'eventTitle' => $updated['name'] ?? '',
+                        ],
+                    );
+                }
+            } catch (\Throwable $e) {
+                error_log('Travel event_updated notification failed: ' . $e->getMessage());
+            }
+        }
+
         return ResponseFactory::json(['data' => $updated], 200, $response);
     }
 
@@ -846,6 +890,19 @@ ROW;
 
         $relationId = $this->travelRelationRepo->addParticipant($userId, $tripId, $accommodation);
 
+        try {
+            $this->notificationService->createNotification(
+                userId: $userId,
+                code: 'travel.participant_added',
+                payload: [
+                    'tripId' => $tripId,
+                    'tripTitle' => $trip['name'] ?? '',
+                ],
+            );
+        } catch (\Throwable $e) {
+            error_log('Travel participant_added notification failed: ' . $e->getMessage());
+        }
+
         return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
     }
 
@@ -959,6 +1016,23 @@ ROW;
 
         $this->accommodationRepo->update($id, $data);
         $updated = $this->accommodationRepo->findById($id);
+
+        try {
+            $users = $this->travelRelationRepo->findUsersByAccommodation($id);
+            foreach ($users as $u) {
+                $this->notificationService->createNotification(
+                    userId: $u['id'],
+                    code: 'travel.accommodation_changed',
+                    payload: [
+                        'accommodationId' => $id,
+                        'accommodationName' => $updated['name'] ?? '',
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('Travel accommodation_changed notification failed: ' . $e->getMessage());
+        }
+
         return ResponseFactory::json(['data' => $updated], 200, $response);
     }
 

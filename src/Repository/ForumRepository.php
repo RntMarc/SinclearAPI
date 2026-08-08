@@ -76,6 +76,16 @@ final readonly class ForumRepository
         return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
+    public function findTripByForumId(string $forumId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM TravelTrip WHERE forumId = ? LIMIT 1'
+        );
+        $stmt->execute([$forumId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
     public function create(array $data): string
     {
         $id = Uuid::uuid7()->toString();

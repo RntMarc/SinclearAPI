@@ -7,6 +7,8 @@ use Sinclear\Api\Repository\FeedPostRepository;
 use Sinclear\Api\Repository\FeedPostVoteRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
 use Sinclear\Api\Repository\ForumRepository;
+use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\UserRepository;
 
 final readonly class ForumService
 {
@@ -22,6 +24,9 @@ final readonly class ForumService
         private FeedPostVoteRepository $voteRepo,
         private FeedPostCommentRepository $commentRepo,
         private ImageService $imageService,
+        private NotificationService $notificationService,
+        private TravelRelationRepository $travelRelationRepo,
+        private UserRepository $userRepo,
     ) {}
 
     // ── Forum ──────────────────────────────────────────────
@@ -223,7 +228,11 @@ final readonly class ForumService
             'content' => $content,
         ]);
 
-        return $this->formatPost($this->postRepo->findById($id), $userId);
+        $post = $this->postRepo->findById($id);
+
+        $this->notifyNewPost($forumId, $post, $userId);
+
+        return $this->formatPost($post, $userId);
     }
 
     public function updatePost(string $forumId, string $postId, string $userId, mixed $content): array
@@ -310,6 +319,8 @@ final readonly class ForumService
         }
 
         $this->voteRepo->create($postId, $userId);
+
+        $this->notifyPostUpvoted($post, $userId);
     }
 
     public function removeVote(string $postId, string $userId): void
@@ -377,6 +388,9 @@ final readonly class ForumService
         ]);
 
         $comment = $this->commentRepo->findById($id);
+
+        $this->notifyNewComment($post, $comment, $userId, $parentId);
+
         return $this->formatComment($comment);
     }
 
@@ -579,5 +593,154 @@ final readonly class ForumService
             'createdAt' => $c['createdAt'],
             'updatedAt' => $c['updatedAt'],
         ];
+    }
+
+    // ── Notifications ────────────────────────────────────
+
+    private function notifyNewPost(string $forumId, array $post, string $actorId): void
+    {
+        try {
+            $isTripForum = $this->forumRepo->isTripLinked($forumId);
+
+            if ($isTripForum) {
+                $recipients = $this->getTripForumRecipientIds($forumId, $actorId);
+            } else {
+                $recipients = $this->getForumMemberRecipientIds($forumId, $actorId);
+            }
+
+            $authorUser = $this->userRepo->findById($post['userId']);
+            $authorDisplayName = $authorUser['displayName'] ?? 'Unbekannt';
+
+            foreach ($recipients as $recipientId) {
+                $this->notificationService->createNotification(
+                    userId: $recipientId,
+                    code: 'forum.new_post',
+                    payload: [
+                        'forumId' => $forumId,
+                        'postId' => $post['id'],
+                        'postType' => $post['type'],
+                        'authorDisplayName' => $authorDisplayName,
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('Forum new_post notification failed: ' . $e->getMessage());
+        }
+    }
+
+    private function notifyNewComment(array $post, array $comment, string $actorId, ?string $parentId): void
+    {
+        try {
+            $notifiedUserIds = [$actorId];
+
+            if ($parentId !== null) {
+                $notifiedUserIds = $this->collectCommentChainAuthors(
+                    $parentId,
+                    $notifiedUserIds,
+                );
+            }
+
+            if (!in_array($post['userId'], $notifiedUserIds, true)) {
+                $notifiedUserIds[] = $post['userId'];
+            }
+
+            $notifiedUserIds = array_values(array_unique(array_diff($notifiedUserIds, [$actorId])));
+
+            $commenterUser = $this->userRepo->findById($comment['userId']);
+            $commenterDisplayName = $commenterUser['displayName'] ?? 'Unbekannt';
+
+            foreach ($notifiedUserIds as $recipientId) {
+                $this->notificationService->createNotification(
+                    userId: $recipientId,
+                    code: 'forum.post_commented',
+                    payload: [
+                        'forumId' => $post['forumId'],
+                        'postId' => $post['id'],
+                        'commentId' => $comment['id'],
+                        'commenterDisplayName' => $commenterDisplayName,
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('Forum post_commented notification failed: ' . $e->getMessage());
+        }
+    }
+
+    /** @return list<string> */
+    private function collectCommentChainAuthors(
+        string $commentId,
+        array $alreadyNotified,
+    ): array {
+        $currentId = $commentId;
+
+        while ($currentId !== null) {
+            $parent = $this->commentRepo->findById($currentId);
+            if ($parent === null) {
+                break;
+            }
+
+            if (!in_array($parent['userId'], $alreadyNotified, true)) {
+                $alreadyNotified[] = $parent['userId'];
+            }
+
+            $currentId = $parent['parentId'];
+        }
+
+        return $alreadyNotified;
+    }
+
+    private function notifyPostUpvoted(array $post, string $actorId): void
+    {
+        if ($post['userId'] === $actorId) {
+            return;
+        }
+
+        try {
+            $voterUser = $this->userRepo->findById($actorId);
+            $voterDisplayName = $voterUser['displayName'] ?? 'Unbekannt';
+
+            $this->notificationService->createNotification(
+                userId: $post['userId'],
+                code: 'forum.post_upvoted',
+                payload: [
+                    'forumId' => $post['forumId'],
+                    'postId' => $post['id'],
+                    'voterDisplayName' => $voterDisplayName,
+                ],
+            );
+        } catch (\Throwable $e) {
+            error_log('Forum post_upvoted notification failed: ' . $e->getMessage());
+        }
+    }
+
+    /** @return list<string> */
+    private function getForumMemberRecipientIds(string $forumId, string $actorId): array
+    {
+        $members = $this->memberRepo->listByForum($forumId);
+        $ids = [];
+        foreach ($members as $member) {
+            if ($member['userId'] !== $actorId && !empty($member['notificationsEnabled'])) {
+                $ids[] = $member['userId'];
+            }
+        }
+        return $ids;
+    }
+
+    /** @return list<string> */
+    private function getTripForumRecipientIds(string $forumId, string $actorId): array
+    {
+        $trip = $this->forumRepo->findTripByForumId($forumId);
+        if ($trip === null) {
+            return $this->getForumMemberRecipientIds($forumId, $actorId);
+        }
+
+        $participants = $this->travelRelationRepo->findParticipantsByTrip($trip['id']);
+        $ids = [];
+        foreach ($participants as $participant) {
+            if ($participant['id'] !== $actorId) {
+                $ids[] = $participant['id'];
+            }
+        }
+        return $ids;
     }
 }
