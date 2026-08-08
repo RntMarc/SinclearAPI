@@ -4,6 +4,7 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
@@ -61,6 +62,7 @@ final readonly class AdminController
         private PlaceSubmissionService $submissionService,
         private ModerationRequestService $moderationRequestService,
         private RecipeRepository $recipeRepo,
+        private LoggerInterface $logger,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -1877,11 +1879,19 @@ ROW;
         $adminNote = trim($body['adminNote'] ?? '');
 
         if ($osmId <= 0 || !in_array($osmType, ['N', 'W', 'R'], true)) {
+            $this->logger->warning('Submission approve failed: invalid OSM data', [
+                'submissionId' => $args['id'],
+                'osmId' => $osmId,
+                'osmType' => $osmType,
+            ]);
             return ResponseFactory::json(['error' => 'invalid_osm_data'], 400, $response);
         }
 
         try {
             $result = $this->submissionService->approveSubmission($args['id'], $osmId, $osmType, $adminNote);
+            $this->logger->info('Submission approved successfully', [
+                'submissionId' => $args['id'],
+            ]);
             return ResponseFactory::json(['data' => $result], 200, $response);
         } catch (\RuntimeException $e) {
             $code = match ($e->getMessage()) {
@@ -1890,6 +1900,11 @@ ROW;
                 default => 'approve_failed',
             };
             $status = $code === 'submission_not_found' ? 404 : 400;
+            $this->logger->warning('Submission approve failed', [
+                'submissionId' => $args['id'],
+                'error' => $e->getMessage(),
+                'code' => $code,
+            ]);
             return ResponseFactory::json(['error' => $code], $status, $response);
         }
     }
@@ -1901,11 +1916,18 @@ ROW;
         $adminNote = trim($body['adminNote'] ?? '');
 
         if ($adminNote === '') {
+            $this->logger->warning('Submission reject failed: empty adminNote', [
+                'submissionId' => $args['id'],
+                'adminNote' => $body['adminNote'] ?? null,
+            ]);
             return ResponseFactory::json(['error' => 'admin_note_required'], 400, $response);
         }
 
         try {
             $result = $this->submissionService->rejectSubmission($args['id'], $adminNote);
+            $this->logger->info('Submission rejected successfully', [
+                'submissionId' => $args['id'],
+            ]);
             return ResponseFactory::json(['data' => $result], 200, $response);
         } catch (\RuntimeException $e) {
             $code = match ($e->getMessage()) {
@@ -1914,6 +1936,11 @@ ROW;
                 default => 'reject_failed',
             };
             $status = $code === 'submission_not_found' ? 404 : 400;
+            $this->logger->warning('Submission reject failed', [
+                'submissionId' => $args['id'],
+                'error' => $e->getMessage(),
+                'code' => $code,
+            ]);
             return ResponseFactory::json(['error' => $code], $status, $response);
         }
     }

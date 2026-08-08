@@ -52,8 +52,17 @@ final readonly class PlaceSubmissionService
         $id = $this->submissionRepo->create($data);
         $submission = $this->submissionRepo->findById($id);
 
-        $this->notifyUserSubmissionCreated($userId, $id, $data['name']);
-        $this->notifyAdminsNewSubmission($id, $data['name']);
+        try {
+            $this->notifyUserSubmissionCreated($userId, $id, $data['name']);
+        } catch (\Throwable $e) {
+            error_log('Failed to send submission created notification: ' . $e->getMessage());
+        }
+
+        try {
+            $this->notifyAdminsNewSubmission($id, $data['name']);
+        } catch (\Throwable $e) {
+            error_log('Failed to send admin new submission notification: ' . $e->getMessage());
+        }
 
         return $this->format($submission);
     }
@@ -155,7 +164,11 @@ final readonly class PlaceSubmissionService
 
         $this->submissionRepo->approve($id, $adminNote, $place['id']);
 
-        $this->notifyUserSubmissionApproved($submission['userId'], $id, $submission['name'], $place['id']);
+        try {
+            $this->notifyUserSubmissionApproved($submission['userId'], $id, $submission['name'], $place['id']);
+        } catch (\Throwable $e) {
+            error_log('Failed to send submission approval notification: ' . $e->getMessage());
+        }
 
         return [
             'placeId' => $place['id'],
@@ -176,7 +189,11 @@ final readonly class PlaceSubmissionService
         $this->submissionRepo->reject($id, $adminNote);
         $updated = $this->submissionRepo->findById($id);
 
-        $this->notifyUserSubmissionRejected($submission['userId'], $id, $submission['name']);
+        try {
+            $this->notifyUserSubmissionRejected($submission['userId'], $id, $submission['name']);
+        } catch (\Throwable $e) {
+            error_log('Failed to send submission rejection notification: ' . $e->getMessage());
+        }
 
         return $this->format($updated);
     }
