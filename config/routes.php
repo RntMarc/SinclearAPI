@@ -376,6 +376,7 @@ return function (App $app): void {
         $group->post('/explore/submissions/{id}/reject', [AdminController::class, 'submissionReject']);
         $group->get('/notifications', [AdminController::class, 'notifications']);
         $group->post('/notifications/send', [AdminController::class, 'sendNotification']);
+        $group->get('/notifications/objects', [AdminController::class, 'notificationObjects']);
         $group->get('/subscriptions', [AdminController::class, 'subscriptions']);
         $group->get('/subscriptions/json', [AdminController::class, 'adminSubscriptionsJson']);
         $group->post('/subscriptions', [AdminController::class, 'createSubscription']);

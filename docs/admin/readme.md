@@ -127,6 +127,7 @@ Nicht-Admins erhalten einen 403-Fehler.
 | DELETE | `/admin/travel/events/{id}/participants/{userId}` | Teilnehmer von Event entfernen (geschützt) |
 | GET | `/admin/notifications` | Benachrichtigungen senden (geschützt) |
 | POST | `/admin/notifications/send` | Notification versenden (geschützt) |
+| GET | `/admin/notifications/objects` | Verfügbare Objekte für Benachrichtigung laden (geschützt) |
 | GET | `/admin/moderation-requests` | Moderations-Anfragen mit Filtern (geschützt) |
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |

@@ -40,7 +40,7 @@ rendert basierend auf dem Code die passende UI und verwendet Daten aus
 | `admin.test` | `{ "deepLink": "home" }` | Test-Ping |
 | `admin.custom` | `{ "deepLink": "...", "title": "...", "body": "..." }` | Freie Admin-Nachricht |
 
-**Deep-Link-Werte:** `home`, `travel`, `events`, `profile`, `settings`, `friends`, `discover`, `news`, `chat`, `feedback`
+**Deep-Link-Werte:** `home`, `reisen`, `kalender`, `entdecken`, `kontakte`, `feedback`, `forum`, `rezepte`, `abos`, `einstellungen`, `einstellungen/profil`
 
 ### Kalender-Codes
 

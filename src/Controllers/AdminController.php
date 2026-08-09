@@ -25,6 +25,12 @@ use Sinclear\Api\Services\ModerationRequestService;
 use Sinclear\Api\Repository\RecipeRepository;
 use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\SubscriptionService;
+use Sinclear\Api\Repository\FeedPostRepository;
+use Sinclear\Api\Repository\FeedPostCommentRepository;
+use Sinclear\Api\Repository\FeedbackSuggestionRepository;
+use Sinclear\Api\Repository\FeedbackCommentRepository;
+use Sinclear\Api\Repository\DiscoverPlaceRepository;
+use Sinclear\Api\Repository\CalendarEventRepository;
 
 final readonly class AdminController
 {
@@ -34,7 +40,44 @@ final readonly class AdminController
         'admin.maintenance',
         'admin.welcome',
         'admin.test',
-        'admin.custom',
+    ];
+
+    private const array NOTIFICATION_TYPES = [
+        'forum' => [
+            'forum.new_post' => 'Neuer Post',
+            'forum.post_commented' => 'Kommentar zu Post',
+            'forum.comment_replied' => 'Antwort auf Kommentar',
+            'forum.post_upvoted' => 'Upvote auf Post',
+        ],
+        'rezepte' => [
+            'recipe.review_created' => 'Jemand bewertet dein Rezept',
+        ],
+        'reisen' => [
+            'travel.participant_added' => 'Teilnehmer hinzugefügt',
+            'travel.event_created' => 'Neues Event',
+            'travel.event_updated' => 'Event geändert',
+            'travel.accommodation_changed' => 'Unterkunft geändert',
+        ],
+        'kalender' => [
+            'calendar.event_created' => 'Neues Event',
+            'calendar.event_updated' => 'Event geändert',
+            'calendar.participant_added' => 'Teilnehmer hinzugefügt',
+        ],
+        'feedback' => [
+            'feedback.status_changed' => 'Status geändert',
+            'feedback.suggestion_commented' => 'Kommentar zum Vorschlag',
+            'feedback.suggestion_comment_replied' => 'Antwort auf Kommentar',
+        ],
+        'abos' => [
+            'subscription.participant_added' => 'Teilnehmer hinzugefügt',
+            'subscription.billing_updated' => 'Abrechungsdaten geändert',
+        ],
+        'entdecken' => [
+            'explore.place_reviewed' => 'Jemand bewertet einen Ort',
+        ],
+        'moderation' => [
+            'moderation.request_resolved' => 'Meldung bearbeitet',
+        ],
     ];
 
     private const array VALID_DEEP_LINKS = [
@@ -63,6 +106,12 @@ final readonly class AdminController
         private ModerationRequestService $moderationRequestService,
         private RecipeRepository $recipeRepo,
         private LoggerInterface $logger,
+        private FeedPostRepository $feedPostRepo,
+        private FeedPostCommentRepository $feedPostCommentRepo,
+        private FeedbackSuggestionRepository $feedbackSuggestionRepo,
+        private FeedbackCommentRepository $feedbackCommentRepo,
+        private DiscoverPlaceRepository $placeRepo,
+        private CalendarEventRepository $calendarEventRepo,
     ) {}
 
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -1408,13 +1457,10 @@ ROW;
     {
         $user = $this->requireUser($request);
 
-        $deepLinks = implode(', ', array_map(
-            fn(string $d) => "'{$d}'",
-            self::VALID_DEEP_LINKS,
-        ));
+        $notificationTypesJson = json_encode(self::NOTIFICATION_TYPES, JSON_UNESCAPED_UNICODE);
 
         $contentHtml = $this->renderTemplate('notifications.php', [
-            'deepLinks' => $deepLinks,
+            'notificationTypesJson' => $notificationTypesJson,
         ]);
         $html = $this->renderLayout('Benachrichtigungen', $contentHtml, $user->email);
 
@@ -1429,18 +1475,18 @@ ROW;
 
         $userId = trim((string) ($body['userId'] ?? ''));
         $code = trim((string) ($body['code'] ?? ''));
-        $deepLink = trim((string) ($body['deepLink'] ?? 'home'));
+        $objectId = trim((string) ($body['objectId'] ?? ''));
 
         if ($userId === '') {
             return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
         }
 
-        if (!in_array($code, self::VALID_CODES, true)) {
-            return ResponseFactory::json(['error' => 'invalid_code'], 400, $response);
+        $allCodes = self::VALID_CODES;
+        foreach (self::NOTIFICATION_TYPES as $types) {
+            $allCodes = array_merge($allCodes, array_keys($types));
         }
-
-        if (!in_array($deepLink, self::VALID_DEEP_LINKS, true)) {
-            return ResponseFactory::json(['error' => 'invalid_deepLink'], 400, $response);
+        if (!in_array($code, $allCodes, true)) {
+            return ResponseFactory::json(['error' => 'invalid_code'], 400, $response);
         }
 
         $targetUser = $this->userRepo->findById($userId);
@@ -1448,16 +1494,20 @@ ROW;
             return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
         }
 
-        $payload = ['deepLink' => $deepLink];
-
-        if ($code === 'admin.custom') {
-            $title = trim((string) ($body['title'] ?? ''));
-            $bodyText = trim((string) ($body['body'] ?? ''));
-            if ($title === '' || $bodyText === '') {
-                return ResponseFactory::json(['error' => 'title_and_body_required'], 400, $response);
+        if (in_array($code, self::VALID_CODES, true)) {
+            $deepLink = trim((string) ($body['deepLink'] ?? 'home'));
+            if (!in_array($deepLink, self::VALID_DEEP_LINKS, true)) {
+                return ResponseFactory::json(['error' => 'invalid_deepLink'], 400, $response);
             }
-            $payload['title'] = $title;
-            $payload['body'] = $bodyText;
+            $payload = ['deepLink' => $deepLink];
+        } else {
+            if ($objectId === '') {
+                return ResponseFactory::json(['error' => 'objectId_required'], 400, $response);
+            }
+            $payload = $this->buildPayload($code, $objectId, $userId);
+            if ($payload === null) {
+                return ResponseFactory::json(['error' => 'object_not_found'], 404, $response);
+            }
         }
 
         $notificationId = $this->notificationService->createNotification($userId, $code, $payload);
@@ -1469,6 +1519,455 @@ ROW;
                 'code' => $code,
             ],
         ], 201, $response);
+    }
+
+    private function buildPayload(string $code, string $objectId, string $adminUserId): ?array
+    {
+        $actorName = ($this->userRepo->findById($adminUserId)['displayName'] ?? 'Admin');
+
+        return match ($code) {
+            'forum.new_post' => $this->buildForumPostPayload($objectId, $actorName),
+            'forum.post_commented' => $this->buildForumCommentPayload($objectId, $actorName),
+            'forum.comment_replied' => $this->buildForumReplyPayload($objectId, $actorName),
+            'forum.post_upvoted' => $this->buildForumUpvotePayload($objectId, $actorName),
+            'recipe.review_created' => $this->buildRecipeReviewPayload($objectId, $actorName),
+            'travel.participant_added' => $this->buildTravelParticipantPayload($objectId),
+            'travel.event_created' => $this->buildTravelEventCreatedPayload($objectId),
+            'travel.event_updated' => $this->buildTravelEventUpdatedPayload($objectId),
+            'travel.accommodation_changed' => $this->buildTravelAccommodationPayload($objectId),
+            'calendar.event_created', 'calendar.event_updated', 'calendar.participant_added' => $this->buildCalendarPayload($objectId),
+            'feedback.status_changed' => $this->buildFeedbackStatusPayload($objectId),
+            'feedback.suggestion_commented' => $this->buildFeedbackCommentPayload($objectId, $actorName),
+            'feedback.suggestion_comment_replied' => $this->buildFeedbackReplyPayload($objectId, $actorName),
+            'subscription.participant_added', 'subscription.billing_updated' => $this->buildSubscriptionPayload($objectId),
+            'explore.place_reviewed' => $this->buildPlaceReviewPayload($objectId, $actorName),
+            'moderation.request_resolved' => $this->buildModerationPayload($objectId),
+            default => null,
+        };
+    }
+
+    private function buildForumPostPayload(string $postId, string $actorName): ?array
+    {
+        $post = $this->feedPostRepo->findById($postId);
+        if ($post === null) {
+            return null;
+        }
+        return [
+            'forumId' => $post['forumId'] ?? '',
+            'postId' => $postId,
+            'postType' => $post['type'] ?? 'text',
+            'authorDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildForumCommentPayload(string $commentId, string $actorName): ?array
+    {
+        $comment = $this->feedPostCommentRepo->findById($commentId);
+        if ($comment === null) {
+            return null;
+        }
+        return [
+            'forumId' => $comment['forumId'] ?? '',
+            'postId' => $comment['postId'] ?? '',
+            'commentId' => $commentId,
+            'commenterDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildForumReplyPayload(string $commentId, string $actorName): ?array
+    {
+        $comment = $this->feedPostCommentRepo->findById($commentId);
+        if ($comment === null) {
+            return null;
+        }
+        return [
+            'forumId' => $comment['forumId'] ?? '',
+            'postId' => $comment['postId'] ?? '',
+            'commentId' => $commentId,
+            'replierDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildForumUpvotePayload(string $postId, string $actorName): ?array
+    {
+        $post = $this->feedPostRepo->findById($postId);
+        if ($post === null) {
+            return null;
+        }
+        return [
+            'forumId' => $post['forumId'] ?? '',
+            'postId' => $postId,
+            'voterDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildRecipeReviewPayload(string $recipeId, string $actorName): ?array
+    {
+        $recipe = $this->recipeRepo->findById($recipeId);
+        if ($recipe === null) {
+            return null;
+        }
+        return [
+            'recipeId' => $recipeId,
+            'recipeTitle' => $recipe['title'] ?? '',
+            'reviewId' => $recipeId,
+            'rating' => 5,
+            'actorDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildTravelParticipantPayload(string $tripId): ?array
+    {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return null;
+        }
+        return [
+            'tripId' => $tripId,
+            'tripTitle' => $trip['title'] ?? '',
+        ];
+    }
+
+    private function buildTravelEventCreatedPayload(string $tripId): ?array
+    {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return null;
+        }
+        return [
+            'tripId' => $tripId,
+            'tripTitle' => $trip['title'] ?? '',
+            'eventId' => '',
+            'eventTitle' => 'Neues Event',
+        ];
+    }
+
+    private function buildTravelEventUpdatedPayload(string $eventId): ?array
+    {
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return null;
+        }
+        return [
+            'tripId' => $event['tripId'] ?? '',
+            'tripTitle' => '',
+            'eventId' => $eventId,
+            'eventTitle' => $event['title'] ?? '',
+        ];
+    }
+
+    private function buildTravelAccommodationPayload(string $accommodationId): ?array
+    {
+        $acc = $this->accommodationRepo->findById($accommodationId);
+        if ($acc === null) {
+            return null;
+        }
+        return [
+            'accommodationId' => $accommodationId,
+            'accommodationName' => $acc['name'] ?? '',
+        ];
+    }
+
+    private function buildCalendarPayload(string $eventId): ?array
+    {
+        $event = $this->calendarEventRepo->findById($eventId);
+        if ($event === null) {
+            return null;
+        }
+        return [
+            'calendarEventId' => $eventId,
+            'title' => $event['title'] ?? '',
+        ];
+    }
+
+    private function buildFeedbackStatusPayload(string $suggestionId): ?array
+    {
+        $suggestion = $this->feedbackSuggestionRepo->findById($suggestionId);
+        if ($suggestion === null) {
+            return null;
+        }
+        return [
+            'suggestionId' => $suggestionId,
+            'suggestionTitle' => $suggestion['title'] ?? '',
+            'newStatus' => 'planned',
+        ];
+    }
+
+    private function buildFeedbackCommentPayload(string $suggestionId, string $actorName): ?array
+    {
+        $suggestion = $this->feedbackSuggestionRepo->findById($suggestionId);
+        if ($suggestion === null) {
+            return null;
+        }
+        return [
+            'suggestionId' => $suggestionId,
+            'suggestionTitle' => $suggestion['title'] ?? '',
+            'commentId' => '',
+            'actorDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildFeedbackReplyPayload(string $commentId, string $actorName): ?array
+    {
+        $comment = $this->feedbackCommentRepo->findById($commentId);
+        if ($comment === null) {
+            return null;
+        }
+        $suggestion = $this->feedbackSuggestionRepo->findById($comment['suggestionId'] ?? '');
+        return [
+            'suggestionId' => $comment['suggestionId'] ?? '',
+            'suggestionTitle' => $suggestion['title'] ?? '',
+            'commentId' => $commentId,
+            'actorDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildSubscriptionPayload(string $subscriptionId): ?array
+    {
+        $sub = $this->subscriptionRepo->findById($subscriptionId);
+        if ($sub === null) {
+            return null;
+        }
+        return [
+            'subscriptionId' => $subscriptionId,
+            'subscriptionName' => $sub['name'] ?? '',
+        ];
+    }
+
+    private function buildPlaceReviewPayload(string $placeId, string $actorName): ?array
+    {
+        $place = $this->placeRepo->findById($placeId);
+        if ($place === null) {
+            return null;
+        }
+        return [
+            'placeId' => $placeId,
+            'placeName' => $place['name'] ?? '',
+            'reviewId' => $placeId,
+            'rating' => 5,
+            'actorDisplayName' => $actorName,
+        ];
+    }
+
+    private function buildModerationPayload(string $requestId): ?array
+    {
+        $result = $this->moderationRequestService->getById($requestId);
+        if ($result === null) {
+            return null;
+        }
+        return [
+            'requestId' => $requestId,
+            'objectType' => $result['objectType'] ?? '',
+            'objectId' => $result['objectId'] ?? '',
+            'resolution' => 'accepted',
+            'adminComment' => 'Test-Benachrichtigung',
+        ];
+    }
+
+    public function notificationObjects(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $query = $request->getQueryParams();
+        $userId = trim((string) ($query['userId'] ?? ''));
+        $code = trim((string) ($query['code'] ?? ''));
+
+        if ($userId === '') {
+            return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
+        }
+
+        $targetUser = $this->userRepo->findById($userId);
+        if ($targetUser === null) {
+            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
+        }
+
+        $objects = match ($code) {
+            'forum.new_post', 'forum.post_commented', 'forum.post_upvoted' => $this->findForumPosts($userId),
+            'forum.comment_replied' => $this->findForumComments($userId),
+            'recipe.review_created' => $this->findRecipes(),
+            'travel.participant_added', 'travel.event_created' => $this->findTrips($userId),
+            'travel.event_updated' => $this->findTravelEvents($userId),
+            'travel.accommodation_changed' => $this->findTravelAccommodations($userId),
+            'calendar.event_created', 'calendar.event_updated', 'calendar.participant_added' => $this->findCalendarEvents($userId),
+            'feedback.status_changed', 'feedback.suggestion_commented' => $this->findFeedbackSuggestions(),
+            'feedback.suggestion_comment_replied' => $this->findFeedbackComments(),
+            'subscription.participant_added', 'subscription.billing_updated' => $this->findSubscriptions($userId),
+            'explore.place_reviewed' => $this->findPlaces(),
+            'moderation.request_resolved' => $this->findModerationRequests($userId),
+            default => [],
+        };
+
+        return ResponseFactory::json(['data' => $objects], 200, $response);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findForumPosts(string $userId): array
+    {
+        $forums = $this->forumRepo->list(1, 100, $userId);
+        $posts = [];
+        foreach ($forums as $forum) {
+            $forumPosts = $this->feedPostRepo->listByForum($forum['id'], 1, 50, $userId);
+            foreach ($forumPosts as $post) {
+                $posts[] = [
+                    'id' => $post['id'],
+                    'label' => mb_substr($post['text'] ?? $post['title'] ?? 'Post', 0, 60),
+                    'deepLink' => 'forum/' . $post['id'],
+                ];
+            }
+        }
+        return $posts;
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findForumComments(string $userId): array
+    {
+        $forums = $this->forumRepo->list(1, 100, $userId);
+        $comments = [];
+        foreach ($forums as $forum) {
+            $forumPosts = $this->feedPostRepo->listByForum($forum['id'], 1, 20, $userId);
+            foreach ($forumPosts as $post) {
+                $postComments = $this->feedPostCommentRepo->listByPost($post['id']);
+                foreach ($postComments as $comment) {
+                    $comments[] = [
+                        'id' => $comment['id'],
+                        'label' => mb_substr($comment['text'] ?? '', 0, 60) . ' (zu: ' . mb_substr($post['text'] ?? $post['title'] ?? '', 0, 30) . ')',
+                        'deepLink' => 'forum/' . $post['id'],
+                    ];
+                }
+            }
+        }
+        return $comments;
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findRecipes(): array
+    {
+        $result = $this->recipeRepo->list(1, 50, null, 'createdAt');
+        return array_map(fn(array $r) => [
+            'id' => $r['id'],
+            'label' => $r['title'] ?? 'Rezept',
+            'deepLink' => 'rezepte/' . $r['id'],
+        ], $result['data'] ?? []);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findTrips(string $userId): array
+    {
+        $result = $this->tripRepo->findByParticipant($userId, 1, 50);
+        return array_map(fn(array $t) => [
+            'id' => $t['id'],
+            'label' => $t['title'] ?? 'Reise',
+            'deepLink' => 'reisen/' . $t['id'],
+        ], $result['data'] ?? []);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findTravelEvents(string $userId): array
+    {
+        $result = $this->tripRepo->findByParticipant($userId, 1, 50);
+        $events = [];
+        foreach ($result['data'] ?? [] as $trip) {
+            $tripEvents = $this->eventRepo->findByTrip($trip['id']);
+            foreach ($tripEvents as $event) {
+                $events[] = [
+                    'id' => $event['id'],
+                    'label' => ($event['title'] ?? 'Event') . ' (' . ($trip['title'] ?? '') . ')',
+                    'deepLink' => 'reisen/' . $trip['id'] . '/events/' . $event['id'],
+                ];
+            }
+        }
+        return $events;
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findTravelAccommodations(string $userId): array
+    {
+        $result = $this->tripRepo->findByParticipant($userId, 1, 50);
+        $accommodations = [];
+        foreach ($result['data'] ?? [] as $trip) {
+            $tripAccommodations = $this->accommodationRepo->findByTrip($trip['id']);
+            foreach ($tripAccommodations as $acc) {
+                $accommodations[] = [
+                    'id' => $acc['id'],
+                    'label' => ($acc['name'] ?? 'Unterkunft') . ' (' . ($trip['title'] ?? '') . ')',
+                    'deepLink' => 'reisen/' . $trip['id'] . '/accommodations/' . $acc['id'],
+                ];
+            }
+        }
+        return $accommodations;
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findCalendarEvents(string $userId): array
+    {
+        $result = $this->calendarEventRepo->findAllVisible($userId, null, null, 1, 50);
+        return array_map(fn(array $e) => [
+            'id' => $e['id'],
+            'label' => $e['title'] ?? 'Event',
+            'deepLink' => 'kalender/' . $e['id'],
+        ], $result['data'] ?? []);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findFeedbackSuggestions(): array
+    {
+        $result = $this->feedbackSuggestionRepo->list(1, 50);
+        return array_map(fn(array $s) => [
+            'id' => $s['id'],
+            'label' => $s['title'] ?? 'Vorschlag',
+            'deepLink' => 'feedback/' . $s['id'],
+        ], $result['data'] ?? []);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findFeedbackComments(): array
+    {
+        $result = $this->feedbackSuggestionRepo->list(1, 20);
+        $comments = [];
+        foreach ($result['data'] ?? [] as $suggestion) {
+            $suggestionComments = $this->feedbackCommentRepo->listBySuggestion($suggestion['id']);
+            foreach ($suggestionComments as $comment) {
+                $comments[] = [
+                    'id' => $comment['id'],
+                    'label' => mb_substr($comment['text'] ?? '', 0, 50) . ' (zu: ' . mb_substr($suggestion['title'] ?? '', 0, 30) . ')',
+                    'deepLink' => 'feedback/' . $suggestion['id'],
+                ];
+            }
+        }
+        return $comments;
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findSubscriptions(string $userId): array
+    {
+        $subscriptions = $this->subscriptionRepo->findByUserId($userId);
+        return array_map(fn(array $s) => [
+            'id' => $s['id'],
+            'label' => $s['name'] ?? 'Abo',
+            'deepLink' => 'abos/' . $s['id'],
+        ], $subscriptions);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findPlaces(): array
+    {
+        $result = $this->placeRepo->list(null, 1, 50);
+        return array_map(fn(array $p) => [
+            'id' => $p['id'],
+            'label' => $p['name'] ?? 'Ort',
+            'deepLink' => 'entdecken/' . $p['id'],
+        ], $result['data'] ?? []);
+    }
+
+    /** @return list<array{id: string, label: string, deepLink: string}> */
+    private function findModerationRequests(string $userId): array
+    {
+        $result = $this->moderationRequestService->listMine($userId, 1, 50);
+        return array_map(fn(array $r) => [
+            'id' => $r['id'],
+            'label' => ($r['objectType'] ?? '') . ' – ' . ($r['message'] ?? ''),
+            'deepLink' => 'home',
+        ], $result['data'] ?? []);
     }
 
     public function subscriptions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

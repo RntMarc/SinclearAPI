@@ -134,7 +134,7 @@ components:
 
     AdminSendNotificationRequest:
       type: object
-      required: [userId, code, deepLink]
+      required: [userId, code]
       properties:
         userId:
           type: string
@@ -146,22 +146,42 @@ components:
             Benachrichtigungscode. Unterstützte Werte:
             `admin.system_update`, `admin.new_feature`,
             `admin.maintenance`, `admin.welcome`, `admin.test`,
-            `admin.custom`
-          example: admin.system_update
+            `forum.new_post`, `forum.post_commented`, `forum.comment_replied`, `forum.post_upvoted`,
+            `recipe.review_created`,
+            `travel.participant_added`, `travel.event_created`, `travel.event_updated`, `travel.accommodation_changed`,
+            `calendar.event_created`, `calendar.event_updated`, `calendar.participant_added`,
+            `feedback.status_changed`, `feedback.suggestion_commented`, `feedback.suggestion_comment_replied`,
+            `subscription.participant_added`, `subscription.billing_updated`,
+            `explore.place_reviewed`,
+            `moderation.request_resolved`
+          example: forum.new_post
         deepLink:
           type: string
           description: >
-            Zielseite in der App (GoRouter-Pfad). Unterstützte Werte:
-            `home`, `reisen`, `kalender`, `entdecken`, `kontakte`,
-            `feedback`, `forum`, `rezepte`, `abos`,
-            `einstellungen`, `einstellungen/profil`
+            Nur bei admin.* Codes: Zielseite in der App (GoRouter-Pfad).
+            Unterstützte Werte: `home`, `reisen`, `kalender`, `entdecken`, `kontakte`,
+            `feedback`, `forum`, `rezepte`, `abos`, `einstellungen`, `einstellungen/profil`
           example: home
-        title:
+        objectId:
           type: string
-          description: "Nur bei `admin.custom`: Titel der Benachrichtigung"
-        body:
+          format: uuid
+          description: >
+            Nur bei nicht-admin Codes: ID des Objekts (Post, Rezept, Reise, etc.),
+            auf das die Benachrichtigung verweist. Wird automatisch im Payload abgelegt.
+
+    AdminNotificationObject:
+      type: object
+      required: [id, label, deepLink]
+      properties:
+        id:
           type: string
-          description: "Nur bei `admin.custom`: Nachrichtentext"
+          format: uuid
+        label:
+          type: string
+          description: Anzeigename des Objekts
+        deepLink:
+          type: string
+          description: DeepLink-Pfad zum Objekt
 
     AdminCreateTripRequest:
       type: object
@@ -8527,7 +8547,8 @@ paths:
       summary: Benachrichtigung senden
       description: >
         Sendet eine Push-Benachrichtigung an einen bestimmten Nutzer.
-        Unterstützt vordefinierte Codes und benutzerdefinierte Nachrichten.
+        Bei admin.* Codes wird deepLink verwendet, bei allen anderen Codes
+        wird objectId benötigt und der Payload automatisch generiert.
       tags: [Admin]
       requestBody:
         required: true
@@ -8558,6 +8579,68 @@ paths:
                         type: string
         '400':
           description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer oder Objekt nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/notifications/objects:
+    get:
+      summary: Verfügbare Objekte für Benachrichtigung laden
+      description: >
+        Gibt eine Liste von Objekten zurück, die der angegebene Nutzer
+        in dem angegebenen Bereich sehen kann. Wird für die objektbezogene
+        Benachrichtigungsauswahl im Admin Dashboard verwendet.
+      tags: [Admin]
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID des Zielnutzers
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: >
+            Notification-Code, um den passenden Objekttyp zu ermitteln.
+            Z.B. `forum.new_post` → Forum-Posts, `travel.event_updated` → Reise-Events.
+      responses:
+        '200':
+          description: Liste der verfügbaren Objekte
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminNotificationObject'
+        '400':
+          description: userId oder code fehlt
           content:
             application/json:
               schema:
