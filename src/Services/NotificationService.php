@@ -58,7 +58,15 @@ final readonly class NotificationService
             'payload' => is_string($notification['payload'])
                 ? json_decode($notification['payload'], true)
                 : $notification['payload'],
-            'createdAt' => $notification['createdAt'],
+            'createdAt' => $this->formatUtcTimestamp($notification['createdAt']),
         ];
+    }
+
+    private function formatUtcTimestamp(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+        return substr((string) $value, 0, 19);
     }
 }

@@ -16,7 +16,7 @@ final readonly class NotificationRepository
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
             'INSERT INTO Notification (id, userId, code, payload, createdAt)
-             VALUES (?, ?, ?, ?, NOW(3))'
+             VALUES (?, ?, ?, ?, NOW())'
         );
         $stmt->execute([$id, $userId, $code, json_encode($payload)]);
         return $id;

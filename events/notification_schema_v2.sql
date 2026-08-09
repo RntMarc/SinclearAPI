@@ -7,7 +7,7 @@ CREATE TABLE `Notification` (
   `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `code` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `payload` json NOT NULL,
-  `createdAt` datetime(3) NOT NULL,
+  `createdAt` datetime NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_notification_user_time` (`userId`, `createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
