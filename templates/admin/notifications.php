@@ -64,7 +64,7 @@
 </div>
 
 <script>
-    const NOTIFICATION_TYPES = <?= $notificationTypesJson ?>;
+    const NOTIFICATION_TYPES = {{notificationTypesJson}};
 
     let users = [];
 
