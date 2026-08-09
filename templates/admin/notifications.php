@@ -32,7 +32,7 @@
             </div>
             <div class="form-group">
                 <label for="objectId">Objekt *</label>
-                <select id="objectId" name="objectId" required disabled>
+                <select id="objectId" name="objectId" required disabled onchange="onObjectChange()">
                     <option value="">– Zuerst Art wählen –</option>
                 </select>
             </div>
@@ -207,6 +207,12 @@
         }
     }
 
+    function onObjectChange() {
+        const objSel = document.getElementById('objectId');
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = !objSel.value;
+    }
+
     async function sendNotification(event) {
         event.preventDefault();
         const userId = document.getElementById('userId').value;
@@ -232,6 +238,7 @@
             if (res.ok) {
                 showToast('Benachrichtigung gesendet (Code: ' + code + ')');
                 document.getElementById('objectId').selectedIndex = 0;
+                document.getElementById('sendBtn').disabled = true;
             } else {
                 const data = await res.json();
                 showToast('Fehler: ' + (data.error || 'unbekannt'), 'error');
