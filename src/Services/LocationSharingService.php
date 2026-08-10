@@ -14,7 +14,6 @@ final readonly class LocationSharingService
         private LocationSharingSessionRepository $sessionRepo,
         private LocationSharingRecipientRepository $recipientRepo,
         private LocationSharingLocationRepository $locationRepo,
-        private NotificationService $notificationService,
         private UserRepository $userRepo,
         private Settings $settings,
     ) {}
@@ -29,25 +28,6 @@ final readonly class LocationSharingService
         ]);
 
         $this->recipientRepo->addRecipients($id, $data['recipient_ids']);
-
-        $owner = $this->userRepo->findById($ownerId);
-        $ownerDisplayName = $owner['displayName'] ?? 'Unbekannt';
-
-        $recipients = $this->recipientRepo->getRecipients($id);
-        foreach ($recipients as $recipient) {
-            try {
-                $this->notificationService->createNotification(
-                    userId: $recipient['userId'],
-                    code: 'location_sharing.started',
-                    payload: [
-                        'locationSharingSessionId' => $id,
-                        'ownerDisplayName' => $ownerDisplayName,
-                    ],
-                );
-            } catch (\Throwable $e) {
-                error_log('Location sharing notification failed: ' . $e->getMessage());
-            }
-        }
 
         return $this->formatSessionDetail($id, $ownerId);
     }

@@ -56,53 +56,6 @@ Nach jeder Änderung an der API (Routes, Controllers, DTOs, Services) oder am Cl
 3. Keine veralteten oder nicht mehr existierenden Seiten/Optionen werden im Dashboard angeboten.
 4. Neue API-Endpunkte oder Client-Seiten, die eine Admin-Bearbeitung erfordern, sind im Dashboard vorhanden.
 
-## Benachrichtigungen
-
-Das Benachrichtigungssystem (`NotificationService` / `PushService`) löst In-App-Benachrichtigungen (Datenbank + optionaler FCM-Push) bei bestimmten Geschäftsvorgängen aus. Die zentrale Übersicht aller Trigger – implementiert und geplant – findet sich in `docs/notifications/list.md`.
-
-### Regeln für Benachrichtigungen
-
-Jeder Entwickler, der eine Funktion implementiert, die Benachrichtigungen auslösen kann, MUSS die folgenden Regeln einhalten:
-
-**Regel 1: Self-Notification-Ausschluss**
-Benachrichtigungen werden **nie** an den auslösenden Nutzer selbst gesendet. Jede Logik muss den handelnden Nutzer (`$userId` / Actor) von der Empfängerliste ausschließen.
-
-**Regel 2: Inhaltseigentümer-Prinzip**
-Wird auf einen Inhalt reagiert (Kommentar, Bewertung, Upvote), wird **der Eigentümer des Ursprungs-Inhalts** benachrichtigt, nicht alle Beteiligten. Ausnahme: Bei Sammel-Features (Foren, Reise-Foren) werden alle Mitglieder informiert (siehe Regel 3).
-
-**Regel 3: Gruppenzugehörigkeit bei Sammel-Features**
-Bei Funktionen mit gemeinsamem Raum (Forum, Abo) werden **alle aktiven Mitglieder** benachrichtigt, sofern sie dies nicht deaktiviert haben. Das `notificationsEnabled`-Flag ist zu respektieren.
-**Ausnahme Reisen:** Im verknüpften Forum einer Reise wird **immer** benachrichtigt – das `notificationsEnabled`-Flag wird dort nicht berücksichtigt, da Reise-Beiträge für alle Teilnehmenden relevant sind.
-
-**Regel 4: Kommentar-Ketten-Logik**
-Bei Kommentaren mit Thread-Struktur wird die Kette **aufwärts** durchlaufen: Alle Eltern-Kommentare werden benachrichtigt, inklusive des Autors des Ursprungs-Beitrags. Der kommentierende Nutzer selbst wird dabei nie benachrichtigt.
-
-**Regel 5: Statusänderungen**
-Bei Statusänderungen (Submission genehmigt/abgelehnt, Moderationsanfrage bearbeitet, Feedback-Vorschlag aktualisiert) wird **ausschließlich der Eigentümer des betroffenen Objekts** benachrichtigt.
-
-**Regel 6: Kollaborative Änderungen**
-Bei Änderungen an kollaborativen Objekten (Kalender-Events, Reise-Events, Reise-Unterkünfte) werden **nur die direkt Beteiligten** benachrichtigt, die nicht der Handelnde sind. Bei Reisen sind das die Teilnehmer des betroffenen Events oder der betroffenen Unterkunft, **nicht** alle Reise-Teilnehmer.
-
-**Regel 7: Payload-Konvention**
-Jede Benachrichtigung enthält im `payload` mindestens:
-- Die ID des betroffenen Objekts (z.B. `postId`, `recipeId`, `tripId`)
-- Einen Anzeigenamen des handelnden Nutzers (`actorDisplayName` oder equivalent)
-- Alle für die Client-Darstellung und Deep-Linking relevanten Felder
-
-Das `code`-Format lautet immer `domain.action` (z.B. `forum.post_commented`).
-
-**Regel 8: Try/Catch mit Logging**
-Jeder Benachrichtigungsaufruf ist in einen `try/catch`-Block zu kapseln. Fehler beim Versand dürfen die Kernaktion (z.B. Kommentar erstellen) nicht behindern. Fehler sind via `error_log()` zu protokollieren.
-
-**Regel 9: Keine Duplikate**
-Pro Ereignis wird maximal **eine** Benachrichtigung pro Empfänger erstellt.
-
-**Regel 10: Lesezeichen/Bookmarks**
-Lesezeichen lösen **niemals** Benachrichtigungen aus – weder am bookmarkten Inhalt noch anderswo.
-
-**Regel 11: Dokumentation**
-Alle existierenden Notification-Codes sind in `docs/notifications/list.md` zu dokumentieren, inklusive Empfängerlogik und Implementierungsstatus. Nach jeder Änderung an der Benachrichtigungslogik MUSS diese Datei aktualisiert werden.
-
 ## Date/Time Convention (UTC-only)
 The API operates exclusively in UTC. This is a hard requirement that all implementations MUST follow:
 

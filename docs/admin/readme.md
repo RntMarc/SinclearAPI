@@ -62,13 +62,6 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Teilnehmer können hinzugefügt und entfernt werden
 - Dropdown mit allen registrierten Nutzern zum Hinzufügen
 
-### Benachrichtigungen (`/notifications`) – **voll implementiert**
-- Vordefinierte Vorlagen: System-Update, Neue Funktion, Wartungshinweis,
-  Willkommensnachricht, Test Ping
-- Benutzerdefinierte Benachrichtigung mit eigenem Titel/Text
-- Empfänger-Auswahl über Dropdown
-- Deep-Link-Auswahl zur Zielseite in der App
-
 ### Moderations-Anfragen (`/moderation-requests`) – **voll implementiert**
 - Listet alle Meldungen und Bearbeitungswünsche der Nutzer
 - Filter nach Bearbeitungsstatus, Art des Objekts und Art der Anfrage
@@ -76,17 +69,6 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Detailseite pro Anfrage mit Anliegen des Nutzers
 - Bearbeitungsstatus und Admin-Kommentar setzen (Rückmeldung an den Nutzer)
 - Statistik-Karte auf dem Dashboard (offene Anfragen)
-
-## Notification-Codes (Admin)
-
-| Code | Payload | Beschreibung |
-|------|---------|-------------|
-| `admin.system_update` | `{ "deepLink": "..." }` | System-Update-Ankündigung |
-| `admin.new_feature` | `{ "deepLink": "..." }` | Neue Funktion verfügbar |
-| `admin.maintenance` | `{ "deepLink": "..." }` | Wartungshinweis |
-| `admin.welcome` | `{ "deepLink": "..." }` | Willkommensnachricht |
-| `admin.test` | `{ "deepLink": "..." }` | Test-Ping |
-| `admin.custom` | `{ "deepLink": "...", "title": "...", "body": "..." }` | Freie Nachricht |
 
 ### Abos (`/subscriptions`) – **voll implementiert**
 - Listet alle Abonnements mit Preisen und Teilnehmeranzahl
@@ -125,9 +107,6 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/travel/events/{id}` | Eventdetail-Seite mit Teilnehmern (geschützt) |
 | POST | `/admin/travel/events/{id}/participants` | Teilnehmer zu Event hinzufügen (geschützt) |
 | DELETE | `/admin/travel/events/{id}/participants/{userId}` | Teilnehmer von Event entfernen (geschützt) |
-| GET | `/admin/notifications` | Benachrichtigungen senden (geschützt) |
-| POST | `/admin/notifications/send` | Notification versenden (geschützt) |
-| GET | `/admin/notifications/objects` | Verfügbare Objekte für Benachrichtigung laden (geschützt) |
 | GET | `/admin/moderation-requests` | Moderations-Anfragen mit Filtern (geschützt) |
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |

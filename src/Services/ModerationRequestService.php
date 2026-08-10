@@ -51,7 +51,6 @@ final readonly class ModerationRequestService
         private TravelRelationRepository $travelRelationRepo,
         private SubscriptionRepository $subscriptionRepo,
         private CalendarEventRepository $calendarEventRepo,
-        private NotificationService $notificationService,
     ) {}
 
     public function createRequest(
@@ -155,26 +154,6 @@ final readonly class ModerationRequestService
 
         $this->requestRepo->update($id, $status, $adminComment);
         $updated = $this->requestRepo->findById($id);
-
-        try {
-            if (in_array($status, ['accepted', 'denied'], true)) {
-                $reporter = $this->userRepo->findById($request['userId']);
-                $this->notificationService->createNotification(
-                    userId: $request['userId'],
-                    code: 'moderation.request_resolved',
-                    payload: [
-                        'requestId' => $id,
-                        'objectType' => $request['objectType'] ?? '',
-                        'objectId' => $request['objectId'] ?? '',
-                        'resolution' => $status,
-                        'adminComment' => $adminComment,
-                        'actorDisplayName' => $reporter['displayName'] ?? '',
-                    ],
-                );
-            }
-        } catch (\Throwable $e) {
-            error_log('moderation.request_resolved notification failed: ' . $e->getMessage());
-        }
 
         return $this->formatRequest($updated);
     }

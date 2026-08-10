@@ -11,8 +11,6 @@ Der MCP-Server scannt `docs/` rekursiv nach `.md`-Dateien. Jede gefundene Datei 
 | Datei | Topic-Name |
 |-------|------------|
 | `docs/travel/readme.md` | `travel` |
-| `docs/notifications/list.md` | `notifications/list` |
-| `docs/notifications/readme.md` | `notifications` |
 | `docs/CRON.md` | `cron` |
 | `docs/app/updates.md` | `app/updates` |
 

@@ -7,7 +7,6 @@ use Sinclear\Api\Repository\RecipeIngredientRepository;
 use Sinclear\Api\Repository\RecipeStepRepository;
 use Sinclear\Api\Repository\RecipeReviewRepository;
 use Sinclear\Api\Repository\RecipeBookmarkRepository;
-use Sinclear\Api\Repository\UserRepository;
 
 final readonly class RecipeService
 {
@@ -23,8 +22,6 @@ final readonly class RecipeService
         private RecipeReviewRepository $reviewRepo,
         private RecipeBookmarkRepository $bookmarkRepo,
         private ImageService $imageService,
-        private NotificationService $notificationService,
-        private UserRepository $userRepo,
     ) {}
 
     public function listRecipes(int $page, int $limit, ?string $search, string $sort): array
@@ -140,25 +137,6 @@ final readonly class RecipeService
         ]);
 
         $review = $this->reviewRepo->findById($id);
-
-        try {
-            if ($recipe['creatorId'] !== $userId) {
-                $reviewer = $this->userRepo->findById($userId);
-                $this->notificationService->createNotification(
-                    userId: $recipe['creatorId'],
-                    code: 'recipe.review_created',
-                    payload: [
-                        'recipeId' => $recipeId,
-                        'recipeTitle' => $recipe['title'] ?? '',
-                        'reviewId' => $id,
-                        'rating' => $rating,
-                        'actorDisplayName' => $reviewer['displayName'] ?? '',
-                    ],
-                );
-            }
-        } catch (\Throwable $e) {
-            error_log('recipe.review_created notification failed: ' . $e->getMessage());
-        }
 
         return $this->formatReview($review);
     }

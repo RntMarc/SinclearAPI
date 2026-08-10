@@ -21,7 +21,6 @@ use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\PlaceSubmissionController;
 use Sinclear\Api\Controllers\ForumController;
-use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\RecipeController;
@@ -58,7 +57,6 @@ use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
 use Sinclear\Api\Middleware\McpApiKeyMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
-use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
 use Sinclear\Api\Repository\EventRelationRepository;
@@ -76,7 +74,6 @@ use Sinclear\Api\Repository\ForumMemberRepository;
 use Sinclear\Api\Repository\FeedPostRepository;
 use Sinclear\Api\Repository\FeedPostVoteRepository;
 use Sinclear\Api\Repository\FeedPostCommentRepository;
-use Sinclear\Api\Repository\UserDeviceRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
@@ -101,7 +98,6 @@ use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Security\Policy\FeedbackPolicy;
 use Sinclear\Api\Security\Policy\RecipePolicy;
 use Sinclear\Api\Security\Policy\ForumPolicy;
-use Sinclear\Api\Security\Policy\NotificationPolicy;
 use Sinclear\Api\Security\Policy\ReviewPolicy;
 use Sinclear\Api\Security\Policy\SubscriptionPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
@@ -114,14 +110,12 @@ use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\ForumService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
-use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\ProfileService;
 use Sinclear\Api\Services\Mcp\DocumentationProvider;
 use Sinclear\Api\Services\Mcp\McpServer;
 use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\ReviewService;
-use Sinclear\Api\Services\PushService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
 use Symfony\Component\Mailer\Mailer;
@@ -355,25 +349,6 @@ return [
     },
 
     AuthenticatedUser::class => null,
-
-    NotificationRepository::class => autowire(),
-    UserDeviceRepository::class => autowire(),
-
-    NotificationPolicy::class => autowire(),
-
-    PushService::class => function (ContainerInterface $c): PushService {
-        $settings = $c->get(Settings::class);
-        return new PushService(
-            deviceRepo: $c->get(UserDeviceRepository::class),
-            logger: $c->get(LoggerInterface::class),
-            projectId: $settings->fcm['project_id'],
-            clientEmail: $settings->fcm['client_email'],
-            privateKey: $settings->fcm['private_key'],
-        );
-    },
-
-    NotificationService::class => autowire(),
-    NotificationController::class => autowire(),
 
     AdminMiddleware::class => create(),
 

@@ -5,9 +5,7 @@ namespace Sinclear\Api\Services;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Repository\FeedbackCommentRepository;
-use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedbackVoteRepository;
-use Sinclear\Api\Repository\UserRepository;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
@@ -25,8 +23,6 @@ final readonly class FeedbackService
         private MailerInterface $mailer,
         private Settings $settings,
         private LoggerInterface $logger,
-        private NotificationService $notificationService,
-        private UserRepository $userRepo,
     ) {}
 
     public function listSuggestions(int $page, int $limit, ?string $userId): array
@@ -109,20 +105,6 @@ final readonly class FeedbackService
         }
 
         $this->suggestionRepo->updateStatus($id, $status);
-
-        try {
-            $this->notificationService->createNotification(
-                userId: $suggestion['userId'],
-                code: 'feedback.status_changed',
-                payload: [
-                    'suggestionId' => $id,
-                    'suggestionTitle' => $suggestion['title'] ?? '',
-                    'newStatus' => $status,
-                ],
-            );
-        } catch (\Throwable $e) {
-            error_log('feedback.status_changed notification failed: ' . $e->getMessage());
-        }
     }
 
     public function listComments(string $suggestionId): array
@@ -178,42 +160,6 @@ final readonly class FeedbackService
         ]);
 
         $comment = $this->commentRepo->findById($id);
-
-        try {
-            if ($parentId === null) {
-                if ($suggestion['userId'] !== $userId) {
-                    $this->notificationService->createNotification(
-                        userId: $suggestion['userId'],
-                        code: 'feedback.suggestion_commented',
-                        payload: [
-                            'suggestionId' => $suggestionId,
-                            'suggestionTitle' => $suggestion['title'] ?? '',
-                            'commentId' => $id,
-                            'actorDisplayName' => $comment['userDisplayName'] ?? '',
-                        ],
-                    );
-                }
-            } else {
-                $notifiedUserIds = $this->collectCommentChainAuthors($parentId, $suggestion['userId']);
-                foreach ($notifiedUserIds as $recipientId) {
-                    if ($recipientId === $userId) {
-                        continue;
-                    }
-                    $this->notificationService->createNotification(
-                        userId: $recipientId,
-                        code: 'feedback.suggestion_comment_replied',
-                        payload: [
-                            'suggestionId' => $suggestionId,
-                            'suggestionTitle' => $suggestion['title'] ?? '',
-                            'commentId' => $id,
-                            'actorDisplayName' => $comment['userDisplayName'] ?? '',
-                        ],
-                    );
-                }
-            }
-        } catch (\Throwable $e) {
-            error_log('feedback.suggestion_comment notification failed: ' . $e->getMessage());
-        }
 
         return $this->formatComment($comment);
     }

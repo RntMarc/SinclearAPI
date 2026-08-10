@@ -11,7 +11,6 @@ final readonly class CalendarEventService
 {
     public function __construct(
         private CalendarEventRepository $eventRepo,
-        private NotificationService $notificationService,
         private CloseFriendRepository $closeFriendRepo,
     ) {}
 
@@ -29,13 +28,6 @@ final readonly class CalendarEventService
 
         $event = $this->eventRepo->findById($eventId);
         $event = $this->enrich($event);
-
-        $this->notifyParticipants(
-            $participantIds,
-            'calendar.event_created',
-            $event,
-            $userId,
-        );
 
         return $event;
     }
@@ -56,13 +48,6 @@ final readonly class CalendarEventService
         $event = $this->enrich($event);
 
         $participantIds = $this->eventRepo->findParticipantIdsByEvent($id);
-        $allNotifyIds = array_unique([...$participantIds, $event['creatorId']]);
-        $this->notifyParticipants(
-            $allNotifyIds,
-            'calendar.event_updated',
-            $event,
-            $userId,
-        );
 
         return $event;
     }
@@ -119,17 +104,6 @@ final readonly class CalendarEventService
         $this->eventRepo->addParticipant($eventId, $participantId);
 
         $event = $this->enrich($event);
-
-        if ($participantId !== $actorId) {
-            $this->notificationService->createNotification(
-                userId: $participantId,
-                code: 'calendar.participant_added',
-                payload: [
-                    'calendarEventId' => $eventId,
-                    'title' => $event['title'],
-                ],
-            );
-        }
 
         return [
             'calendarEventId' => $eventId,
@@ -192,25 +166,5 @@ final readonly class CalendarEventService
 
         $event['participants'] = $this->eventRepo->findParticipantsByEvent($event['id']);
         return $event;
-    }
-
-    private function notifyParticipants(
-        array $participantIds,
-        string $code,
-        array $event,
-        string $actorId,
-    ): void {
-        foreach ($participantIds as $pid) {
-            if ($pid !== $actorId) {
-                $this->notificationService->createNotification(
-                    userId: $pid,
-                    code: $code,
-                    payload: [
-                        'calendarEventId' => $event['id'],
-                        'title' => $event['title'],
-                    ],
-                );
-            }
-        }
     }
 }

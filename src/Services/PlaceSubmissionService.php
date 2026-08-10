@@ -4,7 +4,6 @@ namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\DiscoverPlaceSubmissionRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
-use Sinclear\Api\Repository\UserRepository;
 
 final readonly class PlaceSubmissionService
 {
@@ -12,9 +11,7 @@ final readonly class PlaceSubmissionService
         private DiscoverPlaceSubmissionRepository $submissionRepo,
         private ExploreService $exploreService,
         private DiscoverReviewRepository $reviewRepo,
-        private NotificationService $notificationService,
         private ImageService $imageService,
-        private UserRepository $userRepo,
     ) {}
 
     public function createSubmission(string $userId, array $body): array
@@ -51,18 +48,6 @@ final readonly class PlaceSubmissionService
 
         $id = $this->submissionRepo->create($data);
         $submission = $this->submissionRepo->findById($id);
-
-        try {
-            $this->notifyUserSubmissionCreated($userId, $id, $data['name']);
-        } catch (\Throwable $e) {
-            error_log('Failed to send submission created notification: ' . $e->getMessage());
-        }
-
-        try {
-            $this->notifyAdminsNewSubmission($id, $data['name']);
-        } catch (\Throwable $e) {
-            error_log('Failed to send admin new submission notification: ' . $e->getMessage());
-        }
 
         return $this->format($submission);
     }
@@ -164,12 +149,6 @@ final readonly class PlaceSubmissionService
 
         $this->submissionRepo->approve($id, $adminNote, $place['id']);
 
-        try {
-            $this->notifyUserSubmissionApproved($submission['userId'], $id, $submission['name'], $place['id']);
-        } catch (\Throwable $e) {
-            error_log('Failed to send submission approval notification: ' . $e->getMessage());
-        }
-
         return [
             'placeId' => $place['id'],
             'status' => 'transferred',
@@ -188,12 +167,6 @@ final readonly class PlaceSubmissionService
 
         $this->submissionRepo->reject($id, $adminNote);
         $updated = $this->submissionRepo->findById($id);
-
-        try {
-            $this->notifyUserSubmissionRejected($submission['userId'], $id, $submission['name']);
-        } catch (\Throwable $e) {
-            error_log('Failed to send submission rejection notification: ' . $e->getMessage());
-        }
 
         return $this->format($updated);
     }
@@ -229,62 +202,6 @@ final readonly class PlaceSubmissionService
             return null;
         }
         return $this->imageService->validate((string) $photo);
-    }
-
-    private function notifyUserSubmissionCreated(string $userId, string $submissionId, string $name): void
-    {
-        $this->notificationService->createNotification(
-            userId: $userId,
-            code: 'submission.created',
-            payload: [
-                'submissionId' => $submissionId,
-                'name' => $name,
-                'status' => 'pending',
-            ],
-        );
-    }
-
-    private function notifyAdminsNewSubmission(string $submissionId, string $name): void
-    {
-        $adminIds = $this->userRepo->findAdminIds();
-        foreach ($adminIds as $adminId) {
-            $this->notificationService->createNotification(
-                userId: $adminId,
-                code: 'submission.new',
-                payload: [
-                    'submissionId' => $submissionId,
-                    'name' => $name,
-                    'deepLink' => 'entdecken',
-                ],
-            );
-        }
-    }
-
-    private function notifyUserSubmissionApproved(string $userId, string $submissionId, string $name, string $placeId): void
-    {
-        $this->notificationService->createNotification(
-            userId: $userId,
-            code: 'submission.status_changed',
-            payload: [
-                'submissionId' => $submissionId,
-                'name' => $name,
-                'status' => 'transferred',
-                'placeId' => $placeId,
-            ],
-        );
-    }
-
-    private function notifyUserSubmissionRejected(string $userId, string $submissionId, string $name): void
-    {
-        $this->notificationService->createNotification(
-            userId: $userId,
-            code: 'submission.status_changed',
-            payload: [
-                'submissionId' => $submissionId,
-                'name' => $name,
-                'status' => 'rejected',
-            ],
-        );
     }
 
     private function format(array $submission): array

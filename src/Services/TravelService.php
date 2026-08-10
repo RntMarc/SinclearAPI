@@ -21,7 +21,6 @@ final readonly class TravelService
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
         private ForumRepository $forumRepo,
         private TravelTicketRepository $ticketRepo,
-        private NotificationService $notificationService,
         private UserRepository $userRepo,
     ) {}
 

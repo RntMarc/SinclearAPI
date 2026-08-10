@@ -9,7 +9,6 @@ use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\PlaceSubmissionController;
 use Sinclear\Api\Controllers\ForumController;
-use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
@@ -230,19 +229,6 @@ return function (App $app): void {
         $group->post('/post/{token}[/{name}]', [LocationSharingIngressController::class, 'handleGenericPost']);
     });
 
-    $app->group('/notifications', function (RouteCollectorProxy $group) {
-        $group->get('', [NotificationController::class, 'list']);
-        $group->delete('', [NotificationController::class, 'markAllRead']);
-
-        // Static routes MUST come before /{id} to avoid route capture
-        $group->get('/devices', [NotificationController::class, 'listDevices']);
-        $group->post('/devices', [NotificationController::class, 'registerDevice']);
-        $group->delete('/devices/{deviceId}', [NotificationController::class, 'unregisterDevice']);
-
-        $group->get('/{id}', [NotificationController::class, 'get']);
-        $group->delete('/{id}', [NotificationController::class, 'markRead']);
-    })->add($container->get(AuthenticationMiddleware::class));
-
     $app->group('/subscriptions', function (RouteCollectorProxy $group) {
         $group->get('', [SubscriptionController::class, 'list']);
         $group->get('/{id}', [SubscriptionController::class, 'get']);
@@ -374,9 +360,6 @@ return function (App $app): void {
         $group->get('/explore/submissions/{id}', [AdminController::class, 'submissionDetail']);
         $group->post('/explore/submissions/{id}/approve', [AdminController::class, 'submissionApprove']);
         $group->post('/explore/submissions/{id}/reject', [AdminController::class, 'submissionReject']);
-        $group->get('/notifications', [AdminController::class, 'notifications']);
-        $group->post('/notifications/send', [AdminController::class, 'sendNotification']);
-        $group->get('/notifications/objects', [AdminController::class, 'notificationObjects']);
         $group->get('/subscriptions', [AdminController::class, 'subscriptions']);
         $group->get('/subscriptions/json', [AdminController::class, 'adminSubscriptionsJson']);
         $group->post('/subscriptions', [AdminController::class, 'createSubscription']);

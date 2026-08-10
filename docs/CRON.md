@@ -27,9 +27,8 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | # | Bezeichnung | Intervall | Beschreibung |
 |---|-------------|-----------|--------------|
 | 1 | `cleanup_otp_tokens` | 1 Stunde | Löscht abgelaufene und benutzte OTP-Codes |
-| 2 | `cleanup_notifications` | 24 Stunden | Löscht Notifications älter als 30 Tage |
-| 3 | `cleanup_location_sharing` | 24 Stunden | Bereinigt alte Location-Sharing-Sessions |
-| 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
+| 2 | `cleanup_location_sharing` | 24 Stunden | Bereinigt alte Location-Sharing-Sessions |
+| 3 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
 
 ## Details
 
@@ -37,11 +36,6 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Task-Name:** `cleanup_otp_tokens`
 - **Intervall:** 3600 Sekunden (1 Stunde)
 - **Aktion:** `DELETE FROM OtpToken WHERE expiresAt < NOW()`
-
-### Notification Cleanup
-- **Task-Name:** `cleanup_notifications`
-- **Intervall:** 86400 Sekunden (24 Stunden)
-- **Aktion:** `DELETE FROM Notification WHERE createdAt < DATE_SUB(NOW(), INTERVAL 30 DAY)`
 
 ### Location Sharing Cleanup
 - **Task-Name:** `cleanup_location_sharing`
