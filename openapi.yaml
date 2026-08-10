@@ -3852,6 +3852,81 @@ components:
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
+    Notification:
+      type: object
+      required: [id, userId, type, title, body, isRead, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Benachrichtigungs-ID
+        userId:
+          type: string
+          format: uuid
+          description: ID des Empfängers
+        type:
+          type: string
+          description: Benachrichtigungstyp (z.B. `forum_post`, `trip_invite`, `message`)
+        title:
+          type: string
+          description: Kurztext der Benachrichtigung
+        body:
+          type: string
+          description: Ausführlicher Benachrichtigungstext
+        data:
+          type: object
+          additionalProperties: true
+          nullable: true
+          description: Optionale zusätzliche Daten (z.B. Deep-Link-Payload)
+        isRead:
+          type: boolean
+          description: Ob die Benachrichtigung bereits gelesen wurde
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+
+    NotificationListResponse:
+      type: object
+      required: [notifications]
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+          description: Liste der Benachrichtigungen
+
+    PushSubscriptionRequest:
+      type: object
+      required: [endpoint, type]
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          description: Push-Endpoint-URL des Clients
+        type:
+          type: string
+          enum: [webpush, unifiedpush]
+          description: Push-Dienst-Typ
+        keys:
+          type: object
+          required: [p256dh, auth]
+          properties:
+            p256dh:
+              type: string
+              description: Base64url-encoded P256 DH-Public-Key
+            auth:
+              type: string
+              description: Base64url-encoded Auth-Secret
+
+    VapidKeyResponse:
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+          description: Base64url-encoded VAPID-Public-Key
+
 paths:
   /mcp:
     get:
@@ -4060,7 +4135,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Key nicht gefunden
+          description: Reise nicht gefunden
           content:
             application/json:
               schema:
@@ -12892,3 +12967,179 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /notifications:
+    get:
+      summary: Ungelesene Benachrichtigungen auflisten
+      description: >
+        Gibt eine Liste aller ungelesenen Benachrichtigungen des aktuellen
+        Nutzers zurück, sortiert nach Erstellungszeitpunkt (absteigend).
+        Maximal 50 Einträge.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Optional. Nur Benachrichtigungen nach diesem Zeitpunkt (Format: YYYY-MM-DD HH:MM:SS)
+      responses:
+        '200':
+          description: Liste der Benachrichtigungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/read:
+    post:
+      summary: Benachrichtigungen als gelesen markieren
+      description: >
+        Markiert eine oder mehrere Benachrichtigungen als gelesen.
+        Es werden nur Benachrichtigungen des aktuellen Nutzers verarbeitet.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  description: Liste der Benachrichtigungs-IDs
+                  example:
+                    - "550e8400-e29b-41d4-a716-446655440000"
+                    - "550e8400-e29b-41d4-a716-446655440001"
+      responses:
+        '200':
+          description: Benachrichtigungen erfolgreich als gelesen markiert
+        '400':
+          description: Ungültige Eingabe (z.B. leere IDs-Liste)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/push-subscription:
+    post:
+      summary: Push-Subscription speichern oder aktualisieren
+      description: >
+        Speichert oder aktualisiert die Push-Subscription des aktuellen Nutzers.
+        Überschreibt eine bestehende Subscription mit derselben Endpoint-URL.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionRequest'
+      responses:
+        '201':
+          description: Push-Subscription erfolgreich gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        '400':
+          description: Ungültige Eingabe (z.B. fehlende Pflichtfelder)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Push-Subscription löschen
+      description: >
+        Löscht die Push-Subscription des aktuellen Nutzers.
+        Der Client erhält danach keine Push-Benachrichtigungen mehr.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint:
+                  type: string
+                  format: uri
+                  description: Push-Endpoint-URL der zu löschenden Subscription
+      responses:
+        '200':
+          description: Push-Subscription erfolgreich gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Push-Subscription nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/vapid-public-key:
+    get:
+      summary: VAPID-Public-Key abrufen
+      description: >
+        Gibt den öffentlichen VAPID-Schlüssel zurück, der für die
+        Web-Push-Authentifizierung benötigt wird. Kein Authentifizierung erforderlich.
+      tags: [Notifications]
+      responses:
+        '200':
+          description: VAPID-Public-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VapidKeyResponse'

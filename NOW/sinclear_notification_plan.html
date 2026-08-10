@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sinclear — Benachrichtigungen: Umsetzungsplan</title>
+<style>
+  :root {
+    --api: #1a1f2e;
+    --api-accent: #4f7cff;
+    --api-muted: #2d3452;
+    --api-border: #3a4266;
+    --api-text: #c8d0f0;
+    --api-text-dim: #7a85a8;
+
+    --app: #1c1f18;
+    --app-accent: #6abf4b;
+    --app-muted: #272e20;
+    --app-border: #3a4830;
+    --app-text: #cad8b8;
+    --app-text-dim: #7a9060;
+
+    --shared: #1e1a28;
+    --shared-accent: #b07cf8;
+    --shared-border: #3d3052;
+    --shared-text: #d5c8f0;
+
+    --warn: #1e1a10;
+    --warn-accent: #e0a020;
+    --warn-border: #4a3c10;
+
+    --bonus: #1a1e22;
+    --bonus-accent: #60c8e0;
+    --bonus-border: #2a4050;
+
+    --bg: #111318;
+    --surface: #181b22;
+    --text: #e8eaf2;
+    --text-dim: #6b7094;
+    --rule: rgba(255,255,255,0.07);
+
+    --mono: 'JetBrains Mono', 'Fira Mono', 'Cascadia Code', monospace;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --radius: 10px;
+    --gap: 28px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 48px 32px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .doc-header {
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 32px;
+    margin-bottom: 40px;
+  }
+  .doc-eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 12px;
+  }
+  .doc-title {
+    font-size: 28px; font-weight: 700; color: var(--text);
+    letter-spacing: -.02em; line-height: 1.2; margin-bottom: 10px;
+  }
+  .doc-subtitle { font-size: 14px; color: var(--text-dim); max-width: 680px; }
+
+  .legend {
+    display: flex; gap: 24px; margin-bottom: 36px; flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-api    { background: var(--api-accent); }
+  .dot-app    { background: var(--app-accent); }
+  .dot-shared { background: var(--shared-accent); }
+  .dot-warn   { background: var(--warn-accent); }
+  .dot-bonus  { background: var(--bonus-accent); }
+
+  .phase-heading {
+    font-size: 11px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--text-dim);
+    margin-bottom: 16px; margin-top: 36px;
+  }
+  .phase-heading:first-of-type { margin-top: 0; }
+
+  .columns {
+    display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: start;
+  }
+  @media (max-width: 700px) { .columns { grid-template-columns: 1fr; } }
+
+  .col-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--radius) var(--radius) 0 0;
+    font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .col-header-api    { background: var(--api-muted);  color: var(--api-accent);    border: 1px solid var(--api-border);    border-bottom: none; }
+  .col-header-app    { background: var(--app-muted);  color: var(--app-accent);    border: 1px solid var(--app-border);    border-bottom: none; }
+  .col-header-shared { background: var(--shared);     color: var(--shared-accent); border: 1px solid var(--shared-border); border-bottom: none; }
+  .col-header-icon   { font-size: 16px; }
+
+  .section {
+    border-radius: 0 0 var(--radius) var(--radius);
+    border: 1px solid;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .section-api    { background: var(--api);    border-color: var(--api-border);    border-top-color: var(--api-accent); }
+  .section-app    { background: var(--app);    border-color: var(--app-border);    border-top-color: var(--app-accent); }
+  .section-shared { background: var(--shared); border-color: var(--shared-border); border-top-color: var(--shared-accent); border-radius: 0 0 var(--radius) var(--radius); padding: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .section-shared { grid-template-columns: 1fr; } }
+
+  .section-none {
+    background: var(--api);
+    border: 1px solid var(--api-border);
+    border-top-color: var(--api-accent);
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 20px;
+    color: var(--api-text-dim);
+    font-size: 13px;
+    font-style: italic;
+    line-height: 1.6;
+  }
+
+  .phase { position: relative; }
+  .phase-label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 8px; }
+  .phase-label-api    { color: var(--api-accent); }
+  .phase-label-app    { color: var(--app-accent); }
+  .phase-label-shared { color: var(--shared-accent); }
+  .phase-label-warn   { color: var(--warn-accent); }
+  .phase-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+  .phase-body  { font-size: 13px; color: var(--text-dim); line-height: 1.65; }
+
+  .tasks { list-style: none; display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+  .tasks li { display: flex; gap: 9px; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .tasks li::before { content: '—'; flex-shrink: 0; opacity: .4; margin-top: 1px; }
+  .tasks li strong { color: var(--text); font-weight: 500; }
+
+  code {
+    font-family: var(--mono); font-size: 11.5px;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+    padding: 1px 5px; border-radius: 4px; color: #d4c5f7;
+  }
+
+  .phase-divider { height: 1px; background: var(--rule); margin: 2px 0; }
+
+  /* ── Info-Box (Polling-Hinweis) ── */
+  .infobox {
+    border-radius: var(--radius);
+    border: 1px solid var(--warn-border);
+    background: var(--warn);
+    padding: 16px 18px;
+    margin-top: 4px;
+  }
+  .infobox-title {
+    font-size: 12px; font-weight: 700; letter-spacing: .06em;
+    color: var(--warn-accent); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .infobox-icon { font-size: 15px; }
+  .infobox ul { margin-top: 6px; }
+
+  /* ── Distributor-Auswahl Box ── */
+  .distrib-box {
+    border-radius: var(--radius);
+    border: 1px solid var(--app-border);
+    background: var(--app-muted);
+    padding: 14px 16px;
+    margin-top: 4px;
+  }
+  .distrib-title {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--app-accent); margin-bottom: 10px;
+  }
+  .distrib-list { display: flex; flex-direction: column; gap: 8px; }
+  .distrib-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 12px; color: var(--text-dim); line-height: 1.5;
+  }
+  .distrib-badge {
+    font-size: 9px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; padding: 2px 5px; border-radius: 4px;
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .badge-foss   { background: rgba(106,191,75,.15); color: var(--app-accent); }
+  .badge-gplay  { background: rgba(79,124,255,.15);  color: var(--api-accent); }
+  .distrib-name { font-weight: 600; color: var(--text); display: block; }
+
+  /* ── Bonus-Phase ── */
+  .bonus-row { margin-top: var(--gap); }
+  .col-header-bonus {
+    background: var(--bonus); color: var(--bonus-accent);
+    border: 1px solid var(--bonus-border); border-bottom: none;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; border-radius: var(--radius) var(--radius) 0 0;
+    font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .section-bonus {
+    background: var(--bonus); border: 1px solid var(--bonus-border);
+    border-top-color: var(--bonus-accent);
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  }
+  @media (max-width: 700px) { .section-bonus { grid-template-columns: 1fr; } }
+  .phase-label-bonus { color: var(--bonus-accent); }
+
+  .badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 20px;
+    margin-left: 6px; vertical-align: middle; position: relative; top: -1px;
+  }
+  .badge-optional { background: rgba(255,255,255,.06); color: var(--text-dim); }
+  .badge-later    { background: rgba(96,200,224,.12);   color: var(--bonus-accent); }
+
+  .full-row { margin-top: var(--gap); }
+
+  .flow { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+  .flow-step { display: flex; gap: 12px; align-items: flex-start; }
+  .flow-line-wrap { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 20px; }
+  .flow-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .flow-vert { width: 1px; background: var(--rule); flex: 1; min-height: 18px; margin-top: 2px; }
+  .flow-content { padding-bottom: 16px; font-size: 13px; color: var(--text-dim); line-height: 1.55; flex: 1; }
+  .flow-content strong { display: block; color: var(--text); font-weight: 500; margin-bottom: 2px; }
+  .flow-dot-api    { background: var(--api-accent); }
+  .flow-dot-app    { background: var(--app-accent); }
+  .flow-dot-shared { background: var(--shared-accent); }
+  .flow-dot-bonus  { background: var(--bonus-accent); }
+
+  .shared-block-title {
+    font-size: 12px; font-weight: 600; color: var(--shared-accent);
+    margin-bottom: 8px; letter-spacing: .04em;
+  }
+
+  .doc-footer {
+    margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--rule);
+    font-size: 12px; color: var(--text-dim);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div class="doc-eyebrow">Sinclear · Technischer Plan</div>
+  <h1 class="doc-title">Benachrichtigungs-Infrastruktur</h1>
+  <p class="doc-subtitle">Umsetzungsplan für Polling, Web Push und UnifiedPush — getrennt nach Flutter App und PHP API. Kein Firebase, keine Drittanbieter-Einsicht in Inhalte. FCM als Weck-Signal ist bewusst als spätere Bonus-Phase aufgeführt.</p>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot dot-api"></span>PHP API (Slim)</div>
+  <div class="legend-item"><span class="legend-dot dot-app"></span>Flutter App (Android + Web)</div>
+  <div class="legend-item"><span class="legend-dot dot-shared"></span>Gemeinsam / Schnittstelle</div>
+  <div class="legend-item"><span class="legend-dot dot-warn"></span>UX-Hinweis</div>
+  <div class="legend-item"><span class="legend-dot dot-bonus"></span>Bonus-Phase</div>
+</div>
+
+
+<!-- ═══════════ PHASE 1 ═══════════ -->
+<p class="phase-heading">Phase 1 — Grundstruktur &amp; Polling</p>
+<div class="columns">
+  <div>
+    <div class="col-header col-header-api"><span class="col-header-icon">⬡</span>PHP API</div>
+    <div class="section section-api">
+
+      <div class="phase">
+        <div class="phase-label phase-label-api">Datenbankschema</div>
+        <div class="phase-title">Zwei neue Tabellen</div>
+        <ul class="tasks">
+          <li><span>Tabelle <code>notifications</code>: <strong>id, user_id, type, title, body, data (JSON), is_read, created_at</strong></span></li>
+          <li><span>Tabelle <code>push_subscriptions</code>: <strong>id, user_id, type, endpoint, p256dh, auth, user_agent, created_at</strong> — Feld <code>type</code> unterscheidet <code>'webpush'</code> und <code>'unifiedpush'</code> (schon vorbereiten)</span></li>
+          <li><span>Index auf <code>(user_id, is_read, created_at)</code> für schnelles Polling</span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-api">Service-Klasse</div>
+        <div class="phase-title"><code>NotificationService</code></div>
+        <ul class="tasks">
+          <li><span><strong>create()</strong> — neue Benachrichtigung anlegen und optionalen Push-Versand triggern</span></li>
+          <li><span><strong>getUnread()</strong> — ungelesene Items seit optionalem <code>since</code>-Timestamp</span></li>
+          <li><span><strong>markRead()</strong> — Array von IDs als gelesen markieren</span></li>
+          <li><span><strong>cleanExpiredSubscriptions()</strong> — abgelaufene Endpoints nach Bounce bereinigen</span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-api">Controller &amp; Routen</div>
+        <div class="phase-title"><code>NotificationController</code></div>
+        <ul class="tasks">
+          <li><span><code>GET /notifications</code> — ungelesene Liste, Auth required</span></li>
+          <li><span><code>POST /notifications/read</code> — IDs als gelesen markieren</span></li>
+          <li><span><code>POST /notifications/push-subscription</code> — Subscription speichern (vorbereitet, Phase 3/4)</span></li>
+          <li><span><code>DELETE /notifications/push-subscription</code> — Subscription entfernen</span></li>
+          <li><span><code>GET /notifications/vapid-public-key</code> — öffentlicher VAPID Key (kein Auth nötig)</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div>
+    <div class="col-header col-header-app"><span class="col-header-icon">◈</span>Flutter App</div>
+    <div class="section section-app">
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Datenmodell</div>
+        <div class="phase-title"><code>NotificationItem</code></div>
+        <ul class="tasks">
+          <li><span>Felder: <strong>id, type, title, body, data, createdAt</strong></span></li>
+          <li><span><code>factory NotificationItem.fromJson()</code> — Deserialisierung</span></li>
+          <li><span><code>data</code>-Feld trägt optionale Routing-Info, z.B. <code>{'route': '/forum/123'}</code></span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Service-Klasse</div>
+        <div class="phase-title"><code>NotificationService</code></div>
+        <ul class="tasks">
+          <li><span><strong>startPolling()</strong> — Timer starten, Intervall konfigurierbar (Standard 60 s im Vordergrund)</span></li>
+          <li><span><strong>stopPolling()</strong> — bei Logout und <code>AppLifecycleState.paused</code></span></li>
+          <li><span><strong>markRead()</strong> — IDs an API senden</span></li>
+          <li><span><code>Stream&lt;List&lt;NotificationItem&gt;&gt;</code> — reaktiver Stream für die UI</span></li>
+          <li><span><code>_lastSeen</code>-Timestamp merken, damit nur neue Items abgerufen werden</span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">App-Integration</div>
+        <div class="phase-title">Lifecycle &amp; Login</div>
+        <ul class="tasks">
+          <li><span><code>startPolling()</code> nach erfolgreichem Login aufrufen</span></li>
+          <li><span><code>stopPolling()</code> bei Logout und App-Pause (Web: Page Visibility API)</span></li>
+          <li><span>Service als Singleton injizieren, analog zu bestehenden Services im Projekt</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ PHASE 2 ═══════════ -->
+<p class="phase-heading">Phase 2 — Android Systembenachrichtigungen (Vordergrund)</p>
+<div class="columns">
+  <div>
+    <div class="col-header col-header-api"><span class="col-header-icon">⬡</span>PHP API</div>
+    <div class="section-none">
+      Keine Änderungen erforderlich. Die Polling-Endpunkte aus Phase 1 genügen vollständig. Die API hat keine Kenntnis davon, ob der Client eine lokale Systembenachrichtigung anzeigt oder nicht.
+    </div>
+  </div>
+
+  <div>
+    <div class="col-header col-header-app"><span class="col-header-icon">◈</span>Flutter App (Android)</div>
+    <div class="section section-app">
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Package</div>
+        <div class="phase-title"><code>flutter_local_notifications</code></div>
+        <ul class="tasks">
+          <li><span>Plugin initialisieren mit Android-Channel <code>sinclear_main</code></span></li>
+          <li><span>Notification-Permission beim ersten Start anfragen (<code>requestNotificationsPermission()</code>)</span></li>
+          <li><span>Im <code>NotificationService</code> nach jedem Poll aufrufen, wenn <code>!kIsWeb</code> und neue Items vorhanden</span></li>
+          <li><span>Tap auf Benachrichtigung → App öffnen und zur Route in <code>item.data</code> navigieren</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ PHASE 3 ═══════════ -->
+<p class="phase-heading">Phase 3 — UnifiedPush (Android Hintergrund)</p>
+<div class="columns">
+  <div>
+    <div class="col-header col-header-api"><span class="col-header-icon">⬡</span>PHP API</div>
+    <div class="section section-api">
+
+      <div class="phase">
+        <div class="phase-label phase-label-api">Kein neues Package</div>
+        <div class="phase-title">UnifiedPush-Versand via HTTP</div>
+        <ul class="tasks">
+          <li><span>UnifiedPush-Endpoints sind gewöhnliche HTTPS-URLs — Guzzle reicht</span></li>
+          <li><span>Payload: <code>{"title":"…","body":"…","data":{…}}</code> als JSON-Body</span></li>
+          <li><span>In <code>NotificationService::create()</code> alle Subscriptions des Users mit <code>type = 'unifiedpush'</code> laden und per Guzzle bedienen</span></li>
+          <li><span>Fehler beim Versand dürfen den API-Request nicht blockieren (try/catch, kein Await)</span></li>
+          <li><span>HTTP 410 vom Distributor → Subscription aus DB löschen</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div>
+    <div class="col-header col-header-app"><span class="col-header-icon">◈</span>Flutter App (Android)</div>
+    <div class="section section-app">
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Setup-Flow</div>
+        <div class="phase-title">Distributor-Erkennung &amp; Auswahl</div>
+        <ul class="tasks">
+          <li><span><code>UnifiedPush.getDistributors()</code> aufrufen — liefert installierte Distributoren</span></li>
+          <li><span>Falls Distributoren vorhanden: einen auswählen lassen und Registrierung starten</span></li>
+          <li><span>Falls kein Distributor installiert: Auswahlscreen zeigen (siehe unten)</span></li>
+        </ul>
+
+        <div class="distrib-box" style="margin-top:12px;">
+          <div class="distrib-title">Distributor-Auswahlscreen — kein Distributor gefunden</div>
+          <div class="distrib-list">
+            <div class="distrib-item">
+              <span class="distrib-badge badge-foss">F-Droid</span>
+              <span><span class="distrib-name">ntfy</span>Empfohlen. Selbst hostbar, kein Account nötig. F-Droid und Play Store.</span>
+            </div>
+            <div class="distrib-item">
+              <span class="distrib-badge badge-foss">F-Droid</span>
+              <span><span class="distrib-name">Gotify UP</span>Für bestehende Gotify-Server-Nutzer.</span>
+            </div>
+            <div class="distrib-item">
+              <span class="distrib-badge badge-gplay">Play</span>
+              <span><span class="distrib-name">NextPush</span>Nextcloud-basierter Distributor (F-Droid).</span>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--text-dim);margin-top:10px;">Klick öffnet direkt Play Store oder F-Droid — je nach Quelle. Nach Installation: Setup erneut starten.</p>
+        </div>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Service-Klasse</div>
+        <div class="phase-title"><code>UnifiedPushService</code></div>
+        <ul class="tasks">
+          <li><span><strong>register()</strong> — Distributor wählen, Endpoint empfangen</span></li>
+          <li><span>Endpoint an API senden (<code>POST /notifications/push-subscription</code>, <code>type: "unifiedpush"</code>)</span></li>
+          <li><span><strong>onMessage()</strong> — eingehende Nachricht via <code>LocalNotificationHelper.show()</code> anzeigen</span></li>
+          <li><span><strong>onRegistrationFailed()</strong> — graceful Fallback: Polling weiterführen, Nutzer informieren</span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-warn">UX-Hinweis</div>
+        <div class="phase-title">Polling-Fallback: Energiespar-Hinweis</div>
+        <div class="infobox">
+          <div class="infobox-title"><span class="infobox-icon">⚡</span>Wenn kein Distributor gewählt wird</div>
+          <p style="font-size:12px;color:var(--warn-accent);margin-bottom:8px;">Nutzer, die UnifiedPush überspringen, erhalten einen Infoscreen mit geräteabhängigen Schritten:</p>
+          <ul class="tasks">
+            <li><span><strong>Android (allgemein):</strong> Akku-Optimierung für Sinclear deaktivieren (Einstellungen → Apps → Sinclear → Akku)</span></li>
+            <li><span><strong>Samsung:</strong> Gerätewartung → Akku → Hintergrundnutzung → Sinclear → unrestricted. Zusätzlich Schlafmodus-Ausnahme prüfen.</span></li>
+            <li><span><strong>Xiaomi/MIUI:</strong> Autostart erlauben, Akku-Sparer auf „Keine Einschränkungen", MIUI-Optimierung beachten</span></li>
+            <li><span><strong>OnePlus/OxygenOS:</strong> Akku-Optimierung deaktivieren, App-Sperre entfernen</span></li>
+            <li><span>Hersteller-Link: dontkillmyapp.com kann als Referenz verlinkt werden</span></li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ PHASE 4 ═══════════ -->
+<p class="phase-heading">Phase 4 — Web Push (PWA)</p>
+<div class="columns">
+  <div>
+    <div class="col-header col-header-api"><span class="col-header-icon">⬡</span>PHP API</div>
+    <div class="section section-api">
+
+      <div class="phase">
+        <div class="phase-label phase-label-api">Dependency</div>
+        <div class="phase-title"><code>minishlink/web-push</code></div>
+        <ul class="tasks">
+          <li><span>Per Composer installieren</span></li>
+          <li><span>VAPID-Schlüsselpaar einmalig generieren, in <code>.env</code> ablegen</span></li>
+          <li><span><code>VAPID_SUBJECT = mailto:contact@sinclear.de</code></span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-api">Push-Versand</div>
+        <div class="phase-title">In <code>NotificationService::create()</code></div>
+        <ul class="tasks">
+          <li><span>Nach DB-Insert alle Subscriptions mit <code>type = 'webpush'</code> laden und bedienen</span></li>
+          <li><span>Payload: <code>title, body, data</code> als JSON</span></li>
+          <li><span>HTTP 410 / Expired-Flag → Endpoint automatisch löschen</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <div>
+    <div class="col-header col-header-app"><span class="col-header-icon">◈</span>Flutter App (Web/PWA)</div>
+    <div class="section section-app">
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Service Worker</div>
+        <div class="phase-title"><code>web/sw.js</code></div>
+        <ul class="tasks">
+          <li><span><code>push</code>-Event empfangen, <code>showNotification()</code> aufrufen</span></li>
+          <li><span><code>notificationclick</code>: App-Tab fokussieren oder öffnen, zur Route navigieren</span></li>
+          <li><span>In <code>web/index.html</code> registrieren</span></li>
+        </ul>
+      </div>
+
+      <div class="phase-divider"></div>
+
+      <div class="phase">
+        <div class="phase-label phase-label-app">Service-Klasse</div>
+        <div class="phase-title"><code>WebPushService</code></div>
+        <ul class="tasks">
+          <li><span>Notification-Permission anfragen</span></li>
+          <li><span>VAPID Public Key von <code>/notifications/vapid-public-key</code> laden</span></li>
+          <li><span><code>PushManager.subscribe()</code> mit VAPID Key aufrufen</span></li>
+          <li><span>Subscription (endpoint, p256dh, auth) an API senden</span></li>
+          <li><span>Nur ausführen wenn <code>kIsWeb</code> und Browser Push unterstützt</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ QUERSCHNITT ═══════════ -->
+<div class="full-row">
+  <p class="phase-heading" style="margin-top:0;">Querschnittliche Themen</p>
+  <div class="col-header col-header-shared"><span class="col-header-icon">◇</span>Gemeinsam — API &amp; App</div>
+  <div class="section-shared">
+
+    <div class="shared-block">
+      <div class="shared-block-title">Polling-Strategie</div>
+      <ul class="tasks">
+        <li><span>App im Vordergrund: <strong>60 Sekunden</strong></span></li>
+        <li><span>Web-Tab inaktiv (Page Visibility API): Polling pausieren</span></li>
+        <li><span>Parameter <code>since</code> vermeidet doppeltes Laden</span></li>
+        <li><span>Polling bleibt immer aktiv als Fallback — auch wenn Push aktiv ist</span></li>
+      </ul>
+    </div>
+
+    <div class="shared-block">
+      <div class="shared-block-title">Benachrichtigung erstellen</div>
+      <ul class="tasks">
+        <li><span>Aufruf nur serverseitig: <code>$notificationService->create(...)</code></span></li>
+        <li><span>Feld <code>type</code> für späteres Filtern: <code>'forum_reply'</code>, <code>'event_reminder'</code>, …</span></li>
+        <li><span>Feld <code>data</code> trägt Route für Deep Link in der App</span></li>
+        <li><span>Bestehende Controller rufen den Service direkt auf</span></li>
+      </ul>
+    </div>
+
+    <div class="shared-block">
+      <div class="shared-block-title">Reihenfolge</div>
+      <div class="flow" style="margin-top:10px;">
+        <div class="flow-step">
+          <div class="flow-line-wrap"><div class="flow-dot flow-dot-api"></div><div class="flow-vert"></div></div>
+          <div class="flow-content"><strong>Phase 1 — Basis</strong>DB-Schema, API-Endpunkte, Flutter Service + Polling</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line-wrap"><div class="flow-dot flow-dot-app"></div><div class="flow-vert"></div></div>
+          <div class="flow-content"><strong>Phase 2 — Android UI</strong>Lokale Systembenachrichtigungen im Vordergrund</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line-wrap"><div class="flow-dot flow-dot-shared"></div><div class="flow-vert"></div></div>
+          <div class="flow-content"><strong>Phase 3 — UnifiedPush</strong>Zuverlässige Hintergrund-Pushes + UX-Hinweise</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line-wrap"><div class="flow-dot flow-dot-shared"></div><div class="flow-vert"></div></div>
+          <div class="flow-content"><strong>Phase 4 — Web Push</strong>VAPID, Service Worker, PWA-Subscriptions</div>
+        </div>
+        <div class="flow-step">
+          <div class="flow-line-wrap"><div class="flow-dot flow-dot-bonus"></div></div>
+          <div class="flow-content"><strong>Bonus — FCM Weck-Signal</strong>Erst wenn 1–4 stabil laufen</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════ BONUS ═══════════ -->
+<div class="bonus-row">
+  <p class="phase-heading" style="margin-top:36px;">Bonus-Phase — FCM als stilles Weck-Signal <span class="badge badge-later">Erst nach Phase 4</span></p>
+  <div class="col-header-bonus"><span class="col-header-icon">◎</span>FCM Silent Push — nur zum Aufwecken, kein Inhalt</div>
+  <div class="section-bonus">
+
+    <div class="phase">
+      <div class="phase-label phase-label-bonus">Konzept</div>
+      <div class="phase-title">FCM ohne Inhaltsübertragung</div>
+      <p class="phase-body" style="margin-bottom:10px;">FCM sendet ausschließlich eine Data-Only-Message ohne <code>notification</code>-Block. Der Inhalt ist leer — nur ein Signal, das die App aufweckt. Die App pollt dann sofort die eigene API und zeigt die Benachrichtigung selbst an. Google sieht: <em>„Weck App auf"</em> — kein Titel, kein Text, kein Inhalt.</p>
+      <ul class="tasks">
+        <li><span>FCM-Token wie gewohnt registrieren und an API übermitteln</span></li>
+        <li><span>API sendet Data-Only-Message: <code>{"data": {"ping": "1"}}</code> — kein <code>notification</code>-Key</span></li>
+        <li><span>App empfängt Weck-Signal und triggert sofort einen Polling-Request</span></li>
+        <li><span>Datenschutz: Google transportiert keinen Benachrichtigungsinhalt — nur ein leeres Weck-Paket</span></li>
+      </ul>
+    </div>
+
+    <div class="phase">
+      <div class="phase-label phase-label-bonus">Einordnung &amp; Abwägung</div>
+      <div class="phase-title">Wann sinnvoll?</div>
+      <ul class="tasks">
+        <li><span>Als ergänzender Kanal für Nutzer <em>ohne</em> UnifiedPush-Distributor, die aber Google-Dienste akzeptieren</span></li>
+        <li><span>Verbessert Polling-Zuverlässigkeit im Hintergrund, ohne Inhalte preiszugeben</span></li>
+        <li><span>Nicht geeignet für Nutzer, die Google-Dienste vollständig meiden</span></li>
+        <li><span>Erfordert Firebase-Projekt und GoogleServices-Datei im App-Build — erhöht Komplexität</span></li>
+        <li><span><strong>Erst umsetzen, wenn Phasen 1–4 stabil und im Alltag erprobt sind</strong></span></li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="doc-footer">
+  <span>Sinclear · Notification Plan v2</span>
+  <span>Kein Firebase-Inhalt · VAPID · UnifiedPush · FCM nur als Weck-Signal (Bonus)</span>
+</div>
+
+</body>
+</html>

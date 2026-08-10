@@ -68,4 +68,10 @@ $settings['downloads'] = [
     'base_url' => $_ENV['DOWNLOADS_BASE_URL'] ?? 'https://sinclear.de/downloads',
 ];
 
+$settings['vapid'] = [
+    'public_key' => $_ENV['VAPID_PUBLIC_KEY'] ?? '',
+    'private_key' => $_ENV['VAPID_PRIVATE_KEY'] ?? '',
+    'subject' => $_ENV['VAPID_SUBJECT'] ?? 'mailto:contact@sinclear.de',
+];
+
 return $settings;

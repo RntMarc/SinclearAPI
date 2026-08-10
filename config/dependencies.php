@@ -249,6 +249,48 @@ return [
     ForumService::class => autowire(),
     ForumController::class => autowire(),
 
+    \Sinclear\Api\Repository\NotificationRepository::class => autowire(),
+    \Sinclear\Api\Repository\PushSubscriptionRepository::class => autowire(),
+
+    \Minishlink\WebPush\WebPush::class => function (ContainerInterface $c): \Minishlink\WebPush\WebPush {
+        $settings = $c->get(Settings::class);
+        $vapid = $settings->vapid;
+
+        if (empty($vapid['public_key']) || empty($vapid['private_key'])) {
+            throw new \RuntimeException('VAPID keys not configured');
+        }
+
+        return new \Minishlink\WebPush\WebPush(
+            auth: [
+                'VAPID' => [
+                    'subject' => $vapid['subject'],
+                    'vapidId' => $vapid['public_key'],
+                    'vapidKey' => $vapid['private_key'],
+                ],
+            ],
+        );
+    },
+
+    \Sinclear\Api\Services\NotificationService::class => function (ContainerInterface $c): \Sinclear\Api\Services\NotificationService {
+        $settings = $c->get(Settings::class);
+        $vapid = $settings->vapid;
+
+        $webPush = null;
+        if (!empty($vapid['public_key']) && !empty($vapid['private_key'])) {
+            $webPush = $c->get(\Minishlink\WebPush\WebPush::class);
+        }
+
+        return new \Sinclear\Api\Services\NotificationService(
+            notificationRepo: $c->get(\Sinclear\Api\Repository\NotificationRepository::class),
+            pushSubRepo: $c->get(\Sinclear\Api\Repository\PushSubscriptionRepository::class),
+            webPush: $webPush,
+            httpClient: $c->get(\GuzzleHttp\Client::class),
+            logger: $c->get(\Psr\Log\LoggerInterface::class),
+        );
+    },
+
+    \Sinclear\Api\Controllers\NotificationController::class => autowire(),
+
     NominatimRateLimiter::class => autowire(),
     NominatimCache::class => autowire(),
 

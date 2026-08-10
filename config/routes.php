@@ -14,6 +14,7 @@ use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\ModerationRequestController;
+use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -314,6 +315,17 @@ return function (App $app): void {
         $group->post('/journeys/{id}/participants', [PtController::class, 'addParticipant']);
         $group->delete('/journeys/{id}/participants/{userId}', [PtController::class, 'removeParticipant']);
     })->add($container->get(AuthenticationMiddleware::class));
+
+    // Notifications (authenticated)
+    $app->group('/notifications', function (RouteCollectorProxy $group) {
+        $group->get('', [NotificationController::class, 'index']);
+        $group->post('/read', [NotificationController::class, 'markRead']);
+        $group->post('/push-subscription', [NotificationController::class, 'savePushSubscription']);
+        $group->delete('/push-subscription', [NotificationController::class, 'deletePushSubscription']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    // Notifications (public — no auth required)
+    $app->get('/notifications/vapid-public-key', [NotificationController::class, 'vapidPublicKey']);
 
     // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);
