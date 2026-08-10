@@ -5,11 +5,8 @@ namespace Sinclear\Api\Tests\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\ServerRequestInterface;
-use Psr\Http\Server\RequestHandlerInterface;
-use Slim\App;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Slim\Psr7\Response;
-use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\PushSubscriptionRepository;
@@ -26,9 +23,25 @@ class NotificationIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->db = new PDO('sqlite::memory:');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $this->db = new PDO(
+            sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
+                $_ENV['DB_HOST'] ?? '127.0.0.1',
+                $_ENV['DB_PORT'] ?? '3306',
+                $_ENV['DB_NAME'] ?? 'sinclear_test',
+            ),
+            $_ENV['DB_USER'] ?? 'root',
+            $_ENV['DB_PASSWORD'] ?? '',
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+            ],
+        );
+        $this->db->exec("SET time_zone = '+00:00'");
+
+        $this->db->exec("DROP TABLE IF EXISTS Notification");
+        $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS User");
 
         $this->db->exec("
             CREATE TABLE User (
@@ -36,7 +49,7 @@ class NotificationIntegrationTest extends TestCase
                 email varchar(191) NOT NULL UNIQUE,
                 passwordHash varchar(191) NOT NULL,
                 displayName varchar(191) NOT NULL,
-                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                 birthday datetime(3) DEFAULT NULL,
                 isAdmin tinyint NOT NULL DEFAULT 0,
                 discordId varchar(191) DEFAULT NULL,
@@ -52,12 +65,14 @@ class NotificationIntegrationTest extends TestCase
                 type varchar(64) NOT NULL,
                 title varchar(255) NOT NULL,
                 body text NOT NULL,
-                data text DEFAULT NULL,
+                data json DEFAULT NULL,
                 isRead tinyint(1) NOT NULL DEFAULT 0,
-                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                KEY idx_notification_user_read_created (userId, isRead, createdAt),
+                CONSTRAINT fk_notification_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
             )
         ");
-        $this->db->exec("CREATE INDEX idx_notification_user_read_created ON Notification (userId, isRead, createdAt)");
 
         $this->db->exec("
             CREATE TABLE PushSubscription (
@@ -68,22 +83,35 @@ class NotificationIntegrationTest extends TestCase
                 p256dh text DEFAULT NULL,
                 auth text DEFAULT NULL,
                 userAgent varchar(255) DEFAULT NULL,
-                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                UNIQUE KEY idx_pushsub_endpoint (endpoint(255)),
+                KEY idx_pushsub_user (userId)
             )
         ");
-        $this->db->exec("CREATE UNIQUE INDEX idx_pushsub_endpoint ON PushSubscription (endpoint)");
-        $this->db->exec("CREATE INDEX idx_pushsub_user ON PushSubscription (userId)");
 
-        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-1', 'a@test.com', 'hash', 'Alice', datetime('now'))");
-        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-2', 'b@test.com', 'hash', 'Bob', datetime('now'))");
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-1', 'a@test.com', 'hash', 'Alice', NOW(3))");
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-2', 'b@test.com', 'hash', 'Bob', NOW(3))");
 
         $this->notificationRepo = new NotificationRepository($this->db);
         $this->pushSubRepo = new PushSubscriptionRepository($this->db);
-        $this->service = new NotificationService(notificationRepo: $this->notificationRepo);
+        $this->service = new NotificationService(
+            notificationRepo: $this->notificationRepo,
+            pushSubRepo: $this->pushSubRepo,
+        );
         $this->controller = new NotificationController(
             notificationService: $this->service,
             pushSubscriptionRepo: $this->pushSubRepo,
         );
+    }
+
+    protected function tearDown(): void
+    {
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $this->db->exec("DROP TABLE IF EXISTS Notification");
+        $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS User");
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
 
     private function requestWithUser(string $method, string $path, ?array $body = null, ?string $userId = 'user-1'): ServerRequestInterface
