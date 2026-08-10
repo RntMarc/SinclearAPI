@@ -30,7 +30,7 @@ final readonly class NotificationService
             throw new \InvalidArgumentException('type, title, and body are required');
         }
 
-        $id = $this->notificationRepo->create([
+        $record = $this->notificationRepo->create([
             'userId' => $userId,
             'type' => $type,
             'title' => $title,
@@ -38,10 +38,19 @@ final readonly class NotificationService
             'data' => $data,
         ]);
 
-        $this->sendWebPush($userId, $title, $body, $data);
-        $this->sendUnifiedPush($userId, $title, $body, $data);
+        $notification = [
+            'id' => $record['id'],
+            'type' => $type,
+            'title' => $title,
+            'body' => $body,
+            'data' => $data,
+            'createdAt' => $record['createdAt'],
+        ];
 
-        return $id;
+        $this->sendWebPush($userId, $notification);
+        $this->sendUnifiedPush($userId, $notification);
+
+        return $record['id'];
     }
 
     /**
@@ -66,7 +75,7 @@ final readonly class NotificationService
         $this->notificationRepo->markRead($userId, $cleaned);
     }
 
-    private function sendWebPush(string $userId, string $title, string $body, ?array $data): void
+    private function sendWebPush(string $userId, array $notification): void
     {
         if ($this->webPush === null) {
             return;
@@ -77,11 +86,7 @@ final readonly class NotificationService
             return;
         }
 
-        $payload = json_encode([
-            'title' => $title,
-            'body' => $body,
-            'data' => $data,
-        ], JSON_UNESCAPED_UNICODE);
+        $payload = json_encode($notification, JSON_UNESCAPED_UNICODE);
 
         foreach ($subscriptions as $sub) {
             try {
@@ -108,7 +113,7 @@ final readonly class NotificationService
         }
     }
 
-    private function sendUnifiedPush(string $userId, string $title, string $body, ?array $data): void
+    private function sendUnifiedPush(string $userId, array $notification): void
     {
         if ($this->httpClient === null) {
             return;
@@ -119,11 +124,7 @@ final readonly class NotificationService
             return;
         }
 
-        $payload = json_encode([
-            'title' => $title,
-            'body' => $body,
-            'data' => $data,
-        ], JSON_UNESCAPED_UNICODE);
+        $payload = json_encode($notification, JSON_UNESCAPED_UNICODE);
 
         foreach ($subscriptions as $sub) {
             try {

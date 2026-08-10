@@ -190,9 +190,12 @@ Der API-Server sendet automatisch Web Push-Benachrichtigungen an alle registrier
 **Payload:**
 ```json
 {
+  "id": "01923456-7890-7abc-def0-123456789012",
+  "type": "forum_reply",
   "title": "Neue Antwort",
   "body": "Jemand hat auf deinen Beitrag geantwortet.",
-  "data": { "route": "/forum/42" }
+  "data": { "route": "/forum/42" },
+  "createdAt": "2026-08-10 14:30:00.000"
 }
 ```
 
@@ -205,13 +208,22 @@ UnifiedPush-Endpoints werden per HTTP POST mit JSON-Body bedient. Der Distributo
 **Payload:**
 ```json
 {
+  "id": "01923456-7890-7abc-def0-123456789012",
+  "type": "forum_reply",
   "title": "Neue Antwort",
   "body": "Jemand hat auf deinen Beitrag geantwortet.",
-  "data": { "route": "/forum/42" }
+  "data": { "route": "/forum/42" },
+  "createdAt": "2026-08-10 14:30:00.000"
 }
 ```
 
 HTTP 410 vom Distributor → Subscription wird automatisch gelöscht.
+
+> Der Payload entspricht 1:1 dem JSON-Objekt aus `GET /notifications` (ohne `userId`/`isRead`), damit Clients die Nachricht mit demselben Deserializer (z. B. `NotificationItem.fromJson`) parsen können.
+
+### Bereinigung abgelaufener Subscriptions
+
+Die Bereinigung erfolgt **reaktiv** beim Push-Versand: Endpoints, die mit HTTP 410 (oder 404) antworten, werden unmittelbar nach der Fehlerantwort aus `PushSubscription` gelöscht (`sendWebPush` via `MessageSentReport::isSubscriptionExpired()`, `sendUnifiedPush` bei HTTP 410). Ein separater `cleanExpiredSubscriptions()`-Sweep ist bewusst nicht implementiert, da der reaktive Weg keinen zusätzlichen Zustand benötigt und die Abfrage leben­der Endpoints im Batch unzuverlässig wäre.
 
 ## Integration in bestehende Controller
 

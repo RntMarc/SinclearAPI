@@ -264,8 +264,8 @@ return [
             auth: [
                 'VAPID' => [
                     'subject' => $vapid['subject'],
-                    'vapidId' => $vapid['public_key'],
-                    'vapidKey' => $vapid['private_key'],
+                    'publicKey' => $vapid['public_key'],
+                    'privateKey' => $vapid['private_key'],
                 ],
             ],
         );

@@ -11,7 +11,12 @@ final readonly class NotificationRepository
         private PDO $pdo,
     ) {}
 
-    public function create(array $data): string
+    /**
+     * Insert a notification and return the created record (id + createdAt).
+     *
+     * @return array{id: string, createdAt: string}
+     */
+    public function create(array $data): array
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
@@ -26,7 +31,15 @@ final readonly class NotificationRepository
             $data['body'],
             $data['data'] !== null ? json_encode($data['data'], JSON_UNESCAPED_UNICODE) : null,
         ]);
-        return $id;
+
+        $stmt = $this->pdo->prepare('SELECT createdAt FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $created = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return [
+            'id' => $id,
+            'createdAt' => $created['createdAt'] ?? '',
+        ];
     }
 
     public function getUnread(string $userId, ?string $since = null): array
