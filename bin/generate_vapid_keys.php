@@ -12,7 +12,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 use Minishlink\WebPush\VAPID;
 
-$keyPair = VAPID::createVapidKey();
+$keyPair = VAPID::createVapidKeys();
 
 echo "Add these to your .env file:\n\n";
 echo "VAPID_PUBLIC_KEY=" . $keyPair['publicKey'] . "\n";
