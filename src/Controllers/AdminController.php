@@ -24,6 +24,11 @@ use Sinclear\Api\Services\ModerationRequestService;
 use Sinclear\Api\Repository\RecipeRepository;
 use Sinclear\Api\Services\PlaceSubmissionService;
 use Sinclear\Api\Services\SubscriptionService;
+use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Repository\NotificationRepository;
+use Sinclear\Api\Repository\CalendarEventRepository;
+use Sinclear\Api\Repository\FeedbackSuggestionRepository;
+use PDO;
 
 final readonly class AdminController
 {
@@ -45,6 +50,11 @@ final readonly class AdminController
         private PlaceSubmissionService $submissionService,
         private ModerationRequestService $moderationRequestService,
         private RecipeRepository $recipeRepo,
+        private NotificationService $notificationService,
+        private NotificationRepository $notificationRepo,
+        private CalendarEventRepository $calendarEventRepo,
+        private FeedbackSuggestionRepository $feedbackSuggestionRepo,
+        private PDO $pdo,
         private LoggerInterface $logger,
     ) {}
 
@@ -2056,6 +2066,137 @@ ROW;
 
         $this->ticketRepo->delete($id);
         return ResponseFactory::noContent($response);
+    }
+
+    public function notifications(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        $allUsers = $this->userRepo->findAll();
+        $userOptions = '';
+        foreach ($allUsers as $u) {
+            $uid = htmlspecialchars($u['id']);
+            $uname = htmlspecialchars($u['displayName']);
+            $uemail = htmlspecialchars($u['email']);
+            $userOptions .= "<option value=\"{$uid}\">{$uname} ({$uemail})</option>";
+        }
+
+        $contentHtml = $this->renderTemplate('notifications.php', [
+            'userOptions' => $userOptions,
+        ]);
+        $html = $this->renderLayout('Benachrichtigungen', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminNotificationsJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $users = array_map(fn(array $u) => [
+            'id' => $u['id'],
+            'displayName' => $u['displayName'],
+            'email' => $u['email'],
+        ], $this->userRepo->findAll());
+
+        $trips = array_map(fn(array $t) => [
+            'id' => $t['id'],
+            'name' => $t['name'],
+        ], $this->tripRepo->findAll());
+
+        $events = array_map(fn(array $e) => [
+            'id' => $e['ID'],
+            'name' => $e['name'],
+        ], $this->eventRepo->findAll());
+
+        $subscriptions = array_map(fn(array $s) => [
+            'id' => $s['id'],
+            'name' => $s['name'],
+        ], $this->subscriptionRepo->findAll());
+
+        $feedbackResult = $this->feedbackSuggestionRepo->list(1, 100);
+        $feedback = array_map(fn(array $s) => [
+            'id' => $s['id'],
+            'title' => $s['title'],
+        ], $feedbackResult['data']);
+
+        $calendarStmt = $this->pdo->query('SELECT id, title FROM CalendarEvent ORDER BY createdAt DESC LIMIT 100');
+        $calendarEvents = array_map(fn(array $e) => [
+            'id' => $e['id'],
+            'title' => $e['title'],
+        ], $calendarStmt->fetchAll(PDO::FETCH_ASSOC));
+
+        $forumStmt = $this->pdo->query('SELECT id, type, content FROM FeedPosts ORDER BY createdAt DESC LIMIT 100');
+        $forumPosts = array_map(function (array $p): array {
+            $content = json_decode($p['content'], true);
+            $label = match ($p['type']) {
+                'text' => $content['text'] ?? '(Text-Beitrag)',
+                'music' => 'Musik-Beitrag',
+                'video' => 'Video-Beitrag',
+                'web' => $content['urls'][0] ?? '(Web-Beitrag)',
+                default => '(Beitrag)',
+            };
+            return ['id' => $p['id'], 'title' => mb_strimwidth($label, 0, 60, '...')];
+        }, $forumStmt->fetchAll(PDO::FETCH_ASSOC));
+
+        $pollStmt = $this->pdo->query('SELECT id, title FROM Poll ORDER BY createdAt DESC LIMIT 100');
+        $polls = array_map(fn(array $p) => [
+            'id' => $p['id'],
+            'title' => $p['title'],
+        ], $pollStmt->fetchAll(PDO::FETCH_ASSOC));
+
+        return ResponseFactory::json([
+            'users' => $users,
+            'trips' => $trips,
+            'events' => $events,
+            'subscriptions' => $subscriptions,
+            'feedback' => $feedback,
+            'calendarEvents' => $calendarEvents,
+            'forumPosts' => $forumPosts,
+            'polls' => $polls,
+        ], 200, $response);
+    }
+
+    public function sendTestNotification(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $userId = trim((string) ($body['userId'] ?? ''));
+        $type = trim((string) ($body['type'] ?? ''));
+        $title = trim((string) ($body['title'] ?? ''));
+        $bodyText = trim((string) ($body['body'] ?? ''));
+        $route = trim((string) ($body['route'] ?? ''));
+
+        if ($userId === '' || $type === '' || $title === '' || $bodyText === '') {
+            return ResponseFactory::json(['error' => 'missing_required_fields'], 400, $response);
+        }
+
+        $targetUser = $this->userRepo->findById($userId);
+        if ($targetUser === null) {
+            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
+        }
+
+        $data = $route !== '' ? ['route' => $route] : null;
+
+        try {
+            $notificationId = $this->notificationService->create(
+                userId: $userId,
+                type: $type,
+                title: $title,
+                body: $bodyText,
+                data: $data,
+            );
+        } catch (\InvalidArgumentException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+        }
+
+        return ResponseFactory::json([
+            'success' => true,
+            'notificationId' => $notificationId,
+            'sentTo' => $targetUser['displayName'],
+        ], 201, $response);
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

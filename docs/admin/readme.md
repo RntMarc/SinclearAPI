@@ -76,6 +76,16 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Teilnehmerverwaltung pro Abo (hinzufügen, entfernen, Bezahlstatus ändern)
 - Abos können über die Reisedetail-Seite mit Reisen verknüpft werden
 
+### Benachrichtigungen (`/notifications`) – **voll implementiert**
+- Sendet Test-Benachrichtigungen an beliebige Nutzer
+- Benachrichtigungen sind exakt identisch mit echten Benachrichtigungen (gleiches Schema, Push-Zustellung)
+- Typ-Auswahl mit Auto-Vorschläven für Titel/Text: `travel_update`, `event_reminder`, `forum_reply`, `forum_comment`, `poll_invitation`, `feedback_status`
+- Deep-Link-Objekte werden aus der DB geladen (Reisen, Events, Foren-Beiträge, Umfragen, Feedback-Vorschläge)
+- Route wird automatisch gesetzt basierend auf Typ + Objekt (z.B. `/trips/{id}`)
+- Eigene Typ-Strings über `custom` möglich
+- Live-Vorschau der Benachrichtigung
+- Push-Zustellung an alle registrierten Geräte des Empfängers (Web Push + UnifiedPush)
+
 ## API-Endpoints
 
 | Methode | Pfad | Beschreibung |
@@ -110,6 +120,9 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/moderation-requests` | Moderations-Anfragen mit Filtern (geschützt) |
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |
+| GET | `/admin/notifications` | Benachrichtigungs-Testseite (geschützt) |
+| GET | `/admin/notifications/json` | Entitäten als JSON für Dropdowns (geschützt) |
+| POST | `/admin/notifications/send` | Test-Benachrichtigung senden (geschützt) |
 
 ## Responsive Layout
 

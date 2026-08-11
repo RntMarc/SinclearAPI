@@ -384,5 +384,8 @@ return function (App $app): void {
         $group->get('/moderation-requests', [AdminController::class, 'moderationRequests']);
         $group->get('/moderation-requests/{id}', [AdminController::class, 'moderationRequestDetail']);
         $group->post('/moderation-requests/{id}/update', [AdminController::class, 'moderationRequestUpdate']);
+        $group->get('/notifications', [AdminController::class, 'notifications']);
+        $group->get('/notifications/json', [AdminController::class, 'adminNotificationsJson']);
+        $group->post('/notifications/send', [AdminController::class, 'sendTestNotification']);
     })->add($container->get(AdminMiddleware::class));
 };

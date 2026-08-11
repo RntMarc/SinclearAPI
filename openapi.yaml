@@ -8199,6 +8199,174 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /admin/notifications:
+    get:
+      summary: Benachrichtigungs-Testseite
+      description: >
+        Rendert die HTML-Testseite zum Senden von Test-Benachrichtigungen
+        an beliebige Nutzer. Die Benachrichtigungen sind exakt identisch
+        mit echten Benachrichtigungen (Schema, Deep-Links, Push-Zustellung).
+      tags: [Admin]
+      responses:
+        '200':
+          description: HTML-Seite
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /admin/notifications/json:
+    get:
+      summary: Entitäten für Benachrichtigungs-Dropdowns
+      description: >
+        Liefert alle relevanten Entitäten (Nutzer, Reisen, Events,
+        Kalender-Events, Foren-Beiträge, Umfragen, Feedback-Vorschläge,
+        Abonnements) als JSON zur Befüllung der Dropdown-Listen auf
+        der Benachrichtigungs-Testseite.
+      tags: [Admin]
+      responses:
+        '200':
+          description: Entitäten-Listen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        displayName: { type: string }
+                        email: { type: string, format: email }
+                  trips:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                  subscriptions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        name: { type: string }
+                  feedback:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+                  calendarEvents:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+                  forumPosts:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+                  polls:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        title: { type: string }
+
+  /admin/notifications/send:
+    post:
+      summary: Test-Benachrichtigung senden
+      description: >
+        Sendet eine Test-Benachrichtigung an einen ausgewählten Nutzer.
+        Die Benachrichtigung wird exakt identisch mit einer echten
+        Benachrichtigung erstellt (gleiches Schema in der DB, gleiche
+        Push-Zustellung über Web Push und UnifiedPush). Der Deep-Link
+        in der `data.route` zeigt auf ein reales Objekt, sodass Clients
+        das Deeplinking korrekt testen können.
+      tags: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, type, title, body]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                  description: ID des Empfängers
+                type:
+                  type: string
+                  maxLength: 64
+                  description: >
+                    Benachrichtigungstyp. Bekannte Typen: travel_update,
+                    event_reminder, forum_reply, forum_comment,
+                    poll_invitation, feedback_status. Eigene Typen
+                    sind erlaubt.
+                  example: travel_update
+                title:
+                  type: string
+                  maxLength: 255
+                  description: Kurzer Titel der Benachrichtigung
+                  example: Reise aktualisiert
+                body:
+                  type: string
+                  description: Anzuzeigender Nachrichtentext
+                  example: Details deiner Reise wurden geändert.
+                route:
+                  type: string
+                  description: >
+                    Optionale Deep-Link-Route (z.B. /trips/{id}).
+                    Wird im data-Feld der Benachrichtigung gespeichert.
+                  example: /trips/0192abcd-7890-7abc-def0-1234567890ab
+      responses:
+        '201':
+          description: Benachrichtigung erfolgreich gesendet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  notificationId:
+                    type: string
+                    format: uuid
+                  sentTo:
+                    type: string
+                    description: Display-Name des Empfängers
+        '400':
+          description: Fehlende oder ungültige Pflichtfelder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Empfänger-Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
     delete:
       summary: Bewertung löschen
       description: >
