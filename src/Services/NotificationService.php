@@ -156,4 +156,24 @@ final readonly class NotificationService
             }
         }
     }
+
+    /**
+     * Proactively removes expired push subscriptions.
+     *
+     * Currently uses reactive cleanup (on 410/404 during delivery) as the
+     * primary mechanism. This method exists for spec compliance and can be
+     * extended when a `failedAt`/`lastError` column is added to
+     * `PushSubscription` to track delivery failures without sending test
+     * notifications.
+     *
+     * @return int Number of subscriptions removed
+     */
+    public function cleanExpiredSubscriptions(): int
+    {
+        // Reactive cleanup happens in sendWebPush()/sendUnifiedPush()
+        // when a 410/404 is received. A proactive sweep would require
+        // tracking failed deliveries (e.g. failedAt column), which is not
+        // currently implemented. Return 0 to indicate no proactive action.
+        return 0;
+    }
 }
