@@ -5,6 +5,7 @@ namespace Sinclear\Api\Services;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Repository\FeedbackCommentRepository;
+use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedbackVoteRepository;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
