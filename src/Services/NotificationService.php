@@ -26,9 +26,11 @@ final readonly class NotificationService
         $title = trim($title);
         $body = trim($body);
 
-        if ($type === '' || $title === '' || $body === '') {
-            throw new \InvalidArgumentException('type, title, and body are required');
+        if ($type === '') {
+            throw new \InvalidArgumentException('type is required');
         }
+
+        $data = $this->normalizeData($type, $data);
 
         $record = $this->notificationRepo->create([
             'userId' => $userId,
@@ -41,8 +43,6 @@ final readonly class NotificationService
         $notification = [
             'id' => $record['id'],
             'type' => $type,
-            'title' => $title,
-            'body' => $body,
             'data' => $data,
             'createdAt' => $record['createdAt'],
         ];
@@ -51,6 +51,70 @@ final readonly class NotificationService
         $this->sendUnifiedPush($userId, $notification);
 
         return $record['id'];
+    }
+
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>|null
+     */
+    private function normalizeData(string $type, ?array $data): ?array
+    {
+        return match ($type) {
+            'forum_reply' => $this->normalizeForumReplyData($data),
+            default => throw new \InvalidArgumentException('unsupported notification type'),
+        };
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeForumReplyData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('forum_reply data is required');
+        }
+
+        $requiredRelations = [
+            'reply_author' => 'User',
+            'comment_author' => 'User',
+            'post_author' => 'User',
+            'parent_comment' => 'ForumPostComment',
+            'parent_post' => 'ForumPost',
+            'parent_forum' => 'Forum',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('forum_reply data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('forum_reply data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('forum_reply data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('forum_reply data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /**

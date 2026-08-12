@@ -22,6 +22,7 @@
     # Verzeichnisse blockieren
     RewriteRule ^bin/ - [F,L]
     RewriteRule ^config/ - [F,L]
+    RewriteRule ^database/ - [F,L]
     RewriteRule ^events/ - [F,L]
     RewriteRule ^src/ - [F,L]
     RewriteRule ^vendor/ - [F,L]

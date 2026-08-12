@@ -61,6 +61,7 @@ final readonly class NotificationRepository
         return array_map(function (array $row): array {
             $row['data'] = $row['data'] !== null ? json_decode($row['data'], true) : null;
             $row['isRead'] = (bool) $row['isRead'];
+            unset($row['title'], $row['body']);
             return $row;
         }, $rows);
     }
