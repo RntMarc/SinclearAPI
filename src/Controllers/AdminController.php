@@ -2127,7 +2127,7 @@ ROW;
             'title' => $e['title'],
         ], $calendarStmt->fetchAll(PDO::FETCH_ASSOC));
 
-        $forumStmt = $this->pdo->query('SELECT id, type, content FROM FeedPosts ORDER BY createdAt DESC LIMIT 100');
+        $forumStmt = $this->pdo->query('SELECT id, forumId, userId, type, content FROM FeedPosts ORDER BY createdAt DESC LIMIT 100');
         $forumPosts = array_map(function (array $p): array {
             $content = json_decode($p['content'], true);
             $label = match ($p['type']) {
@@ -2137,7 +2137,12 @@ ROW;
                 'web' => $content['urls'][0] ?? '(Web-Beitrag)',
                 default => '(Beitrag)',
             };
-            return ['id' => $p['id'], 'title' => mb_strimwidth($label, 0, 60, '...')];
+            return [
+                'id' => $p['id'],
+                'forumId' => $p['forumId'],
+                'userId' => $p['userId'],
+                'title' => mb_strimwidth($label, 0, 60, '...'),
+            ];
         }, $forumStmt->fetchAll(PDO::FETCH_ASSOC));
 
         $pollStmt = $this->pdo->query('SELECT id, title FROM Poll ORDER BY createdAt DESC LIMIT 100');
@@ -2167,9 +2172,9 @@ ROW;
         $type = trim((string) ($body['type'] ?? ''));
         $title = trim((string) ($body['title'] ?? ''));
         $bodyText = trim((string) ($body['body'] ?? ''));
-        $route = trim((string) ($body['route'] ?? ''));
+        $data = $body['data'] ?? null;
 
-        if ($userId === '' || $type === '' || $title === '' || $bodyText === '') {
+        if ($userId === '' || $type === '') {
             return ResponseFactory::json(['error' => 'missing_required_fields'], 400, $response);
         }
 
@@ -2178,7 +2183,9 @@ ROW;
             return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
         }
 
-        $data = $route !== '' ? ['route' => $route] : null;
+        if ($data !== null && !is_array($data)) {
+            return ResponseFactory::json(['error' => 'data_invalid'], 400, $response);
+        }
 
         try {
             $notificationId = $this->notificationService->create(

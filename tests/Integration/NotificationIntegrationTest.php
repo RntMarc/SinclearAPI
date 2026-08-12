@@ -15,6 +15,14 @@ use Sinclear\Api\Services\NotificationService;
 
 class NotificationIntegrationTest extends TestCase
 {
+    private const FORUM_REPLY_DATA = [
+        ['relation' => 'reply_author', 'object' => 'User', 'identifier' => 'user-reply'],
+        ['relation' => 'comment_author', 'object' => 'User', 'identifier' => 'user-comment'],
+        ['relation' => 'post_author', 'object' => 'User', 'identifier' => 'user-post'],
+        ['relation' => 'parent_comment', 'object' => 'ForumPostComment', 'identifier' => 'comment-1'],
+        ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
+        ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
+    ];
     private PDO $db;
     private NotificationController $controller;
     private NotificationService $service;
@@ -131,8 +139,8 @@ class NotificationIntegrationTest extends TestCase
 
     public function testIndexReturnsNotifications(): void
     {
-        $this->service->create('user-1', 'forum_reply', 'Title', 'Body');
-        $this->service->create('user-1', 'event_reminder', 'Title 2', 'Body 2');
+        $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
+        $this->service->create('user-1', 'forum_reply', 'Title 2', 'Body 2', self::FORUM_REPLY_DATA);
 
         $request = $this->requestWithUser('GET', '/notifications');
         $response = $this->controller->index($request, new Response());
@@ -144,8 +152,8 @@ class NotificationIntegrationTest extends TestCase
 
     public function testIndexFiltersByUser(): void
     {
-        $this->service->create('user-1', 'type1', 'Title 1', 'Body 1');
-        $this->service->create('user-2', 'type2', 'Title 2', 'Body 2');
+        $this->service->create('user-1', 'forum_reply', 'Title 1', 'Body 1', self::FORUM_REPLY_DATA);
+        $this->service->create('user-2', 'forum_reply', 'Title 2', 'Body 2', self::FORUM_REPLY_DATA);
 
         $request = $this->requestWithUser('GET', '/notifications', userId: 'user-1');
         $response = $this->controller->index($request, new Response());
@@ -157,7 +165,7 @@ class NotificationIntegrationTest extends TestCase
 
     public function testIndexWithSinceParameter(): void
     {
-        $this->service->create('user-1', 'type1', 'Old', 'Body');
+        $this->service->create('user-1', 'forum_reply', 'Old', 'Body', self::FORUM_REPLY_DATA);
 
         $request = $this->requestWithUser('GET', '/notifications', userId: 'user-1');
         $request = $request->withQueryParams(['since' => '9999-01-01 00:00:00']);
@@ -169,7 +177,7 @@ class NotificationIntegrationTest extends TestCase
 
     public function testIndexExcludesReadNotifications(): void
     {
-        $id = $this->service->create('user-1', 'type1', 'Title', 'Body');
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
         $this->service->markRead('user-1', [$id]);
 
         $request = $this->requestWithUser('GET', '/notifications');
@@ -183,7 +191,7 @@ class NotificationIntegrationTest extends TestCase
 
     public function testMarkReadSuccess(): void
     {
-        $id = $this->service->create('user-1', 'type1', 'Title', 'Body');
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
 
         $request = $this->requestWithUser('POST', '/notifications/read', ['ids' => [$id]]);
         $response = $this->controller->markRead($request, new Response());
@@ -214,8 +222,8 @@ class NotificationIntegrationTest extends TestCase
 
     public function testMarkReadOnlyAffectsOwnNotifications(): void
     {
-        $id1 = $this->service->create('user-1', 'type1', 'Title 1', 'Body 1');
-        $id2 = $this->service->create('user-2', 'type2', 'Title 2', 'Body 2');
+        $id1 = $this->service->create('user-1', 'forum_reply', 'Title 1', 'Body 1', self::FORUM_REPLY_DATA);
+        $id2 = $this->service->create('user-2', 'forum_reply', 'Title 2', 'Body 2', self::FORUM_REPLY_DATA);
 
         $request = $this->requestWithUser('POST', '/notifications/read', ['ids' => [$id1, $id2]], userId: 'user-1');
         $response = $this->controller->markRead($request, new Response());

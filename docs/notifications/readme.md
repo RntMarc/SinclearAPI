@@ -27,15 +27,22 @@ Gibt alle ungelesenen Benachrichtigungen des eingeloggten Nutzers zurück (max. 
       "id": "01923456-7890-7abc-def0-123456789012",
       "userId": "user-id",
       "type": "forum_reply",
-      "title": "Neue Antwort",
-      "body": "Jemand hat auf deinen Beitrag geantwortet.",
-      "data": { "route": "/forum/42" },
+      "data": [
+        { "relation": "reply_author", "object": "User", "identifier": "user-reply" },
+        { "relation": "comment_author", "object": "User", "identifier": "user-comment" },
+        { "relation": "post_author", "object": "User", "identifier": "user-post" },
+        { "relation": "parent_comment", "object": "ForumPostComment", "identifier": "comment-id" },
+        { "relation": "parent_post", "object": "ForumPost", "identifier": "post-id" },
+        { "relation": "parent_forum", "object": "Forum", "identifier": "forum-id" }
+      ],
       "isRead": false,
       "createdAt": "2026-08-10 14:30:00"
     }
   ]
 }
 ```
+
+Die API liefert auf Benachrichtigungs-Endpunkten und in Push-Payloads keine Client-Routen, Titel oder Anzeigetexte mehr aus. Clients interpretieren `type` und `data`, laden bei Bedarf die referenzierten Ressourcen nach und erzeugen Text sowie Deep-Link lokal.
 
 ### Benachrichtigungen als gelesen markieren
 
@@ -147,9 +154,9 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Empfänger (FK zu User) |
 | `type` | varchar(64) | Typ der Benachrichtigung (z.B. `forum_reply`, `event_reminder`) |
-| `title` | varchar(255) | Kurztitel |
-| `body` | text | Anzeigetext |
-| `data` | json | Optionale Routing-Daten (z.B. `{"route": "/forum/42"}`) |
+| `title` | varchar(255) | Legacy-Speicherfeld; wird nicht an Clients ausgeliefert |
+| `body` | text | Legacy-Speicherfeld; wird nicht an Clients ausgeliefert |
+| `data` | json | Strukturierte Relation-Liste für den jeweiligen Benachrichtigungstyp |
 | `isRead` | tinyint(1) | 0 = ungelesen, 1 = gelesen |
 | `createdAt` | datetime(3) | Erstellungszeitpunkt (UTC) |
 
@@ -172,14 +179,34 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 
 ## Notification-Typen
 
-| Typ | Beschreibung | Data-Format |
-|-----|-------------|-------------|
-| `forum_reply` | Antwort auf einen Forum-Beitrag | `{"route": "/forum/{id}"}` |
-| `forum_comment` | Kommentar auf eine Antwort | `{"route": "/forum/{id}"}` |
-| `event_reminder` | Erinnerung an einen Kalendereintrag | `{"route": "/calendar/{id}"}` |
-| `poll_invitation` | Einladung zu einer Umfrage | `{"route": "/poll/{id}"}` |
-| `travel_update` | Änderung an einer Reise | `{"route": "/trips/{id}"}` |
-| `feedback_status` | Status-Änderung einer Feedback-Meldung | `{"route": "/feedback/{id}"}` |
+Aktuell ist ausschließlich `forum_reply` als unterstützter strukturierter Benachrichtigungstyp aktiviert. Weitere Typen werden erst nach gemeinsamer Abstimmung ergänzt.
+
+### `forum_reply`
+
+Benachrichtigt darüber, dass auf einen bestehenden Forum-Kommentar geantwortet wurde. Der Client kann daraus den Forum-Deep-Link lokal als `/forum/{parent_forum.identifier}/{parent_post.identifier}` bzw. nach seiner eigenen Routing-Konvention erzeugen.
+
+| Relation | Objekt | Pflicht | Bedeutung |
+|----------|--------|---------|-----------|
+| `reply_author` | `User` | Ja | Nutzer, der die neue Antwort erstellt hat |
+| `comment_author` | `User` | Ja | Nutzer, dessen Kommentar beantwortet wurde |
+| `post_author` | `User` | Ja | Autor des übergeordneten Forum-Posts |
+| `parent_comment` | `ForumPostComment` | Ja | Kommentar, auf den geantwortet wurde |
+| `parent_post` | `ForumPost` | Ja | Forum-Post, unter dem die Kommentar-Kette liegt |
+| `parent_forum` | `Forum` | Ja | Forum, in dem der Post liegt |
+
+**Data-Format:**
+```json
+[
+  { "relation": "reply_author", "object": "User", "identifier": "123456" },
+  { "relation": "comment_author", "object": "User", "identifier": "234567" },
+  { "relation": "post_author", "object": "User", "identifier": "345678" },
+  { "relation": "parent_comment", "object": "ForumPostComment", "identifier": "987654" },
+  { "relation": "parent_post", "object": "ForumPost", "identifier": "456789" },
+  { "relation": "parent_forum", "object": "Forum", "identifier": "567890" }
+]
+```
+
+Nicht unterstützte Typen oder unvollständige/abweichende `forum_reply`-Relationen werden beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
 
 ## Push-Versand
 
@@ -192,9 +219,14 @@ Der API-Server sendet automatisch Web Push-Benachrichtigungen an alle registrier
 {
   "id": "01923456-7890-7abc-def0-123456789012",
   "type": "forum_reply",
-  "title": "Neue Antwort",
-  "body": "Jemand hat auf deinen Beitrag geantwortet.",
-  "data": { "route": "/forum/42" },
+  "data": [
+    { "relation": "reply_author", "object": "User", "identifier": "user-reply" },
+    { "relation": "comment_author", "object": "User", "identifier": "user-comment" },
+    { "relation": "post_author", "object": "User", "identifier": "user-post" },
+    { "relation": "parent_comment", "object": "ForumPostComment", "identifier": "comment-id" },
+    { "relation": "parent_post", "object": "ForumPost", "identifier": "post-id" },
+    { "relation": "parent_forum", "object": "Forum", "identifier": "forum-id" }
+  ],
   "createdAt": "2026-08-10 14:30:00.000"
 }
 ```
@@ -210,16 +242,21 @@ UnifiedPush-Endpoints werden per HTTP POST mit JSON-Body bedient. Der Distributo
 {
   "id": "01923456-7890-7abc-def0-123456789012",
   "type": "forum_reply",
-  "title": "Neue Antwort",
-  "body": "Jemand hat auf deinen Beitrag geantwortet.",
-  "data": { "route": "/forum/42" },
+  "data": [
+    { "relation": "reply_author", "object": "User", "identifier": "user-reply" },
+    { "relation": "comment_author", "object": "User", "identifier": "user-comment" },
+    { "relation": "post_author", "object": "User", "identifier": "user-post" },
+    { "relation": "parent_comment", "object": "ForumPostComment", "identifier": "comment-id" },
+    { "relation": "parent_post", "object": "ForumPost", "identifier": "post-id" },
+    { "relation": "parent_forum", "object": "Forum", "identifier": "forum-id" }
+  ],
   "createdAt": "2026-08-10 14:30:00.000"
 }
 ```
 
 HTTP 410 vom Distributor → Subscription wird automatisch gelöscht.
 
-> Der Payload entspricht 1:1 dem JSON-Objekt aus `GET /notifications` (ohne `userId`/`isRead`), damit Clients die Nachricht mit demselben Deserializer (z. B. `NotificationItem.fromJson`) parsen können.
+> Der Push-Payload entspricht dem reduzierten Benachrichtigungsobjekt aus `GET /notifications` ohne `userId` und `isRead`: `id`, `type`, `data`, `createdAt`. Er enthält keine Routen, Titel oder Texte.
 
 ### Bereinigung abgelaufener Subscriptions
 
@@ -233,9 +270,16 @@ Benachrichtigungen werden serverseitig erstellt, indem der `NotificationService`
 $this->notificationService->create(
     userId: $recipientUserId,
     type: 'forum_reply',
-    title: 'Neue Antwort',
-    body: 'Jemand hat auf deinen Beitrag geantwortet.',
-    data: ['route' => '/forum/' . $postId],
+    title: '', // wird nicht an Clients ausgeliefert
+    body: '',  // wird nicht an Clients ausgeliefert
+    data: [
+        ['relation' => 'reply_author', 'object' => 'User', 'identifier' => $replyAuthorId],
+        ['relation' => 'comment_author', 'object' => 'User', 'identifier' => $commentAuthorId],
+        ['relation' => 'post_author', 'object' => 'User', 'identifier' => $postAuthorId],
+        ['relation' => 'parent_comment', 'object' => 'ForumPostComment', 'identifier' => $commentId],
+        ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => $postId],
+        ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $forumId],
+    ],
 );
 ```
 

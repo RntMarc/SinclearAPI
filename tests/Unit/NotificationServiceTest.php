@@ -10,6 +10,14 @@ use Sinclear\Api\Services\NotificationService;
 
 class NotificationServiceTest extends TestCase
 {
+    private const FORUM_REPLY_DATA = [
+        ['relation' => 'reply_author', 'object' => 'User', 'identifier' => 'user-reply'],
+        ['relation' => 'comment_author', 'object' => 'User', 'identifier' => 'user-comment'],
+        ['relation' => 'post_author', 'object' => 'User', 'identifier' => 'user-post'],
+        ['relation' => 'parent_comment', 'object' => 'ForumPostComment', 'identifier' => 'comment-1'],
+        ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
+        ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
+    ];
     private PDO $db;
     private NotificationService $service;
 
@@ -108,7 +116,7 @@ class NotificationServiceTest extends TestCase
             type: 'forum_reply',
             title: 'Neue Antwort',
             body: 'Jemand hat geantwortet.',
-            data: ['route' => '/forum/42'],
+            data: self::FORUM_REPLY_DATA,
         );
 
         $this->assertNotEmpty($id);
@@ -123,24 +131,26 @@ class NotificationServiceTest extends TestCase
         $this->assertSame('forum_reply', $row['type']);
         $this->assertSame('Neue Antwort', $row['title']);
         $this->assertSame('Jemand hat geantwortet.', $row['body']);
-        $this->assertStringContainsString('/forum/42', $row['data']);
+        $this->assertStringContainsString('parent_forum', $row['data']);
+        $this->assertStringNotContainsString('/forum/', $row['data']);
         $this->assertSame(0, (int) $row['isRead']);
     }
 
-    public function testCreateWithNullData(): void
+    public function testCreateStoresStructuredForumReplyData(): void
     {
         $id = $this->service->create(
             userId: 'user-1',
-            type: 'event_reminder',
-            title: 'Erinnerung',
-            body: 'Event startet gleich.',
+            type: 'forum_reply',
+            title: '',
+            body: '',
+            data: self::FORUM_REPLY_DATA,
         );
 
         $stmt = $this->db->prepare('SELECT data FROM Notification WHERE id = ?');
         $stmt->execute([$id]);
         $row = $stmt->fetch();
 
-        $this->assertNull($row['data']);
+        $this->assertStringContainsString('parent_post', $row['data']);
     }
 
     public function testCreateThrowsOnEmptyType(): void
@@ -150,18 +160,33 @@ class NotificationServiceTest extends TestCase
         $this->service->create('user-1', '', 'Title', 'Body');
     }
 
-    public function testCreateThrowsOnEmptyTitle(): void
+    public function testCreateAllowsEmptyTitleAndBody(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $id = $this->service->create('user-1', 'forum_reply', '', '', self::FORUM_REPLY_DATA);
 
-        $this->service->create('user-1', 'forum_reply', '', 'Body');
+        $stmt = $this->db->prepare('SELECT title, body FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('', $row['title']);
+        $this->assertSame('', $row['body']);
     }
 
-    public function testCreateThrowsOnEmptyBody(): void
+    public function testCreateThrowsOnUnsupportedType(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->service->create('user-1', 'forum_reply', 'Title', '');
+        $this->service->create('user-1', 'type1', 'Title', 'Body', []);
+    }
+
+    public function testCreateThrowsOnMissingForumReplyRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = self::FORUM_REPLY_DATA;
+        array_pop($data);
+
+        $this->service->create('user-1', 'forum_reply', 'Title', 'Body', $data);
     }
 
     public function testCreateTrimsWhitespace(): void
@@ -171,6 +196,7 @@ class NotificationServiceTest extends TestCase
             type: '  forum_reply  ',
             title: '  Neue Antwort  ',
             body: '  Body  ',
+            data: self::FORUM_REPLY_DATA,
         );
 
         $stmt = $this->db->prepare('SELECT type, title, body FROM Notification WHERE id = ?');
@@ -186,9 +212,9 @@ class NotificationServiceTest extends TestCase
 
     public function testGetUnreadReturnsOnlyUnreadForUser(): void
     {
-        $this->service->create('user-1', 'type1', 'Title 1', 'Body 1');
-        $this->service->create('user-1', 'type2', 'Title 2', 'Body 2');
-        $this->service->create('user-2', 'type1', 'Title 3', 'Body 3');
+        $this->service->create('user-1', 'forum_reply', 'Title 1', 'Body 1', self::FORUM_REPLY_DATA);
+        $this->service->create('user-1', 'forum_reply', 'Title 2', 'Body 2', self::FORUM_REPLY_DATA);
+        $this->service->create('user-2', 'forum_reply', 'Title 3', 'Body 3', self::FORUM_REPLY_DATA);
 
         $result = $this->service->getUnread('user-1');
 
@@ -201,7 +227,7 @@ class NotificationServiceTest extends TestCase
 
     public function testGetUnreadExcludesReadNotifications(): void
     {
-        $id = $this->service->create('user-1', 'type1', 'Title', 'Body');
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
         $this->service->markRead('user-1', [$id]);
 
         $result = $this->service->getUnread('user-1');
@@ -211,8 +237,8 @@ class NotificationServiceTest extends TestCase
 
     public function testGetUnreadWithSinceFiltersCorrectly(): void
     {
-        $this->service->create('user-1', 'type1', 'Old', 'Body');
-        $this->service->create('user-1', 'type2', 'New', 'Body');
+        $this->service->create('user-1', 'forum_reply', 'Old', 'Body', self::FORUM_REPLY_DATA);
+        $this->service->create('user-1', 'forum_reply', 'New', 'Body', self::FORUM_REPLY_DATA);
 
         $result = $this->service->getUnread('user-1', since: '9999-01-01 00:00:00');
 
@@ -221,7 +247,7 @@ class NotificationServiceTest extends TestCase
 
     public function testGetUnreadWithSinceReturnsRecentItems(): void
     {
-        $this->service->create('user-1', 'type1', 'Title', 'Body');
+        $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
 
         $result = $this->service->getUnread('user-1', since: '2000-01-01 00:00:00');
 
@@ -237,19 +263,21 @@ class NotificationServiceTest extends TestCase
 
     public function testGetUnreadDecodesDataField(): void
     {
-        $id = $this->service->create('user-1', 'type1', 'Title', 'Body', ['route' => '/forum/1']);
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
         $result = $this->service->getUnread('user-1');
 
         $this->assertIsArray($result[0]['data']);
-        $this->assertSame('/forum/1', $result[0]['data']['route']);
+        $this->assertSame('reply_author', $result[0]['data'][0]['relation']);
+        $this->assertArrayNotHasKey('title', $result[0]);
+        $this->assertArrayNotHasKey('body', $result[0]);
     }
 
     // ── markRead() ────────────────────────────────────────
 
     public function testMarkReadSetsIsReadForUserIds(): void
     {
-        $id1 = $this->service->create('user-1', 'type1', 'Title 1', 'Body 1');
-        $id2 = $this->service->create('user-1', 'type2', 'Title 2', 'Body 2');
+        $id1 = $this->service->create('user-1', 'forum_reply', 'Title 1', 'Body 1', self::FORUM_REPLY_DATA);
+        $id2 = $this->service->create('user-1', 'forum_reply', 'Title 2', 'Body 2', self::FORUM_REPLY_DATA);
 
         $this->service->markRead('user-1', [$id1, $id2]);
 
@@ -259,8 +287,8 @@ class NotificationServiceTest extends TestCase
 
     public function testMarkReadOnlyAffectsOwnNotifications(): void
     {
-        $id1 = $this->service->create('user-1', 'type1', 'Title 1', 'Body 1');
-        $id2 = $this->service->create('user-2', 'type2', 'Title 2', 'Body 2');
+        $id1 = $this->service->create('user-1', 'forum_reply', 'Title 1', 'Body 1', self::FORUM_REPLY_DATA);
+        $id2 = $this->service->create('user-2', 'forum_reply', 'Title 2', 'Body 2', self::FORUM_REPLY_DATA);
 
         $this->service->markRead('user-1', [$id1, $id2]);
 
@@ -271,7 +299,7 @@ class NotificationServiceTest extends TestCase
 
     public function testMarkReadDoesNothingOnEmptyArray(): void
     {
-        $id = $this->service->create('user-1', 'type1', 'Title', 'Body');
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
 
         $this->service->markRead('user-1', []);
 

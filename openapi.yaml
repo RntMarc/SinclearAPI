@@ -3852,9 +3852,25 @@ components:
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
+    NotificationDataRelation:
+      type: object
+      required: [relation, object, identifier]
+      properties:
+        relation:
+          type: string
+          enum: [reply_author, comment_author, post_author, parent_comment, parent_post, parent_forum]
+          description: Beziehung des referenzierten Objekts zur Benachrichtigung.
+        object:
+          type: string
+          enum: [User, ForumPostComment, ForumPost, Forum]
+          description: Tabellen-/Objekttyp der referenzierten Ressource.
+        identifier:
+          type: string
+          description: ID der referenzierten Ressource.
+
     Notification:
       type: object
-      required: [id, userId, type, title, body, isRead, createdAt]
+      required: [id, userId, type, data, isRead, createdAt]
       properties:
         id:
           type: string
@@ -3866,24 +3882,20 @@ components:
           description: ID des Empfängers
         type:
           type: string
-          description: Benachrichtigungstyp (z.B. `forum_post`, `trip_invite`, `message`)
-        title:
-          type: string
-          description: Kurztext der Benachrichtigung
-        body:
-          type: string
-          description: Ausführlicher Benachrichtigungstext
+          enum: [forum_reply]
+          description: Unterstützter Benachrichtigungstyp. Aktuell ist nur `forum_reply` aktiviert.
         data:
-          type: object
-          additionalProperties: true
-          nullable: true
-          description: Optionale zusätzliche Daten (z.B. Deep-Link-Payload)
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationDataRelation'
+          description: >
+            Strukturierte Relationsdaten. Die API liefert keine Titel, Texte oder
+            Deep-Links; Clients erzeugen Anzeige und Routing lokal aus `type` und `data`.
         isRead:
           type: boolean
           description: Ob die Benachrichtigung bereits gelesen wurde
         createdAt:
           type: string
-          format: date-time
           description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
 
     NotificationListResponse:
@@ -13152,8 +13164,7 @@ paths:
           required: false
           schema:
             type: string
-            format: date-time
-          description: Optional. Nur Benachrichtigungen nach diesem Zeitpunkt (Format: YYYY-MM-DD HH:MM:SS)
+          description: "Optional. Nur Benachrichtigungen nach diesem Zeitpunkt (Format: YYYY-MM-DD HH:MM:SS)"
       responses:
         '200':
           description: Liste der Benachrichtigungen
