@@ -11,7 +11,6 @@ use Sinclear\Api\Dav\DavDummyFactory;
 use Sinclear\Api\Dav\DavServerFactory;
 use Sinclear\Api\Dav\IcsFactory;
 use Sinclear\Api\Dav\VcardFactory;
-use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
@@ -19,6 +18,7 @@ use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Policy\UserPolicy;
+use Sinclear\Api\Services\CalendarFeedService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\UserPreferenceService;
 use Sinclear\Api\Services\UserService;
@@ -28,7 +28,7 @@ class DavIntegrationTest extends TestCase
     private PDO $db;
     private DavServerFactory $serverFactory;
     private DavTokenService $tokenService;
-    private CalendarEventRepository $calendarRepo;
+    private CalendarFeedService $feedService;
     private string $aliceId = 'user-alice';
     private string $bobId = 'user-bob';
 
@@ -176,8 +176,6 @@ class DavIntegrationTest extends TestCase
         $davTokenRepo = new DavTokenRepository($this->db);
         $this->tokenService = new DavTokenService($davTokenRepo, $userRepo);
 
-        $calendarRepo = new CalendarEventRepository($this->db);
-        $this->calendarRepo = $calendarRepo;
         $preferenceService = new UserPreferenceService(new UserPreferenceRepository($this->db));
         $userService = new UserService(
             $userRepo,
@@ -191,15 +189,58 @@ class DavIntegrationTest extends TestCase
         $vcardFactory = new VcardFactory();
         $dummyFactory = new DavDummyFactory($icsFactory, $vcardFactory);
 
+        // CalendarFeedService-Mock: Liefert CalendarEvents im Feed-Format
+        $calendarRepo = new \Sinclear\Api\Repository\CalendarEventRepository($this->db);
+        $this->feedService = $this->createFeedServiceMock($calendarRepo);
+
         $this->serverFactory = new DavServerFactory(
             $this->tokenService,
             $userRepo,
             $userService,
-            $calendarRepo,
+            $this->feedService,
             $icsFactory,
             $vcardFactory,
             $dummyFactory,
         );
+    }
+
+    private function createFeedServiceMock(\Sinclear\Api\Repository\CalendarEventRepository $calendarRepo): CalendarFeedService
+    {
+        $feedService = $this->createMock(CalendarFeedService::class);
+        $feedService->method('buildFeed')
+            ->willReturnCallback(function (string $userId, string $start, string $end, array $types) use ($calendarRepo) {
+                $items = [];
+
+                if (in_array('calendar_event', $types, true)) {
+                    $events = $calendarRepo->findAllVisibleForDav($userId, $start, $end);
+                    foreach ($events as $event) {
+                        $items[] = [
+                            'type' => 'calendar_event',
+                            'id' => $event['id'],
+                            'title' => $event['title'] ?? null,
+                            'startTime' => $event['startTime'],
+                            'endTime' => $event['endTime'],
+                            'allDay' => false,
+                            'detail' => $event,
+                        ];
+                    }
+                }
+
+                usort($items, fn(array $a, array $b) => [$a['startTime'], $a['id']] <=> [$b['startTime'], $b['id']]);
+
+                return [
+                    'data' => $items,
+                    'meta' => [
+                        'start' => $start,
+                        'end' => $end,
+                        'types' => $types,
+                        'count' => count($items),
+                        'truncated' => false,
+                    ],
+                ];
+            });
+
+        return $feedService;
     }
 
     public function testOptionsListsDavHeaders(): void
@@ -252,12 +293,6 @@ class DavIntegrationTest extends TestCase
     public function testCalendarObjectOfOtherUserIsHidden(): void
     {
         $token = $this->createToken($this->aliceId);
-
-        // Direkte Pruefung der Repository-Logik (Referenz)
-        self::assertNull(
-            $this->calendarRepo->findVisibleByIdForDav($this->aliceId, 'event-bob-private'),
-            'findVisibleByIdForDav muss fremde private Events ausblenden',
-        );
 
         $response = $this->invoke(
             'GET',

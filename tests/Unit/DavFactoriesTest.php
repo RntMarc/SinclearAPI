@@ -132,4 +132,160 @@ class DavFactoriesTest extends TestCase
         self::assertSame('Abgelaufener oder ungültiger Token', (string) $vcard->FN);
         self::assertStringContainsString('Token ist entweder abgelaufen oder ungültig', (string) $vcard->NOTE);
     }
+
+    public function testFeedItemCalendarEvent(): void
+    {
+        $item = [
+            'type' => 'calendar_event',
+            'id' => 'evt-1',
+            'title' => 'Meeting',
+            'startTime' => '2026-07-01 10:00:00',
+            'endTime' => '2026-07-01 11:00:00',
+            'allDay' => false,
+            'detail' => [
+                'id' => 'evt-1',
+                'creatorId' => 'user-1',
+                'title' => 'Meeting',
+                'description' => 'Beschreibung',
+                'startTime' => '2026-07-01 10:00:00',
+                'endTime' => '2026-07-01 11:00:00',
+                'visibility' => 1,
+                'createdAt' => '2026-06-26 10:00:00',
+                'updatedAt' => '2026-06-27 10:00:00',
+            ],
+        ];
+
+        $object = $this->icsFactory->feedItemToCalendarObject($item);
+        self::assertSame('evt-1.ics', $object['uri']);
+        self::assertSame('vevent', $object['component']);
+
+        $vcal = Reader::read($object['calendardata']);
+        self::assertSame('evt-1@sinclear.de', (string) $vcal->VEVENT->UID);
+        self::assertSame('Meeting', (string) $vcal->VEVENT->SUMMARY);
+        self::assertSame('PUBLIC', (string) $vcal->VEVENT->CLASS);
+        self::assertStringContainsString('Beschreibung', (string) $vcal->VEVENT->DESCRIPTION);
+    }
+
+    public function testFeedItemTravelEvent(): void
+    {
+        $item = [
+            'type' => 'travel_event',
+            'id' => 'te-1',
+            'title' => 'Konzert',
+            'startTime' => '2026-08-15 18:00:00',
+            'endTime' => '2026-08-15 22:00:00',
+            'allDay' => false,
+            'detail' => [
+                'id' => 'te-1',
+                'name' => 'Konzert',
+                'description' => 'Rockkonzert',
+                'start' => '2026-08-15 18:00:00',
+                'end' => '2026-08-15 22:00:00',
+                'participants' => [
+                    ['id' => 'user-1', 'displayName' => 'Max'],
+                ],
+            ],
+        ];
+
+        $object = $this->icsFactory->feedItemToCalendarObject($item);
+        $vcal = Reader::read($object['calendardata']);
+        self::assertSame('te-1@sinclear.de', (string) $vcal->VEVENT->UID);
+        self::assertSame('Konzert', (string) $vcal->VEVENT->SUMMARY);
+        self::assertSame('mailto:user-1@sinclear.de', (string) $vcal->VEVENT->ATTENDEE);
+    }
+
+    public function testFeedItemTripIsAllDay(): void
+    {
+        $item = [
+            'type' => 'trip',
+            'id' => 'trip-1',
+            'title' => 'Italien-Reise',
+            'startTime' => '2026-09-01 00:00:00',
+            'endTime' => '2026-09-14 23:59:59',
+            'allDay' => true,
+            'detail' => [
+                'id' => 'trip-1',
+                'name' => 'Italien-Reise',
+                'description' => 'Sommerurlaub',
+                'start' => '2026-09-01 00:00:00',
+                'end' => '2026-09-14 23:59:59',
+            ],
+        ];
+
+        $object = $this->icsFactory->feedItemToCalendarObject($item);
+        $vcal = Reader::read($object['calendardata']);
+        self::assertSame('trip-1@sinclear.de', (string) $vcal->VEVENT->UID);
+        self::assertSame('Italien-Reise', (string) $vcal->VEVENT->SUMMARY);
+        self::assertSame('TRANSPARENT', (string) $vcal->VEVENT->TRANSP);
+        self::assertStringNotContainsString('CLASS', (string) $vcal->VEVENT);
+    }
+
+    public function testFeedItemPtJourneyWithLegs(): void
+    {
+        $item = [
+            'type' => 'pt_journey',
+            'id' => 'pt-1',
+            'title' => 'Berlin → München',
+            'startTime' => '2026-07-10 08:00:00',
+            'endTime' => '2026-07-10 12:30:00',
+            'allDay' => false,
+            'detail' => [
+                'id' => 'pt-1',
+                'fromStationName' => 'Berlin Hbf',
+                'toStationName' => 'München Hbf',
+                'departureTime' => '2026-07-10 08:00:00',
+                'arrivalTime' => '2026-07-10 12:30:00',
+                'duration' => 270,
+                'transfers' => 1,
+                'legs' => [
+                    [
+                        'lineName' => 'ICE 123',
+                        'fromStationName' => 'Berlin Hbf',
+                        'toStationName' => 'Nürnberg Hbf',
+                        'plannedDeparture' => '2026-07-10 08:00:00',
+                        'plannedArrival' => '2026-07-10 11:00:00',
+                    ],
+                    [
+                        'lineName' => 'ICE 456',
+                        'fromStationName' => 'Nürnberg Hbf',
+                        'toStationName' => 'München Hbf',
+                        'plannedDeparture' => '2026-07-10 11:15:00',
+                        'plannedArrival' => '2026-07-10 12:30:00',
+                    ],
+                ],
+            ],
+        ];
+
+        $object = $this->icsFactory->feedItemToCalendarObject($item);
+        $vcal = Reader::read($object['calendardata']);
+        self::assertSame('pt-1@sinclear.de', (string) $vcal->VEVENT->UID);
+        self::assertSame('Berlin → München', (string) $vcal->VEVENT->SUMMARY);
+        self::assertStringContainsString('Berlin Hbf', (string) $vcal->VEVENT->DESCRIPTION);
+        self::assertStringContainsString('ICE 123', (string) $vcal->VEVENT->DESCRIPTION);
+    }
+
+    public function testFeedItemBirthdayIsAllDayYearly(): void
+    {
+        $item = [
+            'type' => 'birthday',
+            'id' => 'bd-2026-05-04-user-1',
+            'title' => 'Geburtstag: Max',
+            'startTime' => '2026-05-04 00:00:00',
+            'endTime' => '2026-05-04 23:59:59',
+            'allDay' => true,
+            'detail' => [
+                'userId' => 'user-1',
+                'displayName' => 'Max',
+                'birthday' => '1990-05-04',
+                'occurrenceDate' => '2026-05-04',
+            ],
+        ];
+
+        $object = $this->icsFactory->feedItemToCalendarObject($item);
+        $vcal = Reader::read($object['calendardata']);
+        self::assertSame('bd-2026-05-04-user-1@sinclear.de', (string) $vcal->VEVENT->UID);
+        self::assertSame('Geburtstag: Max', (string) $vcal->VEVENT->SUMMARY);
+        self::assertSame('TRANSPARENT', (string) $vcal->VEVENT->TRANSP);
+        self::assertStringContainsString('FREQ=YEARLY', (string) $vcal->VEVENT->RRULE);
+    }
 }

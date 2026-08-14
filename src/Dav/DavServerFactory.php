@@ -11,8 +11,8 @@ use Sabre\DAV\Auth\Plugin as AuthPlugin;
 use Sabre\DAV\Server;
 use Sabre\DAVACL\Plugin as AclPlugin;
 use Sabre\DAVACL\PrincipalCollection;
-use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Services\CalendarFeedService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\UserService;
 
@@ -29,7 +29,7 @@ final readonly class DavServerFactory
         private DavTokenService $tokenService,
         private UserRepository $userRepo,
         private UserService $userService,
-        private CalendarEventRepository $calendarRepo,
+        private CalendarFeedService $feedService,
         private IcsFactory $icsFactory,
         private VcardFactory $vcardFactory,
         private DavDummyFactory $dummyFactory,
@@ -41,7 +41,7 @@ final readonly class DavServerFactory
         $authBackend = new DavAuthBackend($this->tokenService, $this->logger);
         $authBackend->setRealm('Sinclear Beyond');
         $principalBackend = new DavPrincipalBackend($this->userRepo, $authBackend);
-        $caldavBackend = new CalDavBackend($this->calendarRepo, $this->icsFactory, $this->dummyFactory);
+        $caldavBackend = new CalDavBackend($this->feedService, $this->icsFactory, $this->dummyFactory);
         $carddavBackend = new CardDavBackend($this->userRepo, $this->userService, $this->vcardFactory, $this->dummyFactory);
 
         $server = new Server([

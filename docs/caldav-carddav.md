@@ -17,7 +17,9 @@ unter dem vollen Pfad `/api/dav/` erreichbar:
 | Zweck | URL |
 |-------|-----|
 | DAV-Basis-URL | `https://sinclear.de/api/dav/` |
-| Kalender | `https://sinclear.de/api/dav/calendars/{userId}/calendar/` |
+| Beyond Kalender | `https://sinclear.de/api/dav/calendars/{userId}/calendar/` |
+| Reisen & Fahrten | `https://sinclear.de/api/dav/calendars/{userId}/travel/` |
+| Geburtstage | `https://sinclear.de/api/dav/calendars/{userId}/birthdays/` |
 | Adressbuch | `https://sinclear.de/api/dav/addressbooks/{userId}/contacts/` |
 
 RFC-6764-Discovery (`.well-known/caldav` bzw. `.well-known/carddav`) ist
@@ -77,9 +79,27 @@ und nicht gespeichert – es entsteht nie mehr als ein Eintrag.
 
 ## CalDAV – Kalender
 
-- Je Nutzer wird genau ein Kalender „Beyond Kalender" ausgeliefert.
-- Enthalten sind alle `CalendarEvent`-Einträge, die der Nutzer sehen darf
-  (Ersteller, Teilnehmer, Sichtbarkeit `1` öffentlich, `2` enge Freunde).
+Je Nutzer werden **drei Kalender** ausgeliefert, die einzeln abonniert
+werden können (z.B. in DAVx5):
+
+| Kalender | URI | Farbe | Inhalt |
+|----------|-----|-------|--------|
+| Beyond Kalender | `calendar` | Indigo `#6366f1` | Normale Kalender-Events |
+| Reisen & Fahrten | `travel` | Amber `#f59e0b` | Reisen, Reise-Events und ÖPNV-Fahrten |
+| Geburtstage | `birthdays` | Pink `#ec4899` | Geburtstage sichtbarer Nutzer |
+
+Die Daten stammen aus demselben Service wie `GET /calendar/all`
+(`CalendarFeedService`), daher gelten identische Sichtbarkeitsregeln:
+
+- **Beyond Kalender** (`calendar_event`): Ersteller, Teilnehmer,
+  Sichtbarkeit `1` (öffentlich), `2` (enge Freunde).
+- **Reisen & Fahrten** (`travel_event`, `trip`, `pt_journey`): Zugriff
+  über `EventRelation`/`TravelRelation` (Reisen) bzw. `PtParticipant`
+  (ÖPNV-Fahrten).
+- **Geburtstage** (`birthday`): `birthdayVisibility` (0 = niemand,
+  1 = alle, 2 = enge Freunde).
+
+**Allgemein:**
 - Ausgeliefertes Zeitfenster: von 1 Jahr in der Vergangenheit bis 2 Jahre
   in der Zukunft.
 - Unterstützte REPORTs: `calendar-query` und `calendar-multiget`
@@ -92,12 +112,22 @@ und nicht gespeichert – es entsteht nie mehr als ein Eintrag.
 
 | ICS-Eigenschaft | Quelle |
 |-----------------|--------|
-| `UID` | `{eventId}@sinclear.de` |
+| `UID` | `{feedItemId}@sinclear.de` |
 | `DTSTART` / `DTEND` | `startTime` / `endTime` (UTC, Format `…Z`) |
-| `DTSTAMP` | `updatedAt` |
-| `SUMMARY` / `DESCRIPTION` | `title` / `description` |
-| `CLASS` | `visibility`: 0 → `PRIVATE`, 1 → `PUBLIC`, 2 → `CONFIDENTIAL` |
+| `DTSTAMP` | `updatedAt` bzw. aktueller Zeitpunkt |
+| `SUMMARY` / `DESCRIPTION` | `title` / `description` (bzw. Leg-Details bei ÖPNV) |
+| `CLASS` | `visibility`: 0 → `PRIVATE`, 1 → `PUBLIC`, 2 → `CONFIDENTIAL` (nur calendar_event) |
 | `ORGANIZER` / `ATTENDEE` | `mailto:{userId}@sinclear.de` (keine echten E-Mail-Adressen) |
+| `RRULE` | `FREQ=YEARLY` (nur Geburtstage) |
+| `TRANSP` | `TRANSPARENT` (Reisen, Geburtstage – nicht als „besetzt" markieren) |
+
+### Kalender-URLs
+
+| Kalender | Vollständige URL |
+|----------|-----------------|
+| Beyond Kalender | `https://sinclear.de/api/dav/calendars/{userId}/calendar/` |
+| Reisen & Fahrten | `https://sinclear.de/api/dav/calendars/{userId}/travel/` |
+| Geburtstage | `https://sinclear.de/api/dav/calendars/{userId}/birthdays/` |
 
 ## CardDAV – Adressbuch
 
@@ -141,8 +171,9 @@ läuft die Web-App), muss der Account-Pfad manuell gesetzt werden:
 ### Thunderbird
 
 1. „Neuer Kalender" → „Im Netzwerk" → CalDAV
-2. URL: `https://sinclear.de/api/dav/calendars/{userId}/calendar/`
+2. URL: `https://sinclear.de/api/dav/calendars/{userId}/calendar/` (bzw. `/travel/` oder `/birthdays/`)
 3. Benutzername: E-Mail-Adresse, Passwort: DAV-Token
+4. Für jeden Kalender wiederholen (Reisen & Fahrten, Geburtstage)
 
 ## Technische Details
 
@@ -150,6 +181,8 @@ läuft die Web-App), muss der Account-Pfad manuell gesetzt werden:
   (gleiche Basis wie Nextcloud).
 - Eigener Front-Controller: `public/dav.php` (außerhalb der REST-API unter
   `/api/v2`), erreichbar unter `/api/dav/`.
+- Datenquelle: `CalendarFeedService` (identisch zu `GET /calendar/all`),
+  gefiltert nach `type` je Kalender.
 - Die Tabelle `DavToken` wird über die Migration
   `database/migrations/create_dav_tokens_table.sql` angelegt.
 - Ohne gültiges Token erhält ein Client ausschließlich den virtuellen
