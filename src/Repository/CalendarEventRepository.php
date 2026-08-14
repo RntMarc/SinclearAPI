@@ -209,8 +209,16 @@ final readonly class CalendarEventRepository
             '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
         ];
 
+        $visibilityWhere = implode(
+            ' OR ',
+            array_map(
+                static fn (string $condition): string => '(' . $condition . ')',
+                $conditions,
+            ),
+        );
+
         return [
-            '(' . implode(') OR (', $conditions) . ')',
+            '(' . $visibilityWhere . ')',
             [$userId, $userId, $userId],
         ];
     }

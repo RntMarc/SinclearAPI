@@ -206,7 +206,7 @@ class DavIntegrationTest extends TestCase
     {
         $response = $this->invoke('OPTIONS', '/dav/');
         self::assertSame(200, $response->getStatus());
-        self::assertContains('calendar-access', $response->getHeader('DAV'));
+        self::assertStringContainsString('calendar-access', $response->getHeader('DAV'));
     }
 
     public function testCalendarPropfindWithValidToken(): void
@@ -220,9 +220,8 @@ class DavIntegrationTest extends TestCase
             ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
-
         $body = $response->getBodyAsString();
+        self::assertSame(207, $response->getStatus(), $body);
         self::assertStringContainsString('event-alice-public.ics', $body);
         self::assertStringContainsString('event-alice-private.ics', $body);
         self::assertStringContainsString('event-bob-public.ics', $body);
@@ -240,9 +239,10 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
+        $body = $response->getBodyAsString();
+        self::assertSame(200, $response->getStatus(), $body);
 
-        $vcal = Reader::read($response->getBodyAsString());
+        $vcal = Reader::read($body);
         self::assertSame('Alice public', (string) $vcal->VEVENT->SUMMARY);
         self::assertSame('20260701T100000Z', (string) $vcal->VEVENT->DTSTART);
         self::assertSame('20260701T110000Z', (string) $vcal->VEVENT->DTEND);
@@ -303,13 +303,14 @@ class DavIntegrationTest extends TestCase
                    </cal:comp-filter>
                  </cal:comp-filter>
                </cal:filter>
-             </cal:calendar-query>',
+            </cal:calendar-query>',
             $token,
+            ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
-
         $body = $response->getBodyAsString();
+        self::assertSame(207, $response->getStatus(), $body);
+
         self::assertStringContainsString('event-alice-public.ics', $body);
         self::assertStringContainsString('event-bob-public.ics', $body);
         self::assertStringContainsString('event-bob-shared.ics', $body);
@@ -339,9 +340,8 @@ class DavIntegrationTest extends TestCase
             ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
-
         $body = $response->getBodyAsString();
+        self::assertSame(207, $response->getStatus(), $body);
         self::assertStringContainsString('sinclear-dav-invalid-token.ics', $body);
         // Genau ein Hinweis-Event, nicht kumulativ: Das Multistatus enthaelt
         // die Kalender-Collection selbst + genau ein .ics-Objekt.
@@ -357,9 +357,10 @@ class DavIntegrationTest extends TestCase
             'invalid-token',
         );
 
-        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
+        $body = $response->getBodyAsString();
+        self::assertSame(200, $response->getStatus(), $body);
 
-        $vcal = Reader::read($response->getBodyAsString());
+        $vcal = Reader::read($body);
         self::assertSame('Abgelaufener oder ungültiger Token', (string) $vcal->VEVENT->SUMMARY);
         self::assertStringContainsString('Token ist entweder abgelaufen oder ungültig', (string) $vcal->VEVENT->DESCRIPTION);
 
@@ -381,8 +382,9 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
-        self::assertStringContainsString('Abgelaufener oder ungültiger Token', $response->getBodyAsString());
+        $body = $response->getBodyAsString();
+        self::assertSame(200, $response->getStatus(), $body);
+        self::assertStringContainsString('Abgelaufener oder ungültiger Token', $body);
     }
 
     public function testCardDavPropfindWithValidToken(): void
@@ -396,9 +398,8 @@ class DavIntegrationTest extends TestCase
             ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
-
         $body = $response->getBodyAsString();
+        self::assertSame(207, $response->getStatus(), $body);
         self::assertStringContainsString($this->bobId . '.vcf', $body);
         self::assertStringContainsString($this->aliceId . '.vcf', $body);
     }
@@ -413,9 +414,10 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
+        $body = $response->getBodyAsString();
+        self::assertSame(200, $response->getStatus(), $body);
 
-        $vcard = Reader::read($response->getBodyAsString());
+        $vcard = Reader::read($body);
         self::assertSame('Bob', (string) $vcard->FN);
         self::assertSame('user-bob@sinclear.de', (string) $vcard->UID);
         self::assertNull($vcard->EMAIL, 'E-Mail mit emailVisibility=0 darf nicht ausgeliefert werden');
@@ -432,9 +434,10 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
+        $body = $response->getBodyAsString();
+        self::assertSame(200, $response->getStatus(), $body);
 
-        $vcard = Reader::read($response->getBodyAsString());
+        $vcard = Reader::read($body);
         self::assertSame('alice@example.com', (string) $vcard->EMAIL);
     }
 
@@ -447,9 +450,10 @@ class DavIntegrationTest extends TestCase
             'invalid-token',
         );
 
-        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
+        $body = $response->getBodyAsString();
+        self::assertSame(200, $response->getStatus(), $body);
 
-        $vcard = Reader::read($response->getBodyAsString());
+        $vcard = Reader::read($body);
         self::assertSame('Abgelaufener oder ungültiger Token', (string) $vcard->FN);
         self::assertStringContainsString('Token ist entweder abgelaufen oder ungültig', (string) $vcard->NOTE);
     }
