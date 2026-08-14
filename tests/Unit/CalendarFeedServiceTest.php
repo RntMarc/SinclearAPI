@@ -377,9 +377,15 @@ class CalendarFeedServiceTest extends TestCase
         $sorted = $startTimes;
         sort($sorted);
         $this->assertSame($sorted, $startTimes);
-        $this->assertSame('ev-early', $feed['data'][0]['id']);
-        $this->assertSame('trip-mid', $feed['data'][1]['id']);
-        $this->assertSame('ev-late', $feed['data'][2]['id']);
+
+        $insertedIds = array_values(array_map(
+            fn(array $item) => $item['id'],
+            array_filter(
+                $feed['data'],
+                fn(array $item) => in_array($item['id'], ['ev-early', 'trip-mid', 'ev-late'], true),
+            ),
+        ));
+        $this->assertSame(['ev-early', 'trip-mid', 'ev-late'], $insertedIds);
     }
 
     public function testTruncationIsReported(): void

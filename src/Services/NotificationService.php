@@ -43,7 +43,9 @@ final readonly class NotificationService
 
         $data = $this->normalizeData($type, $data);
 
-        [$generatedTitle, $generatedText] = self::CONTENT_TEMPLATES[$type] ?? ['', ''];
+        $template = self::CONTENT_TEMPLATES[$type] ?? [];
+        $generatedTitle = $template['title'] ?? '';
+        $generatedText = $template['text'] ?? '';
         $title = $title !== '' ? $title : $generatedTitle;
         $text = $body !== '' ? $body : $generatedText;
 

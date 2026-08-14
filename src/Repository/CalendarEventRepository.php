@@ -110,7 +110,7 @@ final readonly class CalendarEventRepository
             $params[] = $this->formatDatetime($end);
         }
 
-        $where = $visibilityWhere;
+        $where = '(' . $visibilityWhere . ')';
         if ($timeConditions !== []) {
             $where .= ' AND ' . implode(' AND ', $timeConditions);
         }
@@ -192,8 +192,7 @@ final readonly class CalendarEventRepository
     private function formatDatetime(string $value): string
     {
         try {
-            return (new DateTimeImmutable($value))
-                ->setTimezone(new DateTimeZone('UTC'))
+            return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
                 ->format('Y-m-d H:i:s');
         } catch (\Exception $e) {
             throw new RuntimeException('Invalid datetime');
