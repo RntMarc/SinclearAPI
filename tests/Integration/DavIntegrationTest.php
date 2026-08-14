@@ -11,13 +11,18 @@ use Sinclear\Api\Dav\DavDummyFactory;
 use Sinclear\Api\Dav\DavServerFactory;
 use Sinclear\Api\Dav\IcsFactory;
 use Sinclear\Api\Dav\VcardFactory;
+use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
+use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
+use Sinclear\Api\Repository\TravelEventRepository;
+use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Policy\UserPolicy;
+use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\UserPreferenceService;
@@ -28,7 +33,6 @@ class DavIntegrationTest extends TestCase
     private PDO $db;
     private DavServerFactory $serverFactory;
     private DavTokenService $tokenService;
-    private CalendarFeedService $feedService;
     private string $aliceId = 'user-alice';
     private string $bobId = 'user-bob';
 
@@ -50,9 +54,16 @@ class DavIntegrationTest extends TestCase
         );
         $this->db->exec("SET time_zone = '+00:00'");
 
-        foreach (['DavToken', 'CalendarEventParticipant', 'CalendarEvent', 'CloseFriend', 'UserPreferences', 'User'] as $table) {
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
+        foreach ([
+            'DavToken', 'CalendarEventParticipant', 'CalendarEvent',
+            'EventRelation', 'TravelRelation', 'TravelEvent', 'TravelTrip',
+            'PtParticipant', 'PtLeg', 'PtJourney',
+            'CloseFriend', 'UserPreferences', 'User',
+        ] as $table) {
             $this->db->exec("DROP TABLE IF EXISTS `$table`");
         }
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
 
         $this->db->exec("
             CREATE TABLE User (
@@ -144,13 +155,122 @@ class DavIntegrationTest extends TestCase
             )
         ");
 
+        $this->db->exec("
+            CREATE TABLE TravelTrip (
+                id varchar(191) NOT NULL PRIMARY KEY,
+                name varchar(255) DEFAULT NULL,
+                description text DEFAULT NULL,
+                start datetime(3) DEFAULT NULL,
+                end datetime(3) DEFAULT NULL,
+                hastickets varchar(255) DEFAULT NULL,
+                ticket text DEFAULT NULL,
+                ticketUrl text DEFAULT NULL,
+                forumId varchar(191) DEFAULT NULL
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE TravelRelation (
+                ID varchar(191) NOT NULL PRIMARY KEY,
+                userid varchar(191) NOT NULL,
+                tripid varchar(191) NOT NULL,
+                accommodation varchar(191) DEFAULT NULL
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE TravelEvent (
+                ID varchar(191) NOT NULL PRIMARY KEY,
+                trip varchar(191) DEFAULT NULL,
+                name varchar(255) DEFAULT NULL,
+                description text DEFAULT NULL,
+                start datetime(3) DEFAULT NULL,
+                end datetime(3) DEFAULT NULL,
+                hastickets varchar(255) DEFAULT NULL,
+                ticket text DEFAULT NULL,
+                ticketUrl text DEFAULT NULL,
+                url text DEFAULT NULL,
+                image text DEFAULT NULL,
+                organizer varchar(255) DEFAULT NULL,
+                address varchar(255) DEFAULT NULL,
+                latitude varchar(64) DEFAULT NULL,
+                longitude varchar(64) DEFAULT NULL,
+                OSMID varchar(64) DEFAULT NULL
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE EventRelation (
+                id varchar(191) NOT NULL PRIMARY KEY,
+                eventId varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                createdAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3)
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE PtJourney (
+                id varchar(191) NOT NULL PRIMARY KEY,
+                tripId varchar(191) DEFAULT NULL,
+                creatorId varchar(191) NOT NULL,
+                fromStationId varchar(191) DEFAULT NULL,
+                fromStationName varchar(255) DEFAULT NULL,
+                toStationId varchar(191) DEFAULT NULL,
+                toStationName varchar(255) DEFAULT NULL,
+                departureTime datetime(3) DEFAULT NULL,
+                arrivalTime datetime(3) DEFAULT NULL,
+                duration int DEFAULT NULL,
+                transfers int DEFAULT NULL,
+                chosenAt datetime(3) DEFAULT NULL,
+                createdAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
+                updatedAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3)
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE PtParticipant (
+                journeyId varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                addedAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (journeyId, userId)
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE PtLeg (
+                id varchar(191) NOT NULL PRIMARY KEY,
+                journeyId varchar(191) NOT NULL,
+                legIndex int NOT NULL DEFAULT 0,
+                mode varchar(64) DEFAULT NULL,
+                lineName varchar(255) DEFAULT NULL,
+                lineProduct varchar(64) DEFAULT NULL,
+                fromStationId varchar(191) DEFAULT NULL,
+                fromStationName varchar(255) DEFAULT NULL,
+                toStationId varchar(191) DEFAULT NULL,
+                toStationName varchar(255) DEFAULT NULL,
+                tripId varchar(191) DEFAULT NULL,
+                plannedDeparture datetime(3) DEFAULT NULL,
+                plannedArrival datetime(3) DEFAULT NULL,
+                actualDeparture datetime(3) DEFAULT NULL,
+                actualArrival datetime(3) DEFAULT NULL,
+                departureDelay int DEFAULT NULL,
+                arrivalDelay int DEFAULT NULL,
+                departurePlatform varchar(64) DEFAULT NULL,
+                arrivalPlatform varchar(64) DEFAULT NULL,
+                cancelled tinyint(1) NOT NULL DEFAULT 0,
+                realTimeState varchar(64) DEFAULT NULL,
+                rawResponse text DEFAULT NULL,
+                createdAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3),
+                updatedAt datetime(3) DEFAULT CURRENT_TIMESTAMP(3)
+            )
+        ");
+
         $stmt = $this->db->prepare(
             'INSERT INTO User (id, email, passwordHash, displayName, birthday, createdAt) VALUES (?, ?, ?, ?, ?, NOW(3))'
         );
         $stmt->execute([$this->aliceId, 'alice@example.com', '', 'Alice', null]);
         $stmt->execute([$this->bobId, 'bob@example.com', '', 'Bob', '1990-05-04 00:00:00']);
 
-        // Alice sieht Bobs E-Mail nicht (emailVisibility=0), Bobs Geburtstag aber schon.
         $this->db->prepare('INSERT INTO UserPreferences (id, userId, emailVisibility, birthdayVisibility) VALUES (?, ?, ?, ?)')
             ->execute(['pref-alice', $this->aliceId, 1, 1]);
         $this->db->prepare('INSERT INTO UserPreferences (id, userId, emailVisibility, birthdayVisibility) VALUES (?, ?, ?, ?)')
@@ -189,58 +309,27 @@ class DavIntegrationTest extends TestCase
         $vcardFactory = new VcardFactory();
         $dummyFactory = new DavDummyFactory($icsFactory, $vcardFactory);
 
-        // CalendarFeedService-Mock: Liefert CalendarEvents im Feed-Format
-        $calendarRepo = new \Sinclear\Api\Repository\CalendarEventRepository($this->db);
-        $this->feedService = $this->createFeedServiceMock($calendarRepo);
+        $calendarRepo = new CalendarEventRepository($this->db);
+        $closeFriendRepo = new CloseFriendRepository($this->db);
+        $calendarEventService = new CalendarEventService(eventRepo: $calendarRepo, closeFriendRepo: $closeFriendRepo);
+
+        $feedService = new CalendarFeedService(
+            calendarEventService: $calendarEventService,
+            travelEventRepo: new TravelEventRepository($this->db),
+            tripRepo: new TravelTripRepository($this->db),
+            ptJourneyRepo: new PtJourneyRepository($this->db),
+            userRepo: $userRepo,
+        );
 
         $this->serverFactory = new DavServerFactory(
             $this->tokenService,
             $userRepo,
             $userService,
-            $this->feedService,
+            $feedService,
             $icsFactory,
             $vcardFactory,
             $dummyFactory,
         );
-    }
-
-    private function createFeedServiceMock(\Sinclear\Api\Repository\CalendarEventRepository $calendarRepo): CalendarFeedService
-    {
-        $feedService = $this->createMock(CalendarFeedService::class);
-        $feedService->method('buildFeed')
-            ->willReturnCallback(function (string $userId, string $start, string $end, array $types) use ($calendarRepo) {
-                $items = [];
-
-                if (in_array('calendar_event', $types, true)) {
-                    $events = $calendarRepo->findAllVisibleForDav($userId, $start, $end);
-                    foreach ($events as $event) {
-                        $items[] = [
-                            'type' => 'calendar_event',
-                            'id' => $event['id'],
-                            'title' => $event['title'] ?? null,
-                            'startTime' => $event['startTime'],
-                            'endTime' => $event['endTime'],
-                            'allDay' => false,
-                            'detail' => $event,
-                        ];
-                    }
-                }
-
-                usort($items, fn(array $a, array $b) => [$a['startTime'], $a['id']] <=> [$b['startTime'], $b['id']]);
-
-                return [
-                    'data' => $items,
-                    'meta' => [
-                        'start' => $start,
-                        'end' => $end,
-                        'types' => $types,
-                        'count' => count($items),
-                        'truncated' => false,
-                    ],
-                ];
-            });
-
-        return $feedService;
     }
 
     public function testOptionsListsDavHeaders(): void
@@ -314,8 +403,6 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        // Sabre liefert fuer nicht lesbare Knoten ein 207-Multistatus, in dem
-        // alle angeforderten Properties mit 403 beantwortet werden.
         $body = $response->getBodyAsString();
         self::assertSame(207, $response->getStatus(), $body);
         self::assertStringContainsString('403 Forbidden', $body);
@@ -378,8 +465,6 @@ class DavIntegrationTest extends TestCase
         $body = $response->getBodyAsString();
         self::assertSame(207, $response->getStatus(), $body);
         self::assertStringContainsString('sinclear-dav-invalid-token.ics', $body);
-        // Genau ein Hinweis-Event, nicht kumulativ: Das Multistatus enthaelt
-        // die Kalender-Collection selbst + genau ein .ics-Objekt.
         self::assertSame(1, substr_count($body, '.ics</d:href>'), $body);
     }
 
@@ -512,7 +597,6 @@ class DavIntegrationTest extends TestCase
         self::assertNotEmpty($tokenData['token']);
         self::assertSame('Test-Token', $tokenData['label']);
 
-        // Token ist ein Jahr gueltig.
         $expiresAt = new \DateTimeImmutable($tokenData['expiresAt'], new \DateTimeZone('UTC'));
         $inOneYear = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('+365 days');
         $dayDiff = (int) $expiresAt->diff($inOneYear)->format('%a');
@@ -558,9 +642,6 @@ class DavIntegrationTest extends TestCase
         $response = new Response();
         $server = $this->serverFactory->createServer();
 
-        // invokeMethod() erwartet, dass Server->httpRequest/-Response dem
-        // Request entsprechen, weil einige Handler (z.B. calendarQueryReport)
-        // ueber $server->getRequestUri() arbeiten.
         $server->httpRequest = $request;
         $server->httpResponse = $response;
 
@@ -568,8 +649,6 @@ class DavIntegrationTest extends TestCase
         try {
             $server->invokeMethod($request, $response, false);
         } catch (\Sabre\DAV\Exception $e) {
-            // Sabre uebersetzt DAV-Exceptions erst in Server::start() in
-            // HTTP-Statuscodes; hier wird dieses Verhalten nachgebildet.
             $response->setStatus($e->getHTTPCode());
             $response->setHeader('Content-Type', 'application/xml; charset=utf-8');
             $response->setBody($e->getMessage());

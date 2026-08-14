@@ -217,7 +217,7 @@ class DavFactoriesTest extends TestCase
         self::assertSame('trip-1@sinclear.de', (string) $vcal->VEVENT->UID);
         self::assertSame('Italien-Reise', (string) $vcal->VEVENT->SUMMARY);
         self::assertSame('TRANSPARENT', (string) $vcal->VEVENT->TRANSP);
-        self::assertStringNotContainsString('CLASS', (string) $vcal->VEVENT);
+        self::assertNull($vcal->VEVENT->CLASS);
     }
 
     public function testFeedItemPtJourneyWithLegs(): void
