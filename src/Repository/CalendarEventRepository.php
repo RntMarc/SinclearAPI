@@ -150,15 +150,7 @@ final readonly class CalendarEventRepository
      */
     public function findAllVisibleForDav(string $userId, ?string $start = null, ?string $end = null): array
     {
-        $conditions = [
-            'e.creatorId = ?',
-            'EXISTS (SELECT 1 FROM CalendarEventParticipant p WHERE p.eventId = e.id AND p.userId = ?)',
-            'e.visibility = 1',
-            '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
-        ];
-        $params = [$userId, $userId, $userId];
-
-        $where = '(' . implode(') OR (', $conditions) . ')';
+        [$where, $params] = $this->visibilityWhere($userId);
 
         if ($start !== null) {
             $where .= ' AND e.endTime > ?';
@@ -186,15 +178,9 @@ final readonly class CalendarEventRepository
      */
     public function findVisibleByIdForDav(string $userId, string $id): ?array
     {
-        $conditions = [
-            'e.creatorId = ?',
-            'EXISTS (SELECT 1 FROM CalendarEventParticipant p WHERE p.eventId = e.id AND p.userId = ?)',
-            'e.visibility = 1',
-            '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
-        ];
-        $params = [$userId, $userId, $userId, $id];
-
-        $where = '(' . implode(') OR (', $conditions) . ') AND e.id = ?';
+        [$where, $params] = $this->visibilityWhere($userId);
+        $where .= ' AND (e.id = ?)';
+        $params[] = $id;
 
         $stmt = $this->pdo->prepare(
             "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
@@ -205,6 +191,28 @@ final readonly class CalendarEventRepository
         $stmt->execute($params);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
+    }
+
+    /**
+     * Baut die gemeinsame Sichtbarkeits-Bedingung fuer den Kalender:
+     * sichtbar sind eigene Events, Events mit Teilnahme, oeffentliche
+     * Events und Events fuer enge Freunde.
+     *
+     * @return array{string, list<string>}
+     */
+    private function visibilityWhere(string $userId): array
+    {
+        $conditions = [
+            'e.creatorId = ?',
+            'EXISTS (SELECT 1 FROM CalendarEventParticipant p WHERE p.eventId = e.id AND p.userId = ?)',
+            'e.visibility = 1',
+            '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
+        ];
+
+        return [
+            '(' . implode(') OR (', $conditions) . ')',
+            [$userId, $userId, $userId],
+        ];
     }
 
     /**

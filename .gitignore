@@ -11,6 +11,9 @@ app_version.json
 /var/log/
 /var/cache/
 
+# phpunit tests
+/.phpunit.cache/
+
 # dependencies
 /vendor/
 

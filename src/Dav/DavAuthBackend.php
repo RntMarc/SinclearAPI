@@ -48,15 +48,15 @@ final class DavAuthBackend implements BackendInterface
         $auth = new Basic($this->realm, $request, $response);
         $credentials = $auth->getCredentials();
 
-        if ($credentials !== false) {
-            $userId = $this->tokenService->validateToken($credentials[0], $credentials[1] ?? '');
+        if (is_array($credentials) && isset($credentials[0], $credentials[1])) {
+            $userId = $this->tokenService->validateToken((string) $credentials[0], (string) $credentials[1]);
             if ($userId !== null) {
                 $this->currentPrincipal = self::PRINCIPAL_PREFIX . $userId;
                 return [true, $this->currentPrincipal];
             }
 
             $this->logger?->info('DAV: invalid or expired token presented', [
-                'email' => $credentials[0],
+                'email' => (string) $credentials[0],
             ]);
         }
 

@@ -28,6 +28,7 @@ class DavIntegrationTest extends TestCase
     private PDO $db;
     private DavServerFactory $serverFactory;
     private DavTokenService $tokenService;
+    private CalendarEventRepository $calendarRepo;
     private string $aliceId = 'user-alice';
     private string $bobId = 'user-bob';
 
@@ -176,6 +177,7 @@ class DavIntegrationTest extends TestCase
         $this->tokenService = new DavTokenService($davTokenRepo, $userRepo);
 
         $calendarRepo = new CalendarEventRepository($this->db);
+        $this->calendarRepo = $calendarRepo;
         $preferenceService = new UserPreferenceService(new UserPreferenceRepository($this->db));
         $userService = new UserService(
             $userRepo,
@@ -218,9 +220,9 @@ class DavIntegrationTest extends TestCase
             ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
 
-        $body = (string) $response->getBody();
+        $body = $response->getBodyAsString();
         self::assertStringContainsString('event-alice-public.ics', $body);
         self::assertStringContainsString('event-alice-private.ics', $body);
         self::assertStringContainsString('event-bob-public.ics', $body);
@@ -238,9 +240,9 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
 
-        $vcal = Reader::read((string) $response->getBody());
+        $vcal = Reader::read($response->getBodyAsString());
         self::assertSame('Alice public', (string) $vcal->VEVENT->SUMMARY);
         self::assertSame('20260701T100000Z', (string) $vcal->VEVENT->DTSTART);
         self::assertSame('20260701T110000Z', (string) $vcal->VEVENT->DTEND);
@@ -250,6 +252,13 @@ class DavIntegrationTest extends TestCase
     public function testCalendarObjectOfOtherUserIsHidden(): void
     {
         $token = $this->createToken($this->aliceId);
+
+        // Direkte Pruefung der Repository-Logik (Referenz)
+        self::assertNull(
+            $this->calendarRepo->findVisibleByIdForDav($this->aliceId, 'event-bob-private'),
+            'findVisibleByIdForDav muss fremde private Events ausblenden',
+        );
+
         $response = $this->invoke(
             'GET',
             "/dav/calendars/{$this->aliceId}/calendar/event-bob-private.ics",
@@ -257,7 +266,7 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(404, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(404, $response->getStatus(), $response->getBodyAsString());
     }
 
     public function testForeignCalendarHomeIsDenied(): void
@@ -270,8 +279,12 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertNotSame(207, $response->getStatus(), (string) $response->getBody());
-        self::assertSame(403, $response->getStatus(), (string) $response->getBody());
+        // Sabre liefert fuer nicht lesbare Knoten ein 207-Multistatus, in dem
+        // alle angeforderten Properties mit 403 beantwortet werden.
+        $body = $response->getBodyAsString();
+        self::assertSame(207, $response->getStatus(), $body);
+        self::assertStringContainsString('403 Forbidden', $body);
+        self::assertStringNotContainsString('HTTP/1.1 200 OK', $body, 'Keine Properties duerfen lesbar sein');
     }
 
     public function testCalendarQueryReport(): void
@@ -294,9 +307,9 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(207, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
 
-        $body = (string) $response->getBody();
+        $body = $response->getBodyAsString();
         self::assertStringContainsString('event-alice-public.ics', $body);
         self::assertStringContainsString('event-bob-public.ics', $body);
         self::assertStringContainsString('event-bob-shared.ics', $body);
@@ -313,7 +326,7 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(403, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(403, $response->getStatus(), $response->getBodyAsString());
     }
 
     public function testInvalidTokenGetsDummyCalendarWithHintEvent(): void
@@ -326,12 +339,13 @@ class DavIntegrationTest extends TestCase
             ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
 
-        $body = (string) $response->getBody();
+        $body = $response->getBodyAsString();
         self::assertStringContainsString('sinclear-dav-invalid-token.ics', $body);
-        // Genau ein Hinweis-Event, nicht kumulativ.
-        self::assertSame(1, substr_count($body, '<d:response>'), $body);
+        // Genau ein Hinweis-Event, nicht kumulativ: Das Multistatus enthaelt
+        // die Kalender-Collection selbst + genau ein .ics-Objekt.
+        self::assertSame(1, substr_count($body, '.ics</d:href>'), $body);
     }
 
     public function testInvalidTokenHintEventIsTodayNoonUtc(): void
@@ -343,9 +357,9 @@ class DavIntegrationTest extends TestCase
             'invalid-token',
         );
 
-        self::assertSame(200, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
 
-        $vcal = Reader::read((string) $response->getBody());
+        $vcal = Reader::read($response->getBodyAsString());
         self::assertSame('Abgelaufener oder ungültiger Token', (string) $vcal->VEVENT->SUMMARY);
         self::assertStringContainsString('Token ist entweder abgelaufen oder ungültig', (string) $vcal->VEVENT->DESCRIPTION);
 
@@ -367,8 +381,8 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), (string) $response->getBody());
-        self::assertStringContainsString('Abgelaufener oder ungültiger Token', (string) $response->getBody());
+        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
+        self::assertStringContainsString('Abgelaufener oder ungültiger Token', $response->getBodyAsString());
     }
 
     public function testCardDavPropfindWithValidToken(): void
@@ -382,9 +396,9 @@ class DavIntegrationTest extends TestCase
             ['Depth' => '1'],
         );
 
-        self::assertSame(207, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(207, $response->getStatus(), $response->getBodyAsString());
 
-        $body = (string) $response->getBody();
+        $body = $response->getBodyAsString();
         self::assertStringContainsString($this->bobId . '.vcf', $body);
         self::assertStringContainsString($this->aliceId . '.vcf', $body);
     }
@@ -399,9 +413,9 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
 
-        $vcard = Reader::read((string) $response->getBody());
+        $vcard = Reader::read($response->getBodyAsString());
         self::assertSame('Bob', (string) $vcard->FN);
         self::assertSame('user-bob@sinclear.de', (string) $vcard->UID);
         self::assertNull($vcard->EMAIL, 'E-Mail mit emailVisibility=0 darf nicht ausgeliefert werden');
@@ -418,9 +432,9 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(200, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
 
-        $vcard = Reader::read((string) $response->getBody());
+        $vcard = Reader::read($response->getBodyAsString());
         self::assertSame('alice@example.com', (string) $vcard->EMAIL);
     }
 
@@ -433,9 +447,9 @@ class DavIntegrationTest extends TestCase
             'invalid-token',
         );
 
-        self::assertSame(200, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(200, $response->getStatus(), $response->getBodyAsString());
 
-        $vcard = Reader::read((string) $response->getBody());
+        $vcard = Reader::read($response->getBodyAsString());
         self::assertSame('Abgelaufener oder ungültiger Token', (string) $vcard->FN);
         self::assertStringContainsString('Token ist entweder abgelaufen oder ungültig', (string) $vcard->NOTE);
     }
@@ -450,7 +464,7 @@ class DavIntegrationTest extends TestCase
             $token,
         );
 
-        self::assertSame(403, $response->getStatus(), (string) $response->getBody());
+        self::assertSame(403, $response->getStatus(), $response->getBodyAsString());
     }
 
     public function testDavTokenServiceLifecycle(): void
@@ -503,10 +517,23 @@ class DavIntegrationTest extends TestCase
         $request->setBaseUrl('/dav/');
 
         $response = new Response();
+        $server = $this->serverFactory->createServer();
+
+        // invokeMethod() erwartet, dass Server->httpRequest/-Response dem
+        // Request entsprechen, weil einige Handler (z.B. calendarQueryReport)
+        // ueber $server->getRequestUri() arbeiten.
+        $server->httpRequest = $request;
+        $server->httpResponse = $response;
 
         ob_start();
         try {
-            $this->serverFactory->createServer()->invokeMethod($request, $response, false);
+            $server->invokeMethod($request, $response, false);
+        } catch (\Sabre\DAV\Exception $e) {
+            // Sabre uebersetzt DAV-Exceptions erst in Server::start() in
+            // HTTP-Statuscodes; hier wird dieses Verhalten nachgebildet.
+            $response->setStatus($e->getHTTPCode());
+            $response->setHeader('Content-Type', 'application/xml; charset=utf-8');
+            $response->setBody($e->getMessage());
         } finally {
             ob_end_clean();
         }
