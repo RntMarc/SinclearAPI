@@ -124,4 +124,26 @@ final readonly class TravelTripRepository
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
+
+    /**
+     * Alle Reisen des Nutzers (über TravelRelation), die den Zeitraum
+     * überlappen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findByParticipantInRange(string $userId, string $start, string $end, int $limit): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT t.*
+             FROM TravelTrip t
+             JOIN TravelRelation r ON r.tripid = t.id
+             WHERE r.userid = ?
+               AND COALESCE(t.end, t.start) > ?
+               AND COALESCE(t.start, t.end) < ?
+             ORDER BY t.start ASC
+             LIMIT ?'
+        );
+        $stmt->execute([$userId, $start, $end, $limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

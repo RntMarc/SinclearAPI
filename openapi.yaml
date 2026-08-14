@@ -1688,6 +1688,147 @@ components:
               type: string
               format: uuid
 
+    CalendarFeedItem:
+      type: object
+      required: [type, id, title, startTime, endTime, allDay, detail]
+      properties:
+        type:
+          type: string
+          enum: [calendar_event, travel_event, trip, birthday, pt_journey]
+          description: Typ des Eintrags
+        id:
+          type: string
+          description: Eindeutige ID des Eintrags
+        title:
+          type: string
+          nullable: true
+          description: Anzeige-Titel (bei Geburtstagen servergeneriert)
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        allDay:
+          type: boolean
+          description: Ganzttägiger Eintrag (Reisen, Geburtstage)
+        detail:
+          type: object
+          description: >
+            Typspezifisches Detail-Objekt. Bei `calendar_event` ein
+            CalendarEvent, bei `travel_event` ein TravelEvent (inkl.
+            `participants`), bei `trip` ein Trip, bei `birthday` eine
+            User-Kurzinfo mit `occurrenceDate`, bei `pt_journey` eine
+            Fahrten-Zusammenfassung inkl. `legs`.
+          additionalProperties: true
+
+    CalendarFeedMeta:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: Beginn des abgefragten Zeitraums (UTC)
+        end:
+          type: string
+          format: date-time
+          description: Ende des abgefragten Zeitraums (UTC)
+        types:
+          type: array
+          items:
+            type: string
+          description: Effektiv angewendete Typ-Filter
+        count:
+          type: integer
+          description: Anzahl der zurückgegebenen Einträge
+        truncated:
+          type: boolean
+          description: >
+            True, wenn mindestens eine Quelle mehr als 500 Einträge
+            enthielt und abgeschnitten wurde
+
+    CalendarFeedResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarFeedItem'
+        meta:
+          $ref: '#/components/schemas/CalendarFeedMeta'
+
+    CalendarFeedPtLeg:
+      type: object
+      properties:
+        id:
+          type: string
+        journeyId:
+          type: string
+        legIndex:
+          type: integer
+        mode:
+          type: string
+          nullable: true
+        lineName:
+          type: string
+          nullable: true
+        lineProduct:
+          type: string
+          nullable: true
+        fromStationId:
+          type: string
+          nullable: true
+        fromStationName:
+          type: string
+          nullable: true
+        toStationId:
+          type: string
+          nullable: true
+        toStationName:
+          type: string
+          nullable: true
+        tripId:
+          type: string
+          nullable: true
+        plannedDeparture:
+          type: string
+          format: date-time
+          nullable: true
+        plannedArrival:
+          type: string
+          format: date-time
+          nullable: true
+        actualDeparture:
+          type: string
+          format: date-time
+          nullable: true
+        actualArrival:
+          type: string
+          format: date-time
+          nullable: true
+        departureDelay:
+          type: integer
+          nullable: true
+        arrivalDelay:
+          type: integer
+          nullable: true
+        departurePlatform:
+          type: string
+          nullable: true
+        arrivalPlatform:
+          type: string
+          nullable: true
+        cancelled:
+          type: boolean
+        realTimeState:
+          type: string
+          nullable: true
+
     UserBase:
       type: object
       properties:
@@ -6439,7 +6580,7 @@ paths:
       description: >
         Erstellt ein neues Kalender-Event. Der authentifizierte Nutzer wird
         als Ersteller eingetragen. Optionale Teilnehmer-Liste wird direkt
-        verknüpft. Teilnehmer erhalten eine Push-Benachrichtigung.
+        verknüpft.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -6458,6 +6599,70 @@ paths:
                 $ref: '#/components/schemas/CalendarEventDetailResponse'
         '400':
           description: Ungültige Eingabedaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /calendar/all:
+    get:
+      summary: Kombinierter Kalender-Feed
+      description: >
+        Gibt einen kombinierten, nach `startTime` sortierten Feed aller für
+        den Nutzer sichtbaren Termine zurück: Kalender-Events, Reise-Events,
+        Reisen (als Zeitraum), Geburtstage und ÖPNV-Fahrten. Jedes Item trägt
+        ein `type`-Feld und ein typspezifisches `detail`-Objekt. Ohne `start`
+        und `end` wird der aktuelle Monat verwendet. Pro Quelle werden maximal
+        500 Items zurückgegeben; `meta.truncated` zeigt an, ob Einträge
+        abgeschnitten wurden.
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: >
+            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Nur Termine,
+            die diesen Zeitpunkt überlappen, werden zurückgegeben. Muss
+            zusammen mit `end` gesetzt werden.
+        - name: end
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: >
+            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Nur Termine,
+            die diesen Zeitpunkt überlappen, werden zurückgegeben. Muss
+            zusammen mit `start` gesetzt werden.
+        - name: types
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Komma-separierte Liste der gewünschten Typen. Erlaubte Werte:
+            `calendar_event`, `travel_event`, `trip`, `birthday`,
+            `pt_journey`. Standard: alle Typen.
+      responses:
+        '200':
+          description: Kombinierter, sortierter Kalender-Feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarFeedResponse'
+        '400':
+          description: Ungültige Eingabedaten (z.B. invalid_datetime, invalid_time_range, invalid_type)
           content:
             application/json:
               schema:
@@ -6500,31 +6705,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Reise nicht gefunden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /app/version:
-    get:
-      summary: Aktuelle App-Version abfragen
-      description: >
-        Gibt die aktuell auf dem Server verfügbare App-Version zurück.
-        Wird von der Android-App beim Start aufgerufen, um zu prüfen,
-        ob ein Update verfügbar ist. Dieser Endpoint ist öffentlich
-        zugänglich und erfordert keine Authentifizierung.
-      tags: [App]
-      operationId: getAppVersion
-      responses:
-        '200':
-          description: Versionsinformationen erfolgreich abgerufen
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AppVersionResponse'
-        '503':
-          description: Versionsinformationen nicht verfügbar
+          description: Event nicht gefunden
           content:
             application/json:
               schema:
@@ -6534,8 +6715,7 @@ paths:
       summary: Kalender-Event ändern
       description: >
         Ändert ein bestehendes Kalender-Event. Der Ersteller und alle
-        Teilnehmer (oder Admin) dürfen ändern. Alle Teilnehmer und der
-        Ersteller erhalten eine Push-Benachrichtigung über die Änderung.
+        Teilnehmer dürfen ändern.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -6588,8 +6768,7 @@ paths:
       summary: Kalender-Event löschen
       description: >
         Löscht ein Kalender-Event. Der Ersteller und alle Teilnehmer
-        (oder Admin) dürfen löschen. Es wird keine Benachrichtigung
-        versendet.
+        dürfen löschen.
       tags: [Calendar]
       security:
         - BearerAuth: []
@@ -6622,14 +6801,36 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /app/version:
+    get:
+      summary: Aktuelle App-Version abfragen
+      description: >
+        Gibt die aktuell auf dem Server verfügbare App-Version zurück.
+        Wird von der Android-App beim Start aufgerufen, um zu prüfen,
+        ob ein Update verfügbar ist. Dieser Endpoint ist öffentlich
+        zugänglich und erfordert keine Authentifizierung.
+      tags: [App]
+      operationId: getAppVersion
+      responses:
+        '200':
+          description: Versionsinformationen erfolgreich abgerufen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppVersionResponse'
+        '503':
+          description: Versionsinformationen nicht verfügbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /calendar/{id}/participants:
     post:
       summary: Teilnehmer zu Kalender-Event hinzufügen
       description: >
         Fügt einen Nutzer als Teilnehmer zu einem Kalender-Event hinzu.
-        Der Ersteller und alle Teilnehmer (oder Admin) dürfen Teilnehmer
-        hinzufügen. Der hinzugefügte Nutzer erhält eine
-        Push-Benachrichtigung.
+        Der Ersteller und alle Teilnehmer dürfen Teilnehmer hinzufügen.
       tags: [Calendar]
       security:
         - BearerAuth: []

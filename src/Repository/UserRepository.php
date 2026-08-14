@@ -63,6 +63,27 @@ final readonly class UserRepository
         return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id');
     }
 
+    /**
+     * Alle Nutzer mit hinterlegtem Geburtstag inkl. Sichtbarkeit und
+     * Close-Friend-Status gegenüber dem anfragenden Nutzer.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findBirthdayCandidates(string $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT u.id, u.displayName, u.image, u.birthday,
+                    COALESCE(p.birthdayVisibility, 1) AS birthdayVisibility,
+                    (cf.friendId IS NOT NULL) AS isCloseFriend
+             FROM User u
+             LEFT JOIN UserPreferences p ON p.userId = u.id
+             LEFT JOIN CloseFriend cf ON cf.userId = u.id AND cf.friendId = ?
+             WHERE u.birthday IS NOT NULL'
+        );
+        $stmt->execute([$userId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function countAll(): int
     {
         $stmt = $this->pdo->query('SELECT COUNT(*) FROM User');

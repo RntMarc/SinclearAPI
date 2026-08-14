@@ -7,6 +7,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
+use Sinclear\Api\Services\CalendarFeedService;
 
 final readonly class CalendarEventController
 {
@@ -18,6 +19,7 @@ final readonly class CalendarEventController
 
     public function __construct(
         private CalendarEventService $calendarService,
+        private CalendarFeedService $calendarFeedService,
     ) {}
 
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -169,6 +171,47 @@ final readonly class CalendarEventController
 
         $result = $this->calendarService->listVisible($user->id, $start, $end, $page, $limit);
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    public function all(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+
+        $start = !empty($params['start']) ? $params['start'] : null;
+        $end = !empty($params['end']) ? $params['end'] : null;
+
+        if ($start === null && $end === null) {
+            $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+            $start = $now->modify('first day of this month')->setTime(0, 0, 0)->format('Y-m-d H:i:s');
+            $end = $now->modify('last day of this month')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+        } elseif ($start === null || $end === null) {
+            return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+        }
+
+        $types = CalendarFeedService::SUPPORTED_TYPES;
+        if (!empty($params['types'])) {
+            if (!is_string($params['types'])) {
+                return ResponseFactory::json(['error' => 'invalid_type'], 400, $response);
+            }
+            $types = array_values(array_unique(array_filter(
+                array_map('trim', explode(',', $params['types'])),
+                fn(string $type) => $type !== '',
+            )));
+            foreach ($types as $type) {
+                if (!in_array($type, CalendarFeedService::SUPPORTED_TYPES, true)) {
+                    return ResponseFactory::json(['error' => 'invalid_type'], 400, $response);
+                }
+            }
+        }
+
+        try {
+            $feed = $this->calendarFeedService->buildFeed($user->id, $start, $end, $types);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+
+        return ResponseFactory::json($feed, 200, $response);
     }
 
     public function addParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface

@@ -7,6 +7,10 @@ löschen, andere Nutzer hinzufügen und die Sichtbarkeit festlegen.
 Hinzugefügte Teilnehmer haben die gleichen Bearbeitungsrechte wie
 der Ersteller (Event ändern, löschen, Teilnehmer verwalten).
 
+Zusätzlich bietet `GET /calendar/all` einen kombinierten Feed, der neben den
+Kalender-Events auch Reise-Events, Reisen, Geburtstage und ÖPNV-Fahrten
+ausgibt (siehe [Kombinierter Kalender-Feed](#kombinierter-kalender-feed)).
+
 > **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Das Format ist `YYYY-MM-DD HH:MM:SS` (24h, ohne Millisekunden, ohne Zeitzonenindikatoren). Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
 
 ## Datenbank-Tabellen
@@ -34,17 +38,19 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 |----------|----------------|
 | `POST /calendar` | Authentifizierter Nutzer |
 | `GET /calendar` | Events, die der Nutzer sehen darf (siehe Sichtbarkeit) |
+| `GET /calendar/all` | Kombinierter Feed, quellenabhängig gefiltert (siehe unten) |
 | `GET /calendar/{id}` | Nutzer muss das Event sehen dürfen → sonst `404` |
-| `PUT /calendar/{id}` | Ersteller und alle Teilnehmer (oder Admin) → sonst `403` |
-| `DELETE /calendar/{id}` | Ersteller und alle Teilnehmer (oder Admin) → sonst `403` |
-| `POST /calendar/{id}/participants` | Ersteller und alle Teilnehmer (oder Admin) |
-| `DELETE /calendar/{id}/participants/{userId}` | Ersteller und alle Teilnehmer (oder Admin) |
+| `PUT /calendar/{id}` | Ersteller und alle Teilnehmer → sonst `403` |
+| `DELETE /calendar/{id}` | Ersteller und alle Teilnehmer → sonst `403` |
+| `POST /calendar/{id}/participants` | Ersteller und alle Teilnehmer |
+| `DELETE /calendar/{id}/participants/{userId}` | Ersteller und alle Teilnehmer |
 
 ## API-Endpunkte
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
 | `GET` | `/calendar` | JWT | Paginierte Liste der sichtbaren Kalender-Events (mit Zeitfilter) |
+| `GET` | `/calendar/all` | JWT | Kombinierter Feed (Events, Reisen, Reise-Events, Geburtstage, ÖPNV) |
 | `POST` | `/calendar` | JWT | Neues Kalender-Event erstellen |
 | `GET` | `/calendar/{id}` | JWT | Kalender-Event-Details (mit Teilnehmern) |
 | `PUT` | `/calendar/{id}` | JWT | Kalender-Event ändern |
@@ -106,8 +112,7 @@ Ein Kalender-Event wird immer mit Teilnehmern ausgeliefert:
 }
 ```
 
-`participants` ist optional. Die hinzugefügten Teilnehmer erhalten eine
-Push-Benachrichtigung.
+`participants` ist optional.
 
 ### `PUT /calendar/{id}` – Request (partielles Update)
 
@@ -120,8 +125,6 @@ Nur die zu ändernden Felder mitsenden:
 }
 ```
 
-Alle Teilnehmer und der Ersteller erhalten eine Push-Benachrichtigung über die Änderung.
-
 ### `POST /calendar/{id}/participants` – Request
 
 ```json
@@ -130,19 +133,108 @@ Alle Teilnehmer und der Ersteller erhalten eine Push-Benachrichtigung über die 
 }
 ```
 
-Der hinzugefügte Nutzer erhält eine Push-Benachrichtigung.
+## Kombinierter Kalender-Feed
 
-## Benachrichtigungen
+`GET /calendar/all` aggregiert alle für den Nutzer sichtbaren Termine aus
+fünf Quellen zu einer flachen, nach `startTime` aufsteigend sortierten Liste.
+Der Endpunkt ist ohne Pagination – stattdessen wird über einen Zeitbereich
+gefiltert; pro Quelle werden maximal 500 Einträge zurückgegeben.
 
-Folgende Benachrichtigungs-Codes werden von der Kalender-Funktion verwendet:
+### Query-Parameter
 
-| Code | Auslöser | Empfänger |
-|------|----------|-----------|
-| `calendar.event_created` | Neues Event mit Teilnehmern | Hinzugefügte Teilnehmer |
-| `calendar.event_updated` | Event geändert | Alle Teilnehmer und der Ersteller (außer dem Ausführenden) |
-| `calendar.participant_added` | Teilnehmer hinzugefügt | Der hinzugefügte Nutzer |
+| Parameter | Typ | Beschreibung |
+|-----------|-----|-------------|
+| `start` | `YYYY-MM-DD HH:MM:SS` | Beginn des Zeitraums in UTC. Muss zusammen mit `end` gesetzt werden. |
+| `end` | `YYYY-MM-DD HH:MM:SS` | Ende des Zeitraums in UTC. Muss zusammen mit `start` gesetzt werden. |
+| `types` | string | Komma-separierte Liste der gewünschten Typen (`calendar_event`, `travel_event`, `trip`, `birthday`, `pt_journey`). Standard: alle Typen. |
 
-Beim Löschen (`DELETE /calendar/{id}`) wird keine Benachrichtigung versendet.
+Ohne `start`/`end` wird der aktuelle Monat verwendet. Wird nur einer der
+beiden Parameter gesetzt, antwortet die API mit `400 invalid_time_range`;
+bei ungültigem Format mit `400 invalid_datetime` und bei unbekanntem Typ
+mit `400 invalid_type`.
+
+**Beispiele:**
+```
+GET /calendar/all
+GET /calendar/all?start=2026-06-01 00:00:00&end=2026-06-30 23:59:59
+GET /calendar/all?types=calendar_event,trip
+GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:59
+```
+
+### Enthaltene Typen und Zugriffsregeln
+
+| type | Quelle | Zugriff / Sichtbarkeit |
+|------|--------|------------------------|
+| `calendar_event` | `CalendarEvent` | Wie `GET /calendar` (Ersteller, Teilnehmer, Visibility 0/1/2) |
+| `travel_event` | `TravelEvent` | Standalone-Events über `EventRelation`, Reise-Events über die `TravelRelation` der Reise |
+| `trip` | `TravelTrip` | Reisen, bei denen der Nutzer in `TravelRelation` steht (als mehrtägiger Zeitraum, `allDay`) |
+| `birthday` | `User.birthday` | Eigenes Geburtsdatum immer; sonst über `birthdayVisibility` (1 = alle, 2 = enge Freunde, 0 = niemand). Wiederkehrend je Jahr im Zeitraum (`allDay`) |
+| `pt_journey` | `PtJourney` | Fahrten, bei denen der Nutzer in `PtParticipant` steht (Creator ist immer Teilnehmer) |
+
+### Response-Format
+
+```json
+{
+  "data": [
+    {
+      "type": "calendar_event",
+      "id": "uuid-des-events",
+      "title": "Team Meeting",
+      "startTime": "2026-07-01 10:00:00",
+      "endTime": "2026-07-01 11:00:00",
+      "allDay": false,
+      "detail": { }
+    },
+    {
+      "type": "trip",
+      "id": "uuid-der-reise",
+      "title": "Berlin Trip",
+      "startTime": "2026-07-03 00:00:00",
+      "endTime": "2026-07-06 23:59:59",
+      "allDay": true,
+      "detail": { }
+    },
+    {
+      "type": "birthday",
+      "id": "2026-05-12-uuid-des-nutzers",
+      "title": "Geburtstag: Max",
+      "startTime": "2026-05-12 00:00:00",
+      "endTime": "2026-05-12 23:59:59",
+      "allDay": true,
+      "detail": {
+        "userId": "uuid-des-nutzers",
+        "displayName": "Max",
+        "image": null,
+        "birthday": "1990-05-12",
+        "occurrenceDate": "2026-05-12"
+      }
+    }
+  ],
+  "meta": {
+    "start": "2026-06-01 00:00:00",
+    "end": "2026-06-30 23:59:59",
+    "types": ["calendar_event", "travel_event", "trip", "birthday", "pt_journey"],
+    "count": 3,
+    "truncated": false
+  }
+}
+```
+
+**Gemeinsame Item-Felder:**
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `type` | string | `calendar_event`, `travel_event`, `trip`, `birthday` oder `pt_journey` |
+| `id` | string | ID des zugrunde liegenden Datensatzes (bei Geburtstagen: `Vorkommensdatum + Nutzer-ID`) |
+| `title` | string\|null | Anzeige-Titel (bei Geburtstagen servergeneriert: `Geburtstag: <displayName>`) |
+| `startTime` | string\|null | Beginn in UTC |
+| `endTime` | string\|null | Ende in UTC |
+| `allDay` | bool | `true` bei Reisen und Geburtstagen |
+| `detail` | object | Typspezifisches Objekt: `calendar_event` → CalendarEvent, `travel_event` → TravelEvent inkl. `participants`, `trip` → Trip-Datensatz, `birthday` → Nutzer-Kurzinfo inkl. `occurrenceDate`, `pt_journey` → Fahrten-Zusammenfassung inkl. `legs` |
+
+**Geburtstags-Logik:** Gespeichert ist das Geburtsdatum (`YYYY-MM-DD`). Für
+jedes Jahr im angefragten Zeitraum wird ein Vorkommen erzeugt, sofern der
+Monat/Tag existiert (29. Februar nur in Schaltjahren).
 
 ## Moderation
 
@@ -155,9 +247,7 @@ Der Eigentümer ist der Ersteller des Events (`creatorId`).
 
 Details siehe `docs/moderation-requests/readme.md`.
 
-## SQL-Migration
-
-Die Migration befindet sich in `events/calendar_schema.sql`:
+## Datenbank-Schema (Referenz)
 
 ```sql
 CREATE TABLE IF NOT EXISTS `CalendarEvent` (

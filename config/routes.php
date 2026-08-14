@@ -159,6 +159,8 @@ return function (App $app): void {
         $group->get('', [CalendarEventController::class, 'list']);
         $group->post('', [CalendarEventController::class, 'create']);
 
+        $group->get('/all', [CalendarEventController::class, 'all']);
+
         $group->get('/{id}', [CalendarEventController::class, 'get']);
         $group->put('/{id}', [CalendarEventController::class, 'update']);
         $group->delete('/{id}', [CalendarEventController::class, 'delete']);

@@ -38,6 +38,48 @@ final readonly class PtJourneyRepository
     }
 
     /**
+     * @param list<string> $journeyIds
+     * @return list<array<string, mixed>>
+     */
+    public function findLegsByJourneyIds(array $journeyIds): array
+    {
+        if ($journeyIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($journeyIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT * FROM PtLeg WHERE journeyId IN ($placeholders) ORDER BY journeyId ASC, legIndex ASC"
+        );
+        $stmt->execute($journeyIds);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Alle Fahrten, bei denen der Nutzer Teilnehmer ist (PtParticipant)
+     * und die den Zeitraum überlappen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findByParticipantInRange(string $userId, string $start, string $end, int $limit): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT j.*
+             FROM PtJourney j
+             JOIN PtParticipant p ON p.journeyId = j.id
+             WHERE p.userId = ?
+               AND COALESCE(j.arrivalTime, j.departureTime) > ?
+               AND COALESCE(j.departureTime, j.arrivalTime) < ?
+             ORDER BY j.departureTime ASC
+             LIMIT ?'
+        );
+        $stmt->execute([$userId, $start, $end, $limit]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     public function findParticipantsByJourney(string $journeyId): array

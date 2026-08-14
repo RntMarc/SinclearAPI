@@ -88,6 +88,7 @@ use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
+use Sinclear\Api\Services\CalendarFeedService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Services\PtService;
@@ -316,6 +317,7 @@ return [
 
     CalendarEventRepository::class => autowire(),
     CalendarEventService::class => autowire(),
+    CalendarFeedService::class => autowire(),
     CalendarEventController::class => autowire(),
     CalendarEventPolicy::class => autowire(),
 

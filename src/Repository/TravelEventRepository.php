@@ -45,6 +45,33 @@ final readonly class TravelEventRepository
         return $result ?: null;
     }
 
+    /**
+     * Alle Events, die für den Nutzer sichtbar sind und den Zeitraum
+     * überlappen. Standalone-Events über EventRelation, Reise-Events
+     * über die TravelRelation der zugehörigen Reise.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findVisibleInRange(string $userId, string $start, string $end, int $limit): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT DISTINCT e.*
+             FROM TravelEvent e
+             LEFT JOIN EventRelation er ON er.eventId = e.ID AND er.userId = ?
+             LEFT JOIN TravelRelation tr ON tr.tripid = e.trip AND tr.userid = ?
+             WHERE (
+                 (e.trip IS NULL AND er.userId IS NOT NULL)
+                 OR (e.trip IS NOT NULL AND tr.userid IS NOT NULL)
+             )
+               AND COALESCE(e.end, e.start) > ?
+               AND COALESCE(e.start, e.end) < ?
+             ORDER BY e.start ASC
+             LIMIT ?'
+        );
+        $stmt->execute([$userId, $userId, $start, $end, $limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function findByIdWithAccess(string $eventId, string $userId): ?array
     {
         $stmt = $this->pdo->prepare(
@@ -125,6 +152,28 @@ final readonly class TravelEventRepository
              ORDER BY u.displayName ASC'
         );
         $stmt->execute([$eventId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @param list<string> $eventIds
+     * @return list<array<string, mixed>>
+     */
+    public function findParticipantsByEventIds(array $eventIds): array
+    {
+        if ($eventIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT r.eventId, u.id, u.displayName, u.image
+             FROM EventRelation r
+             JOIN User u ON u.id = r.userId
+             WHERE r.eventId IN ($placeholders)
+             ORDER BY r.eventId ASC, u.displayName ASC"
+        );
+        $stmt->execute($eventIds);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
