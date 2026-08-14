@@ -204,7 +204,7 @@ class DavIntegrationTest extends TestCase
 
     public function testOptionsListsDavHeaders(): void
     {
-        $response = $this->invoke('OPTIONS', '/dav/');
+        $response = $this->invoke('OPTIONS', '/api/dav/');
         self::assertSame(200, $response->getStatus());
         self::assertStringContainsString('calendar-access', $response->getHeader('DAV'));
     }
@@ -214,7 +214,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'PROPFIND',
-            "/dav/calendars/{$this->aliceId}/calendar/",
+            "/api/dav/calendars/{$this->aliceId}/calendar/",
             $this->propfindBody(),
             $token,
             ['Depth' => '1'],
@@ -234,7 +234,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'GET',
-            "/dav/calendars/{$this->aliceId}/calendar/event-alice-public.ics",
+            "/api/dav/calendars/{$this->aliceId}/calendar/event-alice-public.ics",
             null,
             $token,
         );
@@ -261,7 +261,7 @@ class DavIntegrationTest extends TestCase
 
         $response = $this->invoke(
             'GET',
-            "/dav/calendars/{$this->aliceId}/calendar/event-bob-private.ics",
+            "/api/dav/calendars/{$this->aliceId}/calendar/event-bob-private.ics",
             null,
             $token,
         );
@@ -274,7 +274,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'PROPFIND',
-            "/dav/calendars/{$this->bobId}/calendar/",
+            "/api/dav/calendars/{$this->bobId}/calendar/",
             $this->propfindBody(),
             $token,
         );
@@ -292,7 +292,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'REPORT',
-            "/dav/calendars/{$this->aliceId}/calendar/",
+            "/api/dav/calendars/{$this->aliceId}/calendar/",
             '<?xml version="1.0"?>
              <cal:calendar-query xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
                <d:prop><d:getetag/></d:prop>
@@ -322,7 +322,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'PUT',
-            "/dav/calendars/{$this->aliceId}/calendar/new-event.ics",
+            "/api/dav/calendars/{$this->aliceId}/calendar/new-event.ics",
             "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//\r\nBEGIN:VEVENT\r\nUID:test@sinclear.de\r\nDTSTAMP:20260701T000000Z\r\nDTSTART:20260701T000000Z\r\nDTEND:20260701T010000Z\r\nSUMMARY:Test\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
             $token,
         );
@@ -334,7 +334,7 @@ class DavIntegrationTest extends TestCase
     {
         $response = $this->invoke(
             'PROPFIND',
-            '/dav/calendars/dav-invalid-token/calendar/',
+            '/api/dav/calendars/dav-invalid-token/calendar/',
             $this->propfindBody(),
             'definitely-not-a-valid-token',
             ['Depth' => '1'],
@@ -352,7 +352,7 @@ class DavIntegrationTest extends TestCase
     {
         $response = $this->invoke(
             'GET',
-            '/dav/calendars/dav-invalid-token/calendar/sinclear-dav-invalid-token.ics',
+            '/api/dav/calendars/dav-invalid-token/calendar/sinclear-dav-invalid-token.ics',
             null,
             'invalid-token',
         );
@@ -377,7 +377,7 @@ class DavIntegrationTest extends TestCase
 
         $response = $this->invoke(
             'GET',
-            '/dav/calendars/dav-invalid-token/calendar/sinclear-dav-invalid-token.ics',
+            '/api/dav/calendars/dav-invalid-token/calendar/sinclear-dav-invalid-token.ics',
             null,
             $token,
         );
@@ -392,7 +392,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'PROPFIND',
-            "/dav/addressbooks/{$this->aliceId}/contacts/",
+            "/api/dav/addressbooks/{$this->aliceId}/contacts/",
             $this->propfindBody(),
             $token,
             ['Depth' => '1'],
@@ -409,7 +409,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'GET',
-            "/dav/addressbooks/{$this->aliceId}/contacts/{$this->bobId}.vcf",
+            "/api/dav/addressbooks/{$this->aliceId}/contacts/{$this->bobId}.vcf",
             null,
             $token,
         );
@@ -429,7 +429,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'GET',
-            "/dav/addressbooks/{$this->aliceId}/contacts/{$this->aliceId}.vcf",
+            "/api/dav/addressbooks/{$this->aliceId}/contacts/{$this->aliceId}.vcf",
             null,
             $token,
         );
@@ -445,7 +445,7 @@ class DavIntegrationTest extends TestCase
     {
         $response = $this->invoke(
             'GET',
-            '/dav/addressbooks/dav-invalid-token/contacts/sinclear-dav-invalid-token.vcf',
+            '/api/dav/addressbooks/dav-invalid-token/contacts/sinclear-dav-invalid-token.vcf',
             null,
             'invalid-token',
         );
@@ -463,7 +463,7 @@ class DavIntegrationTest extends TestCase
         $token = $this->createToken($this->aliceId);
         $response = $this->invoke(
             'PUT',
-            "/dav/addressbooks/{$this->aliceId}/contacts/new.vcf",
+            "/api/dav/addressbooks/{$this->aliceId}/contacts/new.vcf",
             "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Test\r\nEND:VCARD\r\n",
             $token,
         );
@@ -518,7 +518,7 @@ class DavIntegrationTest extends TestCase
         $headers = array_merge($headers, $extraHeaders);
 
         $request = new Request($method, $url, $headers, $body);
-        $request->setBaseUrl('/dav/');
+        $request->setBaseUrl('/api/dav/');
 
         $response = new Response();
         $server = $this->serverFactory->createServer();

@@ -135,7 +135,7 @@ Nur die zu ändernden Felder mitsenden:
 
 ## CalDAV (read-only)
 
-Die API stellt eine lesende CalDAV-Schnittstelle unter `/dav/` bereit,
+Die API stellt eine lesende CalDAV-Schnittstelle unter `/api/dav/` bereit,
 über die Kalender-Apps (DAVx5, Apple Kalender, Thunderbird) die sichtbaren
 `CalendarEvent`-Einträge des Nutzers synchronisieren können. Die
 Authentifizierung erfolgt per Basic-Auth mit E-Mail-Adresse + DAV-Token

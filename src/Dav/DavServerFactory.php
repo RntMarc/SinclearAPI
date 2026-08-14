@@ -18,6 +18,13 @@ use Sinclear\Api\Services\UserService;
 
 final readonly class DavServerFactory
 {
+    /**
+     * Basis-Pfad des DAV-Endpunkts. Die API liegt unter /api/ auf dem
+     * Webserver (die Root-Domain wird von der Web-App belegt), daher
+     * ist der volle Pfad /api/dav/ - nicht /dav/.
+     */
+    public const string DAV_BASE_URI = '/api/dav/';
+
     public function __construct(
         private DavTokenService $tokenService,
         private UserRepository $userRepo,
@@ -43,7 +50,7 @@ final readonly class DavServerFactory
             new ReadOnlyAddressBookRoot($principalBackend, $carddavBackend),
         ]);
 
-        $server->setBaseUri('/dav/');
+        $server->setBaseUri(self::DAV_BASE_URI);
 
         $server->addPlugin(new AuthPlugin($authBackend));
 

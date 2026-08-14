@@ -13,10 +13,12 @@ $path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
 $path = rtrim($path, '/');
 
 // RFC 6764 Discovery: CalDAV/CardDAV-Clients finden den Server ueber
-// /.well-known/caldav und /.well-known/carddav (Redirect auf die Basis-URL).
-if ($path === '/.well-known/caldav' || $path === '/.well-known/carddav') {
+// .well-known/caldav und .well-known/carddav (Redirect auf die Basis-URL).
+// Die API liegt unter /api/, daher koennen Discovery-Anfragen den
+// .well-known-Pfad nur mit /api/-Praefix erreichen.
+if (str_ends_with($path, '/.well-known/caldav') || str_ends_with($path, '/.well-known/carddav')) {
     http_response_code(301);
-    header('Location: /dav/');
+    header('Location: ' . DavServerFactory::DAV_BASE_URI);
     echo 'Moved Permanently';
     exit;
 }

@@ -4786,7 +4786,7 @@ paths:
         Erstellt ein neues Token für den Zugriff auf die CalDAV-/CardDAV-
         Schnittstelle (z.B. für DAVx5, Apple Kalender oder Thunderbird).
         Das Token dient zusammen mit der E-Mail-Adresse als Basic-Auth-
-        Zugangsdaten für den DAV-Endpunkt unter `/dav/`. Pro Nutzer sind
+        Zugangsdaten für den DAV-Endpunkt unter `/api/dav/`. Pro Nutzer sind
         maximal 5 aktive Tokens erlaubt, die Gültigkeit beträgt 365 Tage.
         Das vollständige Token wird nur einmalig bei der Erstellung
         zurückgegeben.

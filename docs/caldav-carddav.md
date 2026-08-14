@@ -10,16 +10,26 @@ und die Beyond-Kontakte synchronisieren können.
 
 ## Basis-URL & Discovery
 
+Die API liegt auf dem Webserver unter dem Pfad `/api/` (die Root-Domain
+`sinclear.de` wird von der Web-App belegt). Der DAV-Endpunkt ist daher
+unter dem vollen Pfad `/api/dav/` erreichbar:
+
 | Zweck | URL |
 |-------|-----|
-| DAV-Basis-URL | `https://<api-host>/dav/` |
-| Kalender | `https://<api-host>/dav/calendars/{userId}/calendar/` |
-| Adressbuch | `https://<api-host>/dav/addressbooks/{userId}/contacts/` |
+| DAV-Basis-URL | `https://sinclear.de/api/dav/` |
+| Kalender | `https://sinclear.de/api/dav/calendars/{userId}/calendar/` |
+| Adressbuch | `https://sinclear.de/api/dav/addressbooks/{userId}/contacts/` |
 
-Clients, die RFC 6764 Discovery unterstützen, finden die Basis-URL automatisch:
+RFC-6764-Discovery (`.well-known/caldav` bzw. `.well-known/carddav`) ist
+nur innerhalb des API-Pfads erreichbar, da die Root-Domain von der Web-App
+bedient wird:
 
-- `https://<api-host>/.well-known/caldav` → 301 Redirect auf `/dav/`
-- `https://<api-host>/.well-known/carddav` → 301 Redirect auf `/dav/`
+- `https://sinclear.de/api/.well-known/caldav` → 301 Redirect auf `/api/dav/`
+- `https://sinclear.de/api/.well-known/carddav` → 301 Redirect auf `/api/dav/`
+
+Clients, die Discovery automatisch auf der Root-Domain versuchen (z.B.
+DAVx5 mit `https://sinclear.de/`), finden den Dienst dadurch nicht – dort
+ist die Basis-URL **manuell** einzutragen.
 
 ## Authentifizierung (DAV-Tokens)
 
@@ -112,22 +122,26 @@ Zeitzone übernimmt der Client.
 ### DAVx5 (Android)
 
 1. „Konto hinzufügen" → „Anmeldung mit URL und Benutzername"
-2. Basis-URL: `https://<api-host>/dav/`
+2. Basis-URL: `https://sinclear.de/api/dav/`
 3. Benutzername: eigene E-Mail-Adresse, Passwort: DAV-Token
 4. DAVx5 erkennt Kalender (CalDAV) und Kontakte (CardDAV) automatisch
 
 ### Apple (iOS / macOS)
 
+Da die Discovery-URLs auf der Root-Domain nicht erreichbar sind (dort
+läuft die Web-App), muss der Account-Pfad manuell gesetzt werden:
+
 1. Einstellungen → Kalender/Kontakte → Account hinzufügen → „Sonstige"
    → „CalDAV- bzw. CardDAV-Account hinzufügen"
-2. Server: `<api-host>`, Benutzername: E-Mail-Adresse, Passwort: DAV-Token
-3. Die Discovery-URLs (`/.well-known/caldav` bzw. `/.well-known/carddav`)
-   werden von Apple automatisch verwendet
+2. Server: `sinclear.de`, Benutzername: E-Mail-Adresse, Passwort: DAV-Token
+3. Unter „Erweitert" als Account-URL `https://sinclear.de/api/dav/principals/{userId}/`
+   eintragen (bzw. bei CardDAV direkt `https://sinclear.de/api/dav/addressbooks/{userId}/contacts/`
+   verwenden)
 
 ### Thunderbird
 
 1. „Neuer Kalender" → „Im Netzwerk" → CalDAV
-2. URL: `https://<api-host>/dav/calendars/{userId}/calendar/`
+2. URL: `https://sinclear.de/api/dav/calendars/{userId}/calendar/`
 3. Benutzername: E-Mail-Adresse, Passwort: DAV-Token
 
 ## Technische Details
@@ -135,7 +149,7 @@ Zeitzone übernimmt der Client.
 - Implementierung basiert auf [sabre/dav 4.x](https://sabre.io/dav/)
   (gleiche Basis wie Nextcloud).
 - Eigener Front-Controller: `public/dav.php` (außerhalb der REST-API unter
-  `/api/v2`).
+  `/api/v2`), erreichbar unter `/api/dav/`.
 - Die Tabelle `DavToken` wird über die Migration
   `database/migrations/create_dav_tokens_table.sql` angelegt.
 - Ohne gültiges Token erhält ein Client ausschließlich den virtuellen

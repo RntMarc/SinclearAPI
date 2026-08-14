@@ -89,7 +89,7 @@ Nicht sichtbare Felder werden komplett weggelassen (nicht als `null` gesendet).
 
 ## Endpunkte – DAV-Tokens (CalDAV/CardDAV)
 
-Für den Zugriff auf die CalDAV-/CardDAV-Schnittstelle (`/dav/`) werden
+Für den Zugriff auf die CalDAV-/CardDAV-Schnittstelle (`/api/dav/`) werden
 App-spezifische Tokens verwendet (Basic-Auth: E-Mail + Token). Details
 siehe `docs/caldav-carddav.md`.
 
