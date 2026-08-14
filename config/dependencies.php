@@ -26,10 +26,10 @@ use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\SubscriptionController;
-use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
+use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\LocationSharingSessionRepository;
@@ -86,12 +86,14 @@ use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
+use Sinclear\Api\Repository\DavTokenRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Services\PtService;
+use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Services\SubscriptionService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
 use Sinclear\Api\Security\Policy\LocationSharingPolicy;
@@ -115,6 +117,7 @@ use Sinclear\Api\Services\ProfileService;
 use Sinclear\Api\Services\Mcp\DocumentationProvider;
 use Sinclear\Api\Services\Mcp\McpServer;
 use Sinclear\Api\Services\McpApiKeyService;
+use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
@@ -418,4 +421,13 @@ return [
     McpApiKeyRepository::class => autowire(),
     McpApiKeyService::class => autowire(),
     McpApiKeyMiddleware::class => autowire(),
+
+    DavTokenRepository::class => autowire(),
+    DavTokenService::class => autowire(),
+    DavTokenController::class => autowire(),
+
+    \Sinclear\Api\Dav\IcsFactory::class => autowire(),
+    \Sinclear\Api\Dav\VcardFactory::class => autowire(),
+    \Sinclear\Api\Dav\DavDummyFactory::class => autowire(),
+    \Sinclear\Api\Dav\DavServerFactory::class => autowire(),
 ];

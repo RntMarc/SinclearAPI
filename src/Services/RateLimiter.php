@@ -7,7 +7,7 @@ final readonly class RateLimiter
     private string $storageDir;
 
     public function __construct(
-        string $storageDir = null,
+        ?string $storageDir = null,
     ) {
         $this->storageDir = $storageDir ?? sys_get_temp_dir() . '/sinclear_rate_limits';
         if (!is_dir($this->storageDir)) {

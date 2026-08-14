@@ -62,6 +62,15 @@ Nach jeder Änderung an der API (Routes, Controllers, DTOs, Services) oder am Cl
 3. Keine veralteten oder nicht mehr existierenden Seiten/Optionen werden im Dashboard angeboten.
 4. Neue API-Endpunkte oder Client-Seiten, die eine Admin-Bearbeitung erfordern, sind im Dashboard vorhanden.
 
+## Testing and Deployment
+Auf dem lokalen Entwicklungs-System wird NICHT gegen eine Datenbank getestet (kein PDO/MySQL verfügbar). Tests (phpunit, phpstan) werden automatisch beim Deploy über das Update-Skript auf dem Server ausgeführt. Der Betreiber berichtet Fehler zurück.
+
+**Requirement:**
+- Führe `update.sh` NIE ungefragt aus.
+- Verbinde dich NIE ungefragt per SSH mit dem Server.
+- Lokal sind nur statische Prüfungen erlaubt: `php -l`, `vendor/bin/phpstan`, Unit-Tests ohne DB-Abhängigkeit.
+- DB-abhängige Integrationstests dürfen geschrieben werden, laufen aber erst auf dem Server.
+
 ## Date/Time Convention (UTC-only)
 The API operates exclusively in UTC. This is a hard requirement that all implementations MUST follow:
 

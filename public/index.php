@@ -1,26 +1,11 @@
 <?php
 
-use DI\ContainerBuilder;
 use Psr\Log\LoggerInterface;
 use Slim\Factory\AppFactory;
 
 require __DIR__ . '/../vendor/autoload.php';
 
-$rootDir = dirname(__DIR__);
-
-date_default_timezone_set('UTC');
-
-$dotenv = Dotenv\Dotenv::createImmutable($rootDir);
-$dotenv->safeLoad();
-
-$containerBuilder = new ContainerBuilder();
-$containerBuilder->addDefinitions($rootDir . '/config/dependencies.php');
-
-if (!isset($_ENV['APP_DEBUG']) || !filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
-    $containerBuilder->enableCompilation($rootDir . '/var/cache');
-}
-
-$container = $containerBuilder->build();
+$container = require __DIR__ . '/../config/container.php';
 
 $app = AppFactory::createFromContainer($container);
 
@@ -76,6 +61,6 @@ $customErrorHandler = function (
 
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);
 
-(require $rootDir . '/config/routes.php')($app);
+(require dirname(__DIR__) . '/config/routes.php')($app);
 
 $app->run();

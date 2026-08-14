@@ -8,6 +8,13 @@
     RewriteCond %{HTTP:Authorization} ^(.+)$
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # CalDAV/CardDAV-Endpunkt (muss vor der OPTIONS-Preflight-Regel stehen,
+    # damit DAV-OPTIONS-Requests an dav.php gehen)
+    RewriteRule ^dav($|/) public/dav.php [L]
+
+    # RFC 6764 Discovery (CalDAV/CardDAV)
+    RewriteRule ^\.well-known/(caldav|carddav)/?$ public/dav.php [L]
+
     # CORS-Preflight (OPTIONS) direkt an PHP
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^ public/index.php [L]

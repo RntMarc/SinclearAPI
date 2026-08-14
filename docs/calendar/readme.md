@@ -133,9 +133,18 @@ Nur die zu ändernden Felder mitsenden:
 }
 ```
 
-## Kombinierter Kalender-Feed
+## CalDAV (read-only)
 
-`GET /calendar/all` aggregiert alle für den Nutzer sichtbaren Termine aus
+Die API stellt eine lesende CalDAV-Schnittstelle unter `/dav/` bereit,
+über die Kalender-Apps (DAVx5, Apple Kalender, Thunderbird) die sichtbaren
+`CalendarEvent`-Einträge des Nutzers synchronisieren können. Die
+Authentifizierung erfolgt per Basic-Auth mit E-Mail-Adresse + DAV-Token
+(Verwaltung über `POST/GET/DELETE /user/me/dav-tokens`).
+
+Details (Einrichtung, ICS-Abbildung, Verhalten bei ungültigem Token) siehe
+`docs/caldav-carddav.md`.
+
+## Kombinierter Kalender-Feed`GET /calendar/all` aggregiert alle für den Nutzer sichtbaren Termine aus
 fünf Quellen zu einer flachen, nach `startTime` aufsteigend sortierten Liste.
 Der Endpunkt ist ohne Pagination – stattdessen wird über einen Zeitbereich
 gefiltert; pro Quelle werden maximal 500 Einträge zurückgegeben.

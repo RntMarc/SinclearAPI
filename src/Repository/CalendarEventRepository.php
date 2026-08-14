@@ -142,8 +142,104 @@ final readonly class CalendarEventRepository
         ];
     }
 
-    public function addParticipant(string $eventId, string $userId): void
+    /**
+     * Liefert alle fuer den Nutzer sichtbaren Events ohne Pagination
+     * (fuer CalDAV), optional auf einen Zeitraum begrenzt.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findAllVisibleForDav(string $userId, ?string $start = null, ?string $end = null): array
     {
+        $conditions = [
+            'e.creatorId = ?',
+            'EXISTS (SELECT 1 FROM CalendarEventParticipant p WHERE p.eventId = e.id AND p.userId = ?)',
+            'e.visibility = 1',
+            '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
+        ];
+        $params = [$userId, $userId, $userId];
+
+        $where = '(' . implode(') OR (', $conditions) . ')';
+
+        if ($start !== null) {
+            $where .= ' AND e.endTime > ?';
+            $params[] = $this->formatDatetime($start);
+        }
+        if ($end !== null) {
+            $where .= ' AND e.startTime < ?';
+            $params[] = $this->formatDatetime($end);
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
+             FROM CalendarEvent e
+             LEFT JOIN User u ON u.id = e.creatorId
+             WHERE $where ORDER BY e.startTime ASC"
+        );
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Liefert ein einzelnes Event, aber nur wenn der Nutzer es sehen darf.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findVisibleByIdForDav(string $userId, string $id): ?array
+    {
+        $conditions = [
+            'e.creatorId = ?',
+            'EXISTS (SELECT 1 FROM CalendarEventParticipant p WHERE p.eventId = e.id AND p.userId = ?)',
+            'e.visibility = 1',
+            '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
+        ];
+        $params = [$userId, $userId, $userId, $id];
+
+        $where = '(' . implode(') OR (', $conditions) . ') AND e.id = ?';
+
+        $stmt = $this->pdo->prepare(
+            "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
+             FROM CalendarEvent e
+             LEFT JOIN User u ON u.id = e.creatorId
+             WHERE $where LIMIT 1"
+        );
+        $stmt->execute($params);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    /**
+     * Liefert Teilnehmer mehrerer Events gruppiert nach Event-ID.
+     *
+     * @param list<string> $eventIds
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public function findParticipantsForEvents(array $eventIds): array
+    {
+        if ($eventIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT p.eventId, u.id, u.displayName
+             FROM CalendarEventParticipant p
+             JOIN User u ON u.id = p.userId
+             WHERE p.eventId IN ($placeholders)
+             ORDER BY u.displayName ASC"
+        );
+        $stmt->execute($eventIds);
+
+        $result = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $result[$row['eventId']][] = [
+                'id' => $row['id'],
+                'displayName' => $row['displayName'],
+            ];
+        }
+        return $result;
+    }
+
+    public function addParticipant(string $eventId, string $userId): void    {
         $stmt = $this->pdo->prepare(
             'INSERT IGNORE INTO CalendarEventParticipant (eventId, userId, addedAt) VALUES (?, ?, NOW(3))'
         );
@@ -158,6 +254,7 @@ final readonly class CalendarEventRepository
         $stmt->execute([$eventId, $userId]);
     }
 
+    /** @return list<array<string, mixed>> */
     public function findParticipantsByEvent(string $eventId): array
     {
         $stmt = $this->pdo->prepare(

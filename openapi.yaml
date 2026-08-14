@@ -3993,6 +3993,78 @@ components:
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
+    DavToken:
+      type: object
+      required: [id, label, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Token-ID
+        label:
+          type: string
+          description: Bezeichnung für das Token (z.B. "DAVx5 – Pixel 8")
+        expiresAt:
+          type: string
+          format: date-time
+          description: Ablaufzeitpunkt des Tokens. DAV-Tokens sind 365 Tage gültig.
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Zeitpunkt der letzten Verwendung (null, wenn nie verwendet)
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+
+    DavTokenCreateRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Bezeichnung für das neue Token
+
+    DavTokenCreateResponse:
+      type: object
+      required: [id, label, token, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Token-ID
+        label:
+          type: string
+          description: Bezeichnung für das Token
+        token:
+          type: string
+          description: >-
+            Das vollständige DAV-Token. Wird NUR bei der Erstellung einmalig
+            zurückgegeben und kann danach nicht mehr ausgelesen werden.
+            Dient als Basic-Auth-Passwort für CalDAV-/CardDAV-Clients.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Ablaufzeitpunkt (365 Tage nach Erstellung)
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+
+    DavTokenListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DavToken'
+          description: Liste der DAV-Tokens des Nutzers
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
     NotificationDataRelation:
       type: object
       required: [relation, object, identifier]
@@ -4664,6 +4736,126 @@ paths:
                     $ref: '#/components/schemas/UserContactInfo'
         '401':
           description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/dav-tokens:
+    get:
+      summary: Eigene DAV-Tokens auflisten
+      description: >
+        Gibt eine paginierte Liste aller CalDAV-/CardDAV-Tokens des aktuellen
+        Nutzers zurück. Enthält ID, Bezeichnung, Ablaufzeitpunkt, letzten
+        Verwendungszeitpunkt und Erstellungszeitpunkt. Das vollständige Token
+        wird aus Sicherheitsgründen nicht zurückgegeben.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Liste der DAV-Tokens
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DavTokenListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neues DAV-Token erstellen
+      description: >
+        Erstellt ein neues Token für den Zugriff auf die CalDAV-/CardDAV-
+        Schnittstelle (z.B. für DAVx5, Apple Kalender oder Thunderbird).
+        Das Token dient zusammen mit der E-Mail-Adresse als Basic-Auth-
+        Zugangsdaten für den DAV-Endpunkt unter `/dav/`. Pro Nutzer sind
+        maximal 5 aktive Tokens erlaubt, die Gültigkeit beträgt 365 Tage.
+        Das vollständige Token wird nur einmalig bei der Erstellung
+        zurückgegeben.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DavTokenCreateRequest'
+      responses:
+        '201':
+          description: Token erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DavTokenCreateResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Maximale Anzahl an Tokens erreicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/dav-tokens/{id}:
+    delete:
+      summary: DAV-Token löschen
+      description: >
+        Löscht (widerruft) ein DAV-Token. Das Token kann danach nicht mehr
+        für den DAV-Zugriff verwendet werden. Nur der Eigentümer darf löschen.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Token-ID
+      responses:
+        '204':
+          description: Token erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Token nicht gefunden
           content:
             application/json:
               schema:

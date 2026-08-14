@@ -22,6 +22,7 @@ use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
+use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -121,6 +122,9 @@ return function (App $app): void {
         $group->put('/me/onboarding/complete', [ProfileController::class, 'completeOnboarding']);
         $group->get('/me/preferences', [UserPreferenceController::class, 'getPreferences']);
         $group->put('/me/preferences', [UserPreferenceController::class, 'updatePreferences']);
+        $group->post('/me/dav-tokens', [DavTokenController::class, 'createToken']);
+        $group->get('/me/dav-tokens', [DavTokenController::class, 'listTokens']);
+        $group->delete('/me/dav-tokens/{id}', [DavTokenController::class, 'deleteToken']);
         $group->get('/{userId}', [UserController::class, 'get']);
         $group->get('/{userId}/base', [UserController::class, 'getBase']);
         $group->get('/{userId}/social', [UserController::class, 'getSocial']);

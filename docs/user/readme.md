@@ -87,6 +87,21 @@ Gibt ein flaches Objekt mit allen Preferences zurück:
 Diese Endpunkte beachten die **Sichtbarkeitseinstellungen** des angefragten Nutzers.
 Nicht sichtbare Felder werden komplett weggelassen (nicht als `null` gesendet).
 
+## Endpunkte – DAV-Tokens (CalDAV/CardDAV)
+
+Für den Zugriff auf die CalDAV-/CardDAV-Schnittstelle (`/dav/`) werden
+App-spezifische Tokens verwendet (Basic-Auth: E-Mail + Token). Details
+siehe `docs/caldav-carddav.md`.
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `POST` | `/user/me/dav-tokens` | Neues DAV-Token erstellen (`{ "label": "…" }`); Token wird **einmalig** im Klartext zurückgegeben |
+| `GET` | `/user/me/dav-tokens` | DAV-Tokens auflisten (paginiert, ohne Klartext) |
+| `DELETE` | `/user/me/dav-tokens/{id}` | DAV-Token widerrufen |
+
+**Eigenschaften:** Gültigkeit 365 Tage, maximal 5 aktive Tokens pro Nutzer.
+Gespeichert wird nur der SHA-256-Hash (Tabelle `DavToken`).
+
 ## Endpunkte – Schreiben (Profil bearbeiten)
 
 ### Profil-Update (Mehrere Felder gleichzeitig)
