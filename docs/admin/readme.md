@@ -79,10 +79,10 @@ Nicht-Admins erhalten einen 403-Fehler.
 ### Benachrichtigungen (`/notifications`) – **voll implementiert**
 - Sendet Test-Benachrichtigungen an beliebige Nutzer
 - Benachrichtigungen sind exakt identisch mit echten Benachrichtigungen (gleiches Schema, Push-Zustellung)
-- Typ-Auswahl mit Auto-Vorschläven für Titel/Text: `travel_update`, `event_reminder`, `forum_reply`, `forum_comment`, `poll_invitation`, `feedback_status`
-- Deep-Link-Objekte werden aus der DB geladen (Reisen, Events, Foren-Beiträge, Umfragen, Feedback-Vorschläge)
-- Route wird automatisch gesetzt basierend auf Typ + Objekt (z.B. `/trips/{id}`)
-- Eigene Typ-Strings über `custom` möglich
+- Typ-Auswahl für strukturierte Relationsdaten: `forum_reply`, `forum_comment`
+- Foren-Posts werden aus der DB geladen und als Vorlage für die Relationsdaten verwendet
+- Titel und Text werden von der API aus dem Typ generiert, wenn die Felder leer gelassen werden
+- Clients erzeugen den Deep-Link aus Typ und Relationsdaten; Titel und Text kommen von der API
 - Live-Vorschau der Benachrichtigung
 - Push-Zustellung an alle registrierten Geräte des Empfängers (Web Push + UnifiedPush)
 

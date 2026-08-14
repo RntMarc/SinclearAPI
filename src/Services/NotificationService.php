@@ -12,6 +12,17 @@ use Sinclear\Api\Repository\PushSubscriptionRepository;
 
 final readonly class NotificationService
 {
+    private const CONTENT_TEMPLATES = [
+        'forum_reply' => [
+            'title' => 'Neue Antwort auf deinen Kommentar',
+            'text' => 'Jemand hat auf deinen Kommentar geantwortet.',
+        ],
+        'forum_comment' => [
+            'title' => 'Neuer Kommentar zu deinem Beitrag',
+            'text' => 'Jemand hat deinen Beitrag kommentiert.',
+        ],
+    ];
+
     public function __construct(
         private NotificationRepository $notificationRepo,
         private PushSubscriptionRepository $pushSubRepo,
@@ -32,17 +43,23 @@ final readonly class NotificationService
 
         $data = $this->normalizeData($type, $data);
 
+        [$generatedTitle, $generatedText] = self::CONTENT_TEMPLATES[$type] ?? ['', ''];
+        $title = $title !== '' ? $title : $generatedTitle;
+        $text = $body !== '' ? $body : $generatedText;
+
         $record = $this->notificationRepo->create([
             'userId' => $userId,
             'type' => $type,
             'title' => $title,
-            'body' => $body,
+            'body' => $text,
             'data' => $data,
         ]);
 
         $notification = [
             'id' => $record['id'],
             'type' => $type,
+            'title' => $title,
+            'text' => $text,
             'data' => $data,
             'createdAt' => $record['createdAt'],
         ];
@@ -61,6 +78,7 @@ final readonly class NotificationService
     {
         return match ($type) {
             'forum_reply' => $this->normalizeForumReplyData($data),
+            'forum_comment' => $this->normalizeForumCommentData($data),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }
@@ -111,6 +129,56 @@ final readonly class NotificationService
         foreach ($requiredRelations as $relation => $_object) {
             if (!isset($normalized[$relation])) {
                 throw new \InvalidArgumentException('forum_reply data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeForumCommentData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('forum_comment data is required');
+        }
+
+        $requiredRelations = [
+            'comment_author' => 'User',
+            'post_author' => 'User',
+            'parent_post' => 'ForumPost',
+            'parent_forum' => 'Forum',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('forum_comment data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('forum_comment data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('forum_comment data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('forum_comment data is missing relation: ' . $relation);
             }
         }
 

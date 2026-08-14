@@ -1,5 +1,7 @@
 # Notifications API
 
+> **Wichtige Datenschutzregel:** Google FCM (Firebase Cloud Messaging) darf nicht verwendet oder integriert werden. Push-Benachrichtigungen laufen ausschließlich über Web Push (VAPID) und UnifiedPush.
+
 Benachrichtigungs-System für Sinclear Beyond. Ermöglicht In-App-Benachrichtigungen via Polling sowie Push-Benachrichtigungen via Web Push (VAPID) und UnifiedPush.
 
 ## Endpunkte
@@ -27,6 +29,8 @@ Gibt alle ungelesenen Benachrichtigungen des eingeloggten Nutzers zurück (max. 
       "id": "01923456-7890-7abc-def0-123456789012",
       "userId": "user-id",
       "type": "forum_reply",
+      "title": "Neue Antwort auf deinen Kommentar",
+      "text": "Jemand hat auf deinen Kommentar geantwortet.",
       "data": [
         { "relation": "reply_author", "object": "User", "identifier": "user-reply" },
         { "relation": "comment_author", "object": "User", "identifier": "user-comment" },
@@ -42,7 +46,7 @@ Gibt alle ungelesenen Benachrichtigungen des eingeloggten Nutzers zurück (max. 
 }
 ```
 
-Die API liefert auf Benachrichtigungs-Endpunkten und in Push-Payloads keine Client-Routen, Titel oder Anzeigetexte mehr aus. Clients interpretieren `type` und `data`, laden bei Bedarf die referenzierten Ressourcen nach und erzeugen Text sowie Deep-Link lokal.
+Die API liefert auf Benachrichtigungs-Endpunkten und in Push-Payloads keine Client-Routen aus. `title` und `text` werden von der API aus dem Benachrichtigungstyp generiert; Clients interpretieren `type` und `data`, laden bei Bedarf die referenzierten Ressourcen nach und erzeugen das Routing lokal.
 
 ### Benachrichtigungen als gelesen markieren
 
@@ -81,7 +85,7 @@ Speichert oder aktualisiert eine Web Push- oder UnifiedPush-Subscription für de
 **Request Body (Web Push):**
 ```json
 {
-  "endpoint": "https://fcm.googleapis.com/fcm/send/...",
+  "endpoint": "https://push.example.com/endpoint",
   "type": "webpush",
   "keys": {
     "p256dh": "BNcRdreALRFXTkOOUJC1eKdf...=",
@@ -121,7 +125,7 @@ Löscht eine Push-Subscription des Nutzers.
 **Request Body:**
 ```json
 {
-  "endpoint": "https://fcm.googleapis.com/fcm/send/..."
+  "endpoint": "https://push.example.com/endpoint"
 }
 ```
 
@@ -153,9 +157,9 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 |------|-----|-------------|
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Empfänger (FK zu User) |
-| `type` | varchar(64) | Typ der Benachrichtigung (z.B. `forum_reply`, `event_reminder`) |
-| `title` | varchar(255) | Legacy-Speicherfeld; wird nicht an Clients ausgeliefert |
-| `body` | text | Legacy-Speicherfeld; wird nicht an Clients ausgeliefert |
+| `type` | varchar(64) | Typ der Benachrichtigung (z.B. `forum_reply`, `forum_comment`) |
+| `title` | varchar(255) | Kurztitel, von der API aus dem Typ generiert; wird an Clients ausgeliefert |
+| `body` | text | Anzeigetext, von der API aus dem Typ generiert; wird an Clients als `text` ausgeliefert |
 | `data` | json | Strukturierte Relation-Liste für den jeweiligen Benachrichtigungstyp |
 | `isRead` | tinyint(1) | 0 = ungelesen, 1 = gelesen |
 | `createdAt` | datetime(3) | Erstellungszeitpunkt (UTC) |
@@ -179,7 +183,11 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 
 ## Notification-Typen
 
-Aktuell ist ausschließlich `forum_reply` als unterstützter strukturierter Benachrichtigungstyp aktiviert. Weitere Typen werden erst nach gemeinsamer Abstimmung ergänzt.
+> **Übersichtstabelle:** [types.md](./types.md) listet tabellarisch alle Notification-Typen mit Trigger, Empfänger und übermittelten Eigenschaften. Diese Tabelle ist die maßgebliche Übersicht und muss bei jeder Typ-Änderung aktualisiert werden.
+
+Aktuell sind `forum_reply` und `forum_comment` als strukturierte Benachrichtigungstypen aktiviert. Nicht unterstützte Typen oder unvollständige/abweichende Relationsdaten werden beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
+
+Beide Typen werden automatisch in `ForumService::createComment()` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Eigene Kommentare/Antworten lösen keine Benachrichtigung aus (kein Self-Trigger).
 
 ### `forum_reply`
 
@@ -206,7 +214,26 @@ Benachrichtigt darüber, dass auf einen bestehenden Forum-Kommentar geantwortet 
 ]
 ```
 
-Nicht unterstützte Typen oder unvollständige/abweichende `forum_reply`-Relationen werden beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
+### `forum_comment`
+
+Benachrichtigt darüber, dass ein neuer Top-Level-Kommentar direkt auf einen Forum-Post erstellt wurde. Dieser Typ enthält bewusst keine `parent_comment`-Relation. Der Client kann den Forum-Deep-Link lokal aus `parent_forum` und `parent_post` erzeugen.
+
+| Relation | Objekt | Pflicht | Bedeutung |
+|----------|--------|---------|-----------|
+| `comment_author` | `User` | Ja | Nutzer, der den neuen Kommentar erstellt hat |
+| `post_author` | `User` | Ja | Autor des übergeordneten Forum-Posts |
+| `parent_post` | `ForumPost` | Ja | Forum-Post, auf den direkt geantwortet wurde |
+| `parent_forum` | `Forum` | Ja | Forum, in dem der Post liegt |
+
+**Data-Format:**
+```json
+[
+  { "relation": "comment_author", "object": "User", "identifier": "123456" },
+  { "relation": "post_author", "object": "User", "identifier": "345678" },
+  { "relation": "parent_post", "object": "ForumPost", "identifier": "456789" },
+  { "relation": "parent_forum", "object": "Forum", "identifier": "567890" }
+]
+```
 
 ## Push-Versand
 
@@ -219,6 +246,8 @@ Der API-Server sendet automatisch Web Push-Benachrichtigungen an alle registrier
 {
   "id": "01923456-7890-7abc-def0-123456789012",
   "type": "forum_reply",
+  "title": "Neue Antwort auf deinen Kommentar",
+  "text": "Jemand hat auf deinen Kommentar geantwortet.",
   "data": [
     { "relation": "reply_author", "object": "User", "identifier": "user-reply" },
     { "relation": "comment_author", "object": "User", "identifier": "user-comment" },
@@ -227,7 +256,7 @@ Der API-Server sendet automatisch Web Push-Benachrichtigungen an alle registrier
     { "relation": "parent_post", "object": "ForumPost", "identifier": "post-id" },
     { "relation": "parent_forum", "object": "Forum", "identifier": "forum-id" }
   ],
-  "createdAt": "2026-08-10 14:30:00.000"
+  "createdAt": "2026-08-10 14:30:00"
 }
 ```
 
@@ -242,6 +271,8 @@ UnifiedPush-Endpoints werden per HTTP POST mit JSON-Body bedient. Der Distributo
 {
   "id": "01923456-7890-7abc-def0-123456789012",
   "type": "forum_reply",
+  "title": "Neue Antwort auf deinen Kommentar",
+  "text": "Jemand hat auf deinen Kommentar geantwortet.",
   "data": [
     { "relation": "reply_author", "object": "User", "identifier": "user-reply" },
     { "relation": "comment_author", "object": "User", "identifier": "user-comment" },
@@ -250,13 +281,13 @@ UnifiedPush-Endpoints werden per HTTP POST mit JSON-Body bedient. Der Distributo
     { "relation": "parent_post", "object": "ForumPost", "identifier": "post-id" },
     { "relation": "parent_forum", "object": "Forum", "identifier": "forum-id" }
   ],
-  "createdAt": "2026-08-10 14:30:00.000"
+  "createdAt": "2026-08-10 14:30:00"
 }
 ```
 
 HTTP 410 vom Distributor → Subscription wird automatisch gelöscht.
 
-> Der Push-Payload entspricht dem reduzierten Benachrichtigungsobjekt aus `GET /notifications` ohne `userId` und `isRead`: `id`, `type`, `data`, `createdAt`. Er enthält keine Routen, Titel oder Texte.
+> Der Push-Payload entspricht dem reduzierten Benachrichtigungsobjekt aus `GET /notifications` ohne `userId` und `isRead`: `id`, `type`, `title`, `text`, `data`, `createdAt`. Er enthält keine Routen; Titel und Texte sind API-generiert.
 
 ### Bereinigung abgelaufener Subscriptions
 
@@ -269,19 +300,21 @@ Benachrichtigungen werden serverseitig erstellt, indem der `NotificationService`
 ```php
 $this->notificationService->create(
     userId: $recipientUserId,
-    type: 'forum_reply',
-    title: '', // wird nicht an Clients ausgeliefert
-    body: '',  // wird nicht an Clients ausgeliefert
+    type: 'forum_comment',
+    title: '', // leer = von der API generiert
+    body: '',  // leer = von der API generiert
     data: [
-        ['relation' => 'reply_author', 'object' => 'User', 'identifier' => $replyAuthorId],
         ['relation' => 'comment_author', 'object' => 'User', 'identifier' => $commentAuthorId],
         ['relation' => 'post_author', 'object' => 'User', 'identifier' => $postAuthorId],
-        ['relation' => 'parent_comment', 'object' => 'ForumPostComment', 'identifier' => $commentId],
         ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => $postId],
         ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $forumId],
     ],
 );
 ```
+
+Für `forum_reply` verwendet der Aufruf stattdessen die sechs in diesem Typ beschriebenen Relationen einschließlich `reply_author` und `parent_comment`.
+
+Sind `title`/`body` leer, generiert die API sie automatisch aus dem Typ (siehe [types.md](./types.md)). Explizit übergebene Werte (z.B. aus dem Admin-Dashboard) haben Vorrang.
 
 ## Konfiguration
 

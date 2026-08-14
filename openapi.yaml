@@ -3859,7 +3859,11 @@ components:
         relation:
           type: string
           enum: [reply_author, comment_author, post_author, parent_comment, parent_post, parent_forum]
-          description: Beziehung des referenzierten Objekts zur Benachrichtigung.
+          description: >-
+            Beziehung des referenzierten Objekts zur Benachrichtigung. `forum_reply`
+            benötigt reply_author, comment_author, post_author, parent_comment,
+            parent_post und parent_forum. `forum_comment` benötigt comment_author,
+            post_author, parent_post und parent_forum.
         object:
           type: string
           enum: [User, ForumPostComment, ForumPost, Forum]
@@ -3870,7 +3874,7 @@ components:
 
     Notification:
       type: object
-      required: [id, userId, type, data, isRead, createdAt]
+      required: [id, userId, type, title, text, data, isRead, createdAt]
       properties:
         id:
           type: string
@@ -3882,15 +3886,22 @@ components:
           description: ID des Empfängers
         type:
           type: string
-          enum: [forum_reply]
-          description: Unterstützter Benachrichtigungstyp. Aktuell ist nur `forum_reply` aktiviert.
+          enum: [forum_reply, forum_comment]
+          description: Unterstützte strukturierte Benachrichtigungstypen.
+        title:
+          type: string
+          description: Von der API aus dem Typ generierter Kurztitel.
+        text:
+          type: string
+          description: Von der API aus dem Typ generierter Anzeigetext.
         data:
           type: array
           items:
             $ref: '#/components/schemas/NotificationDataRelation'
           description: >
-            Strukturierte Relationsdaten. Die API liefert keine Titel, Texte oder
-            Deep-Links; Clients erzeugen Anzeige und Routing lokal aus `type` und `data`.
+            Strukturierte Relationsdaten. Die API liefert keine Deep-Link-Routen;
+            Clients erzeugen das Routing lokal aus `type` und `data`. `title` und
+            `text` werden von der API generiert.
         isRead:
           type: boolean
           description: Ob die Benachrichtigung bereits gelesen wurde
@@ -8309,9 +8320,9 @@ paths:
         Sendet eine Test-Benachrichtigung an einen ausgewählten Nutzer.
         Die Benachrichtigung wird exakt identisch mit einer echten
         Benachrichtigung erstellt (gleiches Schema in der DB, gleiche
-        Push-Zustellung über Web Push und UnifiedPush). Der Deep-Link
-        in der `data.route` zeigt auf ein reales Objekt, sodass Clients
-        das Deeplinking korrekt testen können.
+        Push-Zustellung über Web Push und UnifiedPush). Titel und Text
+        werden von der API aus dem Typ generiert, wenn sie leer gelassen
+        werden; Clients erzeugen den Deep-Link aus `type` und `data`.
       tags: [Admin]
       requestBody:
         required: true
@@ -8319,7 +8330,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [userId, type, title, body]
+              required: [userId, type, data]
               properties:
                 userId:
                   type: string
@@ -8327,28 +8338,22 @@ paths:
                   description: ID des Empfängers
                 type:
                   type: string
-                  maxLength: 64
-                  description: >
-                    Benachrichtigungstyp. Bekannte Typen: travel_update,
-                    event_reminder, forum_reply, forum_comment,
-                    poll_invitation, feedback_status. Eigene Typen
-                    sind erlaubt.
-                  example: travel_update
+                  enum: [forum_reply, forum_comment]
+                  description: Unterstützter strukturierter Benachrichtigungstyp.
+                  example: forum_comment
                 title:
                   type: string
                   maxLength: 255
-                  description: Kurzer Titel der Benachrichtigung
-                  example: Reise aktualisiert
+                  description: Optional. Leer lassen, damit die API den Titel aus dem Typ generiert.
+                  example: ''
                 body:
                   type: string
-                  description: Anzuzeigender Nachrichtentext
-                  example: Details deiner Reise wurden geändert.
-                route:
-                  type: string
-                  description: >
-                    Optionale Deep-Link-Route (z.B. /trips/{id}).
-                    Wird im data-Feld der Benachrichtigung gespeichert.
-                  example: /trips/0192abcd-7890-7abc-def0-1234567890ab
+                  description: Optional. Leer lassen, damit die API den Text aus dem Typ generiert.
+                data:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/NotificationDataRelation'
+                  description: Strukturierte Relationsdaten des Benachrichtigungstyps.
       responses:
         '201':
           description: Benachrichtigung erfolgreich gesendet

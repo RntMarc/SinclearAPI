@@ -289,7 +289,7 @@ class NotificationIntegrationTest extends TestCase
     {
         $request = $this->requestWithUser('POST', '/notifications/push-subscription', [
             'endpoint' => 'https://example.com',
-            'type' => 'fcm',
+            'type' => 'unsupported-push-provider',
         ]);
 
         $response = $this->controller->savePushSubscription($request, new Response());

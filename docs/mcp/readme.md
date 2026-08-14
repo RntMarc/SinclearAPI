@@ -174,9 +174,9 @@ zurückgegeben.
 
 **Dynamische Themen:** Jede Markdown-Datei in `docs/` ist abrufbar, z.B.
 `travel`, `auth/login`, `user`, `calendar`, `recipes`, `forum`,
-`location-sharing`, `notifications`, `public-transport`, `subscriptions`,
-`feedback`, `explore`, `app/updates`. Auflösungsregel (Groß-/Kleinschreibung
-egal): `docs/{topic}.md` → `docs/{topic}/readme.md`.
+`location-sharing`, `notifications`, `notifications/types`, `public-transport`,
+`subscriptions`, `feedback`, `explore`, `app/updates`. Auflösungsregel
+(Groß-/Kleinschreibung egal): `docs/{topic}.md` → `docs/{topic}/readme.md`.
 
 ## Tool: `create_recipe_draft`
 

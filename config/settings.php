@@ -58,12 +58,6 @@ $settings['pagination'] = [
     'max_limit' => 100,
 ];
 
-$settings['fcm'] = [
-    'project_id' => $_ENV['FCM_PROJECT_ID'] ?? '',
-    'client_email' => $_ENV['FCM_CLIENT_EMAIL'] ?? '',
-    'private_key' => $_ENV['FCM_PRIVATE_KEY'] ?? '',
-];
-
 $settings['downloads'] = [
     'base_url' => $_ENV['DOWNLOADS_BASE_URL'] ?? 'https://sinclear.de/downloads',
 ];

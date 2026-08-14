@@ -16,6 +16,12 @@ After every change to the API (routes, controllers, DTOs, or ResourceRegistry), 
 1. Update the relevant documentation files in `docs/` to reflect the changes.
 2. Ensure that all flows, endpoints, and configuration are accurately documented.
 
+## Notification-Typen-Übersicht
+Die Datei `docs/notifications/types.md` listet tabellarisch ausschließlich die Notification-Typen, ihre Trigger und die übermittelten Eigenschaften (Relations, API-generierte Titel/Texte).
+
+**Requirement:**
+Bei jeder Änderung an Notification-Typen (Trigger, Empfänger, Relations oder generierte Titel/Texte) MUSS `docs/notifications/types.md` aktualisiert werden. Diese Datei ist die maßgebliche Übersicht für alle Notification-Typen.
+
 ## MCP-Server
 Der MCP-Server (`sinclear-docs-mcp`) stellt die gesamte Dokumentation aus `docs/` über das Tool `get_documentation` bereit. Alle `.md`-Dateien werden automatisch als Topics gescannt und als `enum`-Werte des Tools angeboten (auch verschachtelte Pfade wie `notifications/list`).
 

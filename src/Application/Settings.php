@@ -13,7 +13,6 @@ final readonly class Settings
         public array $cors,
         public array $rate_limit,
         public array $pagination,
-        public array $fcm = [],
         public array $downloads = [],
         public array $vapid = [],
     ) {}

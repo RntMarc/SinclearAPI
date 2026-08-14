@@ -18,6 +18,12 @@ class NotificationServiceTest extends TestCase
         ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
         ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
     ];
+    private const FORUM_COMMENT_DATA = [
+        ['relation' => 'comment_author', 'object' => 'User', 'identifier' => 'user-comment'],
+        ['relation' => 'post_author', 'object' => 'User', 'identifier' => 'user-post'],
+        ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
+        ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
+    ];
     private PDO $db;
     private NotificationService $service;
 
@@ -153,6 +159,38 @@ class NotificationServiceTest extends TestCase
         $this->assertStringContainsString('parent_post', $row['data']);
     }
 
+    public function testCreateStoresStructuredForumCommentData(): void
+    {
+        $id = $this->service->create(
+            userId: 'user-1',
+            type: 'forum_comment',
+            title: '',
+            body: '',
+            data: self::FORUM_COMMENT_DATA,
+        );
+
+        $stmt = $this->db->prepare('SELECT type, data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('forum_comment', $row['type']);
+        $this->assertStringContainsString('comment_author', $row['data']);
+        $this->assertStringNotContainsString('parent_comment', $row['data']);
+    }
+
+    public function testCreateThrowsWhenForumCommentContainsParentComment(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = [...self::FORUM_COMMENT_DATA, [
+            'relation' => 'parent_comment',
+            'object' => 'ForumPostComment',
+            'identifier' => 'comment-1',
+        ]];
+
+        $this->service->create('user-1', 'forum_comment', 'Title', 'Body', $data);
+    }
+
     public function testCreateThrowsOnEmptyType(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -160,7 +198,7 @@ class NotificationServiceTest extends TestCase
         $this->service->create('user-1', '', 'Title', 'Body');
     }
 
-    public function testCreateAllowsEmptyTitleAndBody(): void
+    public function testCreateGeneratesTitleAndTextWhenEmpty(): void
     {
         $id = $this->service->create('user-1', 'forum_reply', '', '', self::FORUM_REPLY_DATA);
 
@@ -168,8 +206,32 @@ class NotificationServiceTest extends TestCase
         $stmt->execute([$id]);
         $row = $stmt->fetch();
 
-        $this->assertSame('', $row['title']);
-        $this->assertSame('', $row['body']);
+        $this->assertSame('Neue Antwort auf deinen Kommentar', $row['title']);
+        $this->assertSame('Jemand hat auf deinen Kommentar geantwortet.', $row['body']);
+    }
+
+    public function testCreateGeneratesTitleAndTextForForumComment(): void
+    {
+        $id = $this->service->create('user-1', 'forum_comment', '', '', self::FORUM_COMMENT_DATA);
+
+        $stmt = $this->db->prepare('SELECT title, body FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('Neuer Kommentar zu deinem Beitrag', $row['title']);
+        $this->assertSame('Jemand hat deinen Beitrag kommentiert.', $row['body']);
+    }
+
+    public function testCreatePrefersProvidedTitleAndBody(): void
+    {
+        $id = $this->service->create('user-1', 'forum_reply', 'Eigener Titel', 'Eigener Text', self::FORUM_REPLY_DATA);
+
+        $stmt = $this->db->prepare('SELECT title, body FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('Eigener Titel', $row['title']);
+        $this->assertSame('Eigener Text', $row['body']);
     }
 
     public function testCreateThrowsOnUnsupportedType(): void
@@ -268,8 +330,18 @@ class NotificationServiceTest extends TestCase
 
         $this->assertIsArray($result[0]['data']);
         $this->assertSame('reply_author', $result[0]['data'][0]['relation']);
-        $this->assertArrayNotHasKey('title', $result[0]);
+        $this->assertSame('Title', $result[0]['title']);
+        $this->assertSame('Body', $result[0]['text']);
         $this->assertArrayNotHasKey('body', $result[0]);
+    }
+
+    public function testGetUnreadDeliversGeneratedTitleAndText(): void
+    {
+        $this->service->create('user-1', 'forum_reply', '', '', self::FORUM_REPLY_DATA);
+        $result = $this->service->getUnread('user-1');
+
+        $this->assertSame('Neue Antwort auf deinen Kommentar', $result[0]['title']);
+        $this->assertSame('Jemand hat auf deinen Kommentar geantwortet.', $result[0]['text']);
     }
 
     // ── markRead() ────────────────────────────────────────

@@ -1,5 +1,5 @@
 -- Migration: Remove notification system tables and events
--- Reverts the notification system (in-app + FCM push) completely.
+-- Reverts the notification system (in-app + push delivery) completely.
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 

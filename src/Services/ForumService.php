@@ -24,6 +24,7 @@ final readonly class ForumService
         private FeedPostCommentRepository $commentRepo,
         private ImageService $imageService,
         private TravelRelationRepository $travelRelationRepo,
+        private NotificationService $notificationService,
     ) {}
 
     // ── Forum ──────────────────────────────────────────────
@@ -366,6 +367,7 @@ final readonly class ForumService
             throw new \RuntimeException('post_not_found');
         }
 
+        $parent = null;
         if ($parentId !== null) {
             $parent = $this->commentRepo->findById($parentId);
             if ($parent === null || $parent['postId'] !== $postId) {
@@ -382,7 +384,51 @@ final readonly class ForumService
 
         $comment = $this->commentRepo->findById($id);
 
+        $this->notifyOnCommentCreated($post, $userId, $parent);
+
         return $this->formatComment($comment);
+    }
+
+    private function notifyOnCommentCreated(array $post, string $commentAuthorId, ?array $parent): void
+    {
+        $baseRelations = [
+            ['relation' => 'comment_author', 'object' => 'User', 'identifier' => $commentAuthorId],
+            ['relation' => 'post_author', 'object' => 'User', 'identifier' => $post['userId']],
+            ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => $post['id']],
+            ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $post['forumId']],
+        ];
+
+        if ($parent === null) {
+            if ($post['userId'] !== $commentAuthorId) {
+                $this->notificationService->create(
+                    userId: $post['userId'],
+                    type: 'forum_comment',
+                    title: '',
+                    body: '',
+                    data: $baseRelations,
+                );
+            }
+            return;
+        }
+
+        if ($parent['userId'] === $commentAuthorId) {
+            return;
+        }
+
+        $this->notificationService->create(
+            userId: $parent['userId'],
+            type: 'forum_reply',
+            title: '',
+            body: '',
+            data: [
+                ['relation' => 'reply_author', 'object' => 'User', 'identifier' => $commentAuthorId],
+                ['relation' => 'comment_author', 'object' => 'User', 'identifier' => $parent['userId']],
+                ['relation' => 'post_author', 'object' => 'User', 'identifier' => $post['userId']],
+                ['relation' => 'parent_comment', 'object' => 'ForumPostComment', 'identifier' => $parent['id']],
+                ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => $post['id']],
+                ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $post['forumId']],
+            ],
+        );
     }
 
     public function updateComment(string $postId, string $commentId, string $text): array

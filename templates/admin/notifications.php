@@ -21,6 +21,7 @@
         <select id="notifType" required onchange="onTypeChange()">
             <option value="">– Typ auswählen –</option>
             <option value="forum_reply">Foren-Antwort (forum_reply)</option>
+            <option value="forum_comment">Foren-Kommentar (forum_comment)</option>
         </select>
     </div>
 
@@ -35,17 +36,17 @@
     <div class="form-group">
         <label for="notifData">Strukturierte Daten *</label>
         <textarea id="notifData" required placeholder='[{"relation":"reply_author","object":"User","identifier":"..."}]'></textarea>
-        <div style="font-size:0.8rem;color:#888;margin-top:0.3rem;">Für <code>forum_reply</code> müssen reply_author, comment_author, post_author, parent_comment, parent_post und parent_forum enthalten sein.</div>
+        <div style="font-size:0.8rem;color:#888;margin-top:0.3rem;">Für <code>forum_reply</code> müssen reply_author, comment_author, post_author, parent_comment, parent_post und parent_forum enthalten sein. Für <code>forum_comment</code> müssen comment_author, post_author, parent_post und parent_forum enthalten sein.</div>
     </div>
 
     <div class="form-group">
-        <label for="notifTitle">Titel *</label>
-        <input type="text" id="notifTitle" placeholder="Benachrichtigungstitel" required maxlength="255">
+        <label for="notifTitle">Titel</label>
+        <input type="text" id="notifTitle" placeholder="Leer lassen = von der API generiert" maxlength="255">
     </div>
 
     <div class="form-group">
-        <label for="notifBody">Nachrichtentext *</label>
-        <textarea id="notifBody" placeholder="Text der Benachrichtigung..." required></textarea>
+        <label for="notifBody">Nachrichtentext</label>
+        <textarea id="notifBody" placeholder="Leer lassen = von der API generiert"></textarea>
     </div>
 
     <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
@@ -65,8 +66,9 @@
     <h2 style="font-size:1.1rem;margin-bottom:0.5rem;color:#aaa;">Hinweise</h2>
     <ul style="font-size:0.85rem;color:#888;padding-left:1.2rem;line-height:1.7;">
         <li>Die Benachrichtigung wird exakt identisch zu einer echten Benachrichtigung erstellt.</li>
-        <li>Aktuell ist ausschließlich <code>forum_reply</code> als strukturierter Benachrichtigungstyp unterstützt.</li>
-        <li>Die API sendet keine Titel, Texte oder Deep-Links an Clients; Clients erzeugen Anzeige und Routing aus <code>type</code> und <code>data</code>.</li>
+        <li>Als strukturierte Benachrichtigungstypen werden <code>forum_reply</code> und <code>forum_comment</code> unterstützt.</li>
+        <li>Titel und Text werden von der API generiert, wenn die Felder leer gelassen werden.</li>
+        <li>Die API sendet keine Deep-Link-Routen an Clients; Clients erzeugen das Routing aus <code>type</code> und <code>data</code>.</li>
         <li>Push-Nachrichten werden automatisch an alle registrierten Geräte des Empfängers zugestellt.</li>
     </ul>
 </div>
@@ -84,6 +86,7 @@
 
     const typeConfig = {
         forum_reply: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
+        forum_comment: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
     };
 
     function onTypeChange() {
@@ -131,13 +134,21 @@
             return;
         }
 
-        if (entityId) {
+        if (entityId && type === 'forum_reply') {
             const selected = document.getElementById('notifEntity').selectedOptions[0];
             dataInput.value = JSON.stringify([
                 { relation: 'reply_author', object: 'User', identifier: document.getElementById('notifUser').value || 'REPLY_AUTHOR_ID' },
                 { relation: 'comment_author', object: 'User', identifier: 'COMMENT_AUTHOR_ID' },
                 { relation: 'post_author', object: 'User', identifier: selected.dataset.userId || 'POST_AUTHOR_ID' },
                 { relation: 'parent_comment', object: 'ForumPostComment', identifier: 'PARENT_COMMENT_ID' },
+                { relation: 'parent_post', object: 'ForumPost', identifier: entityId },
+                { relation: 'parent_forum', object: 'Forum', identifier: selected.dataset.forumId || 'PARENT_FORUM_ID' },
+            ], null, 2);
+        } else if (entityId && type === 'forum_comment') {
+            const selected = document.getElementById('notifEntity').selectedOptions[0];
+            dataInput.value = JSON.stringify([
+                { relation: 'comment_author', object: 'User', identifier: 'COMMENT_AUTHOR_ID' },
+                { relation: 'post_author', object: 'User', identifier: selected.dataset.userId || 'POST_AUTHOR_ID' },
                 { relation: 'parent_post', object: 'ForumPost', identifier: entityId },
                 { relation: 'parent_forum', object: 'Forum', identifier: selected.dataset.forumId || 'PARENT_FORUM_ID' },
             ], null, 2);
