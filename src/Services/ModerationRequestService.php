@@ -12,6 +12,7 @@ use Sinclear\Api\Repository\FeedPostRepository;
 use Sinclear\Api\Repository\ModerationRequestRepository;
 use Sinclear\Api\Repository\RecipeRepository;
 use Sinclear\Api\Repository\RecipeReviewRepository;
+use Sinclear\Api\Repository\StoryRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
@@ -27,7 +28,7 @@ final readonly class ModerationRequestService
         'recipe_review', 'forum_comment', 'explore_comment',
         'feedback_suggestion', 'feedback_comment',
         'travel_trip', 'travel_event', 'travel_accommodation', 'travel_ticket',
-        'subscription', 'calendar_event',
+        'subscription', 'calendar_event', 'story',
     ];
 
     public const array VALID_STATUSES = [
@@ -51,6 +52,7 @@ final readonly class ModerationRequestService
         private TravelRelationRepository $travelRelationRepo,
         private SubscriptionRepository $subscriptionRepo,
         private CalendarEventRepository $calendarEventRepo,
+        private StoryRepository $storyRepo,
     ) {}
 
     public function createRequest(
@@ -76,6 +78,10 @@ final readonly class ModerationRequestService
         $ownerId = $this->resolveOwner($objectType, $objectId);
         if ($ownerId === null) {
             throw new \RuntimeException('object_not_found');
+        }
+
+        if ($objectType === 'story' && $requestType === 'deletion') {
+            throw new \RuntimeException('deletion_not_supported');
         }
 
         if ($requestType === 'report' && $ownerId === $userId) {
@@ -193,6 +199,8 @@ private function resolveOwner(string $objectType, string $objectId): ?string
             'subscription' => $this->resolveFirstParticipant(
                 $this->subscriptionRepo->findParticipants($objectId),
             ),
+
+            'story' => $this->safeGet($this->storyRepo->findById($objectId), 'userId'),
 
             default => null,
         };

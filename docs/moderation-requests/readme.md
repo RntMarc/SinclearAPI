@@ -20,7 +20,7 @@ Schema: `events/moderation_request_schema.sql`
 | `id` | varchar(191) | Eindeutige ID (UUIDv7) |
 | `userId` | varchar(191) | ID des Nutzers, der die Anfrage abgeschickt hat |
 | `requestType` | enum | `report`, `deletion`, `other` |
-| `objectType` | enum | `user`, `forum_post`, `recipe`, `explore_place`, `recipe_review`, `forum_comment`, `explore_comment`, `feedback_suggestion`, `feedback_comment`, `travel_trip`, `travel_event`, `travel_accommodation`, `travel_ticket`, `subscription`, `calendar_event` |
+| `objectType` | enum | `user`, `forum_post`, `recipe`, `explore_place`, `recipe_review`, `forum_comment`, `explore_comment`, `feedback_suggestion`, `feedback_comment`, `travel_trip`, `travel_event`, `travel_accommodation`, `travel_ticket`, `subscription`, `calendar_event`, `story` |
 | `objectId` | varchar(191) | ID des Objekts, auf das sich die Anfrage bezieht |
 | `message` | text | Ausführliche Beschreibung des Anliegens |
 | `status` | enum | Bearbeitungsstatus (siehe unten) |
@@ -56,6 +56,7 @@ Schema: `events/moderation_request_schema.sql`
 | `travel_ticket` | Reise-Ticket | `user`-Feld des Tickets |
 | `subscription` | Abo/Zahlung | Erster Teilnehmer (Join-Tabelle `SubscriptionRelation`) |
 | `calendar_event` | Kalender-Event | `creatorId` des Events |
+| `story` | Story (7-Tage-Story) | `userId` der Story |
 
 **`status` (Bearbeitungsstatus):**
 
@@ -78,6 +79,11 @@ Schema: `events/moderation_request_schema.sql`
 - **Fremde Inhalte dürfen nicht zur Löschung beantragt werden:**
   `deletion` auf ein Objekt, dessen Ersteller nicht der Absender ist, wird mit
   `cannot_request_deletion_foreign` (403) abgelehnt.
+- **Stories können nicht zur Löschung beantragt werden:** Für Stories ist
+  `deletion` generell nicht erlaubt (`deletion_not_supported`, 400). Stories
+  können vom Ersteller jederzeit selbst über `DELETE /stories/{id}` gelöscht
+  werden. Fremde Stories dürfen gemeldet (`report`) oder angemerkt (`other`)
+  werden, eigene Stories nur angemerkt (`other`).
 - `other` unterliegt keiner Besitzprüfung.
 - Das referenzierte Objekt muss existieren, sonst `object_not_found` (404).
 
@@ -139,6 +145,7 @@ Authorization: Bearer <JWT>
 | `object_not_found` | 404 | Referenziertes Objekt existiert nicht |
 | `cannot_report_own` | 403 | Eigene Inhalte dürfen nicht gemeldet werden |
 | `cannot_request_deletion_foreign` | 403 | Fremde Inhalte dürfen nicht zur Löschung beantragt werden |
+| `deletion_not_supported` | 400 | Für Stories sind keine Löschanfragen vorgesehen |
 
 ### Eigene Anfragen abrufen
 

@@ -78,6 +78,23 @@ sie nicht gelöscht wurden.
 - Nur der **Ersteller** (oder ein Admin) darf eine Story **löschen**.
 - `StoryView`-Einträge werden beim Löschen der Story automatisch entfernt (FK `ON DELETE CASCADE`).
 
+## Melden & Anmerken von Stories
+
+Stories können über das Moderations-Anfragensystem (`POST /moderation-requests`,
+siehe `docs/moderation-requests/readme.md`) gemeldet oder angemerkt werden:
+
+| Aktion | `requestType` | Fremde Story | Eigene Story |
+|--------|---------------|--------------|--------------|
+| Melden | `report` | erlaubt | verboten (`cannot_report_own`, 403) |
+| Anmerken | `other` | erlaubt | erlaubt |
+| Löschwunsch | `deletion` | verboten | verboten (`deletion_not_supported`, 400) |
+
+- `objectType` ist `story`, `objectId` die ID der Story.
+- **Keine Löschanfragen:** Stories werden vom Ersteller jederzeit selbst über
+  `DELETE /stories/{id}` gelöscht – ohne Beteiligung eines Admins. Ein
+  `deletion`-Antrag für eine Story wird daher immer mit
+  `deletion_not_supported` (400) abgelehnt.
+
 ## Sichtbarkeitsregel (7 Tage)
 
 Die Sichtbarkeit wird ausschließlich über `expiresAt` gesteuert:

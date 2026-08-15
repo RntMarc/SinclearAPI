@@ -17,6 +17,7 @@ final readonly class ModerationRequestController
         'object_not_found' => ['error' => 'object_not_found', 'status' => 404],
         'cannot_report_own' => ['error' => 'cannot_report_own', 'status' => 403],
         'cannot_request_deletion_foreign' => ['error' => 'cannot_request_deletion_foreign', 'status' => 403],
+        'deletion_not_supported' => ['error' => 'deletion_not_supported', 'status' => 400],
         'invalid_status' => ['error' => 'invalid_status', 'status' => 400],
         'request_not_found' => ['error' => 'request_not_found', 'status' => 404],
     ];

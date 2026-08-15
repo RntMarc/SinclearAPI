@@ -1827,6 +1827,7 @@ ROW;
             'forum_post' => 'Forumsbeitrag',
             'recipe' => 'Rezept',
             'explore_place' => 'Entdecken-Ort',
+            'story' => 'Story',
         ];
         $statusLabels = [
             'unread' => 'Ungelesen',
@@ -1930,6 +1931,7 @@ ROW;
             'forum_post' => 'Forumsbeitrag',
             'recipe' => 'Rezept',
             'explore_place' => 'Entdecken-Ort',
+            'story' => 'Story',
         ];
         $statusLabels = [
             'unread' => 'Ungelesen',
