@@ -255,7 +255,7 @@ class StoryTest extends TestCase
         $data = json_decode((string) $response->getBody(), true);
         $this->assertTrue($data['data']['viewed']);
         $this->assertSame(1, $data['data']['viewCount']);
-        $this->assertSame('Bob', $data['data']['user']['displayName']);
+        $this->assertSame('Alice', $data['data']['user']['displayName']);
     }
 
     public function testGetUnknownStoryReturns404(): void
