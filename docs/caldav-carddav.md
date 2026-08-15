@@ -22,16 +22,15 @@ unter dem vollen Pfad `/api/dav/` erreichbar:
 | Geburtstage | `https://sinclear.de/api/dav/calendars/{userId}/birthdays/` |
 | Adressbuch | `https://sinclear.de/api/dav/addressbooks/{userId}/contacts/` |
 
-RFC-6764-Discovery (`.well-known/caldav` bzw. `.well-known/carddav`) ist
-nur innerhalb des API-Pfads erreichbar, da die Root-Domain von der Web-App
-bedient wird:
+RFC-6764-Discovery (`.well-known/caldav` bzw. `.well-known/carddav`) wird von
+der Root-Konfiguration an die API weitergereicht:
 
-- `https://sinclear.de/api/.well-known/caldav` → 301 Redirect auf `/api/dav/`
-- `https://sinclear.de/api/.well-known/carddav` → 301 Redirect auf `/api/dav/`
+- `https://sinclear.de/.well-known/caldav` → 301 Redirect auf `/api/dav/`
+- `https://sinclear.de/.well-known/carddav` → 301 Redirect auf `/api/dav/`
 
-Clients, die Discovery automatisch auf der Root-Domain versuchen (z.B.
-DAVx5 mit `https://sinclear.de/`), finden den Dienst dadurch nicht – dort
-ist die Basis-URL **manuell** einzutragen.
+Die beiden Discovery-Pfade werden dynamisch verarbeitet. Andere
+`.well-known`-Pfade (z.B. ACME-Challenges) werden von der Root-Konfiguration
+unverändert weiter bedient.
 
 ## Authentifizierung (DAV-Tokens)
 
