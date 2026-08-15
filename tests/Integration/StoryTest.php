@@ -10,10 +10,14 @@ use Psr\Http\Message\ServerRequestInterface;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Slim\Psr7\Response;
 use Sinclear\Api\Controllers\StoryController;
+use Sinclear\Api\Repository\NotificationRepository;
+use Sinclear\Api\Repository\PushSubscriptionRepository;
 use Sinclear\Api\Repository\StoryRepository;
+use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\StoryPolicy;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\NotificationService;
 
 class StoryTest extends TestCase
 {
@@ -44,6 +48,8 @@ class StoryTest extends TestCase
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
         $this->db->exec("DROP TABLE IF EXISTS StoryView");
         $this->db->exec("DROP TABLE IF EXISTS Story");
+        $this->db->exec("DROP TABLE IF EXISTS Notification");
+        $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
 
@@ -91,15 +97,37 @@ class StoryTest extends TestCase
             )
         ");
 
+        $this->db->exec("
+            CREATE TABLE Notification (
+                id varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                type varchar(64) NOT NULL,
+                title varchar(255) NOT NULL,
+                body text NOT NULL,
+                data json DEFAULT NULL,
+                isRead tinyint(1) NOT NULL DEFAULT 0,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                KEY idx_notification_user_read_created (userId, isRead, createdAt),
+                CONSTRAINT fk_notification_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
+            )
+        ");
+
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-1', 'a@test.com', 'hash', 'Alice', NOW(3))");
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-2', 'b@test.com', 'hash', 'Bob', NOW(3))");
 
         $this->repo = new StoryRepository($this->db);
         $logger = new Logger('test', [new NullHandler()]);
+        $notificationService = new NotificationService(
+            notificationRepo: new NotificationRepository($this->db),
+            pushSubRepo: new PushSubscriptionRepository($this->db),
+        );
         $this->controller = new StoryController(
             storyRepo: $this->repo,
             policy: new StoryPolicy(),
             imageService: new ImageService($logger),
+            userRepo: new UserRepository($this->db),
+            notificationService: $notificationService,
         );
     }
 
@@ -108,6 +136,8 @@ class StoryTest extends TestCase
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
         $this->db->exec("DROP TABLE IF EXISTS StoryView");
         $this->db->exec("DROP TABLE IF EXISTS Story");
+        $this->db->exec("DROP TABLE IF EXISTS Notification");
+        $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
@@ -158,6 +188,26 @@ class StoryTest extends TestCase
         $this->assertSame(0, $data['data']['viewCount']);
         $this->assertNotNull($data['data']['expiresAt']);
         $this->assertSame('user-1', $data['data']['user']['id']);
+    }
+
+    public function testCreateStoryNotifiesOtherUsers(): void
+    {
+        $request = $this->requestWithUser('POST', '/stories', ['image' => self::IMAGE_BASE64]);
+        $response = $this->controller->create($request, new Response());
+        $this->assertSame(201, $response->getStatusCode());
+
+        $stmt = $this->db->prepare('SELECT userId, type, data FROM Notification ORDER BY userId');
+        $stmt->execute();
+        $notifications = $stmt->fetchAll();
+
+        $this->assertCount(1, $notifications);
+        $this->assertSame('user-2', $notifications[0]['userId']);
+        $this->assertSame('story_post', $notifications[0]['type']);
+
+        $data = json_decode($notifications[0]['data'], true);
+        $relations = array_column($data, 'relation');
+        $this->assertContains('story_author', $relations);
+        $this->assertContains('story', $relations);
     }
 
     public function testCreateStoryWithoutImageReturns400(): void

@@ -4072,15 +4072,16 @@ components:
       properties:
         relation:
           type: string
-          enum: [reply_author, comment_author, post_author, parent_comment, parent_post, parent_forum]
+          enum: [reply_author, comment_author, post_author, parent_comment, parent_post, parent_forum, story_author, story]
           description: >-
             Beziehung des referenzierten Objekts zur Benachrichtigung. `forum_reply`
             benötigt reply_author, comment_author, post_author, parent_comment,
             parent_post und parent_forum. `forum_comment` benötigt comment_author,
-            post_author, parent_post und parent_forum.
+            post_author, parent_post und parent_forum. `story_post` benötigt
+            story_author und story.
         object:
           type: string
-          enum: [User, ForumPostComment, ForumPost, Forum]
+          enum: [User, ForumPostComment, ForumPost, Forum, Story]
           description: Tabellen-/Objekttyp der referenzierten Ressource.
         identifier:
           type: string
@@ -4100,7 +4101,7 @@ components:
           description: ID des Empfängers
         type:
           type: string
-          enum: [forum_reply, forum_comment]
+          enum: [forum_reply, forum_comment, story_post]
           description: Unterstützte strukturierte Benachrichtigungstypen.
         title:
           type: string
@@ -8871,7 +8872,7 @@ paths:
                   description: ID des Empfängers
                 type:
                   type: string
-                  enum: [forum_reply, forum_comment]
+                  enum: [forum_reply, forum_comment, story_post]
                   description: Unterstützter strukturierter Benachrichtigungstyp.
                   example: forum_comment
                 title:

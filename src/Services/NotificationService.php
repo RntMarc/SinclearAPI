@@ -21,6 +21,10 @@ final readonly class NotificationService
             'title' => 'Neuer Kommentar zu deinem Beitrag',
             'text' => 'Jemand hat deinen Beitrag kommentiert.',
         ],
+        'story_post' => [
+            'title' => 'Neue Story',
+            'text' => 'Jemand hat eine neue Story veröffentlicht.',
+        ],
     ];
 
     public function __construct(
@@ -81,6 +85,7 @@ final readonly class NotificationService
         return match ($type) {
             'forum_reply' => $this->normalizeForumReplyData($data),
             'forum_comment' => $this->normalizeForumCommentData($data),
+            'story_post' => $this->normalizeStoryPostData($data),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }
@@ -181,6 +186,54 @@ final readonly class NotificationService
         foreach ($requiredRelations as $relation => $_object) {
             if (!isset($normalized[$relation])) {
                 throw new \InvalidArgumentException('forum_comment data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeStoryPostData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('story_post data is required');
+        }
+
+        $requiredRelations = [
+            'story_author' => 'User',
+            'story' => 'Story',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('story_post data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('story_post data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('story_post data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('story_post data is missing relation: ' . $relation);
             }
         }
 

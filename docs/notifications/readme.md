@@ -185,9 +185,11 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 
 > **Übersichtstabelle:** [types.md](./types.md) listet tabellarisch alle Notification-Typen mit Trigger, Empfänger und übermittelten Eigenschaften. Diese Tabelle ist die maßgebliche Übersicht und muss bei jeder Typ-Änderung aktualisiert werden.
 
-Aktuell sind `forum_reply` und `forum_comment` als strukturierte Benachrichtigungstypen aktiviert. Nicht unterstützte Typen oder unvollständige/abweichende Relationsdaten werden beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
+Aktuell sind `forum_reply`, `forum_comment` und `story_post` als strukturierte Benachrichtigungstypen aktiviert. Nicht unterstützte Typen oder unvollständige/abweichende Relationsdaten werden beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
 
-Beide Typen werden automatisch in `ForumService::createComment()` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Eigene Kommentare/Antworten lösen keine Benachrichtigung aus (kein Self-Trigger).
+Die Forum-Typen werden automatisch in `ForumService::createComment()` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Eigene Kommentare/Antworten lösen keine Benachrichtigung aus (kein Self-Trigger).
+
+Der Story-Typ wird automatisch in `StoryController::create()` getriggert: eine neue Story erzeugt `story_post` für alle übrigen Nutzer (kein Self-Trigger).
 
 ### `forum_reply`
 
@@ -232,6 +234,23 @@ Benachrichtigt darüber, dass ein neuer Top-Level-Kommentar direkt auf einen For
   { "relation": "post_author", "object": "User", "identifier": "345678" },
   { "relation": "parent_post", "object": "ForumPost", "identifier": "456789" },
   { "relation": "parent_forum", "object": "Forum", "identifier": "567890" }
+]
+```
+
+### `story_post`
+
+Benachrichtigt darüber, dass eine neue Story veröffentlicht wurde. Empfänger sind alle Nutzer außer dem Autor selbst (kein Self-Trigger). Der Client kann den Story-Feed-Deeplink lokal aus `story_author` und `story` erzeugen.
+
+| Relation | Objekt | Pflicht | Bedeutung |
+|----------|--------|---------|-----------|
+| `story_author` | `User` | Ja | Nutzer, der die neue Story veröffentlicht hat |
+| `story` | `Story` | Ja | Die neue Story |
+
+**Data-Format:**
+```json
+[
+  { "relation": "story_author", "object": "User", "identifier": "123456" },
+  { "relation": "story", "object": "Story", "identifier": "987654" }
 ]
 ```
 

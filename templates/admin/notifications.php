@@ -22,6 +22,7 @@
             <option value="">– Typ auswählen –</option>
             <option value="forum_reply">Foren-Antwort (forum_reply)</option>
             <option value="forum_comment">Foren-Kommentar (forum_comment)</option>
+            <option value="story_post">Story (story_post)</option>
         </select>
     </div>
 
@@ -36,7 +37,7 @@
     <div class="form-group">
         <label for="notifData">Strukturierte Daten *</label>
         <textarea id="notifData" required placeholder='[{"relation":"reply_author","object":"User","identifier":"..."}]'></textarea>
-        <div style="font-size:0.8rem;color:#888;margin-top:0.3rem;">Für <code>forum_reply</code> müssen reply_author, comment_author, post_author, parent_comment, parent_post und parent_forum enthalten sein. Für <code>forum_comment</code> müssen comment_author, post_author, parent_post und parent_forum enthalten sein.</div>
+        <div style="font-size:0.8rem;color:#888;margin-top:0.3rem;">Für <code>forum_reply</code> müssen reply_author, comment_author, post_author, parent_comment, parent_post und parent_forum enthalten sein. Für <code>forum_comment</code> müssen comment_author, post_author, parent_post und parent_forum enthalten sein. Für <code>story_post</code> müssen story_author und story enthalten sein.</div>
     </div>
 
     <div class="form-group">
@@ -66,7 +67,7 @@
     <h2 style="font-size:1.1rem;margin-bottom:0.5rem;color:#aaa;">Hinweise</h2>
     <ul style="font-size:0.85rem;color:#888;padding-left:1.2rem;line-height:1.7;">
         <li>Die Benachrichtigung wird exakt identisch zu einer echten Benachrichtigung erstellt.</li>
-        <li>Als strukturierte Benachrichtigungstypen werden <code>forum_reply</code> und <code>forum_comment</code> unterstützt.</li>
+        <li>Als strukturierte Benachrichtigungstypen werden <code>forum_reply</code>, <code>forum_comment</code> und <code>story_post</code> unterstützt.</li>
         <li>Titel und Text werden von der API generiert, wenn die Felder leer gelassen werden.</li>
         <li>Die API sendet keine Deep-Link-Routen an Clients; Clients erzeugen das Routing aus <code>type</code> und <code>data</code>.</li>
         <li>Push-Nachrichten werden automatisch an alle registrierten Geräte des Empfängers zugestellt.</li>
@@ -87,6 +88,7 @@
     const typeConfig = {
         forum_reply: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
         forum_comment: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
+        story_post: { entityKey: null, entityLabel: null, defaultTitle: '', defaultBody: '' },
     };
 
     function onTypeChange() {
@@ -110,6 +112,22 @@
 
         document.getElementById('notifTitle').value = config.defaultTitle;
         document.getElementById('notifBody').value = config.defaultBody;
+
+        if (!config.entityKey) {
+            entityGroup.style.display = 'none';
+            entitySelect.innerHTML = '<option value="">– Kein Objekt (kein Deep-Link) –</option>';
+            if (type === 'story_post') {
+                const authorId = document.getElementById('notifUser').value || 'STORY_AUTHOR_ID';
+                dataInput.value = JSON.stringify([
+                    { relation: 'story_author', object: 'User', identifier: authorId },
+                    { relation: 'story', object: 'Story', identifier: 'STORY_ID' },
+                ], null, 2);
+            } else {
+                dataInput.value = '';
+            }
+            updatePreview();
+            return;
+        }
 
         const entities = entityData[config.entityKey] || [];
         entitySelect.innerHTML = '<option value="">– Kein Objekt (kein Deep-Link) –</option>';

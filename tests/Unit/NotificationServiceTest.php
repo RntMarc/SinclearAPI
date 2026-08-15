@@ -24,6 +24,10 @@ class NotificationServiceTest extends TestCase
         ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
         ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
     ];
+    private const STORY_POST_DATA = [
+        ['relation' => 'story_author', 'object' => 'User', 'identifier' => 'user-story'],
+        ['relation' => 'story', 'object' => 'Story', 'identifier' => 'story-1'],
+    ];
     private PDO $db;
     private NotificationService $service;
 
@@ -220,6 +224,60 @@ class NotificationServiceTest extends TestCase
 
         $this->assertSame('Neuer Kommentar zu deinem Beitrag', $row['title']);
         $this->assertSame('Jemand hat deinen Beitrag kommentiert.', $row['body']);
+    }
+
+    public function testCreateStoresStructuredStoryPostData(): void
+    {
+        $id = $this->service->create(
+            userId: 'user-1',
+            type: 'story_post',
+            title: '',
+            body: '',
+            data: self::STORY_POST_DATA,
+        );
+
+        $stmt = $this->db->prepare('SELECT type, data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('story_post', $row['type']);
+        $this->assertStringContainsString('story_author', $row['data']);
+        $this->assertStringContainsString('story', $row['data']);
+    }
+
+    public function testCreateGeneratesTitleAndTextForStoryPost(): void
+    {
+        $id = $this->service->create('user-1', 'story_post', '', '', self::STORY_POST_DATA);
+
+        $stmt = $this->db->prepare('SELECT title, body FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('Neue Story', $row['title']);
+        $this->assertSame('Jemand hat eine neue Story veröffentlicht.', $row['body']);
+    }
+
+    public function testCreateThrowsOnMissingStoryPostRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = self::STORY_POST_DATA;
+        array_pop($data);
+
+        $this->service->create('user-1', 'story_post', 'Title', 'Body', $data);
+    }
+
+    public function testCreateThrowsWhenStoryPostContainsUnsupportedRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = [...self::STORY_POST_DATA, [
+            'relation' => 'parent_forum',
+            'object' => 'Forum',
+            'identifier' => 'forum-1',
+        ]];
+
+        $this->service->create('user-1', 'story_post', 'Title', 'Body', $data);
     }
 
     public function testCreatePrefersProvidedTitleAndBody(): void

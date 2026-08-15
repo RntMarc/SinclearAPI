@@ -6,9 +6,11 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\StoryRepository;
+use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\StoryPolicy;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\NotificationService;
 
 final readonly class StoryController
 {
@@ -30,6 +32,8 @@ final readonly class StoryController
         private StoryRepository $storyRepo,
         private StoryPolicy $policy,
         private ImageService $imageService,
+        private UserRepository $userRepo,
+        private NotificationService $notificationService,
     ) {}
 
     public function feed(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -107,6 +111,8 @@ final readonly class StoryController
             return ResponseFactory::json(['error' => 'story_not_found'], 404, $response);
         }
 
+        $this->notifyOnStoryCreated($user->id, $id);
+
         return ResponseFactory::json(['data' => $this->formatStory($story, $user)], 201, $response);
     }
 
@@ -151,6 +157,27 @@ final readonly class StoryController
         $this->storyRepo->markViewed($story['id'], $user->id);
 
         return ResponseFactory::json(['data' => ['viewed' => true]], 200, $response);
+    }
+
+    private function notifyOnStoryCreated(string $authorId, string $storyId): void
+    {
+        $recipientIds = array_filter(
+            $this->userRepo->findAllIds(),
+            fn(string $id): bool => $id !== $authorId,
+        );
+
+        foreach ($recipientIds as $recipientId) {
+            $this->notificationService->create(
+                userId: $recipientId,
+                type: 'story_post',
+                title: '',
+                body: '',
+                data: [
+                    ['relation' => 'story_author', 'object' => 'User', 'identifier' => $authorId],
+                    ['relation' => 'story', 'object' => 'Story', 'identifier' => $storyId],
+                ],
+            );
+        }
     }
 
     /**

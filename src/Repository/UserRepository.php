@@ -41,6 +41,13 @@ final readonly class UserRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** @return list<string> */
+    public function findAllIds(): array
+    {
+        $stmt = $this->pdo->query('SELECT id FROM User');
+        return array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id');
+    }
+
     /** @return list<array<string, mixed>> */
     public function search(string $query): array
     {
