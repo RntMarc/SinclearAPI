@@ -25,6 +25,7 @@ use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
+use Sinclear\Api\Controllers\StoryController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -84,6 +85,7 @@ use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
+use Sinclear\Api\Repository\StoryRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
@@ -103,6 +105,7 @@ use Sinclear\Api\Security\Policy\RecipePolicy;
 use Sinclear\Api\Security\Policy\ForumPolicy;
 use Sinclear\Api\Security\Policy\ReviewPolicy;
 use Sinclear\Api\Security\Policy\SubscriptionPolicy;
+use Sinclear\Api\Security\Policy\StoryPolicy;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
@@ -405,6 +408,10 @@ return [
     SubscriptionService::class => autowire(),
     SubscriptionController::class => autowire(),
     SubscriptionPolicy::class => autowire(),
+
+    StoryRepository::class => autowire(),
+    StoryPolicy::class => autowire(),
+    StoryController::class => autowire(),
 
     AppController::class => function (ContainerInterface $c): AppController {
         $settings = $c->get(Settings::class);

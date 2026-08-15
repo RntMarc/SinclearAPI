@@ -4163,6 +4163,143 @@ components:
           type: string
           description: Base64url-encoded VAPID-Public-Key
 
+    StoryCreateRequest:
+      type: object
+      required: [image]
+      properties:
+        image:
+          type: string
+          description: >
+            Base64-kodiertes Story-Bild (JPEG, PNG oder WebP, max. 200 KB,
+            max. 1000x1000 Pixel)
+        caption:
+          type: string
+          maxLength: 1000
+          description: Optionale Bildunterschrift
+
+    StoryUser:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID des Story-Autors
+        displayName:
+          type: string
+          description: Anzeigename des Story-Autors
+        avatar:
+          type: string
+          description: Base64-kodiertes Profilbild des Story-Autors
+
+    Story:
+      type: object
+      required: [id, userId, image, createdAt, expiresAt, viewed, viewCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Story-ID
+        userId:
+          type: string
+          format: uuid
+          description: ID des Story-Autors
+        user:
+          $ref: '#/components/schemas/StoryUser'
+        image:
+          type: string
+          description: Base64-kodiertes Story-Bild
+        caption:
+          type: string
+          nullable: true
+          description: Bildunterschrift (optional)
+        createdAt:
+          type: string
+          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        expiresAt:
+          type: string
+          description: Ablaufzeitpunkt (UTC, createdAt + 7 Tage), Format `YYYY-MM-DD HH:MM:SS`
+        viewed:
+          type: boolean
+          description: Ob der aktuelle Nutzer die Story bereits gesehen hat
+        viewCount:
+          type: integer
+          description: Anzahl der Nutzer, die die Story gesehen haben
+
+    StoryFeedEntry:
+      type: object
+      required: [id, image, createdAt, expiresAt, viewed]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Story-ID
+        image:
+          type: string
+          description: Base64-kodiertes Story-Bild
+        caption:
+          type: string
+          nullable: true
+          description: Bildunterschrift (optional)
+        createdAt:
+          type: string
+          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        expiresAt:
+          type: string
+          description: Ablaufzeitpunkt (UTC, createdAt + 7 Tage), Format `YYYY-MM-DD HH:MM:SS`
+        viewed:
+          type: boolean
+          description: Ob der aktuelle Nutzer die Story bereits gesehen hat
+
+    StoryFeedGroup:
+      type: object
+      required: [userId, stories]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID des Story-Autors
+        displayName:
+          type: string
+          description: Anzeigename des Story-Autors
+        avatar:
+          type: string
+          description: Base64-kodiertes Profilbild des Story-Autors
+        stories:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryFeedEntry'
+          description: Aktive Stories des Autors (max. 7 Tage alt, neueste zuerst)
+
+    StoryFeedResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryFeedGroup'
+          description: Nach Nutzer gruppierte aktive Stories
+
+    StoryResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Story'
+
+    StoryViewedResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [viewed]
+          properties:
+            viewed:
+              type: boolean
+              description: Bestätigung, dass die Story als gesehen markiert wurde
+
 paths:
   /mcp:
     get:
@@ -13720,3 +13857,175 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VapidKeyResponse'
+
+  /stories:
+    get:
+      summary: Story-Feed abrufen
+      description: >
+        Gibt alle aktiven Stories der letzten 7 Tage zurück, gruppiert nach
+        Nutzer. Jede Gruppe enthält Anzeigename, Avatar und die Liste der
+        Stories des Autors (neueste zuerst). Für jede Story wird angegeben,
+        ob der aktuelle Nutzer sie bereits gesehen hat.
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Nach Nutzer gruppierte aktive Stories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryFeedResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Neue Story erstellen
+      description: >
+        Erstellt eine neue Story für den aktuellen Nutzer. Die Story ist ab
+        der Erstellung genau 7 Tage für alle authentifizierten Nutzer sichtbar
+        (expiresAt = createdAt + 7 Tage).
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StoryCreateRequest'
+      responses:
+        '201':
+          description: Story erfolgreich erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryResponse'
+        '400':
+          description: Ungültige Eingabe (z.B. fehlendes oder ungültiges Bild)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /stories/{id}:
+    get:
+      summary: Einzelne Story abrufen
+      description: >
+        Gibt eine einzelne Story inkl. Autor, Gesehen-Status des aktuellen
+        Nutzers und Anzahl der Aufrufe zurück.
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      responses:
+        '200':
+          description: Story-Details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Eigene Story löschen
+      description: >
+        Löscht eine eigene Story. Nur der Ersteller (oder ein Admin) darf
+        die Story löschen. Gesehen-Status-Einträge werden mitgelöscht.
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      responses:
+        '204':
+          description: Story erfolgreich gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Nicht der Ersteller der Story
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /stories/{id}/view:
+    post:
+      summary: Story als gesehen markieren
+      description: >
+        Markiert eine Story für den aktuellen Nutzer als gesehen. Mehrfaches
+        Markieren derselben Story hat keinen zusätzlichen Effekt (idempotent).
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      responses:
+        '200':
+          description: Story als gesehen markiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryViewedResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'

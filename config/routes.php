@@ -18,6 +18,7 @@ use Sinclear\Api\Controllers\NotificationController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
+use Sinclear\Api\Controllers\StoryController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -332,6 +333,15 @@ return function (App $app): void {
 
     // Notifications (public — no auth required)
     $app->get('/notifications/vapid-public-key', [NotificationController::class, 'vapidPublicKey']);
+
+    // Stories — 7-Tage-Stories (authenticated)
+    $app->group('/stories', function (RouteCollectorProxy $group) {
+        $group->get('', [StoryController::class, 'feed']);
+        $group->post('', [StoryController::class, 'create']);
+        $group->get('/{id}', [StoryController::class, 'get']);
+        $group->delete('/{id}', [StoryController::class, 'delete']);
+        $group->post('/{id}/view', [StoryController::class, 'markViewed']);
+    })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);
