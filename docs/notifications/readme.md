@@ -149,6 +149,75 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 }
 ```
 
+### Benachrichtigungs-Präferenzen abrufen
+
+```
+GET /notifications/preferences
+```
+
+Gibt die Präferenzen des eingeloggten Nutzers für **alle** bekannten Benachrichtigungstypen zurück. Für Typen ohne gespeicherten Eintrag gilt der Standard `enabled`.
+
+**Authentifizierung:** Erforderlich
+
+**Response 200:**
+```json
+{
+  "data": {
+    "forum_comment": { "state": "enabled", "customAllowed": true,  "customData": null },
+    "story_post":    { "state": "enabled", "customAllowed": true,  "customData": null },
+    "trip_user_added": { "state": "enabled", "customAllowed": false, "customData": null }
+  }
+}
+```
+
+| Feld | Bedeutung |
+|------|-----------|
+| `state` | `enabled` (aktiv), `disabled` (deaktiviert) oder `custom` (individuelle Auswahl) |
+| `customAllowed` | Ob dieser Typ `custom` überhaupt unterstützt (serverseitig festgelegt) |
+| `customData` | JSON mit der individuellen Auswahl; nur gesetzt wenn `state=custom` |
+
+### Benachrichtigungs-Präferenzen aktualisieren
+
+```
+PUT /notifications/preferences
+```
+
+Aktualisiert die Präferenzen des eingeloggten Nutzers (Bulk-Update). Es müssen nur die Typen übermittelt werden, die geändert werden sollen.
+
+**Authentifizierung:** Erforderlich
+
+**Request Body:**
+```json
+{
+  "preferences": [
+    { "type": "story_post", "state": "disabled" },
+    { "type": "forum_comment", "state": "custom", "customData": { "forumIds": ["forum-id-1", "forum-id-2"] } }
+  ]
+}
+```
+
+**Response 200:** Vollständige Präferenz-Map wie bei `GET /notifications/preferences`.
+
+**Response 400:**
+- `preferences_required`: `preferences` fehlt oder ist leer
+- `invalid_type`: unbekannter Benachrichtigungstyp
+- `invalid_state`: ungültiger State (nicht `enabled`/`disabled`/`custom`)
+- `custom_not_allowed`: Typ unterstützt kein `custom`
+- `custom_data_required`: `state=custom` ohne `customData`
+- `custom_data_invalid`: `customData` hat falsches Format
+
+### Custom-Präferenzen
+
+`custom` erlaubt es, Benachrichtigungen nicht pauschal ein- oder auszuschalten, sondern individuell zu filtern. Aktuell unterstützen folgende Typen `custom`:
+
+| Typ | `customData` | Filter-Relation |
+|-----|--------------|-----------------|
+| `forum_comment` | `{ "forumIds": ["..."] }` | `parent_forum` |
+| `forum_reply` | `{ "forumIds": ["..."] }` | `parent_forum` |
+| `story_post` | `{ "userIds": ["..."] }` | `story_author` |
+
+**Hinweis zur Foren-Migration:** Das bisherige per-Forum-Feld `ForumMember.notificationsEnabled` samt Endpunkt `PUT /forums/{id}/members/notifications` ist seit Einführung der Präferenzen **deprecated**. Clients sollen stattdessen `forum_comment`/`forum_reply` mit `state=custom` und `customData.forumIds` verwenden. Das alte Feld bleibt vorerst bestehen, wird aber nicht mehr weiterentwickelt.
+
 ## Datenbank-Schema
 
 ### Tabelle `Notification`
@@ -180,6 +249,20 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 | `createdAt` | datetime(3) | Erstellungszeitpunkt (UTC) |
 
 **Unique:** `endpoint` (Duplikate verhindern)
+
+### Tabelle `NotificationPreference`
+
+| Feld | Typ | Beschreibung |
+|------|-----|-------------|
+| `id` | varchar(191) | Primärschlüssel (UUIDv7) |
+| `userId` | varchar(191) | Eigentümer (FK zu User, ON DELETE CASCADE) |
+| `type` | varchar(64) | Benachrichtigungstyp |
+| `state` | varchar(16) | `enabled`, `disabled` oder `custom` (Default `enabled`) |
+| `data` | json | Individuelle Auswahl bei `custom`; sonst null |
+| `createdAt` | datetime(3) | Erstellungszeitpunkt (UTC) |
+| `updatedAt` | datetime(3) | Änderungszeitpunkt (UTC) |
+
+**Unique:** `(userId, type)` — höchstens ein Eintrag pro Nutzer und Typ. **Kein Eintrag = aktiv.**
 
 ## Notification-Typen
 

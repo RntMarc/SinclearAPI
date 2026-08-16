@@ -258,6 +258,8 @@ return [
 
     \Sinclear\Api\Repository\NotificationRepository::class => autowire(),
     \Sinclear\Api\Repository\PushSubscriptionRepository::class => autowire(),
+    \Sinclear\Api\Repository\NotificationPreferenceRepository::class => autowire(),
+    \Sinclear\Api\Services\NotificationPreferenceService::class => autowire(),
 
     \Minishlink\WebPush\WebPush::class => function (ContainerInterface $c): \Minishlink\WebPush\WebPush {
         $settings = $c->get(Settings::class);
@@ -290,6 +292,7 @@ return [
         return new \Sinclear\Api\Services\NotificationService(
             notificationRepo: $c->get(\Sinclear\Api\Repository\NotificationRepository::class),
             pushSubRepo: $c->get(\Sinclear\Api\Repository\PushSubscriptionRepository::class),
+            preferenceService: $c->get(\Sinclear\Api\Services\NotificationPreferenceService::class),
             webPush: $webPush,
             httpClient: $c->get(\GuzzleHttp\Client::class),
             logger: $c->get(\Psr\Log\LoggerInterface::class),

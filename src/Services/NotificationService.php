@@ -90,12 +90,13 @@ final readonly class NotificationService
     public function __construct(
         private NotificationRepository $notificationRepo,
         private PushSubscriptionRepository $pushSubRepo,
+        private NotificationPreferenceService $preferenceService,
         private ?WebPush $webPush = null,
         private ?Client $httpClient = null,
         private ?LoggerInterface $logger = null,
     ) {}
 
-    public function create(string $userId, string $type, string $title, string $body, ?array $data = null): string
+    public function create(string $userId, string $type, string $title, string $body, ?array $data = null, bool $respectPreferences = true): ?string
     {
         $type = trim($type);
         $title = trim($title);
@@ -103,6 +104,10 @@ final readonly class NotificationService
 
         if ($type === '') {
             throw new \InvalidArgumentException('type is required');
+        }
+
+        if ($respectPreferences && !$this->preferenceService->shouldSend($userId, $type, $data)) {
+            return null;
         }
 
         $data = $this->normalizeData($type, $data);

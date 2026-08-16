@@ -188,6 +188,11 @@ final readonly class ForumController
         }
     }
 
+    /**
+     * @deprecated Seit Einführung der Notification-Präferenzen. Clients sollen
+     *             stattdessen `PUT /notifications/preferences` mit
+     *             `state=custom` und `customData.forumIds` verwenden.
+     */
     public function updateNotifications(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);

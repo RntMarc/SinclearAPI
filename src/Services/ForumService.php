@@ -193,6 +193,11 @@ final readonly class ForumService
         return $this->memberRepo->listByForum($forumId);
     }
 
+    /**
+     * @deprecated Seit Einführung der Notification-Präferenzen (State `custom`
+     *             mit `forumIds`). Der per-Forum-Toggle in `ForumMember` wird
+     *             durch die zentrale Präferenz-Verwaltung ersetzt.
+     */
     public function updateNotifications(string $forumId, string $userId, bool $enabled): void
     {
         $existing = $this->memberRepo->findByForumAndUser($forumId, $userId);

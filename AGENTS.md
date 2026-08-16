@@ -22,6 +22,14 @@ Die Datei `docs/notifications/types.md` listet tabellarisch ausschließlich die 
 **Requirement:**
 Bei jeder Änderung an Notification-Typen (Trigger, Empfänger, Relations oder generierte Titel/Texte) MUSS `docs/notifications/types.md` aktualisiert werden. Diese Datei ist die maßgebliche Übersicht für alle Notification-Typen.
 
+Zusätzlich MUSS bei jedem neuen/entfernten Notification-Typ die Liste `NotificationPreferenceService::KNOWN_TYPES` synchron gehalten werden (sie entspricht den Schlüsseln von `NotificationService::CONTENT_TEMPLATES`). Typen, die die Präferenz `custom` unterstützen, werden in `NotificationPreferenceService::CUSTOMIZABLE_TYPES` gepflegt.
+
+## Notification-Präferenzen
+Nutzer können jeden Notification-Typ aktivieren (`enabled`), deaktivieren (`disabled`) oder – sofern unterstützt – individuell filtern (`custom`). Gespeichert in der Tabelle `NotificationPreference`; kein Eintrag bedeutet Standard `enabled`.
+
+**Requirement:**
+Bei jeder Änderung am Präferenz-System (Zustände, `custom`-Typen, `customData`-Format) MÜSSEN `docs/notifications/readme.md` und die zugehörigen Schemas/Endpunkte in `openapi.yaml` aktualisiert werden. Der Versand-Filter liegt zentral in `NotificationService::create()`.
+
 ## MCP-Server
 Der MCP-Server (`sinclear-docs-mcp`) stellt die gesamte Dokumentation aus `docs/` über das Tool `get_documentation` bereit. Alle `.md`-Dateien werden automatisch als Topics gescannt und als `enum`-Werte des Tools angeboten (auch verschachtelte Pfade wie `notifications/list`).
 

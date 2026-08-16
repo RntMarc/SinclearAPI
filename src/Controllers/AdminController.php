@@ -2227,6 +2227,7 @@ ROW;
                 title: $title,
                 body: $bodyText,
                 data: $data,
+                respectPreferences: false,
             );
         } catch (\InvalidArgumentException $e) {
             return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);

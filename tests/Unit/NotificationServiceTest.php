@@ -51,6 +51,7 @@ class NotificationServiceTest extends TestCase
 
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS User");
 
         $this->db->exec("
@@ -100,12 +101,32 @@ class NotificationServiceTest extends TestCase
             )
         ");
 
+        $this->db->exec("
+            CREATE TABLE NotificationPreference (
+                id varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                type varchar(64) NOT NULL,
+                state varchar(16) NOT NULL DEFAULT 'enabled',
+                data json DEFAULT NULL,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                updatedAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                UNIQUE KEY idx_notifpref_user_type (userId, type)
+            )
+        ");
+
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-1', 'a@test.com', 'hash', 'Alice', NOW(3))");
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-2', 'b@test.com', 'hash', 'Bob', NOW(3))");
 
         $repo = new NotificationRepository($this->db);
         $pushSubRepo = new PushSubscriptionRepository($this->db);
-        $this->service = new NotificationService(notificationRepo: $repo, pushSubRepo: $pushSubRepo);
+        $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
+        $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
+        $this->service = new NotificationService(
+            notificationRepo: $repo,
+            pushSubRepo: $pushSubRepo,
+            preferenceService: $prefService,
+        );
     }
 
     protected function tearDown(): void
@@ -113,6 +134,7 @@ class NotificationServiceTest extends TestCase
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
@@ -326,6 +348,42 @@ class NotificationServiceTest extends TestCase
         $this->assertSame('forum_reply', $row['type']);
         $this->assertSame('Neue Antwort', $row['title']);
         $this->assertSame('Body', $row['body']);
+    }
+
+    // ── Preference filtering ──────────────────────────────
+
+    public function testCreateReturnsNullWhenTypeDisabled(): void
+    {
+        $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
+        $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
+        $prefService->update('user-1', [['type' => 'forum_reply', 'state' => 'disabled']]);
+
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
+
+        $this->assertNull($id);
+    }
+
+    public function testCreateRespectsPreferencesCanBeBypassed(): void
+    {
+        $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
+        $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
+        $prefService->update('user-1', [['type' => 'forum_reply', 'state' => 'disabled']]);
+
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA, respectPreferences: false);
+
+        $this->assertNotEmpty($id);
+    }
+
+    public function testCreateReturnsNullWhenCustomDoesNotMatch(): void
+    {
+        $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
+        $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
+        $prefService->update('user-1', [['type' => 'forum_reply', 'state' => 'custom', 'customData' => ['forumIds' => ['f1']]]]);
+
+        // FORUM_REPLY_DATA has parent_forum = 'forum-1' which is not in ['f1']
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
+
+        $this->assertNull($id);
     }
 
     // ── getUnread() ───────────────────────────────────────

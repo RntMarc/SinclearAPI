@@ -84,6 +84,10 @@ final readonly class ForumMemberRepository
         $stmt->execute([$forumId, $userId]);
     }
 
+    /**
+     * @deprecated Seit Einführung der Notification-Präferenzen. Siehe
+     *             `NotificationPreference` (State `custom` mit `forumIds`).
+     */
     public function updateNotifications(string $forumId, string $userId, bool $enabled): void
     {
         $stmt = $this->pdo->prepare(

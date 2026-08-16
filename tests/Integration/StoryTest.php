@@ -50,6 +50,7 @@ class StoryTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS Story");
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
 
@@ -116,11 +117,28 @@ class StoryTest extends TestCase
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-1', 'a@test.com', 'hash', 'Alice', NOW(3))");
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-2', 'b@test.com', 'hash', 'Bob', NOW(3))");
 
+        $this->db->exec("
+            CREATE TABLE NotificationPreference (
+                id varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                type varchar(64) NOT NULL,
+                state varchar(16) NOT NULL DEFAULT 'enabled',
+                data json DEFAULT NULL,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                updatedAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                UNIQUE KEY idx_notifpref_user_type (userId, type)
+            )
+        ");
+
         $this->repo = new StoryRepository($this->db);
         $logger = new Logger('test', [new NullHandler()]);
+        $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
+        $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
         $notificationService = new NotificationService(
             notificationRepo: new NotificationRepository($this->db),
             pushSubRepo: new PushSubscriptionRepository($this->db),
+            preferenceService: $prefService,
         );
         $this->controller = new StoryController(
             storyRepo: $this->repo,
@@ -138,6 +156,7 @@ class StoryTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS Story");
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }

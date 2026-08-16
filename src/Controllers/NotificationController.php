@@ -7,6 +7,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\PushSubscriptionRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Services\NotificationPreferenceService;
 use Sinclear\Api\Services\NotificationService;
 
 final readonly class NotificationController
@@ -14,6 +15,7 @@ final readonly class NotificationController
     public function __construct(
         private NotificationService $notificationService,
         private PushSubscriptionRepository $pushSubscriptionRepo,
+        private NotificationPreferenceService $preferenceService,
     ) {}
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -97,6 +99,31 @@ final readonly class NotificationController
         $key = $_ENV['VAPID_PUBLIC_KEY'] ?? '';
 
         return ResponseFactory::json(['key' => $key], 200, $response);
+    }
+
+    public function getPreferences(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        return ResponseFactory::json(['data' => $this->preferenceService->getAll($user->id)], 200, $response);
+    }
+
+    public function updatePreferences(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        if (!is_array($body) || !isset($body['preferences']) || !is_array($body['preferences']) || $body['preferences'] === []) {
+            return ResponseFactory::json(['error' => 'preferences_required'], 400, $response);
+        }
+
+        try {
+            $prefs = $this->preferenceService->update($user->id, $body['preferences']);
+        } catch (\InvalidArgumentException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+        }
+
+        return ResponseFactory::json(['data' => $prefs], 200, $response);
     }
 
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser

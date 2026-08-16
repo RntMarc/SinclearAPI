@@ -2684,7 +2684,11 @@ components:
               example: true
             notificationsEnabled:
               type: boolean
-              description: Benachrichtigungseinstellung des eingeloggten Nutzers (nur bei isMember=true)
+              deprecated: true
+              description: >
+                DEPRECATED: Benachrichtigungseinstellung des eingeloggten
+                Nutzers (nur bei isMember=true). Ersetzt durch die zentralen
+                Notification-Präferenzen (`/notifications/preferences`).
               example: true
 
     ForumListResponse:
@@ -2764,6 +2768,9 @@ components:
           description: Profilbild des Mitglieds (nur bei Member-Liste)
         notificationsEnabled:
           type: boolean
+          deprecated: true
+          description: >
+            DEPRECATED: Ersetzt durch die zentralen Notification-Präferenzen.
           example: true
         createdAt:
           type: string
@@ -2784,7 +2791,10 @@ components:
       properties:
         notificationsEnabled:
           type: boolean
-          description: Benachrichtigungen bei neuen Posts aktivieren/deaktivieren
+          deprecated: true
+          description: >
+            DEPRECATED: Benachrichtigungen bei neuen Posts aktivieren/deaktivieren.
+            Ersetzt durch die zentralen Notification-Präferenzen.
           example: false
 
     FeedPost:
@@ -4164,6 +4174,67 @@ components:
         key:
           type: string
           description: Base64url-encoded VAPID-Public-Key
+
+    NotificationPreferenceItem:
+      type: object
+      required: [state, customAllowed, customData]
+      properties:
+        state:
+          type: string
+          enum: [enabled, disabled, custom]
+          description: >
+            `enabled` (aktiv), `disabled` (deaktiviert) oder `custom`
+            (individuelle Auswahl). Standard ist `enabled`.
+        customAllowed:
+          type: boolean
+          description: >
+            Ob dieser Benachrichtigungstyp `custom` überhaupt unterstützt.
+        customData:
+          type: object
+          nullable: true
+          description: >
+            Individuelle Auswahl bei `state=custom`. Für Forum-Typen
+            `{ "forumIds": ["..."] }`, für `story_post` `{ "userIds": ["..."] }`.
+          additionalProperties: true
+
+    NotificationPreferencesResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          description: Map von Benachrichtigungstyp zu Präferenz-Eintrag
+          additionalProperties:
+            $ref: '#/components/schemas/NotificationPreferenceItem'
+
+    NotificationPreferenceUpdateItem:
+      type: object
+      required: [type, state]
+      properties:
+        type:
+          type: string
+          description: Benachrichtigungstyp (z.B. `forum_comment`)
+        state:
+          type: string
+          enum: [enabled, disabled, custom]
+          description: Gewünschter Zustand
+        customData:
+          type: object
+          nullable: true
+          description: >
+            Nur bei `state=custom` erforderlich. Für Forum-Typen
+            `{ "forumIds": ["..."] }`, für `story_post` `{ "userIds": ["..."] }`.
+          additionalProperties: true
+
+    NotificationPreferenceUpdateRequest:
+      type: object
+      required: [preferences]
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationPreferenceUpdateItem'
+          description: Liste der zu ändernden Präferenzen
 
     StoryCreateRequest:
       type: object
@@ -10661,7 +10732,11 @@ paths:
   /forums/{id}/members/notifications:
     put:
       summary: Benachrichtigungseinstellung ändern
+      deprecated: true
       description: >
+        DEPRECATED: Seit Einführung der Notification-Präferenzen. Clients
+        sollen stattdessen `PUT /notifications/preferences` mit `state=custom`
+        und `customData.forumIds` verwenden.
         Aktualisiert die Benachrichtigungseinstellung des angemeldeten
         Nutzers für ein Forum. Der Nutzer muss Mitglied sein.
       tags: [Forum]
@@ -13861,6 +13936,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VapidKeyResponse'
+
+  /notifications/preferences:
+    get:
+      summary: Benachrichtigungs-Präferenzen abrufen
+      description: >
+        Gibt die Präferenzen des aktuellen Nutzers für alle bekannten
+        Benachrichtigungstypen zurück. Für Typen ohne gespeicherten Eintrag
+        gilt der Standard `enabled`.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Präferenz-Map (Typ zu Präferenz-Eintrag)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Benachrichtigungs-Präferenzen aktualisieren
+      description: >
+        Aktualisiert die Präferenzen des aktuellen Nutzers (Bulk-Update).
+        Es müssen nur die Typen übermittelt werden, die geändert werden sollen.
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferenceUpdateRequest'
+      responses:
+        '200':
+          description: Vollständige aktualisierte Präferenz-Map
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+        '400':
+          description: >
+            Ungültige Eingabe (unbekannter Typ, ungültiger State,
+            `custom` nicht erlaubt oder fehlendes/ungültiges `customData`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /stories:
     get:
