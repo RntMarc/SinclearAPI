@@ -376,8 +376,15 @@ ROW;
             return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
         }
 
+        $changedFields = $this->detectTripChanges($trip, $data);
+
         $this->tripRepo->update($id, $data);
         $updated = $this->tripRepo->findById($id);
+
+        if ($changedFields !== []) {
+            $this->notifyTripInfoChanged($id, $changedFields, $request);
+        }
+
         return ResponseFactory::json(['data' => $updated], 200, $response);
     }
 
@@ -444,6 +451,10 @@ ROW;
 
         $event = $this->eventRepo->findById($id);
 
+        if ($tripId !== null) {
+            $this->notifyTripEventAdded($tripId, $event);
+        }
+
         return ResponseFactory::json(['data' => $event], 201, $response);
     }
 
@@ -501,8 +512,14 @@ ROW;
             return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
         }
 
+        $changedFields = $this->detectEventChanges($event, $data);
+
         $this->eventRepo->update($id, $data);
         $updated = $this->eventRepo->findById($id);
+
+        if ($changedFields !== []) {
+            $this->notifyEventInfoChanged($event, $changedFields, $request);
+        }
 
         return ResponseFactory::json(['data' => $updated], 200, $response);
     }
@@ -586,6 +603,8 @@ ROW;
         }
 
         $this->tripSubscriptionRepo->add($tripId, $subscriptionId);
+
+        $this->notifyTripSubscriptionAdded($tripId, $subscriptionId);
 
         return ResponseFactory::json(['message' => 'subscription_linked'], 200, $response);
     }
@@ -843,6 +862,8 @@ ROW;
 
         $relationId = $this->travelRelationRepo->addParticipant($userId, $tripId, $accommodation);
 
+        $this->notifyTripUserAdded($tripId, $userId, $request);
+
         return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
     }
 
@@ -875,6 +896,11 @@ ROW;
             ? trim($body['accommodation']) : null;
 
         $this->travelRelationRepo->updateAccommodation($userId, $tripId, $accommodation);
+
+        if ($accommodation !== null) {
+            $this->notifyTripAccommodationAdded($tripId, $userId, $accommodation);
+        }
+
         return ResponseFactory::json(['message' => 'accommodation_updated'], 200, $response);
     }
 
@@ -1117,6 +1143,8 @@ ROW;
         }
 
         $relationId = $this->eventRelationRepo->addParticipant($eventId, $userId);
+
+        $this->notifyEventUserAdded($event, $userId, $request);
 
         return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
     }
@@ -2025,6 +2053,9 @@ ROW;
 
         $id = $this->ticketRepo->create($data);
         $ticket = $this->ticketRepo->findById($id);
+
+        $this->notifyTicketAdded($ticket, $request);
+
         return ResponseFactory::json(['data' => $ticket], 201, $response);
     }
 
@@ -2215,5 +2246,334 @@ ROW;
             throw new \RuntimeException('Authentication required');
         }
         return $user;
+    }
+
+    private function notifyTripUserAdded(string $tripId, string $addedUserId, ServerRequestInterface $request): void
+    {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return;
+        }
+
+        $addedUser = $this->userRepo->findById($addedUserId);
+        if ($addedUser === null) {
+            return;
+        }
+
+        $adminUser = $this->requireUser($request);
+
+        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
+        foreach ($participants as $participant) {
+            if ($participant['id'] === $addedUserId) {
+                $this->notificationService->create(
+                    userId: $addedUserId,
+                    type: 'trip_user_added',
+                    title: '',
+                    body: '',
+                    data: [
+                        ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
+                        ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
+                        ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
+                    ],
+                );
+            } else {
+                $this->notificationService->create(
+                    userId: $participant['id'],
+                    type: 'trip_user_added_others',
+                    title: '',
+                    body: '',
+                    data: [
+                        ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
+                        ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
+                        ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
+                    ],
+                );
+            }
+        }
+    }
+
+    private function notifyEventUserAdded(array $event, string $addedUserId, ServerRequestInterface $request): void
+    {
+        $addedUser = $this->userRepo->findById($addedUserId);
+        if ($addedUser === null) {
+            return;
+        }
+
+        $adminUser = $this->requireUser($request);
+        $isTripEvent = $event['trip'] !== null;
+
+        $participants = $this->eventRelationRepo->findByEvent($event['ID']);
+        foreach ($participants as $participant) {
+            if ($participant['userId'] === $addedUserId) {
+                $type = $isTripEvent ? 'trip_event_user_added' : 'standalone_event_user_added';
+                $data = [
+                    ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
+                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
+                    ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
+                ];
+                if ($isTripEvent) {
+                    $data[] = ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $event['trip']];
+                }
+                $this->notificationService->create(
+                    userId: $addedUserId,
+                    type: $type,
+                    title: '',
+                    body: '',
+                    data: $data,
+                );
+            } else {
+                $type = $isTripEvent ? 'trip_event_user_added_others' : 'standalone_event_user_added_others';
+                $data = [
+                    ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
+                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
+                    ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
+                ];
+                if ($isTripEvent) {
+                    $data[] = ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $event['trip']];
+                }
+                $this->notificationService->create(
+                    userId: $participant['userId'],
+                    type: $type,
+                    title: '',
+                    body: '',
+                    data: $data,
+                );
+            }
+        }
+    }
+
+    private function notifyTripEventAdded(string $tripId, array $event): void
+    {
+        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
+        foreach ($participants as $participant) {
+            $this->notificationService->create(
+                userId: $participant['id'],
+                type: 'trip_event_added',
+                title: '',
+                body: '',
+                data: [
+                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
+                    ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
+                ],
+            );
+        }
+    }
+
+    private function notifyTicketAdded(array $ticket, ServerRequestInterface $request): void
+    {
+        if ($ticket['type'] === 'user') {
+            return;
+        }
+
+        $uploadedBy = $this->requireUser($request);
+
+        if ($ticket['type'] === 'trip' && $ticket['trip'] !== null) {
+            $participants = $this->travelRelationRepo->findParticipantsByTrip($ticket['trip']);
+            foreach ($participants as $participant) {
+                if ($participant['id'] === $uploadedBy->id) {
+                    continue;
+                }
+                $this->notificationService->create(
+                    userId: $participant['id'],
+                    type: 'trip_ticket_added',
+                    title: '',
+                    body: '',
+                    data: [
+                        ['relation' => 'ticket', 'object' => 'Ticket', 'identifier' => $ticket['ID']],
+                        ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $ticket['trip']],
+                        ['relation' => 'uploaded_by', 'object' => 'User', 'identifier' => $uploadedBy->id],
+                    ],
+                );
+            }
+        } elseif ($ticket['type'] === 'event' && $ticket['event'] !== null) {
+            $event = $this->eventRepo->findById($ticket['event']);
+            if ($event === null) {
+                return;
+            }
+
+            $isTripEvent = $event['trip'] !== null;
+            $type = $isTripEvent ? 'trip_event_ticket_added' : 'standalone_event_ticket_added';
+
+            $participants = $this->eventRelationRepo->findByEvent($ticket['event']);
+            foreach ($participants as $participant) {
+                if ($participant['userId'] === $uploadedBy->id) {
+                    continue;
+                }
+                $data = [
+                    ['relation' => 'ticket', 'object' => 'Ticket', 'identifier' => $ticket['ID']],
+                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $ticket['event']],
+                    ['relation' => 'uploaded_by', 'object' => 'User', 'identifier' => $uploadedBy->id],
+                ];
+                $this->notificationService->create(
+                    userId: $participant['userId'],
+                    type: $type,
+                    title: '',
+                    body: '',
+                    data: $data,
+                );
+            }
+        }
+    }
+
+    private function notifyTripAccommodationAdded(string $tripId, string $userId, string $accommodationId): void
+    {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return;
+        }
+
+        $accommodation = $this->accommodationRepo->findById($accommodationId);
+        if ($accommodation === null) {
+            return;
+        }
+
+        $this->notificationService->create(
+            userId: $userId,
+            type: 'trip_accommodation_added',
+            title: '',
+            body: '',
+            data: [
+                ['relation' => 'accommodation', 'object' => 'Accommodation', 'identifier' => $accommodationId],
+                ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
+                ['relation' => 'user', 'object' => 'User', 'identifier' => $userId],
+            ],
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $oldTrip
+     * @param array<string, mixed> $newData
+     * @return list<string>
+     */
+    private function detectTripChanges(array $oldTrip, array $newData): array
+    {
+        $fieldLabels = [
+            'name' => 'Name',
+            'description' => 'Beschreibung',
+            'start' => 'Startdatum',
+            'end' => 'Enddatum',
+            'hastickets' => 'Ticket-Status',
+            'ticket' => 'Ticket-Informationen',
+            'ticketUrl' => 'Ticket-URL',
+        ];
+
+        $changed = [];
+        foreach ($newData as $field => $newValue) {
+            if (!isset($fieldLabels[$field])) {
+                continue;
+            }
+            $oldValue = $oldTrip[$field] ?? null;
+            if ($oldValue != $newValue) {
+                $changed[] = $fieldLabels[$field];
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
+     * @param array<string, mixed> $oldEvent
+     * @param array<string, mixed> $newData
+     * @return list<string>
+     */
+    private function detectEventChanges(array $oldEvent, array $newData): array
+    {
+        $fieldLabels = [
+            'name' => 'Name',
+            'description' => 'Beschreibung',
+            'start' => 'Startdatum',
+            'end' => 'Enddatum',
+            'hastickets' => 'Ticket-Status',
+            'ticket' => 'Ticket-Informationen',
+            'ticketUrl' => 'Ticket-URL',
+            'url' => 'URL',
+            'image' => 'Bild',
+            'organizer' => 'Veranstalter',
+            'address' => 'Adresse',
+        ];
+
+        $changed = [];
+        foreach ($newData as $field => $newValue) {
+            if (!isset($fieldLabels[$field])) {
+                continue;
+            }
+            $oldValue = $oldEvent[$field] ?? null;
+            if ($oldValue != $newValue) {
+                $changed[] = $fieldLabels[$field];
+            }
+        }
+
+        return $changed;
+    }
+
+    /**
+     * @param list<string> $changedFields
+     */
+    private function notifyTripInfoChanged(string $tripId, array $changedFields, ServerRequestInterface $request): void
+    {
+        $changedBy = $this->requireUser($request);
+        $fieldsString = implode(', ', $changedFields);
+
+        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
+        foreach ($participants as $participant) {
+            $this->notificationService->create(
+                userId: $participant['id'],
+                type: 'trip_info_changed',
+                title: '',
+                body: '',
+                data: [
+                    ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
+                    ['relation' => 'changed_by', 'object' => 'User', 'identifier' => $changedBy->id],
+                    ['relation' => 'changed_fields', 'object' => 'FieldList', 'identifier' => $fieldsString],
+                ],
+            );
+        }
+    }
+
+    /**
+     * @param list<string> $changedFields
+     */
+    private function notifyEventInfoChanged(array $event, array $changedFields, ServerRequestInterface $request): void
+    {
+        $changedBy = $this->requireUser($request);
+        $fieldsString = implode(', ', $changedFields);
+        $isTripEvent = $event['trip'] !== null;
+
+        $participants = $this->eventRelationRepo->findByEvent($event['ID']);
+        foreach ($participants as $participant) {
+            $type = $isTripEvent ? 'trip_event_info_changed' : 'standalone_event_info_changed';
+            $data = [
+                ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
+                ['relation' => 'changed_by', 'object' => 'User', 'identifier' => $changedBy->id],
+                ['relation' => 'changed_fields', 'object' => 'FieldList', 'identifier' => $fieldsString],
+            ];
+            if ($isTripEvent) {
+                $data[] = ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $event['trip']];
+            }
+            $this->notificationService->create(
+                userId: $participant['userId'],
+                type: $type,
+                title: '',
+                body: '',
+                data: $data,
+            );
+        }
+    }
+
+    private function notifyTripSubscriptionAdded(string $tripId, string $subscriptionId): void
+    {
+        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
+        foreach ($participants as $participant) {
+            $this->notificationService->create(
+                userId: $participant['id'],
+                type: 'trip_subscription_added',
+                title: '',
+                body: '',
+                data: [
+                    ['relation' => 'subscription', 'object' => 'Subscription', 'identifier' => $subscriptionId],
+                    ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
+                ],
+            );
+        }
     }
 }

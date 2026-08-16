@@ -25,6 +25,66 @@ final readonly class NotificationService
             'title' => 'Neue Story',
             'text' => 'Jemand hat eine neue Story veröffentlicht.',
         ],
+        'trip_user_added' => [
+            'title' => 'Du wurdest zu einer Reise hinzugefügt',
+            'text' => '',
+        ],
+        'trip_user_added_others' => [
+            'title' => 'Neuer Teilnehmer auf der Reise',
+            'text' => '',
+        ],
+        'standalone_event_user_added' => [
+            'title' => 'Du wurdest zu einem Event hinzugefügt',
+            'text' => '',
+        ],
+        'standalone_event_user_added_others' => [
+            'title' => 'Neuer Teilnehmer beim Event',
+            'text' => '',
+        ],
+        'trip_event_user_added' => [
+            'title' => 'Du wurdest zu einem Event hinzugefügt',
+            'text' => '',
+        ],
+        'trip_event_user_added_others' => [
+            'title' => 'Neuer Teilnehmer beim Event',
+            'text' => '',
+        ],
+        'trip_event_added' => [
+            'title' => 'Neues Event auf der Reise',
+            'text' => '',
+        ],
+        'trip_ticket_added' => [
+            'title' => 'Neues Ticket für die Reise',
+            'text' => '',
+        ],
+        'standalone_event_ticket_added' => [
+            'title' => 'Neues Ticket für das Event',
+            'text' => '',
+        ],
+        'trip_event_ticket_added' => [
+            'title' => 'Neues Ticket für das Event',
+            'text' => '',
+        ],
+        'trip_accommodation_added' => [
+            'title' => 'Hotel-Zuweisung',
+            'text' => '',
+        ],
+        'trip_info_changed' => [
+            'title' => 'Reise-Informationen geändert',
+            'text' => '',
+        ],
+        'standalone_event_info_changed' => [
+            'title' => 'Event-Informationen geändert',
+            'text' => '',
+        ],
+        'trip_event_info_changed' => [
+            'title' => 'Event-Informationen geändert',
+            'text' => '',
+        ],
+        'trip_subscription_added' => [
+            'title' => 'Neues Abo verknüpft',
+            'text' => '',
+        ],
     ];
 
     public function __construct(
@@ -86,6 +146,18 @@ final readonly class NotificationService
             'forum_reply' => $this->normalizeForumReplyData($data),
             'forum_comment' => $this->normalizeForumCommentData($data),
             'story_post' => $this->normalizeStoryPostData($data),
+            'trip_user_added', 'trip_user_added_others' => $this->normalizeTripUserAddedData($data),
+            'standalone_event_user_added', 'standalone_event_user_added_others' => $this->normalizeStandaloneEventUserAddedData($data),
+            'trip_event_user_added', 'trip_event_user_added_others' => $this->normalizeTripEventUserAddedData($data),
+            'trip_event_added' => $this->normalizeTripEventAddedData($data),
+            'trip_ticket_added' => $this->normalizeTripTicketAddedData($data),
+            'standalone_event_ticket_added' => $this->normalizeStandaloneEventTicketAddedData($data),
+            'trip_event_ticket_added' => $this->normalizeTripEventTicketAddedData($data),
+            'trip_accommodation_added' => $this->normalizeTripAccommodationAddedData($data),
+            'trip_info_changed' => $this->normalizeTripInfoChangedData($data),
+            'standalone_event_info_changed' => $this->normalizeStandaloneEventInfoChangedData($data),
+            'trip_event_info_changed' => $this->normalizeTripEventInfoChangedData($data),
+            'trip_subscription_added' => $this->normalizeTripSubscriptionAddedData($data),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }
@@ -234,6 +306,618 @@ final readonly class NotificationService
         foreach ($requiredRelations as $relation => $_object) {
             if (!isset($normalized[$relation])) {
                 throw new \InvalidArgumentException('story_post data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripUserAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_user_added data is required');
+        }
+
+        $requiredRelations = [
+            'added_user' => 'User',
+            'trip' => 'Trip',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_user_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_user_added data entries require relation, object, and identifier');
+            }
+
+            if ($relation === 'added_by') {
+                $normalized['added_by'] = [
+                    'relation' => 'added_by',
+                    'object' => 'User',
+                    'identifier' => $identifier,
+                ];
+                continue;
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_user_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_user_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeStandaloneEventUserAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('standalone_event_user_added data is required');
+        }
+
+        $requiredRelations = [
+            'added_user' => 'User',
+            'event' => 'Event',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('standalone_event_user_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('standalone_event_user_added data entries require relation, object, and identifier');
+            }
+
+            if ($relation === 'added_by') {
+                $normalized['added_by'] = [
+                    'relation' => 'added_by',
+                    'object' => 'User',
+                    'identifier' => $identifier,
+                ];
+                continue;
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('standalone_event_user_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('standalone_event_user_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripEventUserAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_event_user_added data is required');
+        }
+
+        $requiredRelations = [
+            'added_user' => 'User',
+            'event' => 'Event',
+            'trip' => 'Trip',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_event_user_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_event_user_added data entries require relation, object, and identifier');
+            }
+
+            if ($relation === 'added_by') {
+                $normalized['added_by'] = [
+                    'relation' => 'added_by',
+                    'object' => 'User',
+                    'identifier' => $identifier,
+                ];
+                continue;
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_event_user_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_event_user_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripEventAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_event_added data is required');
+        }
+
+        $requiredRelations = [
+            'event' => 'Event',
+            'trip' => 'Trip',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_event_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_event_added data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_event_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_event_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripTicketAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_ticket_added data is required');
+        }
+
+        $requiredRelations = [
+            'ticket' => 'Ticket',
+            'trip' => 'Trip',
+            'uploaded_by' => 'User',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_ticket_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_ticket_added data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_ticket_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_ticket_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeStandaloneEventTicketAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('standalone_event_ticket_added data is required');
+        }
+
+        $requiredRelations = [
+            'ticket' => 'Ticket',
+            'event' => 'Event',
+            'uploaded_by' => 'User',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('standalone_event_ticket_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('standalone_event_ticket_added data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('standalone_event_ticket_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('standalone_event_ticket_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripEventTicketAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_event_ticket_added data is required');
+        }
+
+        $requiredRelations = [
+            'ticket' => 'Ticket',
+            'event' => 'Event',
+            'uploaded_by' => 'User',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_event_ticket_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_event_ticket_added data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_event_ticket_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_event_ticket_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripAccommodationAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_accommodation_added data is required');
+        }
+
+        $requiredRelations = [
+            'accommodation' => 'Accommodation',
+            'trip' => 'Trip',
+            'user' => 'User',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_accommodation_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_accommodation_added data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_accommodation_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_accommodation_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripInfoChangedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_info_changed data is required');
+        }
+
+        $requiredRelations = [
+            'trip' => 'Trip',
+            'changed_by' => 'User',
+            'changed_fields' => 'FieldList',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_info_changed data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_info_changed data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_info_changed data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_info_changed data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeStandaloneEventInfoChangedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('standalone_event_info_changed data is required');
+        }
+
+        $requiredRelations = [
+            'event' => 'Event',
+            'changed_by' => 'User',
+            'changed_fields' => 'FieldList',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('standalone_event_info_changed data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('standalone_event_info_changed data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('standalone_event_info_changed data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('standalone_event_info_changed data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripEventInfoChangedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_event_info_changed data is required');
+        }
+
+        $requiredRelations = [
+            'event' => 'Event',
+            'trip' => 'Trip',
+            'changed_by' => 'User',
+            'changed_fields' => 'FieldList',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_event_info_changed data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_event_info_changed data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_event_info_changed data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_event_info_changed data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTripSubscriptionAddedData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('trip_subscription_added data is required');
+        }
+
+        $requiredRelations = [
+            'subscription' => 'Subscription',
+            'trip' => 'Trip',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('trip_subscription_added data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('trip_subscription_added data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('trip_subscription_added data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('trip_subscription_added data is missing relation: ' . $relation);
             }
         }
 
