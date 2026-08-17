@@ -1006,7 +1006,7 @@ final readonly class NotificationService
             try {
                 $this->httpClient->post($sub['endpoint'], [
                     'body' => $payload,
-                    'headers' => ['Content-Type' => 'application/json'],
+                    'headers' => ['Content-Type' => 'application/json; charset=utf-8'],
                     'timeout' => 10,
                 ]);
             } catch (RequestException $e) {

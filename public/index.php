@@ -56,7 +56,7 @@ $customErrorHandler = function (
 
     $response = $app->getResponseFactory()->createResponse($statusCode);
     $response->getBody()->write(json_encode($payload, JSON_UNESCAPED_UNICODE));
-    return $response->withHeader('Content-Type', 'application/json');
+    return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
 };
 
 $errorMiddleware->setDefaultErrorHandler($customErrorHandler);

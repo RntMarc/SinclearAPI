@@ -39,7 +39,7 @@ final class McpController
         return $response
             ->withStatus(405)
             ->withHeader('Allow', 'POST')
-            ->withHeader('Content-Type', 'application/json')
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
             ->withHeader('Mcp-Protocol-Version', $this->server->getProtocolVersion());
     }
 
@@ -96,7 +96,7 @@ final class McpController
         $response->getBody()->write($payload);
         return $response
             ->withStatus(200)
-            ->withHeader('Content-Type', 'application/json')
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
             ->withHeader('Mcp-Protocol-Version', $protocolVersion);
     }
 
@@ -183,7 +183,7 @@ final class McpController
         $response->getBody()->write($payload);
         return $response
             ->withStatus($status)
-            ->withHeader('Content-Type', 'application/json')
+            ->withHeader('Content-Type', 'application/json; charset=utf-8')
             ->withHeader('Mcp-Protocol-Version', $this->server->getProtocolVersion());
     }
 }

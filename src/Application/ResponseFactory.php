@@ -13,7 +13,7 @@ final class ResponseFactory
         $response->getBody()->write(json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         return $response
             ->withStatus($status)
-            ->withHeader('Content-Type', 'application/json');
+            ->withHeader('Content-Type', 'application/json; charset=utf-8');
     }
 
     public static function noContent(?ResponseInterface $response = null): ResponseInterface
