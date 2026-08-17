@@ -65,6 +65,39 @@ final readonly class ForumMemberRepository
         return $counts;
     }
 
+    /**
+     * Prüft für mehrere Foren, ob der Nutzer Mitglied ist.
+     *
+     * @return array<string, bool> forumId => isMember
+     */
+    public function findMembershipsByUserAndForumIds(string $userId, array $forumIds): array
+    {
+        if ($forumIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($forumIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT forumId FROM ForumMember
+             WHERE userId = ? AND forumId IN ($placeholders)"
+        );
+        $stmt->execute(array_merge([$userId], $forumIds));
+
+        $memberships = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $memberships[$row['forumId']] = true;
+        }
+
+        // Alle nicht gefundenen Foren sind keine Mitgliedschaft
+        foreach ($forumIds as $forumId) {
+            if (!isset($memberships[$forumId])) {
+                $memberships[$forumId] = false;
+            }
+        }
+
+        return $memberships;
+    }
+
     public function join(string $forumId, string $userId): string
     {
         $id = Uuid::uuid7()->toString();

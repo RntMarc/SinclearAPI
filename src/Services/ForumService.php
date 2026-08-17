@@ -103,6 +103,10 @@ final readonly class ForumService
         $forumIds = array_column($result['data'], 'id');
         $memberCounts = $this->memberRepo->countByForums($forumIds);
 
+        $memberships = $userId !== null
+            ? $this->memberRepo->findMembershipsByUserAndForumIds($userId, $forumIds)
+            : [];
+
         $result['data'] = array_map(
             fn(array $f) => [
                 'id' => $f['id'],
@@ -110,6 +114,7 @@ final readonly class ForumService
                 'description' => $f['description'],
                 'image' => $f['image'],
                 'memberCount' => $memberCounts[$f['id']] ?? 0,
+                'isMember' => $userId !== null ? ($memberships[$f['id']] ?? false) : false,
                 'createdAt' => $f['createdAt'],
                 'updatedAt' => $f['updatedAt'],
             ],
