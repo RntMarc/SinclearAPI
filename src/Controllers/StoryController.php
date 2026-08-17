@@ -65,8 +65,8 @@ final readonly class StoryController
                 'id' => $story['id'],
                 'image' => $story['image'],
                 'caption' => $story['caption'],
-                'createdAt' => $story['createdAt'],
-                'expiresAt' => $story['expiresAt'],
+                'createdAt' => self::stripFractionalSeconds($story['createdAt']),
+                'expiresAt' => self::stripFractionalSeconds($story['expiresAt']),
                 'viewed' => isset($viewedSet[$story['id']]),
             ];
         }
@@ -117,9 +117,18 @@ final readonly class StoryController
             return ResponseFactory::json(['error' => 'story_not_found'], 404, $response);
         }
 
-        $this->notifyOnStoryCreated($user->id, $id);
+        $response = ResponseFactory::json(['data' => $this->formatStory($story, $user)], 201, $response);
 
-        return ResponseFactory::json(['data' => $this->formatStory($story, $user)], 201, $response);
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        }
+
+        try {
+            $this->notifyOnStoryCreated($user->id, $id);
+        } catch (\Throwable) {
+        }
+
+        return $response;
     }
 
     public function get(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -203,11 +212,22 @@ final readonly class StoryController
             ],
             'image' => $story['image'],
             'caption' => $story['caption'],
-            'createdAt' => $story['createdAt'],
-            'expiresAt' => $story['expiresAt'],
+            'createdAt' => self::stripFractionalSeconds($story['createdAt']),
+            'expiresAt' => self::stripFractionalSeconds($story['expiresAt']),
             'viewed' => $viewedIds !== [],
             'viewCount' => $this->storyRepo->countViews($story['id']),
         ];
+    }
+
+    /**
+     * Strip fractional seconds from datetime(3) values.
+     * MySQL datetime(3) returns "YYYY-MM-DD HH:MM:SS.fff"; the API
+     * contracts require "YYYY-MM-DD HH:MM:SS" (no milliseconds).
+     */
+    private static function stripFractionalSeconds(string $datetime): string
+    {
+        $dot = strpos($datetime, '.');
+        return $dot !== false ? substr($datetime, 0, $dot) : $datetime;
     }
 
     private function errorResponse(string $message, ResponseInterface $response): ResponseInterface
