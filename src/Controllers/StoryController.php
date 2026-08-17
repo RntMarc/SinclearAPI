@@ -14,6 +14,8 @@ use Sinclear\Api\Services\NotificationService;
 
 final readonly class StoryController
 {
+    private const int MAX_IMAGE_SIZE = 1024 * 1024;
+    private const int MAX_IMAGE_DIMENSION = 2000;
     private const int MAX_CAPTION_LENGTH = 1000;
 
     private const array ERROR_MAP = [
@@ -95,7 +97,11 @@ final readonly class StoryController
         }
 
         try {
-            $image = $this->imageService->validate($body['image']);
+            $image = $this->imageService->validate(
+                $body['image'],
+                self::MAX_IMAGE_SIZE,
+                self::MAX_IMAGE_DIMENSION,
+            );
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), $response);
         }

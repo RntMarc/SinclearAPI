@@ -4338,8 +4338,8 @@ components:
         image:
           type: string
           description: >
-            Base64-kodiertes Story-Bild (JPEG, PNG oder WebP, max. 200 KB,
-            max. 1000x1000 Pixel)
+            Base64-kodiertes Story-Bild (JPEG, PNG oder WebP, max. 1 MB,
+            max. 2000x2000 Pixel)
         caption:
           type: string
           maxLength: 1000

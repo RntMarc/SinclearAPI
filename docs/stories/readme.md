@@ -32,7 +32,7 @@ Request-Body:
 
 ```json
 {
-  "image": "<base64: JPEG/PNG/WebP, max. 200 KB, max. 1000x1000 px>",
+  "image": "<base64: JPEG/PNG/WebP, max. 1 MB, max. 2000x2000 px>",
   "caption": "Optionale Bildunterschrift (max. 1000 Zeichen)"
 }
 ```

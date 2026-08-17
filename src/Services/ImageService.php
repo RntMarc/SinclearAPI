@@ -18,13 +18,20 @@ final readonly class ImageService
      * Validates a base64-encoded image string.
      *
      * @param string $imageData Base64-encoded image data
+     * @param int|null $maxSize Max decoded size in bytes (null = self::MAX_IMAGE_SIZE)
+     * @param int|null $maxDimension Max width or height in pixels (null = self::MAX_IMAGE_DIMENSION)
      * @return string Original validated base64 data
      * @throws \InvalidArgumentException On validation failure
      */
-    public function validate(string $imageData): string
+    public function validate(string $imageData, ?int $maxSize = null, ?int $maxDimension = null): string
     {
+        $maxSize ??= self::MAX_IMAGE_SIZE;
+        $maxDimension ??= self::MAX_IMAGE_DIMENSION;
+
         $this->logger->debug('ImageService: validating image', [
             'base64_length' => strlen($imageData),
+            'max_size' => $maxSize,
+            'max_dimension' => $maxDimension,
         ]);
 
         if ($imageData === '') {
@@ -40,13 +47,13 @@ final readonly class ImageService
         $decodedSize = strlen($decoded);
         $this->logger->debug('ImageService: decoded size', [
             'decoded_bytes' => $decodedSize,
-            'max_allowed' => self::MAX_IMAGE_SIZE,
+            'max_allowed' => $maxSize,
         ]);
 
-        if ($decodedSize > self::MAX_IMAGE_SIZE) {
+        if ($decodedSize > $maxSize) {
             $this->logger->debug('ImageService: image too large', [
                 'decoded_bytes' => $decodedSize,
-                'max_allowed' => self::MAX_IMAGE_SIZE,
+                'max_allowed' => $maxSize,
             ]);
             throw new \InvalidArgumentException('image_too_large');
         }
@@ -75,11 +82,11 @@ final readonly class ImageService
             throw new \InvalidArgumentException('unsupported_image_format');
         }
 
-        if ($width > self::MAX_IMAGE_DIMENSION || $height > self::MAX_IMAGE_DIMENSION) {
+        if ($width > $maxDimension || $height > $maxDimension) {
             $this->logger->debug('ImageService: dimensions too large', [
                 'width' => $width,
                 'height' => $height,
-                'max' => self::MAX_IMAGE_DIMENSION,
+                'max' => $maxDimension,
             ]);
             throw new \InvalidArgumentException('image_dimensions_too_large');
         }
