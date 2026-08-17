@@ -2,7 +2,9 @@
 
 Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihre Trigger und die übermittelten Eigenschaften. Technische Details zur API stehen in [readme.md](./readme.md). Sie muss bei jeder Änderung an Notification-Typen aktualisiert werden.
 
-> **Präferenzen:** Alle Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply` (Denylist `forumIds`) und `story_post` (Denylist `userIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
+> **Präferenzen:** Die vom Preferences-Endpoint angebotenen Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Interne Event-Typen werden dabei zu gemeinsamen Preference-Schlüsseln zusammengefasst. Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply` (Denylist `forumIds`) und `story_post` (Denylist `userIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
+>
+> **Vereinheitlichte Event-Typen:** Interne Notification-Typen (z.B. `standalone_event_user_added`, `trip_event_user_added`) werden bei den Präferenzen auf vereinheitlichte Typen gemappt. Der Nutzer sieht nur: `event_user_added` / `event_user_added_others`, `event_ticket_added` und `event_info_changed`. Diese gelten sowohl für Reise-Events als auch für eigenständige Events.
 
 ## Forum & Stories
 

@@ -22,7 +22,7 @@ Die Datei `docs/notifications/types.md` listet tabellarisch ausschließlich die 
 **Requirement:**
 Bei jeder Änderung an Notification-Typen (Trigger, Empfänger, Relations oder generierte Titel/Texte) MUSS `docs/notifications/types.md` aktualisiert werden. Diese Datei ist die maßgebliche Übersicht für alle Notification-Typen.
 
-Zusätzlich MUSS bei jedem neuen/entfernten Notification-Typ die Liste `NotificationPreferenceService::KNOWN_TYPES` synchron gehalten werden (sie entspricht den Schlüsseln von `NotificationService::CONTENT_TEMPLATES`). Typen, die die Präferenz `custom` unterstützen, werden in `NotificationPreferenceService::CUSTOMIZABLE_TYPES` gepflegt.
+Zusätzlich MUSS bei jedem neuen/entfernten Notification-Typ geprüft werden, ob er einen eigenen oder einen bereits vorhandenen vereinheitlichten Eintrag in `NotificationPreferenceService::KNOWN_TYPES` benötigt. `KNOWN_TYPES` entspricht den vom Preferences-Endpoint angebotenen Schlüsseln, nicht zwingend den internen Schlüsseln von `NotificationService::CONTENT_TEMPLATES`; die Zuordnung erfolgt über das Type-Mapping. Typen, die die Präferenz `custom` unterstützen, werden in `NotificationPreferenceService::CUSTOMIZABLE_TYPES` gepflegt.
 
 ## Notification-Präferenzen
 Nutzer können jeden Notification-Typ aktivieren (`enabled`), deaktivieren (`disabled`) oder – sofern unterstützt – per Denylist filtern (`custom`). Gespeichert in der Tabelle `NotificationPreference`; kein Eintrag bedeutet Standard `enabled`.

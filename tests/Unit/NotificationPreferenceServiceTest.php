@@ -228,4 +228,79 @@ class NotificationPreferenceServiceTest extends TestCase
 
         $this->assertTrue($this->service->shouldSend('user-1', 'story_post', $data));
     }
+
+    public function testShouldSendMapsInternalTypeToUnifiedPreference(): void
+    {
+        // Disable the unified preference for event_user_added
+        $this->service->update('user-1', [
+            ['type' => 'event_user_added', 'state' => 'disabled'],
+        ]);
+
+        // Internal standalone type should be blocked by the unified preference
+        $this->assertFalse($this->service->shouldSend('user-1', 'standalone_event_user_added', null));
+
+        // Internal trip event type should also be blocked by the unified preference
+        $this->assertFalse($this->service->shouldSend('user-1', 'trip_event_user_added', null));
+    }
+
+    public function testShouldSendMapsInternalTicketTypeToUnifiedPreference(): void
+    {
+        $this->service->update('user-1', [
+            ['type' => 'event_ticket_added', 'state' => 'disabled'],
+        ]);
+
+        $this->assertFalse($this->service->shouldSend('user-1', 'standalone_event_ticket_added', null));
+        $this->assertFalse($this->service->shouldSend('user-1', 'trip_event_ticket_added', null));
+    }
+
+    public function testShouldSendMapsInternalInfoChangedTypeToUnifiedPreference(): void
+    {
+        $this->service->update('user-1', [
+            ['type' => 'event_info_changed', 'state' => 'disabled'],
+        ]);
+
+        $this->assertFalse($this->service->shouldSend('user-1', 'standalone_event_info_changed', null));
+        $this->assertFalse($this->service->shouldSend('user-1', 'trip_event_info_changed', null));
+    }
+
+    public function testGetAllReturnsUnifiedTypesOnly(): void
+    {
+        $all = $this->service->getAll('user-1');
+
+        // Should contain unified types
+        $this->assertArrayHasKey('event_user_added', $all);
+        $this->assertArrayHasKey('event_user_added_others', $all);
+        $this->assertArrayHasKey('event_ticket_added', $all);
+        $this->assertArrayHasKey('event_info_changed', $all);
+
+        // Should NOT contain internal types
+        $this->assertArrayNotHasKey('standalone_event_user_added', $all);
+        $this->assertArrayNotHasKey('trip_event_user_added', $all);
+        $this->assertArrayNotHasKey('standalone_event_ticket_added', $all);
+        $this->assertArrayNotHasKey('trip_event_ticket_added', $all);
+        $this->assertArrayNotHasKey('standalone_event_info_changed', $all);
+        $this->assertArrayNotHasKey('trip_event_info_changed', $all);
+    }
+
+    public function testUpdateRejectsInternalNotificationType(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('invalid_type: standalone_event_user_added');
+
+        $this->service->update('user-1', [
+            ['type' => 'standalone_event_user_added', 'state' => 'disabled'],
+        ]);
+    }
+
+    public function testGetAllUsesLegacyPreferenceForUnifiedType(): void
+    {
+        $this->db->exec("INSERT INTO NotificationPreference (id, userId, type, state) VALUES ('legacy-1', 'user-1', 'standalone_event_user_added', 'disabled')");
+
+        $all = $this->service->getAll('user-1');
+
+        $this->assertSame('disabled', $all['event_user_added']['state']);
+        $this->assertArrayNotHasKey('standalone_event_user_added', $all);
+        $this->assertFalse($this->service->shouldSend('user-1', 'standalone_event_user_added', null));
+        $this->assertFalse($this->service->shouldSend('user-1', 'trip_event_user_added', null));
+    }
 }

@@ -155,7 +155,23 @@ Gibt den öffentlichen VAPID-Schlüssel für Web Push zurück. Keine Authentifiz
 GET /notifications/preferences
 ```
 
-Gibt die Präferenzen des eingeloggten Nutzers für **alle** bekannten Benachrichtigungstypen zurück. Für Typen ohne gespeicherten Eintrag gilt der Standard `enabled`.
+Gibt die Präferenzen des eingeloggten Nutzers für alle vom Endpoint angebotenen
+Benachrichtigungstypen zurück. Für Typen ohne gespeicherten Eintrag gilt der
+Standard `enabled`.
+
+**Hinweis:** Interne Notification-Typen (z.B. `standalone_event_user_added`, `trip_event_user_added`) werden bei den Präferenzen auf vereinheitlichte Typen gemappt (`event_user_added`, `event_ticket_added`, `event_info_changed`). Der Nutzer sieht nur die vereinheitlichten Typen, die sowohl für Reise-Events als auch für eigenständige Events gelten.
+
+Der Endpoint liefert genau einen Preference-Schlüssel je fachlicher Einstellung:
+
+| Preference-Schlüssel | Gilt für interne Notification-Typen |
+|----------------------|-------------------------------------|
+| `event_user_added` | `standalone_event_user_added`, `trip_event_user_added` |
+| `event_user_added_others` | `standalone_event_user_added_others`, `trip_event_user_added_others` |
+| `event_ticket_added` | `standalone_event_ticket_added`, `trip_event_ticket_added` |
+| `event_info_changed` | `standalone_event_info_changed`, `trip_event_info_changed` |
+
+Die internen Typen sind beim `PUT` nicht gültig. Clients müssen die
+vereinheitlichten Preference-Schlüssel verwenden.
 
 **Authentifizierung:** Erforderlich
 
@@ -165,7 +181,8 @@ Gibt die Präferenzen des eingeloggten Nutzers für **alle** bekannten Benachric
   "data": {
     "forum_comment": { "state": "custom", "customAllowed": true,  "customData": { "forumIds": ["forum-id-9"] } },
     "story_post":    { "state": "enabled", "customAllowed": true,  "customData": null },
-    "trip_user_added": { "state": "enabled", "customAllowed": false, "customData": null }
+    "trip_user_added": { "state": "enabled", "customAllowed": false, "customData": null },
+    "event_user_added": { "state": "enabled", "customAllowed": false, "customData": null }
   }
 }
 ```
@@ -284,9 +301,9 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 |------|-----|-------------|
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Eigentümer (FK zu User, ON DELETE CASCADE) |
-| `type` | varchar(64) | Benachrichtigungstyp |
+| `type` | varchar(64) | Preference-Schlüssel; Event-Typen werden vereinheitlicht gespeichert |
 | `state` | varchar(16) | `enabled`, `disabled` oder `custom` (Default `enabled`) |
-| `data` | json | Individuelle Auswahl bei `custom`; sonst null |
+| `data` | json | Denylist bei `custom`; sonst null |
 | `createdAt` | datetime(3) | Erstellungszeitpunkt (UTC) |
 | `updatedAt` | datetime(3) | Änderungszeitpunkt (UTC) |
 
@@ -296,7 +313,13 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 
 > **Übersichtstabelle:** [types.md](./types.md) listet tabellarisch alle Notification-Typen mit Trigger, Empfänger und übermittelten Eigenschaften. Diese Tabelle ist die maßgebliche Übersicht und muss bei jeder Typ-Änderung aktualisiert werden.
 
-Aktuell sind `forum_reply`, `forum_comment` und `story_post` als strukturierte Benachrichtigungstypen aktiviert. Nicht unterstützte Typen oder unvollständige/abweichende Relationsdaten werden beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
+Die strukturierten Benachrichtigungstypen und ihre internen Trigger sind in
+[types.md](./types.md) vollständig aufgeführt. Der Preferences-Endpoint bietet
+für Event-Typen nur die gemeinsamen Schlüssel `event_user_added`,
+`event_user_added_others`, `event_ticket_added` und `event_info_changed` an;
+die internen Reise-/Standalone-Varianten bleiben davon getrennt.
+Nicht unterstützte Typen oder unvollständige/abweichende Relationsdaten werden
+beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
 
 Die Forum-Typen werden automatisch in `ForumService::createComment()` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Eigene Kommentare/Antworten lösen keine Benachrichtigung aus (kein Self-Trigger).
 

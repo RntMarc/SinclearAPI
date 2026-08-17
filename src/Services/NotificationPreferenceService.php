@@ -7,8 +7,13 @@ use Sinclear\Api\Repository\NotificationPreferenceRepository;
 final readonly class NotificationPreferenceService
 {
     /**
-     * Alle bekannten Notification-Typen. Muss mit den Schlüsseln von
-     * `NotificationService::CONTENT_TEMPLATES` übereinstimmen.
+     * Vereinheitlichte Preference-Typen (was der Nutzer in den Settings sieht).
+     * Interne Notification-Typen (z.B. standalone_event_user_added) werden
+     * diesen Preferences zugeordnet.
+     *
+     * Diese Liste beschreibt ausschließlich die vom Preferences-Endpoint
+     * angebotenen Schlüssel. Interne Notification-Typen werden über
+     * TYPE_MAPPING diesen Schlüsseln zugeordnet.
      */
     public const KNOWN_TYPES = [
         'forum_reply',
@@ -16,19 +21,32 @@ final readonly class NotificationPreferenceService
         'story_post',
         'trip_user_added',
         'trip_user_added_others',
-        'standalone_event_user_added',
-        'standalone_event_user_added_others',
-        'trip_event_user_added',
-        'trip_event_user_added_others',
         'trip_event_added',
         'trip_ticket_added',
-        'standalone_event_ticket_added',
-        'trip_event_ticket_added',
         'trip_accommodation_added',
         'trip_info_changed',
-        'standalone_event_info_changed',
-        'trip_event_info_changed',
         'trip_subscription_added',
+        'event_user_added',
+        'event_user_added_others',
+        'event_ticket_added',
+        'event_info_changed',
+    ];
+
+    /**
+     * Mapping: interner Notification-Typ → vereinheitlichter Preference-Typ.
+     * Einträge ohne Matching bleiben unverändert.
+     *
+     * @var array<string, string>
+     */
+    private const TYPE_MAPPING = [
+        'standalone_event_user_added' => 'event_user_added',
+        'trip_event_user_added' => 'event_user_added',
+        'standalone_event_user_added_others' => 'event_user_added_others',
+        'trip_event_user_added_others' => 'event_user_added_others',
+        'standalone_event_ticket_added' => 'event_ticket_added',
+        'trip_event_ticket_added' => 'event_ticket_added',
+        'standalone_event_info_changed' => 'event_info_changed',
+        'trip_event_info_changed' => 'event_info_changed',
     ];
 
     /**
@@ -54,15 +72,25 @@ final readonly class NotificationPreferenceService
     ) {}
 
     /**
-     * Liefert die vollständige Präferenz-Map (alle bekannten Typen).
+     * Liefert die vollständige Präferenz-Map (alle vereinheitlichten Typen).
      *
      * @return array<string, array{state: string, customAllowed: bool, customData: array<string, mixed>|null}>
      */
     public function getAll(string $userId): array
     {
         $prefs = [];
+        $canonicalTypes = [];
         foreach ($this->repo->findByUser($userId) as $row) {
-            $prefs[$row['type']] = $row;
+            $type = self::TYPE_MAPPING[$row['type']] ?? $row['type'];
+            $isCanonical = $type === $row['type'];
+
+            if (!isset($prefs[$type])
+                || ($isCanonical && !($canonicalTypes[$type] ?? false))
+                || (!$isCanonical && !($canonicalTypes[$type] ?? false) && $row['state'] === 'disabled')
+            ) {
+                $prefs[$type] = $row;
+                $canonicalTypes[$type] = $isCanonical;
+            }
         }
 
         $result = [];
@@ -124,14 +152,15 @@ final readonly class NotificationPreferenceService
      * Entscheidet, ob für einen Empfänger eine Benachrichtigung gesendet
      * werden soll. Kein Präferenz-Eintrag bedeutet Standard: enabled.
      *
-     * Bei `custom` (Denylist): gesendet wird alles, außer die ID der
-     * Filter-Relation ist im customData enthalten.
+     * Der interne Notification-Typ wird über TYPE_MAPPING auf den
+     * vereinheitlichten Preference-Typ gemappt.
      *
      * @param array<int, array{relation: string, object: string, identifier: string}>|null $data
      */
     public function shouldSend(string $userId, string $type, ?array $data): bool
     {
-        $pref = $this->repo->findByUserAndType($userId, $type);
+        $prefType = self::TYPE_MAPPING[$type] ?? $type;
+        $pref = $this->findPreference($userId, $prefType);
         if ($pref === null) {
             return true;
         }
@@ -141,6 +170,42 @@ final readonly class NotificationPreferenceService
             'custom' => $this->matchesCustom($type, $data, $pref['data']),
             default => true,
         };
+    }
+
+    /**
+     * Liest zunächst die neue gemeinsame Präferenz. Alte, bereits
+     * gespeicherte Einzelpräferenzen dienen nur als Fallback, damit die
+     * Umstellung des Preferences-Endpoints bestehende Nutzer nicht aktiviert.
+     */
+    private function findPreference(string $userId, string $preferenceType): ?array
+    {
+        $preference = $this->repo->findByUserAndType($userId, $preferenceType);
+        if ($preference !== null) {
+            return $preference;
+        }
+
+        $legacyTypes = array_keys(array_filter(
+            self::TYPE_MAPPING,
+            static fn(string $mappedType): bool => $mappedType === $preferenceType,
+        ));
+
+        $fallback = null;
+        foreach ($legacyTypes as $legacyType) {
+            $legacyPreference = $this->repo->findByUserAndType($userId, $legacyType);
+            if ($legacyPreference === null) {
+                continue;
+            }
+
+            // Bei ehemals getrennten Event-Settings bleibt die restriktivere
+            // Einstellung erhalten, bis der Nutzer die gemeinsame Einstellung setzt.
+            if ($legacyPreference['state'] === 'disabled') {
+                return $legacyPreference;
+            }
+
+            $fallback ??= $legacyPreference;
+        }
+
+        return $fallback;
     }
 
     public function customAllowed(string $type): bool

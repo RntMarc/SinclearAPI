@@ -4111,8 +4111,30 @@ components:
           description: ID des Empfängers
         type:
           type: string
-          enum: [forum_reply, forum_comment, story_post]
-          description: Unterstützte strukturierte Benachrichtigungstypen.
+          enum:
+            - forum_reply
+            - forum_comment
+            - story_post
+            - trip_user_added
+            - trip_user_added_others
+            - standalone_event_user_added
+            - standalone_event_user_added_others
+            - trip_event_user_added
+            - trip_event_user_added_others
+            - trip_event_added
+            - trip_ticket_added
+            - standalone_event_ticket_added
+            - trip_event_ticket_added
+            - trip_accommodation_added
+            - trip_info_changed
+            - standalone_event_info_changed
+            - trip_event_info_changed
+            - trip_subscription_added
+          description: >
+            Strukturierter Benachrichtigungstyp. Interne Typen
+            (standalone_event_*, trip_event_*) werden bei den
+            Präferenzen auf vereinheitlichte Typen gemappt
+            (event_user_added, event_ticket_added, event_info_changed).
         title:
           type: string
           description: Von der API aus dem Typ generierter Kurztitel.
@@ -4205,9 +4227,55 @@ components:
       properties:
         data:
           type: object
-          description: Map von Benachrichtigungstyp zu Präferenz-Eintrag
-          additionalProperties:
-            $ref: '#/components/schemas/NotificationPreferenceItem'
+          description: >
+            Präferenz-Einträge für die vom Endpoint angebotenen Typen. Die
+            Event-Typen sind vereinheitlicht und gelten jeweils für Reise-Events
+            und eigenständige Events.
+          required:
+            - forum_reply
+            - forum_comment
+            - story_post
+            - trip_user_added
+            - trip_user_added_others
+            - trip_event_added
+            - trip_ticket_added
+            - trip_accommodation_added
+            - trip_info_changed
+            - trip_subscription_added
+            - event_user_added
+            - event_user_added_others
+            - event_ticket_added
+            - event_info_changed
+          additionalProperties: false
+          properties:
+            forum_reply:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            forum_comment:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            story_post:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_user_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_user_added_others:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_event_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_ticket_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_accommodation_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_info_changed:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_subscription_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_user_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_user_added_others:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_ticket_added:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_info_changed:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
 
     NotificationPreferenceUpdateItem:
       type: object
@@ -4215,7 +4283,26 @@ components:
       properties:
         type:
           type: string
-          description: Benachrichtigungstyp (z.B. `forum_comment`)
+          enum:
+            - forum_reply
+            - forum_comment
+            - story_post
+            - trip_user_added
+            - trip_user_added_others
+            - trip_event_added
+            - trip_ticket_added
+            - trip_accommodation_added
+            - trip_info_changed
+            - trip_subscription_added
+            - event_user_added
+            - event_user_added_others
+            - event_ticket_added
+            - event_info_changed
+          description: >
+            Vereinheitlichter Benachrichtigungstyp. Interne Typen
+            (standalone_event_*, trip_event_*) werden automatisch
+            auf `event_user_added`, `event_ticket_added` bzw.
+            `event_info_changed` gemappt.
         state:
           type: string
           enum: [enabled, disabled, custom]
@@ -13949,9 +14036,13 @@ paths:
     get:
       summary: Benachrichtigungs-Präferenzen abrufen
       description: >
-        Gibt die Präferenzen des aktuellen Nutzers für alle bekannten
-        Benachrichtigungstypen zurück. Für Typen ohne gespeicherten Eintrag
-        gilt der Standard `enabled`.
+        Gibt ausschließlich die vom Preferences-Endpoint angebotenen
+        Präferenztypen zurück. Reise-Events und eigenständige Events teilen
+        sich jeweils einen Eintrag (`event_user_added`,
+        `event_user_added_others`, `event_ticket_added`,
+        `event_info_changed`). Für Typen ohne gespeicherten Eintrag gilt der
+        Standard `enabled`. Interne Notification-Typen werden nicht als
+        separate Präferenzschlüssel ausgegeben.
       tags: [Notifications]
       security:
         - BearerAuth: []
@@ -13973,6 +14064,10 @@ paths:
       description: >
         Aktualisiert die Präferenzen des aktuellen Nutzers (Bulk-Update).
         Es müssen nur die Typen übermittelt werden, die geändert werden sollen.
+        Für Reise-Events und eigenständige Events sind ausschließlich die
+        gemeinsamen Preference-Typen zulässig; interne Typen wie
+        `standalone_event_user_added` oder `trip_event_user_added` werden mit
+        `invalid_type` abgelehnt.
         `custom` ist eine Denylist: Die IDs im `customData` werden vom
         Versand ausgeschlossen; ohne Einträge wird alles zugestellt.
       tags: [Notifications]
