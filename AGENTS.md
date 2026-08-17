@@ -25,10 +25,12 @@ Bei jeder Änderung an Notification-Typen (Trigger, Empfänger, Relations oder g
 Zusätzlich MUSS bei jedem neuen/entfernten Notification-Typ die Liste `NotificationPreferenceService::KNOWN_TYPES` synchron gehalten werden (sie entspricht den Schlüsseln von `NotificationService::CONTENT_TEMPLATES`). Typen, die die Präferenz `custom` unterstützen, werden in `NotificationPreferenceService::CUSTOMIZABLE_TYPES` gepflegt.
 
 ## Notification-Präferenzen
-Nutzer können jeden Notification-Typ aktivieren (`enabled`), deaktivieren (`disabled`) oder – sofern unterstützt – individuell filtern (`custom`). Gespeichert in der Tabelle `NotificationPreference`; kein Eintrag bedeutet Standard `enabled`.
+Nutzer können jeden Notification-Typ aktivieren (`enabled`), deaktivieren (`disabled`) oder – sofern unterstützt – per Denylist filtern (`custom`). Gespeichert in der Tabelle `NotificationPreference`; kein Eintrag bedeutet Standard `enabled`.
 
 **Requirement:**
 Bei jeder Änderung am Präferenz-System (Zustände, `custom`-Typen, `customData`-Format) MÜSSEN `docs/notifications/readme.md` und die zugehörigen Schemas/Endpunkte in `openapi.yaml` aktualisiert werden. Der Versand-Filter liegt zentral in `NotificationService::create()`.
+
+**custom = Denylist (verbindliche Semantik):** Die IDs im `customData` werden vom Versand ausgeschlossen; ohne Einträge wird alles zugestellt. Das Format ist pro Typ fest definiert (`forumIds` für Forum-Typen, `userIds` für `story_post`) und darf NICHT in Allowlist-Logik umgedeutet werden.
 
 ## MCP-Server
 Der MCP-Server (`sinclear-docs-mcp`) stellt die gesamte Dokumentation aus `docs/` über das Tool `get_documentation` bereit. Alle `.md`-Dateien werden automatisch als Topics gescannt und als `enum`-Werte des Tools angeboten (auch verschachtelte Pfade wie `notifications/list`).

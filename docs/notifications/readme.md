@@ -163,7 +163,7 @@ Gibt die Präferenzen des eingeloggten Nutzers für **alle** bekannten Benachric
 ```json
 {
   "data": {
-    "forum_comment": { "state": "enabled", "customAllowed": true,  "customData": null },
+    "forum_comment": { "state": "custom", "customAllowed": true,  "customData": { "forumIds": ["forum-id-9"] } },
     "story_post":    { "state": "enabled", "customAllowed": true,  "customData": null },
     "trip_user_added": { "state": "enabled", "customAllowed": false, "customData": null }
   }
@@ -172,9 +172,9 @@ Gibt die Präferenzen des eingeloggten Nutzers für **alle** bekannten Benachric
 
 | Feld | Bedeutung |
 |------|-----------|
-| `state` | `enabled` (aktiv), `disabled` (deaktiviert) oder `custom` (individuelle Auswahl) |
+| `state` | `enabled` (aktiv), `disabled` (deaktiviert) oder `custom` (aktiv mit Denylist) |
 | `customAllowed` | Ob dieser Typ `custom` überhaupt unterstützt (serverseitig festgelegt) |
-| `customData` | JSON mit der individuellen Auswahl; nur gesetzt wenn `state=custom` |
+| `customData` | JSON mit der Denylist; nur gesetzt wenn `state=custom` |
 
 ### Benachrichtigungs-Präferenzen aktualisieren
 
@@ -206,15 +206,43 @@ Aktualisiert die Präferenzen des eingeloggten Nutzers (Bulk-Update). Es müssen
 - `custom_data_required`: `state=custom` ohne `customData`
 - `custom_data_invalid`: `customData` hat falsches Format
 
-### Custom-Präferenzen
+### Custom-Präferenzen (Denylist)
 
-`custom` erlaubt es, Benachrichtigungen nicht pauschal ein- oder auszuschalten, sondern individuell zu filtern. Aktuell unterstützen folgende Typen `custom`:
+`custom` bedeutet **aktiv mit Denylist**: Benachrichtigungen werden gesendet,
+**außer** die ID der Filter-Relation ist in der Denylist enthalten. Eine
+leere Denylist ist erlaubt und entspricht dann `enabled` (alles wird
+zugestellt). Die Denylist kann später beliebig erweitert oder wieder
+geleert werden, ohne den State zu ändern.
 
-| Typ | `customData` | Filter-Relation |
-|-----|--------------|-----------------|
-| `forum_comment` | `{ "forumIds": ["..."] }` | `parent_forum` |
-| `forum_reply` | `{ "forumIds": ["..."] }` | `parent_forum` |
-| `story_post` | `{ "userIds": ["..."] }` | `story_author` |
+**Format-Regeln (verbindlich für alle Clients):**
+- `customData` ist ein JSON-Objekt mit **genau einem** Schlüssel, der sich
+  aus dem Benachrichtigungstyp ergibt (siehe Tabelle unten).
+- Der Wert ist ein Array aus **nicht-leeren Strings** (IDs). Er darf leer
+  sein (`[]`).
+- Doppelte IDs werden serverseitig dedupliziert; zusätzliche unbekannte
+  Schlüssel werden verworfen.
+- Nur die folgenden Typen unterstützen `custom`. Für alle anderen Typen
+  sind nur `enabled` und `disabled` gültig.
+
+| Typ | `customData`-Schlüssel | Bedeutung der IDs | Filter-Relation im Notification-`data` |
+|-----|------------------------|-------------------|----------------------------------------|
+| `forum_comment` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
+| `forum_reply` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
+| `story_post` | `userIds` | Nutzer-IDs (Story-Autoren), deren Stories unterdrückt werden | `story_author` |
+
+**Beispiel Foren (Denylist):**
+```json
+{ "type": "forum_comment", "state": "custom", "customData": { "forumIds": ["0193c1f1-...", "0193c1f2-..."] } }
+```
+→ Der Nutzer bekommt `forum_comment`-Benachrichtigungen aus **allen** Foren,
+außer aus den beiden genannten.
+
+**Beispiel Stories (Denylist leer):**
+```json
+{ "type": "story_post", "state": "custom", "customData": { "userIds": [] } }
+```
+→ Der Nutzer bekommt `story_post`-Benachrichtigungen zu **allen** Stories
+aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 
 **Hinweis zur Foren-Migration:** Das bisherige per-Forum-Feld `ForumMember.notificationsEnabled` samt Endpunkt `PUT /forums/{id}/members/notifications` ist seit Einführung der Präferenzen **deprecated**. Clients sollen stattdessen `forum_comment`/`forum_reply` mit `state=custom` und `customData.forumIds` verwenden. Das alte Feld bleibt vorerst bestehen, wird aber nicht mehr weiterentwickelt.
 

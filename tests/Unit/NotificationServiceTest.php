@@ -374,16 +374,28 @@ class NotificationServiceTest extends TestCase
         $this->assertNotEmpty($id);
     }
 
-    public function testCreateReturnsNullWhenCustomDoesNotMatch(): void
+    public function testCreateReturnsNullWhenCustomDenylistBlocks(): void
     {
         $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
         $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
-        $prefService->update('user-1', [['type' => 'forum_reply', 'state' => 'custom', 'customData' => ['forumIds' => ['f1']]]]);
+        // FORUM_REPLY_DATA has parent_forum = 'forum-1' which is on the denylist
+        $prefService->update('user-1', [['type' => 'forum_reply', 'state' => 'custom', 'customData' => ['forumIds' => ['forum-1']]]]);
 
-        // FORUM_REPLY_DATA has parent_forum = 'forum-1' which is not in ['f1']
         $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
 
         $this->assertNull($id);
+    }
+
+    public function testCreateSendsWhenCustomDenylistDoesNotBlock(): void
+    {
+        $prefRepo = new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db);
+        $prefService = new \Sinclear\Api\Services\NotificationPreferenceService($prefRepo);
+        // parent_forum = 'forum-1' is NOT on the denylist -> must be sent
+        $prefService->update('user-1', [['type' => 'forum_reply', 'state' => 'custom', 'customData' => ['forumIds' => ['other-forum']]]]);
+
+        $id = $this->service->create('user-1', 'forum_reply', 'Title', 'Body', self::FORUM_REPLY_DATA);
+
+        $this->assertNotEmpty($id);
     }
 
     // ── getUnread() ───────────────────────────────────────

@@ -36,6 +36,9 @@ final readonly class NotificationPreferenceService
      * Relation im Notification-`data`, gegen die gefiltert wird, sowie den
      * Schlüssel im customData-JSON.
      *
+     * `custom` ist eine DENYLIST: Die im customData enthaltenen IDs werden
+     * vom Versand ausgeschlossen. Ohne Einträge wird alles zugestellt.
+     *
      * @var array<string, array{relation: string, dataKey: string}>
      */
     private const CUSTOMIZABLE_TYPES = [
@@ -121,6 +124,9 @@ final readonly class NotificationPreferenceService
      * Entscheidet, ob für einen Empfänger eine Benachrichtigung gesendet
      * werden soll. Kein Präferenz-Eintrag bedeutet Standard: enabled.
      *
+     * Bei `custom` (Denylist): gesendet wird alles, außer die ID der
+     * Filter-Relation ist im customData enthalten.
+     *
      * @param array<int, array{relation: string, object: string, identifier: string}>|null $data
      */
     public function shouldSend(string $userId, string $type, ?array $data): bool
@@ -143,6 +149,10 @@ final readonly class NotificationPreferenceService
     }
 
     /**
+     * Denylist-Auswertung: true (senden), wenn die ID der Filter-Relation
+     * NICHT in der customData-Liste enthalten ist. Fehlende/leere Liste
+     * oder fehlende Relation bedeuten: nichts ausgeschlossen → senden.
+     *
      * @param array<int, array{relation: string, object: string, identifier: string}>|null $data
      * @param array<string, mixed>|null $customData
      */
@@ -150,17 +160,20 @@ final readonly class NotificationPreferenceService
     {
         $config = self::CUSTOMIZABLE_TYPES[$type] ?? null;
         if ($config === null || !is_array($customData)) {
-            return false;
+            return true;
         }
 
         $identifier = $this->findRelationIdentifier($data, $config['relation']);
         if ($identifier === null) {
-            return false;
+            return true;
         }
 
-        $allowed = $customData[$config['dataKey']] ?? null;
+        $blocked = $customData[$config['dataKey']] ?? null;
+        if (!is_array($blocked)) {
+            return true;
+        }
 
-        return is_array($allowed) && in_array($identifier, $allowed, true);
+        return !in_array($identifier, $blocked, true);
     }
 
     /**
@@ -182,9 +195,14 @@ final readonly class NotificationPreferenceService
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Validierung der Denylist. Erforderlich ist das Objekt mit dem
+     * passenden Schlüssel (`forumIds` bzw. `userIds`) als Array aus
+     * nicht-leeren Strings. Eine leere Liste ist erlaubt (= nichts
+     * ausgeschlossen).
+     *
+     * @return array<string, mixed>
      */
-    private function validateCustomData(string $type, mixed $customData): ?array
+    private function validateCustomData(string $type, mixed $customData): array
     {
         $config = self::CUSTOMIZABLE_TYPES[$type];
         $dataKey = $config['dataKey'];

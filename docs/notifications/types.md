@@ -2,7 +2,7 @@
 
 Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihre Trigger und die übermittelten Eigenschaften. Technische Details zur API stehen in [readme.md](./readme.md). Sie muss bei jeder Änderung an Notification-Typen aktualisiert werden.
 
-> **Präferenzen:** Alle Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Folgende Typen unterstützen zusätzlich `custom` (individuelle Auswahl): `forum_comment`, `forum_reply` (Filter über `forumIds`) und `story_post` (Filter über `userIds`). Details siehe [readme.md](./readme.md).
+> **Präferenzen:** Alle Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply` (Denylist `forumIds`) und `story_post` (Denylist `userIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
 
 ## Forum & Stories
 

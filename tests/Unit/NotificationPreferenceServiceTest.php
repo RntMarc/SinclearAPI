@@ -164,7 +164,7 @@ class NotificationPreferenceServiceTest extends TestCase
         $this->assertFalse($this->service->shouldSend('user-1', 'forum_comment', null));
     }
 
-    public function testShouldSendCustomMatchesForum(): void
+    public function testShouldSendCustomBlocksForumOnDenylist(): void
     {
         $this->service->update('user-1', [
             ['type' => 'forum_comment', 'state' => 'custom', 'customData' => ['forumIds' => ['f1', 'f2']]],
@@ -174,10 +174,10 @@ class NotificationPreferenceServiceTest extends TestCase
             ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'f1'],
         ];
 
-        $this->assertTrue($this->service->shouldSend('user-1', 'forum_comment', $data));
+        $this->assertFalse($this->service->shouldSend('user-1', 'forum_comment', $data));
     }
 
-    public function testShouldSendCustomDoesNotMatchForum(): void
+    public function testShouldSendCustomAllowsForumNotOnDenylist(): void
     {
         $this->service->update('user-1', [
             ['type' => 'forum_comment', 'state' => 'custom', 'customData' => ['forumIds' => ['f1', 'f2']]],
@@ -187,10 +187,23 @@ class NotificationPreferenceServiceTest extends TestCase
             ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'f9'],
         ];
 
-        $this->assertFalse($this->service->shouldSend('user-1', 'forum_comment', $data));
+        $this->assertTrue($this->service->shouldSend('user-1', 'forum_comment', $data));
     }
 
-    public function testShouldSendCustomStoryMatchesAuthor(): void
+    public function testShouldSendCustomEmptyDenylistAllowsEverything(): void
+    {
+        $this->service->update('user-1', [
+            ['type' => 'forum_comment', 'state' => 'custom', 'customData' => ['forumIds' => []]],
+        ]);
+
+        $data = [
+            ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'f1'],
+        ];
+
+        $this->assertTrue($this->service->shouldSend('user-1', 'forum_comment', $data));
+    }
+
+    public function testShouldSendCustomBlocksStoryAuthorOnDenylist(): void
     {
         $this->service->update('user-1', [
             ['type' => 'story_post', 'state' => 'custom', 'customData' => ['userIds' => ['author-1']]],
@@ -198,6 +211,19 @@ class NotificationPreferenceServiceTest extends TestCase
 
         $data = [
             ['relation' => 'story_author', 'object' => 'User', 'identifier' => 'author-1'],
+        ];
+
+        $this->assertFalse($this->service->shouldSend('user-1', 'story_post', $data));
+    }
+
+    public function testShouldSendCustomAllowsStoryAuthorNotOnDenylist(): void
+    {
+        $this->service->update('user-1', [
+            ['type' => 'story_post', 'state' => 'custom', 'customData' => ['userIds' => ['author-1']]],
+        ]);
+
+        $data = [
+            ['relation' => 'story_author', 'object' => 'User', 'identifier' => 'author-2'],
         ];
 
         $this->assertTrue($this->service->shouldSend('user-1', 'story_post', $data));

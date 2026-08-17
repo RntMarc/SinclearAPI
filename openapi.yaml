@@ -4184,7 +4184,7 @@ components:
           enum: [enabled, disabled, custom]
           description: >
             `enabled` (aktiv), `disabled` (deaktiviert) oder `custom`
-            (individuelle Auswahl). Standard ist `enabled`.
+            (aktiv mit Denylist). Standard ist `enabled`.
         customAllowed:
           type: boolean
           description: >
@@ -4193,8 +4193,10 @@ components:
           type: object
           nullable: true
           description: >
-            Individuelle Auswahl bei `state=custom`. Für Forum-Typen
-            `{ "forumIds": ["..."] }`, für `story_post` `{ "userIds": ["..."] }`.
+            Denylist bei `state=custom`: IDs, deren Benachrichtigungen
+            unterdrückt werden. Format: `{ "forumIds": ["..."] }` für
+            `forum_comment`/`forum_reply`, `{ "userIds": ["..."] }` für
+            `story_post`. Leeres Array erlaubt (= nichts ausgeschlossen).
           additionalProperties: true
 
     NotificationPreferencesResponse:
@@ -4217,13 +4219,19 @@ components:
         state:
           type: string
           enum: [enabled, disabled, custom]
-          description: Gewünschter Zustand
+          description: >
+            Gewünschter Zustand. `custom` = aktiv mit Denylist (nur für
+            Typen mit `customAllowed=true`).
         customData:
           type: object
           nullable: true
           description: >
-            Nur bei `state=custom` erforderlich. Für Forum-Typen
-            `{ "forumIds": ["..."] }`, für `story_post` `{ "userIds": ["..."] }`.
+            Nur bei `state=custom` erforderlich. Denylist im exakt
+            festgelegten Format: `{ "forumIds": ["..."] }` für
+            `forum_comment`/`forum_reply`, `{ "userIds": ["..."] }` für
+            `story_post`. Der Wert ist ein Array aus nicht-leeren Strings
+            und darf leer sein (`[]` = nichts ausgeschlossen). Die IDs in
+            der Denylist werden vom Versand ausgeschlossen.
           additionalProperties: true
 
     NotificationPreferenceUpdateRequest:
@@ -13965,6 +13973,8 @@ paths:
       description: >
         Aktualisiert die Präferenzen des aktuellen Nutzers (Bulk-Update).
         Es müssen nur die Typen übermittelt werden, die geändert werden sollen.
+        `custom` ist eine Denylist: Die IDs im `customData` werden vom
+        Versand ausgeschlossen; ohne Einträge wird alles zugestellt.
       tags: [Notifications]
       security:
         - BearerAuth: []
