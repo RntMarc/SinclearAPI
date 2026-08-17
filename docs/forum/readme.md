@@ -111,6 +111,8 @@ GET /forums?page=1&limit=20
 → 200 { "data": [...], "meta": { "page": 1, "limit": 20, "total": 5, "totalPages": 1 } }
 ```
 
+Jeder Eintrag enthält `isMember` (boolean), das angibt, ob der eingeloggte Nutzer Mitglied ist. Das Feld wird verwendet, um die Notification-Denylist „Nur Mitglieds-Foren" zu bedienen.
+
 ### Post-Feed über alle Foren
 ```
 GET /forums/feed?page=1&limit=20

@@ -2666,6 +2666,10 @@ components:
         memberCount:
           type: integer
           example: 12
+        isMember:
+          type: boolean
+          description: Ob der eingeloggte Nutzer Mitglied ist
+          example: true
         createdAt:
           type: string
           format: date-time
@@ -2678,10 +2682,6 @@ components:
         - $ref: '#/components/schemas/Forum'
         - type: object
           properties:
-            isMember:
-              type: boolean
-              description: Ob der eingeloggte Nutzer Mitglied ist
-              example: true
             notificationsEnabled:
               type: boolean
               deprecated: true
@@ -10360,7 +10360,7 @@ paths:
         Erstellungsdatum (absteigend). Standardmäßig werden nur öffentliche
         Foren angezeigt (keine Reise-verknüpften). Mit `all=1` werden alle
         Foren inklusive Reise-verknüpfter angezeigt. Jeder Eintrag enthält
-        die Anzahl der Mitglieder.
+        die Anzahl der Mitglieder und `isMember`, ob der Nutzer Mitglied ist.
       tags: [Forum]
       security:
         - BearerAuth: []
