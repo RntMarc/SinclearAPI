@@ -74,6 +74,7 @@ class NotificationServiceTest extends TestCase
                 id varchar(191) NOT NULL,
                 userId varchar(191) NOT NULL,
                 type varchar(64) NOT NULL,
+                dedupeKey varchar(191) DEFAULT NULL,
                 title varchar(255) NOT NULL,
                 body text NOT NULL,
                 data json DEFAULT NULL,
@@ -81,6 +82,7 @@ class NotificationServiceTest extends TestCase
                 createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                 PRIMARY KEY (id),
                 KEY idx_notification_user_read_created (userId, isRead, createdAt),
+                KEY idx_notification_dedupe (userId, dedupeKey, isRead),
                 CONSTRAINT fk_notification_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
             )
         ");
