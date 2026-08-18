@@ -69,7 +69,9 @@ final readonly class DirectMessageService
                 'lastMessage' => $lastMessage,
                 'unreadCount' => (int) $row['unreadCount'],
                 'lastSeenAt' => $row['lastSeenAt'] !== null ? self::stripFractionalSeconds($row['lastSeenAt']) : null,
+                'lastReadSeq' => (int) $row['lastReadSeq'],
                 'otherLastReadSeq' => (int) ($row['otherLastReadSeq'] ?? 0),
+                'createdAt' => self::stripFractionalSeconds($row['createdAt']),
                 'updatedAt' => self::stripFractionalSeconds($row['updatedAt']),
             ];
         }, $conversations);
@@ -393,6 +395,17 @@ final readonly class DirectMessageService
         $participant = $this->participantRepo->find($conversation['id'], $userId);
         $otherParticipant = $this->participantRepo->findOtherParticipant($conversation['id'], $userId);
 
+        $lastMessage = null;
+        $dm = $this->messageRepo->findLastMessage($conversation['id']);
+        if ($dm !== null) {
+            $lastMessage = [
+                'content' => $dm['deletedAt'] !== null ? '' : $dm['content'],
+                'senderId' => $dm['senderId'],
+                'createdAt' => self::stripFractionalSeconds($dm['createdAt']),
+                'deleted' => $dm['deletedAt'] !== null,
+            ];
+        }
+
         return [
             'id' => $conversation['id'],
             'type' => $conversation['type'],
@@ -402,6 +415,10 @@ final readonly class DirectMessageService
                 'displayName' => $otherParticipant['displayName'] ?? null,
                 'avatar' => $otherParticipant['userImage'] ?? null,
             ] : null,
+            'lastMessage' => $lastMessage,
+            'unreadCount' => $participant !== null ? (int) $this->messageRepo->countUnread($conversation['id'], $userId, $participant['lastReadSeq']) : 0,
+            'lastSeenAt' => $otherParticipant !== null && $otherParticipant['lastSeenAt'] !== null
+                ? self::stripFractionalSeconds($otherParticipant['lastSeenAt']) : null,
             'lastReadSeq' => $participant !== null ? (int) $participant['lastReadSeq'] : 0,
             'otherLastReadSeq' => $otherParticipant !== null ? (int) $otherParticipant['lastReadSeq'] : 0,
             'createdAt' => self::stripFractionalSeconds($conversation['createdAt']),

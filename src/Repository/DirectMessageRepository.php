@@ -108,6 +108,34 @@ final readonly class DirectMessageRepository
     }
 
     /**
+     * Find the latest message in a conversation (for preview).
+     */
+    public function findLastMessage(string $conversationId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT content, senderId, createdAt, deletedAt FROM DirectMessage
+             WHERE conversationId = ?
+             ORDER BY seq DESC LIMIT 1'
+        );
+        $stmt->execute([$conversationId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    /**
+     * Count unread messages for a user in a conversation.
+     */
+    public function countUnread(string $conversationId, string $userId, int $lastReadSeq): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM DirectMessage
+             WHERE conversationId = ? AND seq > ? AND senderId != ? AND deletedAt IS NULL'
+        );
+        $stmt->execute([$conversationId, $lastReadSeq, $userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    /**
      * Get the highest seq for a conversation.
      */
     public function getMaxSeq(string $conversationId): int

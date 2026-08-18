@@ -19,8 +19,140 @@
 | `ChatParticipant` | Teilnehmer + `lastReadSeq` + `lastSeenAt` |
 | `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor) |
 | `ChatEvent` | Nachrichten-Events (`message_created`/`message_edited`/`message_deleted`) mit eigenem `seq` |
-| `ChatPresence` | Push-Unterdrückung (`activeUntil`) |
+| `ChatPresence` | Push-Unterdrückung (`activeUntil`) — **nicht** für Online-Anzeige gedacht |
 | `ChatTyping` | Tippindikator (ephemer, läuft nach 5 s ab) |
+
+## DTO-Schemas
+
+Die vollständigen Schemas leben in `openapi.yaml`. Hier die Feldreferenz als Kurzübersicht.
+
+### ChatConversation
+
+Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id}` (Detail) zurückgegeben. Beide Endpoints liefern **dasselbe Feldset**.
+
+```json
+{
+  "id": "uuid",
+  "type": "direct",
+  "name": null,
+  "otherUser": {
+    "id": "uuid",
+    "displayName": "Alice",
+    "avatar": "https://..."
+  },
+  "lastMessage": {
+    "content": "Hallo!",
+    "senderId": "uuid",
+    "createdAt": "2025-01-15 10:30:00",
+    "deleted": false
+  },
+  "unreadCount": 3,
+  "lastSeenAt": "2025-01-15 10:25:00",
+  "lastReadSeq": 42,
+  "otherLastReadSeq": 38,
+  "createdAt": "2025-01-15 10:00:00",
+  "updatedAt": "2025-01-15 10:30:00"
+}
+```
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `id` | string (uuid) | Konversations-ID |
+| `type` | string | `direct` oder `group` |
+| `name` | string\|null | Name (für Gruppen, null bei 1:1) |
+| `otherUser` | object\|null | Der andere Teilnehmer (`id`, `displayName`, `avatar`) |
+| `lastMessage` | object\|null | Vorschau der letzten Nachricht (null wenn keine) |
+| `unreadCount` | int | Anzahl ungelesener Nachrichten |
+| `lastSeenAt` | string\|null | Letzter Seitenaufruf des anderen Teilnehmers |
+| `lastReadSeq` | int | Eigener Lesestand (höchster gelesener seq) |
+| `otherLastReadSeq` | int | Lesestand des Gegenübers |
+| `createdAt` | string | Erstellungszeitpunkt (UTC) |
+| `updatedAt` | string | Zeitpunkt der letzten Aktivität (UTC) |
+
+### DirectMessage
+
+```json
+{
+  "id": "uuid",
+  "seq": 42,
+  "conversationId": "uuid",
+  "senderId": "uuid",
+  "sender": {
+    "id": "uuid",
+    "displayName": "Alice",
+    "avatar": "https://..."
+  },
+  "type": "text",
+  "content": "Hallo!",
+  "payload": null,
+  "clientId": "client-123",
+  "editedAt": null,
+  "deleted": false,
+  "createdAt": "2025-01-15 10:30:00"
+}
+```
+
+- `content`: Leerstring wenn `deleted == true`
+- `payload`: null wenn `deleted == true` oder `type == text`
+- `sender`: Engeschachteltes Objekt mit Absender-Details (aus User-Tabelle)
+
+### ChatEvent
+
+```json
+{
+  "seq": 100,
+  "conversationId": "uuid",
+  "actorId": "uuid",
+  "type": "message_created",
+  "messageId": "uuid",
+  "message": { ... }
+}
+```
+
+- `message`: `DirectMessage`-Objekt (aktueller Zustand) oder null
+- `type`: `message_created` | `message_edited` | `message_deleted`
+
+### ChatSyncResponse
+
+Antwort von `GET /chat/sync`:
+
+```json
+{
+  "data": {
+    "events": [
+      {
+        "seq": 100,
+        "conversationId": "uuid",
+        "actorId": "uuid",
+        "type": "message_created",
+        "messageId": "uuid",
+        "message": { ... }
+      }
+    ],
+    "conversations": [
+      {
+        "conversationId": "uuid",
+        "unreadCount": 3,
+        "lastSeenAt": "2025-01-15 10:25:00",
+        "otherLastReadSeq": 42
+      }
+    ],
+    "typing": {
+      "uuid-conversation-id": ["uuid-user-1"]
+    }
+  },
+  "meta": {
+    "seq": 100,
+    "hasMore": false
+  }
+}
+```
+
+- `events`: Alle Nachrichten-Events mit `seq > after` (neu/bearbeitet/gelöscht)
+- `conversations`: **Voll-Liste** aller Konversationen (bis 100), nicht nur Delta
+- `typing`: Map von Konversations-ID → Array tippender User-IDs
+- `meta.seq`: Höchster gesehener Event-seq (für nächsten Sync als `after`-Parameter verwenden)
+- `meta.hasMore`: true wenn `limit` erreicht wurde → weiter pollen
 
 ## REST-API
 
@@ -28,8 +160,8 @@
 |---|---|---|
 | GET | `/chat/sync?after=<eventSeq>&limit=` | **Optimierte Sync-Route:** Nachrichten-Events + Unread + Tippzustände |
 | GET | `/chat/conversations` | Konversationsliste (letzte Nachricht, Unread, lastSeenAt) |
-| POST | `/chat/conversations` | 1:1-Konversation öffnen (idempotent: get-or-create) |
-| GET | `/chat/conversations/{id}` | Konversation + Teilnehmer |
+| POST | `/chat/conversations` | 1:1-Konversation öffnen (idempotent: get-or-create) → 200 (bestehend) oder 201 (neu) |
+| GET | `/chat/conversations/{id}` | Konversation + Teilnehmer (lastReadSeq, otherLastReadSeq) |
 | GET | `/chat/conversations/{id}/messages?before=<seq>&limit=50` | History (Cursor `before`) |
 | POST | `/chat/conversations/{id}/messages` | Senden (`{clientId, type, content, payload?}`) |
 | PATCH | `/chat/messages/{id}` | Bearbeiten (nur eigener, 10 Min-Fenster) |
@@ -43,15 +175,28 @@
 2. Pollt `GET /chat/sync?after=<letzterEventSeq>` alle 2–3 s (aktiv) oder bis 30 s (idle)
 3. Erhält:
    - `events`: `message_created` (neue Nachricht hinzufügen), `message_edited` (Inhalt/`editedAt` ersetzen), `message_deleted` (als gelöscht markieren)
-   - `conversations`: geänderte Unread-Zähler, `lastSeenAt`, `otherLastReadSeq` (Lesestatus des Gegenübers)
+   - `conversations`: **Voll-Liste** aller Konversationen mit `unreadCount`, `lastSeenAt`, `otherLastReadSeq`
    - `typing`: Tippzustände
 4. Presence wird bei jedem Sync aktualisiert (`activeUntil = now + 5 s`)
 5. Push wird nur gesendet wenn Empfänger NICHT aktiv pollt
 
+**Hinweis:** `conversations` ist keine Delta-Antwort. Der Server liefert bei jedem Sync-Aufruf den kompletten Stand aller Konversationen (bis `limit=100`). Der Client kann die Liste direkt verwenden, ohne本地en Cache zu mergen.
+
+## Online-Anzeige / Presence
+
+- `ChatPresence.activeUntil` ist **server-intern** für Push-Unterdrückung. Das Feld istClients **nicht** verfügbar.
+- Das einzige verfügbare Feld für „war der andere online?" ist `lastSeenAt` (aus `ChatParticipant`). Es zeigt den Zeitpunkt des letzten Seitenaufrufs des anderen Teilnehmers.
+- Ein `online`-Feld wird **nicht** Exposed. Clients können `lastSeenAt` verwenden, um z.B. „zuletzt online vor 5 Minuten" anzuzeigen.
+- `ChatPresence` könnte in Zukunft für eine heartbeat-basierte Online-Anzeige erweitert werden (z.B. `isActive: true` wenn `activeUntil > now`), ist aber aktuell nicht vorgesehen.
+
 ## Lesestatus (Read Receipts)
 
 - Pro Teilnehmer wird `lastReadSeq` geführt. Der Sender sieht „gelesen", sobald `otherLastReadSeq >= msg.seq`.
-- Der Sender erhält den Lesestatus über `conversations[].otherLastReadSeq` im Sync bzw. `ChatConversation.otherLastReadSeq` in der Konversationsliste. Der Client markiert eigene Nachrichten mit `seq <= otherLastReadSeq` als gelesen.
+- Der Sender erhält den Lesestatus über:
+  - `conversations[].otherLastReadSeq` im Sync (Voll-Liste)
+  - `ChatConversation.otherLastReadSeq` in der Konversationsliste
+  - `ChatConversation.otherLastReadSeq` in Detail-Endpoints (`getConversation`, `openConversation`)
+- Der Client markiert eigene Nachrichten mit `seq <= otherLastReadSeq` als gelesen.
 - `POST /chat/conversations/{id}/read` setzt den eigenen Lesestand; das `seq` wird serverseitig auf das Maximum der Konversation begrenzt (Clamp).
 
 ## Idempotenz
@@ -72,6 +217,19 @@
 - Coalesced Upsert: Existierende ungelesene Notification wird aktualisiert statt neu anzulegen
 - Denylist-Präferenz: `direct_message` mit `customData.userIds` (wie `story_post`)
 - **Push-Unterdrückung**: Ein aktiver Empfänger (pollt) erhält weiterhin den In-App-Listeneintrag, aber keinen Push
+
+## Moderation
+
+Chat-Nachrichten haben aktuell **keinen** `ModerationObjectType`. Die `VALID_OBJECT_TYPES` in `ModerationRequestService` enthalten:
+
+```
+user, forum_post, recipe, explore_place, recipe_review, forum_comment,
+explore_comment, feedback_suggestion, feedback_comment, travel_trip,
+travel_event, travel_accommodation, travel_ticket, subscription,
+calendar_event, story
+```
+
+`chat_message` fehlt. Laut AGENTS.md muss jeder User-Content einen Report-Flag haben. **TODO:** `chat_message` zu `VALID_OBJECT_TYPES` hinzufügen und `resolveOwner` für Chat-Nachrichten implementieren. Der Report-Button für Chat kann ggf. auf die nächste Iteration verschoben werden.
 
 ## Cron
 
