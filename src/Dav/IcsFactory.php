@@ -195,14 +195,13 @@ final readonly class IcsFactory
         $vcal = $this->createCalendar();
         $detail = $item['detail'];
 
-        $startDt = DateTimeImmutable::createFromFormat('!Y-m-d', substr($item['startTime'], 0, 10));
-        $endDt = DateTimeImmutable::createFromFormat('!Y-m-d', substr($item['endTime'], 0, 10));
+        $startDt = new DateTimeImmutable(substr($item['startTime'], 0, 10), new DateTimeZone('UTC'));
+        $endDt = new DateTimeImmutable(substr($item['endTime'], 0, 10), new DateTimeZone('UTC'));
+        $endDt = $endDt->modify('+1 day');
 
         $properties = [
             'UID' => $this->feedItemUid($item),
             'DTSTAMP' => new DateTimeImmutable('now', new DateTimeZone('UTC')),
-            'DTSTART' => $startDt,
-            'DTEND' => $endDt->modify('+1 day'),
             'SUMMARY' => (string) $item['title'],
             'TRANSP' => 'TRANSPARENT',
         ];
@@ -211,7 +210,9 @@ final readonly class IcsFactory
             $properties['DESCRIPTION'] = (string) $detail['description'];
         }
 
-        $vcal->add('VEVENT', $properties);
+        $vevent = $vcal->add('VEVENT', $properties);
+        $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
+        $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
 
         return $vcal->serialize();
     }
@@ -247,20 +248,20 @@ final readonly class IcsFactory
         $detail = $item['detail'];
 
         $dateStr = $detail['occurrenceDate'] ?? substr($item['startTime'], 0, 10);
-        $startDt = DateTimeImmutable::createFromFormat('!Y-m-d', $dateStr);
+        $startDt = new DateTimeImmutable($dateStr, new DateTimeZone('UTC'));
         $endDt = $startDt->modify('+1 day');
 
         $properties = [
             'UID' => $this->feedItemUid($item),
             'DTSTAMP' => new DateTimeImmutable('now', new DateTimeZone('UTC')),
-            'DTSTART' => $startDt,
-            'DTEND' => $endDt,
             'SUMMARY' => (string) $item['title'],
             'TRANSP' => 'TRANSPARENT',
             'RRULE' => 'FREQ=YEARLY',
         ];
 
-        $vcal->add('VEVENT', $properties);
+        $vevent = $vcal->add('VEVENT', $properties);
+        $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
+        $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
 
         return $vcal->serialize();
     }

@@ -218,6 +218,8 @@ class DavFactoriesTest extends TestCase
         self::assertSame('Italien-Reise', (string) $vcal->VEVENT->SUMMARY);
         self::assertSame('TRANSPARENT', (string) $vcal->VEVENT->TRANSP);
         self::assertNull($vcal->VEVENT->CLASS);
+        self::assertSame('20260901', (string) $vcal->VEVENT->DTSTART);
+        self::assertSame('20260915', (string) $vcal->VEVENT->DTEND);
     }
 
     public function testFeedItemPtJourneyWithLegs(): void
@@ -287,5 +289,7 @@ class DavFactoriesTest extends TestCase
         self::assertSame('Geburtstag: Max', (string) $vcal->VEVENT->SUMMARY);
         self::assertSame('TRANSPARENT', (string) $vcal->VEVENT->TRANSP);
         self::assertStringContainsString('FREQ=YEARLY', (string) $vcal->VEVENT->RRULE);
+        self::assertSame('20260504', (string) $vcal->VEVENT->DTSTART);
+        self::assertSame('20260505', (string) $vcal->VEVENT->DTEND);
     }
 }
