@@ -100,7 +100,7 @@ final readonly class NotificationService
         private ?LoggerInterface $logger = null,
     ) {}
 
-    public function create(string $userId, string $type, string $title, string $body, ?array $data = null, bool $respectPreferences = true, ?string $dedupeKey = null): ?string
+    public function create(string $userId, string $type, string $title, string $body, ?array $data = null, bool $respectPreferences = true, ?string $dedupeKey = null, bool $suppressPush = false): ?string
     {
         $type = trim($type);
         $title = trim($title);
@@ -148,8 +148,10 @@ final readonly class NotificationService
             'createdAt' => $record['createdAt'],
         ];
 
-        $this->sendWebPush($userId, $notification);
-        $this->sendUnifiedPush($userId, $notification);
+        if (!$suppressPush) {
+            $this->sendWebPush($userId, $notification);
+            $this->sendUnifiedPush($userId, $notification);
+        }
 
         return $record['id'];
     }

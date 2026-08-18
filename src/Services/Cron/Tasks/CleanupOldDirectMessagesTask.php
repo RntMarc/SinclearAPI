@@ -58,6 +58,21 @@ final class CleanupOldDirectMessagesTask implements CronTaskInterface
         // Cleanup expired typing indicators
         $pdo->exec('DELETE FROM ChatTyping WHERE expiresAt < NOW(3)');
 
-        $logger->info("Chat Cleanup: $totalDeleted Nachrichten gelöscht, $orphanedDeleted verwaiste Konversationen entfernt");
+        // Batch-delete old chat events (created/edited/deleted) to avoid long locks
+        $totalEventsDeleted = 0;
+        do {
+            $stmt = $pdo->prepare(
+                'DELETE FROM ChatEvent WHERE createdAt < DATE_SUB(NOW(), INTERVAL ? DAY) LIMIT ?'
+            );
+            $stmt->execute([self::RETENTION_DAYS, self::BATCH_SIZE]);
+            $deleted = $stmt->rowCount();
+            $totalEventsDeleted += $deleted;
+        } while ($deleted === self::BATCH_SIZE);
+
+        $logger->info(
+            "Chat Cleanup: $totalDeleted Nachrichten gelöscht, "
+            . "$totalEventsDeleted Events gelöscht, "
+            . "$orphanedDeleted verwaiste Konversationen entfernt"
+        );
     }
 }

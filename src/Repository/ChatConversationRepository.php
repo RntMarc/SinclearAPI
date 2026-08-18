@@ -66,6 +66,7 @@ final readonly class ChatConversationRepository
             'SELECT cc.*,
                     cp.lastReadSeq,
                     cp.lastSeenAt,
+                    cp2.lastReadSeq AS otherLastReadSeq,
                     u.id AS otherUserId,
                     u.displayName AS otherUserDisplayName,
                     u.image AS otherUserImage,

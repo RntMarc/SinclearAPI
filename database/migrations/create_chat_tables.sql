@@ -55,7 +55,7 @@ ALTER TABLE `DirectMessage`
   ADD UNIQUE KEY `uk_dm_seq` (`seq`),
   ADD KEY `idx_dm_conversation_seq` (`conversationId`,`seq`),
   ADD KEY `idx_dm_sender` (`senderId`),
-  ADD KEY `idx_dm_sender_client` (`senderId`,`clientId`);
+  ADD UNIQUE KEY `uk_dm_sender_client` (`senderId`,`clientId`);
 
 ALTER TABLE `DirectMessage`
   ADD CONSTRAINT `fk_dm_conversation` FOREIGN KEY (`conversationId`) REFERENCES `ChatConversation` (`id`) ON DELETE CASCADE,
@@ -84,3 +84,24 @@ ALTER TABLE `ChatTyping`
 ALTER TABLE `ChatTyping`
   ADD CONSTRAINT `fk_typing_conversation` FOREIGN KEY (`conversationId`) REFERENCES `ChatConversation` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_typing_user` FOREIGN KEY (`userId`) REFERENCES `User` (`id`) ON DELETE CASCADE;
+
+CREATE TABLE `ChatEvent` (
+  `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `seq` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `conversationId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `actorId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('message_created','message_edited','message_deleted') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `messageId` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE `ChatEvent`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_ce_seq` (`seq`),
+  ADD KEY `idx_ce_conv_seq` (`conversationId`,`seq`),
+  ADD KEY `idx_ce_message` (`messageId`);
+
+ALTER TABLE `ChatEvent`
+  ADD CONSTRAINT `fk_ce_conversation` FOREIGN KEY (`conversationId`) REFERENCES `ChatConversation` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_ce_message` FOREIGN KEY (`messageId`) REFERENCES `DirectMessage` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_ce_actor` FOREIGN KEY (`actorId`) REFERENCES `User` (`id`) ON DELETE CASCADE;

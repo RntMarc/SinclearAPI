@@ -58,14 +58,15 @@ final readonly class DirectMessageRepository
     }
 
     /**
-     * Check for duplicate clientId (idempotency).
+     * Check for duplicate clientId (idempotency) within the same conversation.
      */
-    public function findByClientId(string $senderId, string $clientId): ?array
+    public function findByClientId(string $conversationId, string $senderId, string $clientId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, seq, createdAt FROM DirectMessage WHERE senderId = ? AND clientId = ?'
+            'SELECT id, seq, createdAt FROM DirectMessage
+             WHERE conversationId = ? AND senderId = ? AND clientId = ?'
         );
-        $stmt->execute([$senderId, $clientId]);
+        $stmt->execute([$conversationId, $senderId, $clientId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
@@ -107,27 +108,6 @@ final readonly class DirectMessageRepository
     }
 
     /**
-     * Get all new messages across all conversations for a user since a seq cursor.
-     * Used by the sync endpoint.
-     *
-     * @return array<int, array>
-     */
-    public function findNewForUser(string $userId, int $afterSeq, int $limit = 200): array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT dm.*, u.displayName AS senderDisplayName, u.image AS senderImage
-             FROM DirectMessage dm
-             INNER JOIN ChatParticipant cp ON cp.conversationId = dm.conversationId AND cp.userId = ?
-             LEFT JOIN User u ON u.id = dm.senderId
-             WHERE dm.seq > ?
-             ORDER BY dm.seq ASC
-             LIMIT ?'
-        );
-        $stmt->execute([$userId, $afterSeq, $limit]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
      * Get the highest seq for a conversation.
      */
     public function getMaxSeq(string $conversationId): int
@@ -160,18 +140,6 @@ final readonly class DirectMessageRepository
             'UPDATE DirectMessage SET content = ?, editedAt = NOW(3) WHERE id = ?'
         );
         $stmt->execute([$content, $id]);
-    }
-
-    /**
-     * Count messages older than a given date.
-     */
-    public function countOlderThan(int $days): int
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT COUNT(*) FROM DirectMessage WHERE createdAt < DATE_SUB(NOW(), INTERVAL ? DAY)'
-        );
-        $stmt->execute([$days]);
-        return (int) $stmt->fetchColumn();
     }
 
     /**

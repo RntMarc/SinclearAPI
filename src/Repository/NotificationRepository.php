@@ -66,9 +66,13 @@ final readonly class NotificationRepository
                 $existing['id'],
             ]);
 
+            $createdAtStmt = $this->pdo->prepare('SELECT createdAt FROM Notification WHERE id = ?');
+            $createdAtStmt->execute([$existing['id']]);
+            $createdAt = $createdAtStmt->fetchColumn();
+
             return [
                 'id' => $existing['id'],
-                'createdAt' => $existing['createdAt'],
+                'createdAt' => $createdAt !== false ? $createdAt : $existing['createdAt'],
             ];
         }
 

@@ -11,8 +11,6 @@ use Sinclear\Api\Services\DirectMessageService;
 
 final readonly class ChatController
 {
-    private const int MAX_CONTENT_LENGTH = 2000;
-
     private const array ERROR_MAP = [
         'conversation_not_found' => ['error' => 'conversation_not_found', 'status' => 404],
         'message_not_found' => ['error' => 'message_not_found', 'status' => 404],
@@ -21,8 +19,10 @@ final readonly class ChatController
         'content_required' => ['error' => 'content_required', 'status' => 400],
         'content_too_long' => ['error' => 'content_too_long', 'status' => 400],
         'invalid_type' => ['error' => 'invalid_type', 'status' => 400],
+        'invalid_payload' => ['error' => 'invalid_payload', 'status' => 400],
         'edit_window_expired' => ['error' => 'edit_window_expired', 'status' => 400],
         'message_deleted' => ['error' => 'message_deleted', 'status' => 400],
+        'rate_limit_exceeded' => ['error' => 'rate_limit_exceeded', 'status' => 429],
         'forbidden' => ['error' => 'forbidden', 'status' => 403],
     ];
 
@@ -60,7 +60,8 @@ final readonly class ChatController
             return $this->errorResponse($e->getMessage(), $response);
         }
 
-        return ResponseFactory::json(['data' => $result], 201, $response);
+        $status = $result['created'] ? 201 : 200;
+        return ResponseFactory::json(['data' => $result['conversation']], $status, $response);
     }
 
     public function getConversation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface

@@ -4517,6 +4517,14 @@ components:
         unreadCount:
           type: integer
           description: Anzahl ungelesener Nachrichten
+        lastReadSeq:
+          type: integer
+          format: int64
+          description: Eigener Lesestand (höchster gelesener Nachrichten-seq)
+        otherLastReadSeq:
+          type: integer
+          format: int64
+          description: Lesestand des Gegenübers (zum Ableiten des Gelesen-Status eigener Nachrichten)
         lastSeenAt:
           type: string
           format: date-time
@@ -4627,6 +4635,34 @@ components:
         data:
           $ref: '#/components/schemas/DirectMessage'
 
+    ChatEvent:
+      type: object
+      required: [seq, conversationId, actorId, type]
+      properties:
+        seq:
+          type: integer
+          format: int64
+          description: Globaler monotoner Event-Sync-Cursor
+        conversationId:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+          description: Nutzer, der das Event ausgelöst hat
+        type:
+          type: string
+          enum: [message_created, message_edited, message_deleted]
+          description: Art der Nachrichten-Änderung
+        messageId:
+          type: string
+          format: uuid
+          nullable: true
+        message:
+          $ref: '#/components/schemas/DirectMessage'
+          nullable: true
+          description: Aktueller Zustand der betroffenen Nachricht (bei message_created/-edited/-deleted)
+
     ChatSyncResponse:
       type: object
       required: [data, meta]
@@ -4634,11 +4670,11 @@ components:
         data:
           type: object
           properties:
-            messages:
+            events:
               type: array
               items:
-                $ref: '#/components/schemas/DirectMessage'
-              description: Alle neuen Nachrichten seit dem letzten Sync
+                $ref: '#/components/schemas/ChatEvent'
+              description: Nachrichten-Änderungen seit dem letzten Sync (neu/bearbeitet/gelöscht)
             conversations:
               type: array
               items:
@@ -4653,7 +4689,10 @@ components:
                     type: string
                     format: date-time
                     nullable: true
-              description: Aktualisierte Konversations-Zusammenfassungen
+                  otherLastReadSeq:
+                    type: integer
+                    format: int64
+              description: Aktualisierte Konversations-Zusammenfassungen (inkl. Lesestatus des Gegenübers)
             typing:
               type: object
               additionalProperties:
@@ -4668,7 +4707,7 @@ components:
             seq:
               type: integer
               format: int64
-              description: Höchster gesehener seq-Wert (für nächsten Sync)
+              description: Höchster gesehener Event-seq (für nächsten Sync)
             hasMore:
               type: boolean
               description: Gibt es weitere Daten
@@ -4702,7 +4741,7 @@ components:
         payload:
           type: object
           nullable: true
-          description: Strukturierte Daten (z.B. Koordinaten)
+          description: Strukturierte Daten. Aktuell nur für zukünftige Typen (image/location); bei `type: text` wird `payload` abgelehnt.
 
     ChatMessageEditRequest:
       type: object
@@ -5432,11 +5471,12 @@ paths:
     get:
       summary: Chat-Sync (Short Polling)
       description: >
-        Optimierte Sync-Route: Liefert alle neuen Nachrichten, geänderte
-        Unread-Zähler und Tippzustände über alle Konversationen in einem
-        Aufruf. Der Client merkt sich den höchsten gesehenen seq-Wert
-        und übergibt ihn als `after`-Parameter. Die Presence wird bei
-        jedem Aufruf aktualisiert (Push-Unterdrückung für 5 Sekunden).
+        Optimierte Sync-Route: Liefert Nachrichten-Events (neu, bearbeitet,
+        gelöscht), geänderte Unread-Zähler, Lesestatus des Gegenübers und
+        Tippzustände über alle Konversationen in einem Aufruf. Der Client
+        merkt sich den höchsten gesehenen Event-seq-Wert und übergibt ihn
+        als `after`-Parameter. Die Presence wird bei jedem Aufruf aktualisiert
+        (Push-Unterdrückung für 5 Sekunden).
       tags: [Chat]
       security:
         - BearerAuth: []
@@ -5447,7 +5487,7 @@ paths:
             type: integer
             format: int64
             default: 0
-          description: Nur Nachrichten mit seq > after zurückgeben
+          description: Nur Events mit seq > after zurückgeben
         - name: limit
           in: query
           schema:
@@ -5523,8 +5563,14 @@ paths:
             schema:
               $ref: '#/components/schemas/ChatOpenRequest'
       responses:
+        '200':
+          description: Bestehende Konversation (idempotenter Fall)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatConversationResponse'
         '201':
-          description: Konversation (neu oder bestehend)
+          description: Neu erstellte Konversation
           content:
             application/json:
               schema:
@@ -5701,6 +5747,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Nachrichten (Rate-Limit 20/Minute)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /chat/messages/{id}:
     patch:
@@ -5871,6 +5923,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Kein Teilnehmer der Konversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Tippindikatoren (Rate-Limit 30/Minute)
           content:
             application/json:
               schema:

@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\ChatConversationRepository;
+use Sinclear\Api\Repository\ChatEventRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\ChatPresenceRepository;
 use Sinclear\Api\Repository\ChatTypingRepository;
@@ -15,6 +16,11 @@ final readonly class DirectMessageService
     private const int EDIT_WINDOW_SECONDS = 600; // 10 minutes
     private const int MESSAGES_PER_PAGE = 50;
     private const int SYNC_LIMIT = 200;
+    private const int SEND_RATE_LIMIT = 20;       // Nachrichten pro Minute
+    private const int SEND_RATE_WINDOW = 60;
+    private const int TYPING_RATE_LIMIT = 30;     // Tippindikatoren pro Minute
+    private const int TYPING_RATE_WINDOW = 60;
+    private const int NOTIFICATION_PREVIEW_LENGTH = 160;
 
     private const array VALID_TYPES = ['text'];
 
@@ -24,8 +30,10 @@ final readonly class DirectMessageService
         private DirectMessageRepository $messageRepo,
         private ChatPresenceRepository $presenceRepo,
         private ChatTypingRepository $typingRepo,
+        private ChatEventRepository $eventRepo,
         private UserRepository $userRepo,
         private NotificationService $notificationService,
+        private RateLimiter $rateLimiter,
     ) {}
 
     /**
@@ -61,6 +69,7 @@ final readonly class DirectMessageService
                 'lastMessage' => $lastMessage,
                 'unreadCount' => (int) $row['unreadCount'],
                 'lastSeenAt' => $row['lastSeenAt'] !== null ? self::stripFractionalSeconds($row['lastSeenAt']) : null,
+                'otherLastReadSeq' => (int) ($row['otherLastReadSeq'] ?? 0),
                 'updatedAt' => self::stripFractionalSeconds($row['updatedAt']),
             ];
         }, $conversations);
@@ -80,6 +89,8 @@ final readonly class DirectMessageService
 
     /**
      * Open (get-or-create) a 1:1 conversation with another user.
+     *
+     * @return array{conversation: array, created: bool}
      */
     public function openConversation(string $userId, string $otherUserId): array
     {
@@ -95,7 +106,10 @@ final readonly class DirectMessageService
         // Check for existing conversation
         $existing = $this->conversationRepo->findDirectConversation($userId, $otherUserId);
         if ($existing !== null) {
-            return $this->formatConversation($existing, $userId);
+            return [
+                'conversation' => $this->formatConversation($existing, $userId),
+                'created' => false,
+            ];
         }
 
         // Create new conversation
@@ -104,7 +118,10 @@ final readonly class DirectMessageService
         $this->participantRepo->add($conversationId, $otherUserId);
 
         $conversation = $this->conversationRepo->findById($conversationId);
-        return $this->formatConversation($conversation, $userId);
+        return [
+            'conversation' => $this->formatConversation($conversation, $userId),
+            'created' => true,
+        ];
     }
 
     /**
@@ -167,6 +184,14 @@ final readonly class DirectMessageService
             throw new \RuntimeException('invalid_type');
         }
 
+        if (isset($body['payload'])) {
+            throw new \RuntimeException('invalid_payload');
+        }
+
+        if (!$this->rateLimiter->isAllowed('chat_send:' . $userId, self::SEND_RATE_LIMIT, self::SEND_RATE_WINDOW)) {
+            throw new \RuntimeException('rate_limit_exceeded');
+        }
+
         $clientId = $body['clientId'] ?? null;
         if ($clientId !== null) {
             $clientId = trim((string) $clientId);
@@ -177,29 +202,42 @@ final readonly class DirectMessageService
 
         // Idempotency check
         if ($clientId !== null) {
-            $existing = $this->messageRepo->findByClientId($userId, $clientId);
+            $existing = $this->messageRepo->findByClientId($conversationId, $userId, $clientId);
             if ($existing !== null) {
                 $msg = $this->messageRepo->findById($existing['id']);
                 return $this->formatMessage($msg);
             }
         }
 
-        $result = $this->messageRepo->create([
-            'conversationId' => $conversationId,
-            'senderId' => $userId,
-            'type' => $type,
-            'content' => $content,
-            'payload' => $body['payload'] ?? null,
-            'clientId' => $clientId,
-        ]);
+        try {
+            $result = $this->messageRepo->create([
+                'conversationId' => $conversationId,
+                'senderId' => $userId,
+                'type' => $type,
+                'content' => $content,
+                'payload' => null,
+                'clientId' => $clientId,
+            ]);
+        } catch (\PDOException $e) {
+            // Unique (senderId, clientId): concurrent duplicate → return existing
+            if ($clientId !== null && $e->getCode() === '23000') {
+                $existing = $this->messageRepo->findByClientId($conversationId, $userId, $clientId);
+                if ($existing !== null) {
+                    $msg = $this->messageRepo->findById($existing['id']);
+                    return $this->formatMessage($msg);
+                }
+            }
+            throw $e;
+        }
 
         $this->conversationRepo->updateTimestamp($conversationId);
+        $this->eventRepo->create($conversationId, $userId, 'message_created', $result['id']);
 
         $message = $this->messageRepo->findById($result['id']);
         $formatted = $this->formatMessage($message);
 
-        // Send notification to other participants (async, fire-and-forget)
-        $this->notifyParticipants($userId, $conversationId, $formatted, $conversation);
+        // Send notification to other participants
+        $this->notifyParticipants($userId, $conversationId, $formatted);
 
         return $formatted;
     }
@@ -238,6 +276,7 @@ final readonly class DirectMessageService
         }
 
         $this->messageRepo->updateContent($messageId, $newContent);
+        $this->eventRepo->create($message['conversationId'], $userId, 'message_edited', $messageId);
 
         $updated = $this->messageRepo->findById($messageId);
         return $this->formatMessage($updated);
@@ -262,6 +301,7 @@ final readonly class DirectMessageService
         }
 
         $this->messageRepo->markDeleted($messageId, $userId);
+        $this->eventRepo->create($message['conversationId'], $userId, 'message_deleted', $messageId);
     }
 
     /**
@@ -269,6 +309,8 @@ final readonly class DirectMessageService
      */
     public function markRead(string $userId, string $conversationId, int $seq): void
     {
+        $maxSeq = $this->messageRepo->getMaxSeq($conversationId);
+        $seq = min(max($seq, 0), $maxSeq);
         $this->participantRepo->updateLastReadSeq($conversationId, $userId, $seq);
     }
 
@@ -277,6 +319,10 @@ final readonly class DirectMessageService
      */
     public function setTyping(string $userId, string $conversationId, bool $typing): void
     {
+        if (!$this->rateLimiter->isAllowed('chat_typing:' . $userId, self::TYPING_RATE_LIMIT, self::TYPING_RATE_WINDOW)) {
+            throw new \RuntimeException('rate_limit_exceeded');
+        }
+
         if ($typing) {
             $this->typingRepo->touch($conversationId, $userId);
         } else {
@@ -286,7 +332,7 @@ final readonly class DirectMessageService
 
     /**
      * Sync endpoint: get all new data since a seq cursor.
-     * Returns new messages across all conversations, read receipts, and typing states.
+     * Returns new/changed messages (as events), read status, and typing states.
      */
     public function sync(string $userId, int $afterSeq = 0, int $limit = self::SYNC_LIMIT): array
     {
@@ -295,8 +341,8 @@ final readonly class DirectMessageService
 
         $limit = min(500, max(1, $limit));
 
-        // Get new messages across all conversations
-        $messages = $this->messageRepo->findNewForUser($userId, $afterSeq, $limit);
+        // Get new/changed messages (events) across all conversations
+        $events = $this->eventRepo->findNewForUser($userId, $afterSeq, $limit);
 
         // Get typing states
         $typingMap = $this->typingRepo->findTypingForUser($userId);
@@ -304,31 +350,40 @@ final readonly class DirectMessageService
         // Get conversations with updated read status
         $conversations = $this->conversationRepo->listForUser($userId, 100, 0);
 
-        $conversationUpdates = array_map(function (array $conv) use ($userId) {
+        $conversationUpdates = array_map(function (array $conv) {
             return [
                 'conversationId' => $conv['id'],
                 'unreadCount' => (int) $conv['unreadCount'],
                 'lastSeenAt' => $conv['lastSeenAt'] !== null ? self::stripFractionalSeconds($conv['lastSeenAt']) : null,
+                'otherLastReadSeq' => (int) ($conv['otherLastReadSeq'] ?? 0),
             ];
         }, $conversations);
 
         $newMaxSeq = $afterSeq;
-        $formattedMessages = array_map(function (array $row) use (&$newMaxSeq) {
-            if ((int) $row['seq'] > $newMaxSeq) {
-                $newMaxSeq = (int) $row['seq'];
+        $formattedEvents = array_map(function (array $row) use (&$newMaxSeq) {
+            $eventSeq = (int) $row['eventSeq'];
+            if ($eventSeq > $newMaxSeq) {
+                $newMaxSeq = $eventSeq;
             }
-            return $this->formatMessage($row);
-        }, $messages);
+            return [
+                'seq' => $eventSeq,
+                'conversationId' => $row['conversationId'],
+                'actorId' => $row['actorId'],
+                'type' => $row['type'],
+                'messageId' => $row['messageId'],
+                'message' => $row['messageId'] !== null ? $this->formatMessage($row) : null,
+            ];
+        }, $events);
 
         return [
             'data' => [
-                'messages' => $formattedMessages,
+                'events' => $formattedEvents,
                 'conversations' => $conversationUpdates,
                 'typing' => $typingMap,
             ],
             'meta' => [
                 'seq' => $newMaxSeq,
-                'hasMore' => count($messages) === $limit,
+                'hasMore' => count($events) === $limit,
             ],
         ];
     }
@@ -348,6 +403,7 @@ final readonly class DirectMessageService
                 'avatar' => $otherParticipant['userImage'] ?? null,
             ] : null,
             'lastReadSeq' => $participant !== null ? (int) $participant['lastReadSeq'] : 0,
+            'otherLastReadSeq' => $otherParticipant !== null ? (int) $otherParticipant['lastReadSeq'] : 0,
             'createdAt' => self::stripFractionalSeconds($conversation['createdAt']),
             'updatedAt' => self::stripFractionalSeconds($conversation['updatedAt']),
         ];
@@ -356,7 +412,7 @@ final readonly class DirectMessageService
     private function formatMessage(array $message): array
     {
         $payload = null;
-        if (isset($message['payload']) && $message['payload'] !== null) {
+        if (isset($message['payload'])) {
             $payload = is_string($message['payload'])
                 ? json_decode($message['payload'], true)
                 : $message['payload'];
@@ -382,36 +438,49 @@ final readonly class DirectMessageService
         ];
     }
 
-    private function notifyParticipants(string $senderId, string $conversationId, array $formattedMessage, array $conversation): void
+    private function notifyParticipants(string $senderId, string $conversationId, array $formattedMessage): void
     {
         $participants = $this->participantRepo->findByConversation($conversationId);
 
         $sender = $this->userRepo->findById($senderId);
         $senderName = $sender['displayName'] ?? 'Jemand';
+        $body = $this->buildNotificationBody($senderName, $formattedMessage['content'] ?? '');
 
         foreach ($participants as $participant) {
             if ($participant['userId'] === $senderId) {
                 continue;
             }
 
-            // Push suppression: skip if recipient is active (polling)
-            if ($this->presenceRepo->isActive($participant['userId'])) {
-                continue;
-            }
+            // Push suppression: skip only the push if recipient is actively polling,
+            // but still create the (coalesced) in-app notification list entry.
+            $suppressPush = $this->presenceRepo->isActive($participant['userId']);
 
             $this->notificationService->create(
                 userId: $participant['userId'],
                 type: 'direct_message',
                 title: '',
-                body: '',
+                body: $body,
                 data: [
                     ['relation' => 'sender', 'object' => 'User', 'identifier' => $senderId],
                     ['relation' => 'conversation', 'object' => 'ChatConversation', 'identifier' => $conversationId],
                     ['relation' => 'message', 'object' => 'DirectMessage', 'identifier' => $formattedMessage['id']],
                 ],
                 dedupeKey: 'chat:' . $conversationId,
+                suppressPush: $suppressPush,
             );
         }
+    }
+
+    private function buildNotificationBody(string $senderName, string $content): string
+    {
+        $preview = trim(preg_replace('/\s+/', ' ', $content) ?? '');
+        if ($preview === '') {
+            return $senderName . ' hat dir eine Nachricht geschickt.';
+        }
+        if (mb_strlen($preview) > self::NOTIFICATION_PREVIEW_LENGTH) {
+            $preview = mb_substr($preview, 0, self::NOTIFICATION_PREVIEW_LENGTH) . '…';
+        }
+        return $senderName . ': ' . $preview;
     }
 
     private static function stripFractionalSeconds(string $datetime): string

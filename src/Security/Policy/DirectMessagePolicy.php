@@ -22,28 +22,4 @@ final readonly class DirectMessagePolicy
 
         return $this->participantRepo->isParticipant($conversationId, $user->id);
     }
-
-    /**
-     * Only the sender may edit their own message.
-     */
-    public function canEdit(AuthenticatedUser $user, array $message): bool
-    {
-        if ($user->isAdmin) {
-            return true;
-        }
-
-        return $user->id === $message['senderId'];
-    }
-
-    /**
-     * Only the sender may delete their own message (for all, no time window).
-     */
-    public function canDelete(AuthenticatedUser $user, array $message): bool
-    {
-        if ($user->isAdmin) {
-            return true;
-        }
-
-        return $user->id === $message['senderId'];
-    }
 }

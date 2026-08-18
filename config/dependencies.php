@@ -35,6 +35,7 @@ use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
+use Sinclear\Api\Repository\ChatEventRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\ChatPresenceRepository;
 use Sinclear\Api\Repository\ChatTypingRepository;
@@ -271,6 +272,7 @@ return [
 
     ChatConversationRepository::class => autowire(),
     ChatParticipantRepository::class => autowire(),
+    ChatEventRepository::class => autowire(),
     DirectMessageRepository::class => autowire(),
     ChatPresenceRepository::class => autowire(),
     ChatTypingRepository::class => autowire(),

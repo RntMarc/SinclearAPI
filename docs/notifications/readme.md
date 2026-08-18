@@ -394,9 +394,9 @@ Benachrichtigt darüber, dass eine neue Story veröffentlicht wurde. Empfänger 
 
 ### `direct_message`
 
-Benachrichtigt darüber, dass eine neue Direktnachricht in einer 1:1-Konversation eingegangen ist. **Bündelung:** Es wird maximal eine Notification pro Konversation erstellt (`dedupeKey = "chat:<conversationId>"`). Bei weiteren Nachrichten in derselben Konversation wird die bestehende, ungelesene Notification aktualisiert (Titel/Text/Data), statt eine neue anzulegen.
+Benachrichtigt darüber, dass eine neue Direktnachricht in einer 1:1-Konversation eingegangen ist. **Bündelung:** Es wird maximal eine Notification pro Konversation erstellt (`dedupeKey = "chat:<conversationId>"`). Bei weiteren Nachrichten in derselben Konversation wird die bestehende, ungelesene Notification aktualisiert (Titel/Text/Data), statt eine neue anzulegen. **Body:** `"{Absender}: {Vorschau}"` (Vorschau auf 160 Zeichen gekürzt) — dadurch zeigt der Push den Nachrichteninhalt.
 
-**Push-Unterdrückung:** Der Empfänger erhält nur dann eine Push-Benachrichtigung, wenn sein `ChatPresence.activeUntil` in der Vergangenheit liegt (er nicht aktiv pollt).
+**Push-Unterdrückung:** Der In-App-Listeneintrag wird immer erstellt. Eine **Push-Benachrichtigung** (Web/Unified) wird nur gesendet, wenn `ChatPresence.activeUntil` des Empfängers in der Vergangenheit liegt (er nicht aktiv pollt).
 
 | Relation | Objekt | Pflicht | Bedeutung |
 |----------|--------|---------|-----------|
@@ -413,7 +413,7 @@ Benachrichtigt darüber, dass eine neue Direktnachricht in einer 1:1-Konversatio
 ]
 ```
 
-**Coalesced Upsert:** Der `NotificationService` prüft bei `dedupeKey` auf eine vorhandene ungelesene Notification mit demselben Key. Existiert eine, wird `title`/`body`/`data` aktualisiert und `createdAt` auf `NOW(3)` gesetzt. Die `data`-Relationen werden dabei überschrieben (nicht gemerged) – der Client sollte die `message`-ID aus der最新的 Notification verwenden.
+**Coalesced Upsert:** Der `NotificationService` prüft bei `dedupeKey` auf eine vorhandene ungelesene Notification mit demselben Key. Existiert eine, wird `title`/`body`/`data` aktualisiert und `createdAt` auf `NOW(3)` gesetzt. Die `data`-Relationen werden dabei überschrieben (nicht gemerged) – der Client sollte die `message`-ID aus der zuletzt eingegangenen Notification verwenden.
 
 ## Push-Versand
 
