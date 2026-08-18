@@ -19,6 +19,7 @@ final readonly class NotificationPreferenceService
         'forum_reply',
         'forum_comment',
         'story_post',
+        'direct_message',
         'trip_user_added',
         'trip_user_added_others',
         'trip_event_added',
@@ -63,6 +64,7 @@ final readonly class NotificationPreferenceService
         'forum_comment' => ['relation' => 'parent_forum', 'dataKey' => 'forumIds'],
         'forum_reply' => ['relation' => 'parent_forum', 'dataKey' => 'forumIds'],
         'story_post' => ['relation' => 'story_author', 'dataKey' => 'userIds'],
+        'direct_message' => ['relation' => 'sender', 'dataKey' => 'userIds'],
     ];
 
     private const VALID_STATES = ['enabled', 'disabled', 'custom'];

@@ -246,6 +246,7 @@ geleert werden, ohne den State zu ändern.
 | `forum_comment` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
 | `forum_reply` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
 | `story_post` | `userIds` | Nutzer-IDs (Story-Autoren), deren Stories unterdrückt werden | `story_author` |
+| `direct_message` | `userIds` | Nutzer-IDs (Absender), deren Nachrichten unterdrückt werden | `sender` |
 
 **Beispiel Foren (Denylist):**
 ```json
@@ -272,6 +273,7 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Empfänger (FK zu User) |
 | `type` | varchar(64) | Typ der Benachrichtigung (z.B. `forum_reply`, `forum_comment`) |
+| `dedupeKey` | varchar(191) | Optional. Deduplizierungsschlüssel (z.B. `chat:<conversationId>` für gebündelte Chat-Notifications). Bei Setzung wird eine bestehende ungelesene Notification mit gleichem Key aktualisiert statt neu anzulegen. |
 | `title` | varchar(255) | Kurztitel, von der API aus dem Typ generiert; wird an Clients ausgeliefert |
 | `body` | text | Anzeigetext, von der API aus dem Typ generiert; wird an Clients als `text` ausgeliefert |
 | `data` | json | Strukturierte Relation-Liste für den jeweiligen Benachrichtigungstyp |
@@ -324,6 +326,8 @@ beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
 Die Forum-Typen werden automatisch in `ForumService::createComment()` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Eigene Kommentare/Antworten lösen keine Benachrichtigung aus (kein Self-Trigger).
 
 Der Story-Typ wird automatisch in `StoryController::create()` getriggert: eine neue Story erzeugt `story_post` für alle übrigen Nutzer (kein Self-Trigger).
+
+Der Chat-Typ wird automatisch in `DirectMessageService::sendMessage()` getriggert: eine neue Nachricht erzeugt `direct_message` für alle anderen Teilnehmer der Konversation (kein Self-Trigger). Push wird nur gesendet wenn `ChatPresence.activeUntil` des Empfängers in der Vergangenheit liegt. Bündelung via `dedupeKey = "chat:<conversationId>"`.
 
 ### `forum_reply`
 
@@ -387,6 +391,29 @@ Benachrichtigt darüber, dass eine neue Story veröffentlicht wurde. Empfänger 
   { "relation": "story", "object": "Story", "identifier": "987654" }
 ]
 ```
+
+### `direct_message`
+
+Benachrichtigt darüber, dass eine neue Direktnachricht in einer 1:1-Konversation eingegangen ist. **Bündelung:** Es wird maximal eine Notification pro Konversation erstellt (`dedupeKey = "chat:<conversationId>"`). Bei weiteren Nachrichten in derselben Konversation wird die bestehende, ungelesene Notification aktualisiert (Titel/Text/Data), statt eine neue anzulegen.
+
+**Push-Unterdrückung:** Der Empfänger erhält nur dann eine Push-Benachrichtigung, wenn sein `ChatPresence.activeUntil` in der Vergangenheit liegt (er nicht aktiv pollt).
+
+| Relation | Objekt | Pflicht | Bedeutung |
+|----------|--------|---------|-----------|
+| `sender` | `User` | Ja | Nutzer, der die Nachricht gesendet hat |
+| `conversation` | `ChatConversation` | Ja | Die Konversation |
+| `message` | `DirectMessage` | Ja | Die neue Nachricht |
+
+**Data-Format:**
+```json
+[
+  { "relation": "sender", "object": "User", "identifier": "123456" },
+  { "relation": "conversation", "object": "ChatConversation", "identifier": "987654" },
+  { "relation": "message", "object": "DirectMessage", "identifier": "456789" }
+]
+```
+
+**Coalesced Upsert:** Der `NotificationService` prüft bei `dedupeKey` auf eine vorhandene ungelesene Notification mit demselben Key. Existiert eine, wird `title`/`body`/`data` aktualisiert und `createdAt` auf `NOW(3)` gesetzt. Die `data`-Relationen werden dabei überschrieben (nicht gemerged) – der Client sollte die `message`-ID aus der最新的 Notification verwenden.
 
 ## Push-Versand
 

@@ -85,6 +85,10 @@ final readonly class NotificationService
             'title' => 'Neues Abo verknüpft',
             'text' => '',
         ],
+        'direct_message' => [
+            'title' => 'Neue Nachricht',
+            'text' => '',
+        ],
     ];
 
     public function __construct(
@@ -96,7 +100,7 @@ final readonly class NotificationService
         private ?LoggerInterface $logger = null,
     ) {}
 
-    public function create(string $userId, string $type, string $title, string $body, ?array $data = null, bool $respectPreferences = true): ?string
+    public function create(string $userId, string $type, string $title, string $body, ?array $data = null, bool $respectPreferences = true, ?string $dedupeKey = null): ?string
     {
         $type = trim($type);
         $title = trim($title);
@@ -118,13 +122,22 @@ final readonly class NotificationService
         $title = $title !== '' ? $title : $generatedTitle;
         $text = $body !== '' ? $body : $generatedText;
 
-        $record = $this->notificationRepo->create([
+        $recordData = [
             'userId' => $userId,
             'type' => $type,
             'title' => $title,
             'body' => $text,
             'data' => $data,
-        ]);
+            'dedupeKey' => $dedupeKey,
+        ];
+
+        // Coalesced upsert when dedupeKey is provided
+        if ($dedupeKey !== null) {
+            $existing = $this->notificationRepo->findUnreadByDedupeKey($userId, $dedupeKey);
+            $record = $this->notificationRepo->coalescedUpsert($recordData, $existing);
+        } else {
+            $record = $this->notificationRepo->create($recordData);
+        }
 
         $notification = [
             'id' => $record['id'],
@@ -163,6 +176,7 @@ final readonly class NotificationService
             'standalone_event_info_changed' => $this->normalizeStandaloneEventInfoChangedData($data),
             'trip_event_info_changed' => $this->normalizeTripEventInfoChangedData($data),
             'trip_subscription_added' => $this->normalizeTripSubscriptionAddedData($data),
+            'direct_message' => $this->normalizeDirectMessageData($data),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }
@@ -923,6 +937,55 @@ final readonly class NotificationService
         foreach ($requiredRelations as $relation => $_object) {
             if (!isset($normalized[$relation])) {
                 throw new \InvalidArgumentException('trip_subscription_added data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeDirectMessageData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('direct_message data is required');
+        }
+
+        $requiredRelations = [
+            'sender' => 'User',
+            'conversation' => 'ChatConversation',
+            'message' => 'DirectMessage',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('direct_message data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('direct_message data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('direct_message data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('direct_message data is missing relation: ' . $relation);
             }
         }
 

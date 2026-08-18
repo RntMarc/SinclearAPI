@@ -14,6 +14,7 @@ use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
+use Sinclear\Api\Controllers\ChatController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\McpController;
@@ -33,6 +34,11 @@ use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
+use Sinclear\Api\Repository\ChatConversationRepository;
+use Sinclear\Api\Repository\ChatParticipantRepository;
+use Sinclear\Api\Repository\ChatPresenceRepository;
+use Sinclear\Api\Repository\ChatTypingRepository;
+use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\LocationSharingSessionRepository;
 use Sinclear\Api\Repository\LocationSharingRecipientRepository;
 use Sinclear\Api\Repository\LocationSharingLocationRepository;
@@ -92,12 +98,14 @@ use Sinclear\Api\Repository\DavTokenRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
+use Sinclear\Api\Services\DirectMessageService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Services\PtService;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Services\SubscriptionService;
 use Sinclear\Api\Security\Policy\CalendarEventPolicy;
+use Sinclear\Api\Security\Policy\DirectMessagePolicy;
 use Sinclear\Api\Security\Policy\LocationSharingPolicy;
 use Sinclear\Api\Security\Policy\ExplorePolicy;
 use Sinclear\Api\Security\Policy\FeedbackPolicy;
@@ -260,6 +268,15 @@ return [
     \Sinclear\Api\Repository\PushSubscriptionRepository::class => autowire(),
     \Sinclear\Api\Repository\NotificationPreferenceRepository::class => autowire(),
     \Sinclear\Api\Services\NotificationPreferenceService::class => autowire(),
+
+    ChatConversationRepository::class => autowire(),
+    ChatParticipantRepository::class => autowire(),
+    DirectMessageRepository::class => autowire(),
+    ChatPresenceRepository::class => autowire(),
+    ChatTypingRepository::class => autowire(),
+    DirectMessagePolicy::class => autowire(),
+    DirectMessageService::class => autowire(),
+    ChatController::class => autowire(),
 
     \Minishlink\WebPush\WebPush::class => function (ContainerInterface $c): \Minishlink\WebPush\WebPush {
         $settings = $c->get(Settings::class);

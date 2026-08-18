@@ -2,7 +2,7 @@
 
 Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihre Trigger und die übermittelten Eigenschaften. Technische Details zur API stehen in [readme.md](./readme.md). Sie muss bei jeder Änderung an Notification-Typen aktualisiert werden.
 
-> **Präferenzen:** Die vom Preferences-Endpoint angebotenen Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Interne Event-Typen werden dabei zu gemeinsamen Preference-Schlüsseln zusammengefasst. Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply` (Denylist `forumIds`) und `story_post` (Denylist `userIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
+> **Präferenzen:** Die vom Preferences-Endpoint angebotenen Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Interne Event-Typen werden dabei zu gemeinsamen Preference-Schlüsseln zusammengefasst. Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply` (Denylist `forumIds`), `story_post` (Denylist `userIds`) und `direct_message` (Denylist `userIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
 >
 > **Vereinheitlichte Event-Typen:** Interne Notification-Typen (z.B. `standalone_event_user_added`, `trip_event_user_added`) werden bei den Präferenzen auf vereinheitlichte Typen gemappt. Der Nutzer sieht nur: `event_user_added` / `event_user_added_others`, `event_ticket_added` und `event_info_changed`. Diese gelten sowohl für Reise-Events als auch für eigenständige Events.
 
@@ -13,6 +13,12 @@ Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihr
 | `forum_comment` | Neuer Top-Level-Kommentar (ohne `parentId`) auf einen Forum-Post | Autor des Posts, außer bei eigenem Kommentar (kein Self-Trigger) | `comment_author` (User, Autor des Kommentars), `post_author` (User), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neuer Kommentar zu deinem Beitrag` | `Jemand hat deinen Beitrag kommentiert.` |
 | `forum_reply` | Neue Antwort (mit `parentId`) auf einen bestehenden Forum-Kommentar | Autor des beantworteten Kommentars, außer bei eigener Antwort (kein Self-Trigger) | `reply_author` (User, Autor der Antwort), `comment_author` (User, Autor des beantworteten Kommentars), `post_author` (User), `parent_comment` (ForumPostComment), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neue Antwort auf deinen Kommentar` | `Jemand hat auf deinen Kommentar geantwortet.` |
 | `story_post` | Neue Story wird veröffentlicht | Alle Nutzer außer dem Autor (kein Self-Trigger) | `story_author` (User, Autor der Story), `story` (Story) | `Neue Story` | `Jemand hat eine neue Story veröffentlicht.` |
+
+## Direktnachrichten
+
+| Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
+|------|---------|-----------|--------------------|-----------------------|----------------------|
+| `direct_message` | Neue Nachricht in einer 1:1-Konversation | Der andere Teilnehmer (nicht der Sender), aber NUR wenn `ChatPresence.activeUntil` des Empfängers in der Vergangenheit liegt (Push-Unterdrückung bei aktivem Polling). Bündelung: Eine Notification pro Konversation (`dedupeKey = "chat:<conversationId>"`), nicht pro Nachricht. | `sender` (User, Absender), `conversation` (ChatConversation), `message` (DirectMessage) | `Neue Nachricht` | Dynamisch: `{sender.displayName} hat dir eine Nachricht geschickt.` |
 
 ## Reise: Nutzer hinzugefügt
 

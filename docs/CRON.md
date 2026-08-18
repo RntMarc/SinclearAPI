@@ -28,7 +28,8 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 |---|-------------|-----------|--------------|
 | 1 | `cleanup_otp_tokens` | 1 Stunde | Löscht abgelaufene und benutzte OTP-Codes |
 | 2 | `cleanup_location_sharing` | 24 Stunden | Bereinigt alte Location-Sharing-Sessions |
-| 3 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
+| 3 | `cleanup_direct_messages` | 24 Stunden | Löscht Chat-Nachrichten älter als 90 Tage |
+| 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
 
 ## Details
 
@@ -48,6 +49,12 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Aktion:** Ruft für alle Legs mit `tripId`, deren `lastCheckedAt` älter als 5 Minuten ist, aktuelle Echtzeitdaten von Transitious `/v6/trip` ab und aktualisiert `actualDeparture`, `actualArrival`, `departureDelay`, `arrivalDelay`, `departurePlatform`, `arrivalPlatform`, `cancelled`, `realTimeState` und `lastCheckedAt`.
 - **Rate-Limit:** Max. 8 Legs pro Batch, 2 Sekunden Pause zwischen den Batches.
 - **Datei:** `src/Services/Cron/Tasks/PtRefreshStaleLegsTask.php`
+
+### Chat Cleanup
+- **Task-Name:** `cleanup_direct_messages`
+- **Intervall:** 86400 Sekunden (24 Stunden)
+- **Aktion:** Löscht `DirectMessage`-Einträge älter als 90 Tage in Batches (LIMIT 1000, um lange Locks zu vermeiden). Räumt verwaiste `ChatConversation`-Einträge (keine Nachrichten, älter als 1 Tag), abgelaufene `ChatPresence`- und `ChatTyping`-Einträge auf.
+- **Datei:** `src/Services/Cron/Tasks/CleanupOldDirectMessagesTask.php`
 
 ## CronSchedule-Tabelle
 

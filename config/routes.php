@@ -5,6 +5,7 @@ use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
+use Sinclear\Api\Controllers\ChatController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\PlaceSubmissionController;
@@ -343,6 +344,25 @@ return function (App $app): void {
         $group->get('/{id}', [StoryController::class, 'get']);
         $group->delete('/{id}', [StoryController::class, 'delete']);
         $group->post('/{id}/view', [StoryController::class, 'markViewed']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    // Chat / Direktnachrichten (authenticated)
+    $app->group('/chat', function (RouteCollectorProxy $group) {
+        // Sync endpoint (static route MUST come before parameterized routes)
+        $group->get('/sync', [ChatController::class, 'sync']);
+
+        // Message routes (static route MUST come before /{id})
+        $group->patch('/messages/{id}', [ChatController::class, 'editMessage']);
+        $group->delete('/messages/{id}', [ChatController::class, 'deleteMessage']);
+
+        // Conversation routes
+        $group->get('/conversations', [ChatController::class, 'listConversations']);
+        $group->post('/conversations', [ChatController::class, 'openConversation']);
+        $group->get('/conversations/{id}', [ChatController::class, 'getConversation']);
+        $group->get('/conversations/{id}/messages', [ChatController::class, 'listMessages']);
+        $group->post('/conversations/{id}/messages', [ChatController::class, 'sendMessage']);
+        $group->post('/conversations/{id}/read', [ChatController::class, 'markRead']);
+        $group->post('/conversations/{id}/typing', [ChatController::class, 'setTyping']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)
