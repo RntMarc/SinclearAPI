@@ -4,6 +4,7 @@
 -- DirectMessage: actual messages with seq-based sync cursor
 -- ChatPresence: push suppression for active pollers
 -- ChatTyping: ephemeral typing indicator
+-- ChatEvent: event log for message lifecycle (created/edited/deleted)
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 
@@ -47,15 +48,15 @@ CREATE TABLE `DirectMessage` (
   `editedAt` datetime(3) DEFAULT NULL,
   `deletedAt` datetime(3) DEFAULT NULL,
   `deletedBy` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_dm_seq` (`seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE `DirectMessage`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_dm_seq` (`seq`),
+  ADD UNIQUE KEY `uk_dm_sender_client` (`senderId`,`clientId`),
   ADD KEY `idx_dm_conversation_seq` (`conversationId`,`seq`),
-  ADD KEY `idx_dm_sender` (`senderId`),
-  ADD UNIQUE KEY `uk_dm_sender_client` (`senderId`,`clientId`);
+  ADD KEY `idx_dm_sender` (`senderId`);
 
 ALTER TABLE `DirectMessage`
   ADD CONSTRAINT `fk_dm_conversation` FOREIGN KEY (`conversationId`) REFERENCES `ChatConversation` (`id`) ON DELETE CASCADE,
@@ -92,12 +93,12 @@ CREATE TABLE `ChatEvent` (
   `actorId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `type` enum('message_created','message_edited','message_deleted') COLLATE utf8mb4_unicode_ci NOT NULL,
   `messageId` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY `uk_ce_seq` (`seq`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE `ChatEvent`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uk_ce_seq` (`seq`),
   ADD KEY `idx_ce_conv_seq` (`conversationId`,`seq`),
   ADD KEY `idx_ce_message` (`messageId`);
 
