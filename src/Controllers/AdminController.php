@@ -971,6 +971,7 @@ ROW;
 HTML;
             }
         }
+        $noForumTextStyle = $forumInfo !== '' ? 'display:none;' : '';
         $allForumsResult = $this->forumRepo->list(1, 99999);
         $forumOptions = '<option value="">– Kein Forum –</option>';
         foreach ($allForumsResult['data'] as $f) {
@@ -1002,15 +1003,46 @@ ROW;
         }
 
         // Chat info
-        $travelChat = $this->travelChatRepo->findByTripId($id);
+        $hasChat = false;
         $chatInfo = '';
+        try {
+            $travelChat = $this->travelChatRepo->findByTripId($id);
+        } catch (\Throwable) {
+            $travelChat = null;
+        }
         if ($travelChat !== null) {
+            $hasChat = true;
+            try {
+                $memberCount = $this->conversationRepo->countParticipants($travelChat['conversationId']);
+            } catch (\Throwable) {
+                $memberCount = '?';
+            }
             $chatInfo = <<<HTML
             <div class="flex" style="gap:0.5rem;align-items:center;">
-                <span>Gruppenchat aktiv ({$this->conversationRepo->countParticipants($travelChat['conversationId'])} Mitglieder)</span>
+                <span>Gruppenchat aktiv ({$memberCount} Mitglieder)</span>
                 <button class="btn btn-sm btn-danger" onclick="deleteTripChat()">Chat löschen</button>
             </div>
 HTML;
+        }
+        $noChatTextStyle = $hasChat ? 'display:none;' : '';
+        $createChatBtnStyle = $hasChat ? 'display:none;' : '';
+
+        // Chat icon
+        $chatIconSectionStyle = $hasChat ? '' : 'display:none;';
+        $chatIconPreviewHtml = '';
+        $removeChatIconBtnStyle = 'display:none;';
+        if ($hasChat) {
+            $chatImage = null;
+            try {
+                $conversation = $this->conversationRepo->findById($travelChat['conversationId']);
+                if ($conversation !== null) {
+                    $chatImage = $conversation['image'] ?? null;
+                }
+            } catch (\Throwable) {}
+            if (!empty($chatImage)) {
+                $chatIconPreviewHtml = '<img src="data:image/jpeg;base64,' . htmlspecialchars($chatImage) . '" style="width:100%;height:100%;object-fit:cover;">';
+                $removeChatIconBtnStyle = '';
+            }
         }
 
         $contentHtml = $this->renderTemplate('trip_detail.php', [
@@ -1028,10 +1060,16 @@ HTML;
             'tripEventCount' => $tripEventCount,
             'availableEventOptions' => $availableEventOptions,
             'forumInfo' => $forumInfo,
+            'noForumTextStyle' => $noForumTextStyle,
             'forumOptions' => $forumOptions,
             'subscriptionRows' => $subscriptionRows,
             'availableSubscriptionOptions' => $availableSubscriptionOptions,
             'chatInfo' => $chatInfo,
+            'noChatTextStyle' => $noChatTextStyle,
+            'createChatBtnStyle' => $createChatBtnStyle,
+            'chatIconSectionStyle' => $chatIconSectionStyle,
+            'chatIconPreviewHtml' => $chatIconPreviewHtml,
+            'removeChatIconBtnStyle' => $removeChatIconBtnStyle,
         ]);
         $html = $this->renderLayout("Reise: {$tripName}", $contentHtml, $user->email);
 
@@ -1312,15 +1350,46 @@ ROW;
         }
 
         // Chat info
-        $travelChat = $this->travelChatRepo->findByEventId($id);
+        $hasChat = false;
         $chatInfo = '';
+        try {
+            $travelChat = $this->travelChatRepo->findByEventId($id);
+        } catch (\Throwable) {
+            $travelChat = null;
+        }
         if ($travelChat !== null) {
+            $hasChat = true;
+            try {
+                $memberCount = $this->conversationRepo->countParticipants($travelChat['conversationId']);
+            } catch (\Throwable) {
+                $memberCount = '?';
+            }
             $chatInfo = <<<HTML
             <div class="flex" style="gap:0.5rem;align-items:center;">
-                <span>Gruppenchat aktiv ({$this->conversationRepo->countParticipants($travelChat['conversationId'])} Mitglieder)</span>
+                <span>Gruppenchat aktiv ({$memberCount} Mitglieder)</span>
                 <button class="btn btn-sm btn-danger" onclick="deleteEventChat()">Chat löschen</button>
             </div>
 HTML;
+        }
+        $noChatTextStyle = $hasChat ? 'display:none;' : '';
+        $createChatBtnStyle = $hasChat ? 'display:none;' : '';
+
+        // Chat icon
+        $chatIconSectionStyle = $hasChat ? '' : 'display:none;';
+        $chatIconPreviewHtml = '';
+        $removeChatIconBtnStyle = 'display:none;';
+        if ($hasChat) {
+            $chatImage = null;
+            try {
+                $conversation = $this->conversationRepo->findById($travelChat['conversationId']);
+                if ($conversation !== null) {
+                    $chatImage = $conversation['image'] ?? null;
+                }
+            } catch (\Throwable) {}
+            if (!empty($chatImage)) {
+                $chatIconPreviewHtml = '<img src="data:image/jpeg;base64,' . htmlspecialchars($chatImage) . '" style="width:100%;height:100%;object-fit:cover;">';
+                $removeChatIconBtnStyle = '';
+            }
         }
 
         // Banner image preview
@@ -1346,6 +1415,11 @@ HTML;
             'tripOptions' => $tripOptions,
             'eventEditData' => $editData,
             'chatInfo' => $chatInfo,
+            'noChatTextStyle' => $noChatTextStyle,
+            'createChatBtnStyle' => $createChatBtnStyle,
+            'chatIconSectionStyle' => $chatIconSectionStyle,
+            'chatIconPreviewHtml' => $chatIconPreviewHtml,
+            'removeChatIconBtnStyle' => $removeChatIconBtnStyle,
         ]);
         $html = $this->renderLayout("Event: {$eventName}", $contentHtml, $user->email);
 

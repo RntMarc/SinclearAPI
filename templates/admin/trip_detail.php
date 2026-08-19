@@ -196,7 +196,7 @@
         <button class="btn btn-primary" onclick="showLinkForumForm()">Forum ändern</button>
     </div>
     {{forumInfo}}
-    <p style="color:#666;{{forumInfo ? 'display:none;' : ''}}" id="noForumText">Kein Forum verknüpft.</p>
+    <p style="color:#666;{{noForumTextStyle}}" id="noForumText">Kein Forum verknüpft.</p>
 </div>
 
 <!-- Link Forum Form -->
@@ -221,8 +221,21 @@
         <h2 style="font-size:1.1rem;color:#aaa;">Chat</h2>
     </div>
     {{chatInfo}}
-    <p style="color:#666;{{chatInfo ? 'display:none;' : ''}}" id="noChatText">Kein Gruppenchat vorhanden.</p>
-    <button class="btn btn-primary" id="createChatBtn" onclick="createTripChat()" style="{{chatInfo ? 'display:none;' : ''}}">Gruppenchat erstellen</button>
+    <p style="color:#666;{{noChatTextStyle}}" id="noChatText">Kein Gruppenchat vorhanden.</p>
+    <button class="btn btn-primary" id="createChatBtn" onclick="createTripChat()" style="{{createChatBtnStyle}}">Gruppenchat erstellen</button>
+    <div id="chatIconSection" style="{{chatIconSectionStyle}}">
+        <div style="border-top:1px solid #333;padding-top:1rem;margin-top:1rem;">
+            <label style="color:#888;font-size:0.85rem;display:block;margin-bottom:0.5rem;">Chat-Bild</label>
+            <div class="flex" style="gap:0.5rem;align-items:center;">
+                <div id="chatIconPreview" style="width:64px;height:64px;border-radius:12px;overflow:hidden;background:#1a1a2e;border:2px solid #333;flex-shrink:0;">{{chatIconPreviewHtml}}</div>
+                <div>
+                    <input type="file" id="chatIconFile" accept="image/jpeg,image/png,image/webp" onchange="handleChatIconFile(this)" style="display:none;">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('chatIconFile').click()">Bild hochladen</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="removeChatIconBtn" onclick="removeChatIcon()" style="{{removeChatIconBtnStyle}}">Entfernen</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card" style="margin-bottom:1rem;">
@@ -289,6 +302,21 @@
     </form>
 </div>
 
+<!-- Crop Modal -->
+<div id="cropModal" class="modal" onclick="if(event.target===this)cancelCrop()">
+    <div class="card" style="max-width:700px;">
+        <h2 id="cropModalTitle" style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Bild zuschneiden</h2>
+        <div style="max-height:400px;overflow:hidden;margin-bottom:1rem;">
+            <img id="cropImage" src="" style="max-width:100%;display:block;">
+        </div>
+        <div class="flex" style="gap:0.5rem;">
+            <button type="button" class="btn btn-success" onclick="confirmCrop()">Zuschneiden & Übernehmen</button>
+            <button type="button" class="btn" onclick="cancelCrop()">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script>
     // Trip ID stored for API calls
     const tripId = '{{tripId}}';
@@ -603,5 +631,131 @@
             if (res.ok) { showToast('Gruppenchat gelöscht'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Löschen', 'error'); }
+    }
+
+    // Chat icon
+    const ICON_MAX_BYTES = 200 * 1024;
+    let cropAspectRatio = 1 / 1;
+    let cropOutputWidth = 512;
+    let cropOutputHeight = 512;
+    let cropMaxBytes = ICON_MAX_BYTES;
+    let cropRatioLabel = '1:1';
+
+    function handleChatIconFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            openCropModal(e.target.result).then(function(croppedBase64) {
+                saveChatIcon(croppedBase64);
+            }).catch(function() {
+                input.value = '';
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function saveChatIcon(base64) {
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/chat', {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64 }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) {
+                document.getElementById('chatIconPreview').innerHTML = '<img src="data:image/jpeg;base64,' + base64 + '" style="width:100%;height:100%;object-fit:cover;">';
+                document.getElementById('removeChatIconBtn').style.display = 'inline-flex';
+                showToast('Chat-Bild gespeichert');
+            } else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Speichern', 'error'); }
+    }
+
+    async function removeChatIcon() {
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/chat', {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: null }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) {
+                document.getElementById('chatIconPreview').innerHTML = '';
+                document.getElementById('removeChatIconBtn').style.display = 'none';
+                document.getElementById('chatIconFile').value = '';
+                showToast('Chat-Bild entfernt');
+            } else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Entfernen', 'error'); }
+    }
+
+    // Crop modal
+    function openCropModal(imageSrc, options) {
+        if (options) {
+            cropAspectRatio = options.aspectRatio ?? cropAspectRatio;
+            cropOutputWidth = options.outputWidth ?? cropOutputWidth;
+            cropOutputHeight = options.outputHeight ?? cropOutputHeight;
+            cropMaxBytes = options.maxBytes ?? cropMaxBytes;
+            cropRatioLabel = options.ratioLabel ?? cropRatioLabel;
+        }
+        return new Promise(function(resolve, reject) {
+            cropResolve = { resolve: resolve, reject: reject };
+            const modal = document.getElementById('cropModal');
+            const img = document.getElementById('cropImage');
+            const title = document.getElementById('cropModalTitle');
+            img.src = imageSrc;
+            if (title) title.textContent = 'Bild zuschneiden (' + cropRatioLabel + ')';
+            modal.style.display = 'flex';
+            if (cropper) { cropper.destroy(); cropper = null; }
+            setTimeout(function() {
+                cropper = new Cropper(img, {
+                    aspectRatio: cropAspectRatio,
+                    viewMode: 1,
+                    autoCropArea: 1,
+                    responsive: true,
+                    background: false,
+                });
+            }, 100);
+        });
+    }
+
+    function confirmCrop() {
+        if (!cropper) return;
+        const canvas = cropper.getCroppedCanvas({
+            width: cropOutputWidth,
+            height: cropOutputHeight,
+            imageSmoothingQuality: 'high',
+        });
+        const base64 = compressToMaxBytes(canvas, cropMaxBytes);
+        destroyCropModal();
+        if (cropResolve) { cropResolve.resolve(base64); cropResolve = null; }
+    }
+
+    function cancelCrop() {
+        const resolver = cropResolve;
+        cropResolve = null;
+        destroyCropModal();
+        if (resolver) resolver.reject();
+    }
+
+    function destroyCropModal() {
+        document.getElementById('cropModal').style.display = 'none';
+        if (cropper) { cropper.destroy(); cropper = null; }
+        document.getElementById('cropImage').src = '';
+    }
+
+    function closeCropModal() { cancelCrop(); }
+
+    function compressToMaxBytes(canvas, maxBytes) {
+        let quality = 0.9;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let base64 = dataUrl.split(',')[1];
+        while (base64.length * 3 / 4 > maxBytes && quality > 0.3) {
+            quality -= 0.1;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+            base64 = dataUrl.split(',')[1];
+        }
+        return base64;
     }
 </script>

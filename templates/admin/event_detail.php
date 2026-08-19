@@ -160,8 +160,21 @@
         <h2 style="font-size:1.1rem;color:#aaa;">Chat</h2>
     </div>
     {{chatInfo}}
-    <p style="color:#666;{{chatInfo ? 'display:none;' : ''}}" id="noChatText">Kein Gruppenchat vorhanden.</p>
-    <button class="btn btn-primary" id="createChatBtn" onclick="createEventChat()" style="{{chatInfo ? 'display:none;' : ''}}">Gruppenchat erstellen</button>
+    <p style="color:#666;{{noChatTextStyle}}" id="noChatText">Kein Gruppenchat vorhanden.</p>
+    <button class="btn btn-primary" id="createChatBtn" onclick="createEventChat()" style="{{createChatBtnStyle}}">Gruppenchat erstellen</button>
+    <div id="chatIconSection" style="{{chatIconSectionStyle}}">
+        <div style="border-top:1px solid #333;padding-top:1rem;margin-top:1rem;">
+            <label style="color:#888;font-size:0.85rem;display:block;margin-bottom:0.5rem;">Chat-Bild</label>
+            <div class="flex" style="gap:0.5rem;align-items:center;">
+                <div id="chatIconPreview" style="width:64px;height:64px;border-radius:12px;overflow:hidden;background:#1a1a2e;border:2px solid #333;flex-shrink:0;">{{chatIconPreviewHtml}}</div>
+                <div>
+                    <input type="file" id="chatIconFile" accept="image/jpeg,image/png,image/webp" onchange="handleChatIconFile(this)" style="display:none;">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="document.getElementById('chatIconFile').click()">Bild hochladen</button>
+                    <button type="button" class="btn btn-sm btn-danger" id="removeChatIconBtn" onclick="removeChatIcon()" style="{{removeChatIconBtnStyle}}">Entfernen</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Crop Modal -->
@@ -448,5 +461,63 @@
             if (res.ok) { showToast('Gruppenchat gelöscht'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Löschen', 'error'); }
+    }
+
+    // Chat icon
+    const ICON_MAX_BYTES = 200 * 1024;
+
+    function handleChatIconFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            openCropModal(e.target.result, {
+                aspectRatio: 1 / 1,
+                outputWidth: 512,
+                outputHeight: 512,
+                maxBytes: ICON_MAX_BYTES,
+                ratioLabel: '1:1',
+            }).then(function(croppedBase64) {
+                saveChatIcon(croppedBase64);
+            }).catch(function() {
+                input.value = '';
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function saveChatIcon(base64) {
+        try {
+            const res = await fetch('/api/v2/admin/travel/events/' + eventId + '/chat', {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64 }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) {
+                document.getElementById('chatIconPreview').innerHTML = '<img src="data:image/jpeg;base64,' + base64 + '" style="width:100%;height:100%;object-fit:cover;">';
+                document.getElementById('removeChatIconBtn').style.display = 'inline-flex';
+                showToast('Chat-Bild gespeichert');
+            } else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Speichern', 'error'); }
+    }
+
+    async function removeChatIcon() {
+        try {
+            const res = await fetch('/api/v2/admin/travel/events/' + eventId + '/chat', {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: null }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) {
+                document.getElementById('chatIconPreview').innerHTML = '';
+                document.getElementById('removeChatIconBtn').style.display = 'none';
+                document.getElementById('chatIconFile').value = '';
+                showToast('Chat-Bild entfernt');
+            } else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Entfernen', 'error'); }
     }
 </script>
