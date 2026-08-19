@@ -328,15 +328,15 @@
 </div>
 
 <!-- Crop Modal -->
-<div id="cropModal" class="modal" onclick="if(event.target===this)closeCropModal()">
+<div id="cropModal" class="modal" onclick="if(event.target===this)cancelCrop()">
     <div class="card" style="max-width:700px;">
-        <h2 style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Bild zuschneiden (3.5:1)</h2>
+        <h2 id="cropModalTitle" style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Bild zuschneiden (3.5:1)</h2>
         <div style="max-height:400px;overflow:hidden;margin-bottom:1rem;">
             <img id="cropImage" src="" style="max-width:100%;display:block;">
         </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="button" class="btn btn-success" onclick="confirmCrop()">Zuschneiden & Übernehmen</button>
-            <button type="button" class="btn" onclick="closeCropModal()">Abbrechen</button>
+            <button type="button" class="btn" onclick="cancelCrop()">Abbrechen</button>
         </div>
     </div>
 </div>
@@ -408,19 +408,20 @@
     }
 
     // Image handling
-    function handleImageFile(input, hiddenId, previewId) {
+    const BANNER_MAX_BYTES = 500 * 1024;
+    let cropAspectRatio = 3.5 / 1;
+    let cropOutputWidth = 1750;
+    let cropOutputHeight = 500;
+    let cropMaxBytes = BANNER_MAX_BYTES;
+    let cropRatioLabel = '3.5:1';
+
+    function handleImageFile(input, hiddenId, previewId, options) {
         const file = input.files[0];
         if (!file) return;
 
-        if (file.size > 500 * 1024) {
-            showToast('Bild ist zu groß (max. 500 KB).', 'error');
-            input.value = '';
-            return;
-        }
-
         const reader = new FileReader();
         reader.onload = function(e) {
-            openCropModal(e.target.result).then(function(croppedBase64) {
+            openCropModal(e.target.result, options).then(function(croppedBase64) {
                 document.getElementById(hiddenId).value = croppedBase64;
                 showImagePreview(previewId, croppedBase64);
                 if (hiddenId === 'editEventImage') {
@@ -433,19 +434,28 @@
         reader.readAsDataURL(file);
     }
 
-    function openCropModal(imageSrc) {
+    function openCropModal(imageSrc, options) {
+        if (options) {
+            cropAspectRatio = options.aspectRatio ?? cropAspectRatio;
+            cropOutputWidth = options.outputWidth ?? cropOutputWidth;
+            cropOutputHeight = options.outputHeight ?? cropOutputHeight;
+            cropMaxBytes = options.maxBytes ?? cropMaxBytes;
+            cropRatioLabel = options.ratioLabel ?? cropRatioLabel;
+        }
         return new Promise(function(resolve, reject) {
             cropResolve = { resolve: resolve, reject: reject };
             const modal = document.getElementById('cropModal');
             const img = document.getElementById('cropImage');
+            const title = document.getElementById('cropModalTitle');
             img.src = imageSrc;
+            if (title) title.textContent = 'Bild zuschneiden (' + cropRatioLabel + ')';
             modal.style.display = 'flex';
 
             if (cropper) { cropper.destroy(); cropper = null; }
 
             setTimeout(function() {
                 cropper = new Cropper(img, {
-                    aspectRatio: 3.5 / 1,
+                    aspectRatio: cropAspectRatio,
                     viewMode: 1,
                     autoCropArea: 1,
                     responsive: true,
@@ -458,22 +468,46 @@
     function confirmCrop() {
         if (!cropper) return;
         const canvas = cropper.getCroppedCanvas({
-            width: 3500,
-            height: 1000,
+            width: cropOutputWidth,
+            height: cropOutputHeight,
             imageSmoothingQuality: 'high',
         });
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        const base64 = dataUrl.split(',')[1];
-        closeCropModal();
-        if (cropResolve) cropResolve.resolve(base64);
+        const base64 = compressToMaxBytes(canvas, cropMaxBytes);
+        destroyCropModal();
+        if (cropResolve) {
+            cropResolve.resolve(base64);
+            cropResolve = null;
+        }
     }
 
-    function closeCropModal() {
+    function cancelCrop() {
+        const resolver = cropResolve;
+        cropResolve = null;
+        destroyCropModal();
+        if (resolver) resolver.reject();
+    }
+
+    function destroyCropModal() {
         const modal = document.getElementById('cropModal');
         modal.style.display = 'none';
         if (cropper) { cropper.destroy(); cropper = null; }
         document.getElementById('cropImage').src = '';
-        if (cropResolve) { cropResolve.reject(); cropResolve = null; }
+    }
+
+    function closeCropModal() {
+        cancelCrop();
+    }
+
+    function compressToMaxBytes(canvas, maxBytes) {
+        let quality = 0.9;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let base64 = dataUrl.split(',')[1];
+        while (base64.length * 3 / 4 > maxBytes && quality > 0.3) {
+            quality -= 0.1;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+            base64 = dataUrl.split(',')[1];
+        }
+        return base64;
     }
 
     function showImagePreview(previewId, base64) {
