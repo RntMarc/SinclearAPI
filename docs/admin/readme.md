@@ -120,8 +120,10 @@ Nicht-Admins erhalten einen 403-Fehler.
 | DELETE | `/admin/travel/events/{id}/participants/{userId}` | Teilnehmer von Event entfernen (geschützt) |
 | POST | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise erstellen (geschützt) |
 | DELETE | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise löschen (geschützt) |
+| PATCH | `/admin/travel/trips/{id}/chat` | Gruppenchat-Icon für Reise setzen/entfernen (geschützt) |
 | POST | `/admin/travel/events/{id}/chat` | Gruppenchat für Event erstellen (geschützt) |
 | DELETE | `/admin/travel/events/{id}/chat` | Gruppenchat für Event löschen (geschützt) |
+| PATCH | `/admin/travel/events/{id}/chat` | Gruppenchat-Icon für Event setzen/entfernen (geschützt) |
 | GET | `/admin/moderation-requests` | Moderations-Anfragen mit Filtern (geschützt) |
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |

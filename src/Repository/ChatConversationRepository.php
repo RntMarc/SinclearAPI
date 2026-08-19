@@ -58,6 +58,17 @@ final readonly class ChatConversationRepository
     }
 
     /**
+     * Update the image of a group conversation.
+     */
+    public function updateImage(string $conversationId, ?string $image): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE ChatConversation SET image = ?, updatedAt = NOW(3) WHERE id = ?'
+        );
+        $stmt->execute([$image, $conversationId]);
+    }
+
+    /**
      * List conversations for a user, with last message preview and unread count.
      * Supports both direct and group conversations.
      */

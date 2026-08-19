@@ -670,6 +670,68 @@ ROW;
         return ResponseFactory::noContent($response);
     }
 
+    public function updateTripChatImage(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+        $body = $request->getParsedBody();
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $travelChat = $this->travelChatRepo->findByTripId($tripId);
+        if ($travelChat === null) {
+            return ResponseFactory::json(['error' => 'chat_not_found'], 404, $response);
+        }
+
+        $image = null;
+        if (isset($body['image']) && is_string($body['image']) && $body['image'] !== '') {
+            try {
+                $this->imageService->validate($body['image']);
+                $image = $body['image'];
+            } catch (\InvalidArgumentException $e) {
+                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            }
+        }
+
+        $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
+
+        return ResponseFactory::json(['data' => ['conversationId' => $travelChat['conversationId'], 'image' => $image]], 200, $response);
+    }
+
+    public function updateEventChatImage(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $eventId = $args['id'];
+        $body = $request->getParsedBody();
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        }
+
+        $travelChat = $this->travelChatRepo->findByEventId($eventId);
+        if ($travelChat === null) {
+            return ResponseFactory::json(['error' => 'chat_not_found'], 404, $response);
+        }
+
+        $image = null;
+        if (isset($body['image']) && is_string($body['image']) && $body['image'] !== '') {
+            try {
+                $this->imageService->validate($body['image']);
+                $image = $body['image'];
+            } catch (\InvalidArgumentException $e) {
+                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            }
+        }
+
+        $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
+
+        return ResponseFactory::json(['data' => ['conversationId' => $travelChat['conversationId'], 'image' => $image]], 200, $response);
+    }
+
     public function linkTripForum(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $this->requireUser($request);

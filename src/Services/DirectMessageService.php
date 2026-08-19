@@ -63,6 +63,7 @@ final readonly class DirectMessageService
                 'id' => $row['id'],
                 'type' => $row['type'],
                 'name' => $row['name'],
+                'image' => $isGroup ? ($row['image'] ?? null) : null,
                 'otherUser' => !$isGroup && $row['otherUserId'] !== null ? [
                     'id' => $row['otherUserId'],
                     'displayName' => $row['otherUserDisplayName'] ?? null,
@@ -419,6 +420,7 @@ final readonly class DirectMessageService
             'id' => $conversation['id'],
             'type' => $conversation['type'],
             'name' => $conversation['name'],
+            'image' => $isGroup ? ($conversation['image'] ?? null) : null,
             'otherUser' => $otherParticipant !== null ? [
                 'id' => $otherParticipant['userId'],
                 'displayName' => $otherParticipant['displayName'] ?? null,

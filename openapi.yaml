@@ -4505,6 +4505,12 @@ components:
           type: string
           nullable: true
           description: Name der Konversation (für Gruppen)
+        image:
+          type: string
+          nullable: true
+          description: >
+            Icon/Avatar der Gruppenkonversation (base64-encoded Bild).
+            Nur bei Gruppen relevant; null bei 1:1-Konversationen.
         otherUser:
           type: object
           nullable: true
@@ -8711,6 +8717,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+    patch:
+      summary: Admin-Gruppenchat-Icon für Reise setzen
+      description: >
+        Setzt oder entfernt das Icon (Bild) eines Gruppenchats für eine Reise.
+        Das Bild wird als base64-encoded String übermittelt.
+        Sendet man `image: null` oder ein leeres String, wird das Icon entfernt.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  nullable: true
+                  description: >
+                    Base64-encoded Bild oder null zum Entfernen.
+      responses:
+        '200':
+          description: Icon aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversationId:
+                        type: string
+                        format: uuid
+                      image:
+                        type: string
+                        nullable: true
+        '400':
+          description: Ungültiges Bild
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Chat nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /admin/travel/events:
     post:
@@ -8883,6 +8944,61 @@ paths:
       responses:
         '204':
           description: Chat gelöscht (kein Inhalt)
+        '404':
+          description: Event oder Chat nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Admin-Gruppenchat-Icon für Event setzen
+      description: >
+        Setzt oder entfernt das Icon (Bild) eines Gruppenchats für ein Event.
+        Das Bild wird als base64-encoded String übermittelt.
+        Sendet man `image: null` oder ein leeres String, wird das Icon entfernt.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  nullable: true
+                  description: >
+                    Base64-encoded Bild oder null zum Entfernen.
+      responses:
+        '200':
+          description: Icon aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      conversationId:
+                        type: string
+                        format: uuid
+                      image:
+                        type: string
+                        nullable: true
+        '400':
+          description: Ungültiges Bild
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Event oder Chat nicht gefunden
           content:

@@ -77,6 +77,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "id": "uuid",
   "type": "group",
   "name": "Sommerurlaub 2025",
+  "image": "data:image/jpeg;base64,...",
   "otherUser": null,
   "lastMessage": { "..." },
   "unreadCount": 5,
@@ -94,6 +95,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | `id` | string (uuid) | Konversations-ID |
 | `type` | string | `direct` oder `group` |
 | `name` | string\|null | Name (für Gruppen, null bei 1:1) |
+| `image` | string\|null | Icon/Avatar der Gruppenkonversation (base64-encoded Bild); null bei 1:1 und wenn nicht gesetzt |
 | `otherUser` | object\|null | Der andere Teilnehmer (`id`, `displayName`, `avatar`); null bei Gruppen |
 | `lastMessage` | object\|null | Vorschau der letzten Nachricht (null wenn keine) |
 | `unreadCount` | int | Anzahl ungelesener Nachrichten |
@@ -210,8 +212,10 @@ Antwort von `GET /chat/sync`:
 |---|---|---|
 | POST | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise erstellen (idempotent) |
 | DELETE | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise löschen |
+| PATCH | `/admin/travel/trips/{id}/chat` | Gruppenchat-Icon für Reise setzen/entfernen |
 | POST | `/admin/travel/events/{id}/chat` | Gruppenchat für Event erstellen (idempotent) |
 | DELETE | `/admin/travel/events/{id}/chat` | Gruppenchat für Event löschen |
+| PATCH | `/admin/travel/events/{id}/chat` | Gruppenchat-Icon für Event setzen/entfernen |
 
 **Verhalten:**
 - Bei Erstellung wird `ChatConversation` mit `type=group` + Name = Reise-/Event-Name angelegt

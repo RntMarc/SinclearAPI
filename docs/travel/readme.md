@@ -118,6 +118,7 @@ Die Chat-Mitglieder werden automatisch aus den Teilnehmern der Reise/Events gesp
 - `ChatParticipant` wird aus `TravelRelation`/`EventRelation` gespiegelt
 - Bei Hinzufügen/Entfernen von Teilnehmern wird der Chat automatisch synchronisiert
 - `conversationId` ist in den Trip/Event-Responses enthalten
+- Chat-Icon kann über `PATCH /admin/travel/trips/{id}/chat` oder `PATCH /admin/travel/events/{id}/chat` gesetzt werden
 - Chat wird bei Löschung der Reise/Events automatisch gelöscht (FK-Cascade)
 
 **Client-Zugang:** Über `GET /chat/conversations` erscheinen Gruppenchats alongside 1:1-Chats in der Übersicht.
