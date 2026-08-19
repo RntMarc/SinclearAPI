@@ -577,12 +577,18 @@
         document.getElementById('editEventLongitude').value = d.longitude || '';
         document.getElementById('editEventOSMID').value = d.OSMID || '';
         clearImagePreview('editEventImage', 'editEventImagePreview');
-        if (d.image) {
+        if (isValidImageData(d.image)) {
             document.getElementById('editEventImage').value = d.image;
             showImagePreview('editEventImagePreview', d.image);
             document.getElementById('removeEditEventImage').style.display = 'inline-flex';
         }
         showEditEventForm();
+    }
+
+    function isValidImageData(value) {
+        if (typeof value !== 'string' || value === '') return false;
+        if (!/^[A-Za-z0-9+\/=]+$/.test(value)) return false;
+        return value.startsWith('/9j/') || value.startsWith('iVBOR') || value.startsWith('UklGR');
     }
 
     function editTrip(id, name, description, start, end, hastickets, ticket, ticketUrl) {

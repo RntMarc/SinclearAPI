@@ -453,7 +453,7 @@ ROW;
         $tripId = isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
             ? trim($body['trip']) : null;
 
-        $image = isset($body['image']) && is_string($body['image']) && $body['image'] !== ''
+        $image = isset($body['image']) && $this->isValidImageData($body['image'])
             ? $body['image'] : null;
         if ($image !== null) {
             try {
@@ -549,13 +549,13 @@ ROW;
                 ? (int) $body['OSMID'] : null;
         }
 
-        if (isset($data['image']) && $data['image'] !== null && $data['image'] !== '') {
+        if (isset($data['image']) && $this->isValidImageData($data['image'])) {
             try {
                 $data['image'] = $this->imageService->validate($data['image'], 500 * 1024, 2000, 3.5);
             } catch (\InvalidArgumentException $e) {
                 return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
             }
-        } elseif (isset($data['image']) && ($data['image'] === null || $data['image'] === '')) {
+        } elseif (isset($data['image'])) {
             $data['image'] = null;
         }
 
@@ -681,7 +681,11 @@ ROW;
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
         }
 
-        $travelChat = $this->travelChatRepo->findByTripId($tripId);
+        try {
+            $travelChat = $this->travelChatRepo->findByTripId($tripId);
+        } catch (\Throwable) {
+            return ResponseFactory::json(['error' => 'chat_table_missing'], 500, $response);
+        }
         if ($travelChat === null) {
             return ResponseFactory::json(['error' => 'chat_not_found'], 404, $response);
         }
@@ -696,7 +700,11 @@ ROW;
             }
         }
 
-        $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
+        try {
+            $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
+        } catch (\Throwable) {
+            return ResponseFactory::json(['error' => 'chat_image_update_failed'], 500, $response);
+        }
 
         return ResponseFactory::json(['data' => ['conversationId' => $travelChat['conversationId'], 'image' => $image]], 200, $response);
     }
@@ -712,7 +720,11 @@ ROW;
             return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
         }
 
-        $travelChat = $this->travelChatRepo->findByEventId($eventId);
+        try {
+            $travelChat = $this->travelChatRepo->findByEventId($eventId);
+        } catch (\Throwable) {
+            return ResponseFactory::json(['error' => 'chat_table_missing'], 500, $response);
+        }
         if ($travelChat === null) {
             return ResponseFactory::json(['error' => 'chat_not_found'], 404, $response);
         }
@@ -727,7 +739,11 @@ ROW;
             }
         }
 
-        $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
+        try {
+            $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
+        } catch (\Throwable) {
+            return ResponseFactory::json(['error' => 'chat_image_update_failed'], 500, $response);
+        }
 
         return ResponseFactory::json(['data' => ['conversationId' => $travelChat['conversationId'], 'image' => $image]], 200, $response);
     }
@@ -1332,7 +1348,7 @@ ROW;
             'ticket' => $event['ticket'] ?? '',
             'ticketUrl' => $event['ticketUrl'] ?? '',
             'url' => $event['url'] ?? '',
-            'image' => $event['image'] ?? '',
+            'image' => $this->isValidImageData($event['image'] ?? null) ? $event['image'] : '',
             'organizer' => $event['organizer'] ?? '',
             'address' => $event['address'] ?? '',
             'latitude' => $event['latitude'] ?? '',
@@ -1394,7 +1410,7 @@ HTML;
 
         // Banner image preview
         $eventImagePreview = '';
-        if (!empty($event['image'])) {
+        if ($this->isValidImageData($event['image'] ?? null)) {
             $eventImagePreview = '<div class="card" style="margin-bottom:1rem;padding:0;overflow:hidden;"><img src="data:image/jpeg;base64,' . htmlspecialchars($event['image']) . '" alt="Banner-Bild" style="width:100%;aspect-ratio:3.5/1;object-fit:cover;display:block;"></div>';
         }
 
@@ -1936,6 +1952,26 @@ ROW;
             $replacements['{{' . $key . '}}'] = $value;
         }
         return strtr($html, $replacements);
+    }
+
+    /**
+     * Checks whether a string is valid base64-encoded image data
+     * (JPEG, PNG or WebP magic header). Used to guard against junk
+     * values like '(NULL)' stored in image columns.
+     */
+    private function isValidImageData(mixed $value): bool
+    {
+        if (!is_string($value) || $value === '') {
+            return false;
+        }
+        $decoded = base64_decode($value, true);
+        if ($decoded === false || $decoded === '') {
+            return false;
+        }
+        $header = substr($decoded, 0, 4);
+        return str_starts_with($header, "\xFF\xD8\xFF")
+            || str_starts_with($header, "\x89PNG")
+            || ($header === 'RIFF' && substr($decoded, 8, 4) === 'WEBP');
     }
 
     public function submissions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
