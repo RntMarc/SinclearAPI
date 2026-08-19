@@ -320,6 +320,8 @@
 <script>
     // Trip ID stored for API calls
     const tripId = '{{tripId}}';
+    let cropper = null;
+    let cropResolve = null;
 
     // Participant form toggles
     function showAddParticipantForm() {
