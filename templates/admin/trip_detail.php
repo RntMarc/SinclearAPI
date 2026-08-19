@@ -218,6 +218,15 @@
 
 <div class="card" style="margin-bottom:1rem;">
     <div class="flex-between" style="margin-bottom:1rem;">
+        <h2 style="font-size:1.1rem;color:#aaa;">Chat</h2>
+    </div>
+    {{chatInfo}}
+    <p style="color:#666;{{chatInfo ? 'display:none;' : ''}}" id="noChatText">Kein Gruppenchat vorhanden.</p>
+    <button class="btn btn-primary" id="createChatBtn" onclick="createTripChat()" style="{{chatInfo ? 'display:none;' : ''}}">Gruppenchat erstellen</button>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="flex-between" style="margin-bottom:1rem;">
         <h2 style="font-size:1.1rem;color:#aaa;">Verknüpfte Abos</h2>
         <button class="btn btn-primary" onclick="showLinkSubscriptionForm()">+ Abo verknüpfen</button>
     </div>
@@ -568,5 +577,31 @@
             if (res.ok) { showToast('Event getrennt'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Trennen', 'error'); }
+    }
+
+    // Travel Chat
+    async function createTripChat() {
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/chat', {
+                method: 'POST',
+                credentials: 'same-origin',
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok || res.status === 201) { showToast('Gruppenchat erstellt'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Erstellen', 'error'); }
+    }
+
+    async function deleteTripChat() {
+        if (!confirm('Gruppenchat wirklich löschen? Alle Nachrichten gehen verloren.')) return;
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/chat', {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Gruppenchat gelöscht'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Löschen', 'error'); }
     }
 </script>

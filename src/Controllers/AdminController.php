@@ -28,6 +28,9 @@ use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
+use Sinclear\Api\Repository\ChatConversationRepository;
+use Sinclear\Api\Repository\TravelChatRepository;
+use Sinclear\Api\Services\TravelChatService;
 use PDO;
 
 final readonly class AdminController
@@ -54,6 +57,9 @@ final readonly class AdminController
         private NotificationRepository $notificationRepo,
         private CalendarEventRepository $calendarEventRepo,
         private FeedbackSuggestionRepository $feedbackSuggestionRepo,
+        private ChatConversationRepository $conversationRepo,
+        private TravelChatRepository $travelChatRepo,
+        private TravelChatService $travelChatService,
         private PDO $pdo,
         private LoggerInterface $logger,
     ) {}
@@ -398,6 +404,7 @@ ROW;
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
         }
 
+        $this->travelChatService->deleteForTrip($id);
         $this->tripRepo->delete($id);
         return ResponseFactory::noContent($response);
     }
@@ -534,7 +541,88 @@ ROW;
             return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
         }
 
+        $this->travelChatService->deleteForEvent($id);
         $this->eventRepo->delete($id);
+        return ResponseFactory::noContent($response);
+    }
+
+    public function createTripChat(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $existing = $this->travelChatRepo->findByTripId($tripId);
+        if ($existing !== null) {
+            return ResponseFactory::json(['data' => $existing], 200, $response);
+        }
+
+        $chat = $this->travelChatService->createForTrip($tripId);
+
+        return ResponseFactory::json(['data' => $chat], 201, $response);
+    }
+
+    public function deleteTripChat(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $tripId = $args['id'];
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+
+        $existing = $this->travelChatRepo->findByTripId($tripId);
+        if ($existing === null) {
+            return ResponseFactory::json(['error' => 'chat_not_found'], 404, $response);
+        }
+
+        $this->travelChatService->deleteForTrip($tripId);
+
+        return ResponseFactory::noContent($response);
+    }
+
+    public function createEventChat(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $eventId = $args['id'];
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        }
+
+        $existing = $this->travelChatRepo->findByEventId($eventId);
+        if ($existing !== null) {
+            return ResponseFactory::json(['data' => $existing], 200, $response);
+        }
+
+        $chat = $this->travelChatService->createForEvent($eventId);
+
+        return ResponseFactory::json(['data' => $chat], 201, $response);
+    }
+
+    public function deleteEventChat(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+        $eventId = $args['id'];
+
+        $event = $this->eventRepo->findById($eventId);
+        if ($event === null) {
+            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        }
+
+        $existing = $this->travelChatRepo->findByEventId($eventId);
+        if ($existing === null) {
+            return ResponseFactory::json(['error' => 'chat_not_found'], 404, $response);
+        }
+
+        $this->travelChatService->deleteForEvent($eventId);
+
         return ResponseFactory::noContent($response);
     }
 
@@ -807,6 +895,18 @@ ROW;
             }
         }
 
+        // Chat info
+        $travelChat = $this->travelChatRepo->findByTripId($id);
+        $chatInfo = '';
+        if ($travelChat !== null) {
+            $chatInfo = <<<HTML
+            <div class="flex" style="gap:0.5rem;align-items:center;">
+                <span>Gruppenchat aktiv ({$this->conversationRepo->countParticipants($travelChat['conversationId'])} Mitglieder)</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteTripChat()">Chat löschen</button>
+            </div>
+HTML;
+        }
+
         $contentHtml = $this->renderTemplate('trip_detail.php', [
             'tripId' => $id,
             'tripName' => $tripName,
@@ -825,6 +925,7 @@ ROW;
             'forumOptions' => $forumOptions,
             'subscriptionRows' => $subscriptionRows,
             'availableSubscriptionOptions' => $availableSubscriptionOptions,
+            'chatInfo' => $chatInfo,
         ]);
         $html = $this->renderLayout("Reise: {$tripName}", $contentHtml, $user->email);
 
@@ -862,6 +963,8 @@ ROW;
 
         $relationId = $this->travelRelationRepo->addParticipant($userId, $tripId, $accommodation);
 
+        $this->travelChatService->syncTripMembers($tripId);
+
         $this->notifyTripUserAdded($tripId, $userId, $request);
 
         return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
@@ -878,6 +981,9 @@ ROW;
         }
 
         $this->travelRelationRepo->removeByUserAndTrip($userId, $tripId);
+
+        $this->travelChatService->syncTripMembers($tripId);
+
         return ResponseFactory::noContent($response);
     }
 
@@ -1099,6 +1205,18 @@ ROW;
             $tripOptions .= "<option value=\"{$tid}\">{$tname}</option>";
         }
 
+        // Chat info
+        $travelChat = $this->travelChatRepo->findByEventId($id);
+        $chatInfo = '';
+        if ($travelChat !== null) {
+            $chatInfo = <<<HTML
+            <div class="flex" style="gap:0.5rem;align-items:center;">
+                <span>Gruppenchat aktiv ({$this->conversationRepo->countParticipants($travelChat['conversationId'])} Mitglieder)</span>
+                <button class="btn btn-sm btn-danger" onclick="deleteEventChat()">Chat löschen</button>
+            </div>
+HTML;
+        }
+
         $contentHtml = $this->renderTemplate('event_detail.php', [
             'eventId' => $id,
             'eventName' => $eventName,
@@ -1114,6 +1232,7 @@ ROW;
             'userOptions' => $userOptions,
             'tripOptions' => $tripOptions,
             'eventEditData' => $editData,
+            'chatInfo' => $chatInfo,
         ]);
         $html = $this->renderLayout("Event: {$eventName}", $contentHtml, $user->email);
 
@@ -1144,6 +1263,8 @@ ROW;
 
         $relationId = $this->eventRelationRepo->addParticipant($eventId, $userId);
 
+        $this->travelChatService->syncEventMembers($eventId);
+
         $this->notifyEventUserAdded($event, $userId, $request);
 
         return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
@@ -1156,6 +1277,9 @@ ROW;
         $userId = $args['userId'];
 
         $this->eventRelationRepo->removeByEventAndUser($eventId, $userId);
+
+        $this->travelChatService->syncEventMembers($eventId);
+
         return ResponseFactory::noContent($response);
     }
 

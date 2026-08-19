@@ -56,6 +56,7 @@ Nicht-Admins erhalten einen 403-Fehler.
   Beim Verknüpfen werden alle Teilnehmer automatisch in das Forum eingetragen.
 - **Abo-Verknüpfung:** Abonnements mit der Reise verknüpfen/trennen.
   Die Abos erscheinen dann auf dem "Zahlungen"-Tab im Client.
+- **Gruppenchat:** Gruppenchat erstellen/löschen. Chat-Mitglieder werden automatisch aus Reise-Teilnehmern gespiegelt.
 
 ### Eventdetail (`/travel/events/{id}`) – **voll implementiert**
 - Zeigt Eventinformationen und Teilnehmer
@@ -117,6 +118,10 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/travel/events/{id}` | Eventdetail-Seite mit Teilnehmern (geschützt) |
 | POST | `/admin/travel/events/{id}/participants` | Teilnehmer zu Event hinzufügen (geschützt) |
 | DELETE | `/admin/travel/events/{id}/participants/{userId}` | Teilnehmer von Event entfernen (geschützt) |
+| POST | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise erstellen (geschützt) |
+| DELETE | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise löschen (geschützt) |
+| POST | `/admin/travel/events/{id}/chat` | Gruppenchat für Event erstellen (geschützt) |
+| DELETE | `/admin/travel/events/{id}/chat` | Gruppenchat für Event löschen (geschützt) |
 | GET | `/admin/moderation-requests` | Moderations-Anfragen mit Filtern (geschützt) |
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |

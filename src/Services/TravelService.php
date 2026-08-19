@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\TravelAccommodationRepository;
+use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTicketRepository;
@@ -21,6 +22,7 @@ final readonly class TravelService
         private TravelTripSubscriptionRepository $tripSubscriptionRepo,
         private ForumRepository $forumRepo,
         private TravelTicketRepository $ticketRepo,
+        private TravelChatRepository $travelChatRepo,
         private UserRepository $userRepo,
     ) {}
 
@@ -322,12 +324,19 @@ final readonly class TravelService
 
         $trip['subscriptionCount'] = $this->tripSubscriptionRepo->countByTrip($trip['id']);
 
+        $travelChat = $this->travelChatRepo->findByTripId($trip['id']);
+        $trip['conversationId'] = $travelChat !== null ? $travelChat['conversationId'] : null;
+
         return $trip;
     }
 
     private function enrichEvent(array $event): array
     {
         $event['participants'] = $this->eventRepo->findParticipantsByEvent($event['ID']);
+
+        $travelChat = $this->travelChatRepo->findByEventId($event['ID']);
+        $event['conversationId'] = $travelChat !== null ? $travelChat['conversationId'] : null;
+
         return $event;
     }
 

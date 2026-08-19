@@ -1,6 +1,6 @@
 # Chat / Direktnachrichten
 
-1:1-Direktnachrichten zwischen Nutzern. Text-only (Bilder/Standort vorbereitet, aber nicht implementiert).
+1:1-Direktnachrichten und Gruppenchats zwischen Nutzern. Text-only (Bilder/Standort vorbereitet, aber nicht implementiert).
 
 ## Architektur
 
@@ -21,6 +21,18 @@
 | `ChatEvent` | Nachrichten-Events (`message_created`/`message_edited`/`message_deleted`) mit eigenem `seq` |
 | `ChatPresence` | Push-Unterdrückung (`activeUntil`) — **nicht** für Online-Anzeige gedacht |
 | `ChatTyping` | Tippindikator (ephemer, läuft nach 5 s ab) |
+| `TravelChat` | Verknüpfung von Gruppenchat mit Reise oder Event |
+
+### Gruppenchat (type: group)
+
+Gruppenchats werden aktuell nur admin-seitig für Reisen und Events erstellt. Manuelle User-Gruppenchats sind geplant, aber nicht implementiert.
+
+- `ChatConversation.type = 'group'` + `ChatConversation.name = Reise-/Event-Name`
+- `ChatParticipant`-Einträge werden aus `TravelRelation`/`EventRelation` gespiegelt
+- `TravelChat`-Tabelle speichert die Zuordnung (Reise oder Event)
+- Bei Hinzufügen/Entfernen von Teilnehmern wird `ChatParticipant` automatisch synchronisiert
+- `otherUser` ist `null` bei Gruppen; `otherLastReadSeq` ist `null` bei Gruppen
+- `memberCount` enthält die Anzahl der aktiven Teilnehmer
 
 ## DTO-Schemas
 
@@ -29,6 +41,8 @@ Die vollständigen Schemas leben in `openapi.yaml`. Hier die Feldreferenz als Ku
 ### ChatConversation
 
 Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id}` (Detail) zurückgegeben. Beide Endpoints liefern **dasselbe Feldset**.
+
+**1:1-Konversation (direct):**
 
 ```json
 {
@@ -50,8 +64,28 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "lastSeenAt": "2025-01-15 10:25:00",
   "lastReadSeq": 42,
   "otherLastReadSeq": 38,
+  "memberCount": null,
   "createdAt": "2025-01-15 10:00:00",
   "updatedAt": "2025-01-15 10:30:00"
+}
+```
+
+**Gruppenchat (group):**
+
+```json
+{
+  "id": "uuid",
+  "type": "group",
+  "name": "Sommerurlaub 2025",
+  "otherUser": null,
+  "lastMessage": { "..." },
+  "unreadCount": 5,
+  "lastSeenAt": null,
+  "lastReadSeq": 42,
+  "otherLastReadSeq": null,
+  "memberCount": 4,
+  "createdAt": "2025-06-01 09:00:00",
+  "updatedAt": "2025-06-15 14:00:00"
 }
 ```
 
@@ -60,12 +94,13 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | `id` | string (uuid) | Konversations-ID |
 | `type` | string | `direct` oder `group` |
 | `name` | string\|null | Name (für Gruppen, null bei 1:1) |
-| `otherUser` | object\|null | Der andere Teilnehmer (`id`, `displayName`, `avatar`) |
+| `otherUser` | object\|null | Der andere Teilnehmer (`id`, `displayName`, `avatar`); null bei Gruppen |
 | `lastMessage` | object\|null | Vorschau der letzten Nachricht (null wenn keine) |
 | `unreadCount` | int | Anzahl ungelesener Nachrichten |
-| `lastSeenAt` | string\|null | Letzter Seitenaufruf des anderen Teilnehmers |
+| `lastSeenAt` | string\|null | Letzter Seitenaufruf des anderen Teilnehmers; null bei Gruppen |
 | `lastReadSeq` | int | Eigener Lesestand (höchster gelesener seq) |
-| `otherLastReadSeq` | int | Lesestand des Gegenübers |
+| `otherLastReadSeq` | int\|null | Lesestand des Gegenübers; null bei Gruppen |
+| `memberCount` | int\|null | Anzahl der Teilnehmer (nur bei Gruppen; null bei 1:1) |
 | `createdAt` | string | Erstellungszeitpunkt (UTC) |
 | `updatedAt` | string | Zeitpunkt der letzten Aktivität (UTC) |
 
@@ -168,6 +203,23 @@ Antwort von `GET /chat/sync`:
 | DELETE | `/chat/messages/{id}` | Löschen für alle (Platzhalter "Nachricht gelöscht") |
 | POST | `/chat/conversations/{id}/read` | Lesestand setzen (`{seq}`) |
 | POST | `/chat/conversations/{id}/typing` | Tippindikator (`{typing: bool}`) |
+
+### Admin: Travel-Gruppenchats
+
+| Methode | Pfad | Zweck |
+|---|---|---|
+| POST | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise erstellen (idempotent) |
+| DELETE | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise löschen |
+| POST | `/admin/travel/events/{id}/chat` | Gruppenchat für Event erstellen (idempotent) |
+| DELETE | `/admin/travel/events/{id}/chat` | Gruppenchat für Event löschen |
+
+**Verhalten:**
+- Bei Erstellung wird `ChatConversation` mit `type=group` + Name = Reise-/Event-Name angelegt
+- `TravelChat`-Eintrag verknüpft den Chat mit Reise oder Event
+- `ChatParticipant` wird aus den aktuellen Reise-/Event-Teilnehmern gespiegelt (via `TravelRelation`/`EventRelation`)
+- Idempotent: GET oder POST gibt den bestehenden Chat zurück
+- Bei Löschung werden `TravelChat`, `ChatConversation` und assoziierte `ChatParticipant`/`DirectMessage`/`ChatEvent` gelöscht (FK-Cascade)
+- Automatischer Sync: `AdminController` ruft `syncTripMembers`/`syncEventMembers` bei Hinzufügen/Entfernen von Teilnehmern auf
 
 ## Sync-Flow
 

@@ -57,20 +57,23 @@ final readonly class DirectMessageService
                 ];
             }
 
+            $isGroup = $row['type'] === 'group';
+
             return [
                 'id' => $row['id'],
                 'type' => $row['type'],
                 'name' => $row['name'],
-                'otherUser' => [
+                'otherUser' => !$isGroup && $row['otherUserId'] !== null ? [
                     'id' => $row['otherUserId'],
                     'displayName' => $row['otherUserDisplayName'] ?? null,
                     'avatar' => $row['otherUserImage'] ?? null,
-                ],
+                ] : null,
                 'lastMessage' => $lastMessage,
                 'unreadCount' => (int) $row['unreadCount'],
-                'lastSeenAt' => $row['lastSeenAt'] !== null ? self::stripFractionalSeconds($row['lastSeenAt']) : null,
+                'lastSeenAt' => !$isGroup && $row['lastSeenAt'] !== null ? self::stripFractionalSeconds($row['lastSeenAt']) : null,
                 'lastReadSeq' => (int) $row['lastReadSeq'],
-                'otherLastReadSeq' => (int) ($row['otherLastReadSeq'] ?? 0),
+                'otherLastReadSeq' => !$isGroup ? (int) ($row['otherLastReadSeq'] ?? 0) : null,
+                'memberCount' => $isGroup ? $this->conversationRepo->countParticipants($row['id']) : null,
                 'createdAt' => self::stripFractionalSeconds($row['createdAt']),
                 'updatedAt' => self::stripFractionalSeconds($row['updatedAt']),
             ];
@@ -353,11 +356,12 @@ final readonly class DirectMessageService
         $conversations = $this->conversationRepo->listForUser($userId, 100, 0);
 
         $conversationUpdates = array_map(function (array $conv) {
+            $isGroup = $conv['type'] === 'group';
             return [
                 'conversationId' => $conv['id'],
                 'unreadCount' => (int) $conv['unreadCount'],
-                'lastSeenAt' => $conv['lastSeenAt'] !== null ? self::stripFractionalSeconds($conv['lastSeenAt']) : null,
-                'otherLastReadSeq' => (int) ($conv['otherLastReadSeq'] ?? 0),
+                'lastSeenAt' => !$isGroup && $conv['lastSeenAt'] !== null ? self::stripFractionalSeconds($conv['lastSeenAt']) : null,
+                'otherLastReadSeq' => !$isGroup && $conv['otherLastReadSeq'] !== null ? (int) $conv['otherLastReadSeq'] : null,
             ];
         }, $conversations);
 
@@ -393,7 +397,6 @@ final readonly class DirectMessageService
     private function formatConversation(array $conversation, string $userId): array
     {
         $participant = $this->participantRepo->find($conversation['id'], $userId);
-        $otherParticipant = $this->participantRepo->findOtherParticipant($conversation['id'], $userId);
 
         $lastMessage = null;
         $dm = $this->messageRepo->findLastMessage($conversation['id']);
@@ -404,6 +407,12 @@ final readonly class DirectMessageService
                 'createdAt' => self::stripFractionalSeconds($dm['createdAt']),
                 'deleted' => $dm['deletedAt'] !== null,
             ];
+        }
+
+        $isGroup = $conversation['type'] === 'group';
+        $otherParticipant = null;
+        if (!$isGroup) {
+            $otherParticipant = $this->participantRepo->findOtherParticipant($conversation['id'], $userId);
         }
 
         return [
@@ -417,10 +426,11 @@ final readonly class DirectMessageService
             ] : null,
             'lastMessage' => $lastMessage,
             'unreadCount' => $participant !== null ? (int) $this->messageRepo->countUnread($conversation['id'], $userId, $participant['lastReadSeq']) : 0,
-            'lastSeenAt' => $otherParticipant !== null && $otherParticipant['lastSeenAt'] !== null
+            'lastSeenAt' => !$isGroup && $otherParticipant !== null && $otherParticipant['lastSeenAt'] !== null
                 ? self::stripFractionalSeconds($otherParticipant['lastSeenAt']) : null,
             'lastReadSeq' => $participant !== null ? (int) $participant['lastReadSeq'] : 0,
-            'otherLastReadSeq' => $otherParticipant !== null ? (int) $otherParticipant['lastReadSeq'] : 0,
+            'otherLastReadSeq' => !$isGroup && $otherParticipant !== null ? (int) $otherParticipant['lastReadSeq'] : null,
+            'memberCount' => $isGroup ? $this->conversationRepo->countParticipants($conversation['id']) : null,
             'createdAt' => self::stripFractionalSeconds($conversation['createdAt']),
             'updatedAt' => self::stripFractionalSeconds($conversation['updatedAt']),
         ];

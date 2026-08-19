@@ -388,6 +388,8 @@ return function (App $app): void {
         $group->put('/travel/trips/{id}', [AdminController::class, 'updateTrip']);
         $group->delete('/travel/trips/{id}', [AdminController::class, 'deleteTrip']);
         $group->get('/travel/trips/{id}', [AdminController::class, 'tripDetail']);
+        $group->post('/travel/trips/{id}/chat', [AdminController::class, 'createTripChat']);
+        $group->delete('/travel/trips/{id}/chat', [AdminController::class, 'deleteTripChat']);
         $group->post('/travel/trips/{id}/participants', [AdminController::class, 'addTripParticipant']);
         $group->delete('/travel/trips/{id}/participants/{userId}', [AdminController::class, 'removeTripParticipant']);
         $group->put('/travel/trips/{id}/participants/{userId}/accommodation', [AdminController::class, 'updateParticipantAccommodation']);
@@ -401,6 +403,8 @@ return function (App $app): void {
         $group->put('/travel/events/{id}', [AdminController::class, 'updateEvent']);
         $group->delete('/travel/events/{id}', [AdminController::class, 'deleteEvent']);
         $group->get('/travel/events/{id}', [AdminController::class, 'eventDetail']);
+        $group->post('/travel/events/{id}/chat', [AdminController::class, 'createEventChat']);
+        $group->delete('/travel/events/{id}/chat', [AdminController::class, 'deleteEventChat']);
         $group->post('/travel/events/{id}/participants', [AdminController::class, 'addEventParticipant']);
         $group->delete('/travel/events/{id}/participants/{userId}', [AdminController::class, 'removeEventParticipant']);
         $group->post('/travel/tickets', [AdminController::class, 'createTicket']);

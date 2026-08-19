@@ -1021,6 +1021,11 @@ components:
         subscriptionCount:
           type: integer
           description: Anzahl der mit dieser Reise verknüpften Abos
+        conversationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des zugehörigen Gruppenchats (falls vorhanden)
 
     TravelTripListResponse:
       type: object
@@ -1103,6 +1108,11 @@ components:
           description: Teilnehmer des Events (über EventRelation)
           items:
             $ref: '#/components/schemas/TravelParticipantBrief'
+        conversationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID des zugehörigen Gruppenchats (falls vorhanden)
 
     TravelParticipantBrief:
       type: object
@@ -4524,12 +4534,17 @@ components:
         otherLastReadSeq:
           type: integer
           format: int64
-          description: Lesestand des Gegenübers (zum Ableiten des Gelesen-Status eigener Nachrichten)
+          nullable: true
+          description: Lesestand des Gegenübers (nur 1:1; null bei Gruppen)
         lastSeenAt:
           type: string
           format: date-time
           nullable: true
           description: Zeitpunkt des letzten Seitenaufrufs des anderen Teilnehmers
+        memberCount:
+          type: integer
+          nullable: true
+          description: Anzahl der Teilnehmer (nur bei Gruppen; null bei 1:1)
         updatedAt:
           type: string
           format: date-time
@@ -4552,6 +4567,36 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/ChatConversation'
+
+    TravelChatResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Reise-Chat-ID
+            conversationId:
+              type: string
+              format: uuid
+              description: Zugehörige Chat-Konversation
+            tripId:
+              type: string
+              format: uuid
+              nullable: true
+              description: Zugehörige Reise (null bei Event-Chat)
+            eventId:
+              type: string
+              format: uuid
+              nullable: true
+              description: Zugehöriges Event (null bei Reise-Chat)
+            createdAt:
+              type: string
+              format: date-time
+              description: Erstellungszeitpunkt (UTC)
 
     DirectMessage:
       type: object
@@ -4741,7 +4786,9 @@ components:
         payload:
           type: object
           nullable: true
-          description: Strukturierte Daten. Aktuell nur für zukünftige Typen (image/location); bei `type: text` wird `payload` abgelehnt.
+          description: >
+            Strukturierte Daten. Aktuell nur für zukünftige Typen (image/location);
+            bei `type: text` wird `payload` abgelehnt.
 
     ChatMessageEditRequest:
       type: object
@@ -8598,6 +8645,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /admin/travel/trips/{id}/chat:
+    post:
+      summary: Admin-Gruppenchat für Reise erstellen
+      description: >
+        Erstellt einen Gruppenchat für eine Reise. Mitglieder werden automatisch
+        aus den aktuellen Reise-Teilnehmern gespiegelt. Idempotent: gibt den
+        bestehenden Chat zurück, falls bereits vorhanden.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Chat erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelChatResponse'
+        '200':
+          description: Chat existiert bereits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelChatResponse'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Admin-Gruppenchat für Reise löschen
+      description: >
+        Löscht den Gruppenchat einer Reise. Alle Nachrichten gehen verloren.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Chat gelöscht (kein Inhalt)
+        '404':
+          description: Reise oder Chat nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /admin/travel/events:
     post:
       summary: Admin-Event anlegen
@@ -8715,6 +8818,62 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}/chat:
+    post:
+      summary: Admin-Gruppenchat für Event erstellen
+      description: >
+        Erstellt einen Gruppenchat für ein Event. Mitglieder werden automatisch
+        aus den aktuellen Event-Teilnehmern gespiegelt. Idempotent: gibt den
+        bestehenden Chat zurück, falls bereits vorhanden.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Chat erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelChatResponse'
+        '200':
+          description: Chat existiert bereits
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelChatResponse'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Admin-Gruppenchat für Event löschen
+      description: >
+        Löscht den Gruppenchat eines Events. Alle Nachrichten gehen verloren.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Chat gelöscht (kein Inhalt)
+        '404':
+          description: Event oder Chat nicht gefunden
           content:
             application/json:
               schema:

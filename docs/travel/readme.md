@@ -16,6 +16,7 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 | `TravelAccommodation` | Unterkünfte (Hotels, Ferienwohnungen, etc.) |
 | `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften |
 | `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone) |
+| `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
 
 ## Autorisierungs-Logik
 
@@ -77,6 +78,23 @@ Jede `TravelAccommodation` kann mehreren Nutzern zugeordnet sein (über
   }
 }
 ```
+
+## Travel-Gruppenchats
+
+Reisen und Standalone-Events können admin-seitig mit einem Gruppenchat versehen werden.
+Die Chat-Mitglieder werden automatisch aus den Teilnehmern der Reise/Events gespiegelt.
+
+**Datenbank:** `TravelChat` speichert die Zuordnung (Reise oder Event) zur `ChatConversation`.
+
+**Verhalten:**
+- Admin erstellt Chat über `POST /admin/travel/trips/{id}/chat` oder `POST /admin/travel/events/{id}/chat`
+- `ChatConversation` wird mit `type=group` und `name=Reise-/Event-Name` angelegt
+- `ChatParticipant` wird aus `TravelRelation`/`EventRelation` gespiegelt
+- Bei Hinzufügen/Entfernen von Teilnehmern wird der Chat automatisch synchronisiert
+- `conversationId` ist in den Trip/Event-Responses enthalten
+- Chat wird bei Löschung der Reise/Events automatisch gelöscht (FK-Cascade)
+
+**Client-Zugang:** Über `GET /chat/conversations` erscheinen Gruppenchats alongside 1:1-Chats in der Übersicht.
 
 ## Tickets (TravelEventTicket)
 

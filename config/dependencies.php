@@ -89,6 +89,7 @@ use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTicketRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
+use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
@@ -102,6 +103,7 @@ use Sinclear\Api\Services\CalendarFeedService;
 use Sinclear\Api\Services\DirectMessageService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
+use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\PtService;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Services\SubscriptionService;
@@ -332,8 +334,10 @@ return [
     EventRelationRepository::class => autowire(),
     TravelTicketRepository::class => autowire(),
     TravelTripSubscriptionRepository::class => autowire(),
+    TravelChatRepository::class => autowire(),
 
     TravelService::class => autowire(),
+    TravelChatService::class => autowire(),
     TravelController::class => autowire(),
 
     PtStationRepository::class => autowire(),

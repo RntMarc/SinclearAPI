@@ -59,6 +59,7 @@ final readonly class ChatConversationRepository
 
     /**
      * List conversations for a user, with last message preview and unread count.
+     * Supports both direct and group conversations.
      */
     public function listForUser(string $userId, int $limit = 50, int $offset = 0): array
     {
@@ -66,10 +67,10 @@ final readonly class ChatConversationRepository
             'SELECT cc.*,
                     cp.lastReadSeq,
                     cp.lastSeenAt,
-                    cp2.lastReadSeq AS otherLastReadSeq,
-                    u.id AS otherUserId,
-                    u.displayName AS otherUserDisplayName,
-                    u.image AS otherUserImage,
+                    CASE WHEN cc.type = \'direct\' THEN cp2.lastReadSeq ELSE NULL END AS otherLastReadSeq,
+                    CASE WHEN cc.type = \'direct\' THEN u.id ELSE NULL END AS otherUserId,
+                    CASE WHEN cc.type = \'direct\' THEN u.displayName ELSE NULL END AS otherUserDisplayName,
+                    CASE WHEN cc.type = \'direct\' THEN u.image ELSE NULL END AS otherUserImage,
                     dm.content AS lastMessageContent,
                     dm.senderId AS lastMessageSenderId,
                     dm.createdAt AS lastMessageCreatedAt,
@@ -81,8 +82,9 @@ final readonly class ChatConversationRepository
                        AND dm2.deletedAt IS NULL) AS unreadCount
              FROM ChatConversation cc
              INNER JOIN ChatParticipant cp ON cp.conversationId = cc.id AND cp.userId = ?
-             INNER JOIN ChatParticipant cp2 ON cp2.conversationId = cc.id AND cp2.userId != ?
-             INNER JOIN User u ON u.id = cp2.userId
+             LEFT JOIN ChatParticipant cp2 ON cp2.conversationId = cc.id
+               AND cp2.userId != ? AND cc.type = \'direct\'
+             LEFT JOIN User u ON u.id = cp2.userId AND cc.type = \'direct\'
              LEFT JOIN DirectMessage dm ON dm.conversationId = cc.id
                AND dm.seq = (SELECT MAX(dm3.seq) FROM DirectMessage dm3 WHERE dm3.conversationId = cc.id)
              ORDER BY cc.updatedAt DESC
@@ -90,6 +92,18 @@ final readonly class ChatConversationRepository
         );
         $stmt->execute([$userId, $userId, $userId, $limit, $offset]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Count participants in a conversation (for group member count).
+     */
+    public function countParticipants(string $conversationId): int
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM ChatParticipant WHERE conversationId = ?'
+        );
+        $stmt->execute([$conversationId]);
+        return (int) $stmt->fetchColumn();
     }
 
     /**
