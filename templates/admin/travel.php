@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+
 <div class="page-header">
     <div>
         <h1>Reisen & Events</h1>
@@ -197,8 +199,10 @@
                 <input type="url" id="newEventUrl" name="url" placeholder="https://example.com/event">
             </div>
             <div class="form-group">
-                <label for="newEventImage">Bild-URL</label>
-                <input type="url" id="newEventImage" name="image" placeholder="https://example.com/image.jpg">
+                <label>Banner-Bild (3.5:1, max. 500 KB)</label>
+                <input type="file" id="newEventImageFile" accept="image/jpeg,image/png,image/webp" onchange="handleImageFile(this, 'newEventImage', 'newEventImagePreview')" style="padding:0.4rem 0;">
+                <input type="hidden" id="newEventImage" name="image">
+                <div id="newEventImagePreview" style="margin-top:0.5rem;"></div>
             </div>
         </div>
         <div class="form-row">
@@ -285,8 +289,11 @@
                 <input type="url" id="editEventUrl" name="url">
             </div>
             <div class="form-group">
-                <label for="editEventImage">Bild-URL</label>
-                <input type="url" id="editEventImage" name="image">
+                <label>Banner-Bild (3.5:1, max. 500 KB)</label>
+                <input type="file" id="editEventImageFile" accept="image/jpeg,image/png,image/webp" onchange="handleImageFile(this, 'editEventImage', 'editEventImagePreview')" style="padding:0.4rem 0;">
+                <input type="hidden" id="editEventImage" name="image">
+                <div id="editEventImagePreview" style="margin-top:0.5rem;"></div>
+                <button type="button" class="btn btn-sm btn-danger" id="removeEditEventImage" onclick="removeEventImage('editEventImage', 'editEventImagePreview')" style="margin-top:0.4rem;display:none;">Bild entfernen</button>
             </div>
         </div>
         <div class="form-row">
@@ -320,7 +327,26 @@
     </form>
 </div>
 
+<!-- Crop Modal -->
+<div id="cropModal" class="modal" onclick="if(event.target===this)closeCropModal()">
+    <div class="card" style="max-width:700px;">
+        <h2 style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Bild zuschneiden (3.5:1)</h2>
+        <div style="max-height:400px;overflow:hidden;margin-bottom:1rem;">
+            <img id="cropImage" src="" style="max-width:100%;display:block;">
+        </div>
+        <div class="flex" style="gap:0.5rem;">
+            <button type="button" class="btn btn-success" onclick="confirmCrop()">Zuschneiden & Übernehmen</button>
+            <button type="button" class="btn" onclick="closeCropModal()">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script>
+    const eventsData = {{eventsData}};
+    let cropper = null;
+    let cropResolve = null;
+
     // Trip utilities
     function showCreateTripForm() {
         hideEditTripForm(); hideCreateEventForm(); hideEditEventForm();
@@ -360,6 +386,7 @@
         document.getElementById('createEventForm').style.display = 'none';
         document.getElementById('newEventForm').reset();
         document.getElementById('newEventTicketFields').style.display = 'none';
+        clearImagePreview('newEventImage', 'newEventImagePreview');
     }
     function showEditEventForm() {
         hideCreateTripForm(); hideEditTripForm(); hideCreateEventForm();
@@ -369,6 +396,7 @@
         document.getElementById('editEventForm').style.display = 'none';
         document.getElementById('editEventFormEl').reset();
         document.getElementById('editEventTicketFields').style.display = 'none';
+        clearImagePreview('editEventImage', 'editEventImagePreview');
     }
     function toggleEventTickets() {
         document.getElementById('newEventTicketFields').style.display =
@@ -377,6 +405,92 @@
     function toggleEditEventTickets() {
         document.getElementById('editEventTicketFields').style.display =
             document.getElementById('editEventHastickets').checked ? 'block' : 'none';
+    }
+
+    // Image handling
+    function handleImageFile(input, hiddenId, previewId) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (file.size > 500 * 1024) {
+            showToast('Bild ist zu groß (max. 500 KB).', 'error');
+            input.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            openCropModal(e.target.result).then(function(croppedBase64) {
+                document.getElementById(hiddenId).value = croppedBase64;
+                showImagePreview(previewId, croppedBase64);
+                if (hiddenId === 'editEventImage') {
+                    document.getElementById('removeEditEventImage').style.display = 'inline-flex';
+                }
+            }).catch(function() {
+                input.value = '';
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function openCropModal(imageSrc) {
+        return new Promise(function(resolve, reject) {
+            cropResolve = { resolve: resolve, reject: reject };
+            const modal = document.getElementById('cropModal');
+            const img = document.getElementById('cropImage');
+            img.src = imageSrc;
+            modal.style.display = 'flex';
+
+            if (cropper) { cropper.destroy(); cropper = null; }
+
+            setTimeout(function() {
+                cropper = new Cropper(img, {
+                    aspectRatio: 3.5 / 1,
+                    viewMode: 1,
+                    autoCropArea: 1,
+                    responsive: true,
+                    background: false,
+                });
+            }, 100);
+        });
+    }
+
+    function confirmCrop() {
+        if (!cropper) return;
+        const canvas = cropper.getCroppedCanvas({
+            width: 3500,
+            height: 1000,
+            imageSmoothingQuality: 'high',
+        });
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const base64 = dataUrl.split(',')[1];
+        closeCropModal();
+        if (cropResolve) cropResolve.resolve(base64);
+    }
+
+    function closeCropModal() {
+        const modal = document.getElementById('cropModal');
+        modal.style.display = 'none';
+        if (cropper) { cropper.destroy(); cropper = null; }
+        document.getElementById('cropImage').src = '';
+        if (cropResolve) { cropResolve.reject(); cropResolve = null; }
+    }
+
+    function showImagePreview(previewId, base64) {
+        const el = document.getElementById(previewId);
+        el.innerHTML = '<img src="data:image/jpeg;base64,' + base64 + '" style="max-width:100%;border-radius:8px;aspect-ratio:3.5/1;object-fit:cover;">';
+    }
+
+    function clearImagePreview(hiddenId, previewId) {
+        document.getElementById(hiddenId).value = '';
+        document.getElementById(previewId).innerHTML = '';
+        const removeBtn = document.getElementById('removeEditEventImage');
+        if (removeBtn) removeBtn.style.display = 'none';
+    }
+
+    function removeEventImage(hiddenId, previewId) {
+        clearImagePreview(hiddenId, previewId);
+        document.getElementById(hiddenId).value = 'null';
     }
 
     // CRUD: Trips
@@ -406,6 +520,35 @@
             if (res.ok) { showToast('Reise erstellt'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Erstellen', 'error'); }
+    }
+
+    function editEvent(id) {
+        const d = eventsData[id];
+        if (!d) return;
+        document.getElementById('editEventId').value = d.id;
+        document.getElementById('editEventName').value = d.name;
+        document.getElementById('editEventDescription').value = d.description;
+        document.getElementById('editEventTrip').value = d.trip || '';
+        document.getElementById('editEventStart').value = d.start;
+        document.getElementById('editEventEnd').value = d.end;
+        const hasTickets = d.hastickets === '1';
+        document.getElementById('editEventHastickets').checked = hasTickets;
+        document.getElementById('editEventTicketFields').style.display = hasTickets ? 'block' : 'none';
+        document.getElementById('editEventTicket').value = d.ticket || '';
+        document.getElementById('editEventTicketUrl').value = d.ticketUrl || '';
+        document.getElementById('editEventUrl').value = d.url || '';
+        document.getElementById('editEventOrganizer').value = d.organizer || '';
+        document.getElementById('editEventAddress').value = d.address || '';
+        document.getElementById('editEventLatitude').value = d.latitude || '';
+        document.getElementById('editEventLongitude').value = d.longitude || '';
+        document.getElementById('editEventOSMID').value = d.OSMID || '';
+        clearImagePreview('editEventImage', 'editEventImagePreview');
+        if (d.image) {
+            document.getElementById('editEventImage').value = d.image;
+            showImagePreview('editEventImagePreview', d.image);
+            document.getElementById('removeEditEventImage').style.display = 'inline-flex';
+        }
+        showEditEventForm();
     }
 
     function editTrip(id, name, description, start, end, hastickets, ticket, ticketUrl) {
@@ -467,6 +610,7 @@
     async function submitCreateEvent(event) {
         event.preventDefault();
         const form = document.getElementById('newEventForm');
+        const imageData = document.getElementById('newEventImage').value;
         const data = {
             name: form.name.value.trim(),
             description: form.description.value.trim() || null,
@@ -477,7 +621,7 @@
             ticket: document.getElementById('newEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('newEventTicketUrl').value.trim() || null,
             url: document.getElementById('newEventUrl').value.trim() || null,
-            image: document.getElementById('newEventImage').value.trim() || null,
+            image: imageData || null,
             organizer: document.getElementById('newEventOrganizer').value.trim() || null,
             address: document.getElementById('newEventAddress').value.trim() || null,
             latitude: document.getElementById('newEventLatitude').value.trim() || null,
@@ -500,32 +644,11 @@
         } catch (e) { showToast('Fehler beim Erstellen', 'error'); }
     }
 
-    function editEvent(id, name, description, trip, start, end, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID) {
-        document.getElementById('editEventId').value = id;
-        document.getElementById('editEventName').value = name;
-        document.getElementById('editEventDescription').value = description;
-        document.getElementById('editEventTrip').value = trip || '';
-        document.getElementById('editEventStart').value = start;
-        document.getElementById('editEventEnd').value = end;
-        const hasTickets = hastickets === '1';
-        document.getElementById('editEventHastickets').checked = hasTickets;
-        document.getElementById('editEventTicketFields').style.display = hasTickets ? 'block' : 'none';
-        document.getElementById('editEventTicket').value = ticket || '';
-        document.getElementById('editEventTicketUrl').value = ticketUrl || '';
-        document.getElementById('editEventUrl').value = url || '';
-        document.getElementById('editEventImage').value = image || '';
-        document.getElementById('editEventOrganizer').value = organizer || '';
-        document.getElementById('editEventAddress').value = address || '';
-        document.getElementById('editEventLatitude').value = latitude || '';
-        document.getElementById('editEventLongitude').value = longitude || '';
-        document.getElementById('editEventOSMID').value = OSMID || '';
-        showEditEventForm();
-    }
-
     async function submitEditEvent(event) {
         event.preventDefault();
         const form = document.getElementById('editEventFormEl');
         const id = document.getElementById('editEventId').value;
+        const imageData = document.getElementById('editEventImage').value;
         const data = {
             name: form.name.value.trim(),
             description: form.description.value.trim() || null,
@@ -536,7 +659,7 @@
             ticket: document.getElementById('editEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('editEventTicketUrl').value.trim() || null,
             url: document.getElementById('editEventUrl').value.trim() || null,
-            image: document.getElementById('editEventImage').value.trim() || null,
+            image: imageData === 'null' ? null : (imageData || undefined),
             organizer: document.getElementById('editEventOrganizer').value.trim() || null,
             address: document.getElementById('editEventAddress').value.trim() || null,
             latitude: document.getElementById('editEventLatitude').value.trim() || null,

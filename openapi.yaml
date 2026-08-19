@@ -246,8 +246,11 @@ components:
           nullable: true
         image:
           type: string
-          format: uri
           nullable: true
+          description: >
+            Banner-Bild als Base64-kodierter String (JPEG/PNG/WebP).
+            Seitenverhältnis 3.5:1, max. 500 KB, max. 2000px Breite.
+            Wird automatisch in JPEG konvertiert (Quality 0.85).
         organizer:
           type: string
           nullable: true
@@ -301,8 +304,11 @@ components:
           nullable: true
         image:
           type: string
-          format: uri
           nullable: true
+          description: >
+            Banner-Bild als Base64-kodierter String (JPEG/PNG/WebP).
+            Seitenverhältnis 3.5:1, max. 500 KB, max. 2000px Breite.
+            Bei Update: Überschreibt bestehendes Bild. Setze `null` zum Entfernen.
         organizer:
           type: string
           nullable: true
@@ -1086,6 +1092,11 @@ components:
         image:
           type: string
           nullable: true
+          description: >
+            Banner-Bild als Base64-kodierter String (JPEG/PNG/WebP).
+            Seitenverhältnis 3.5:1, max. 500 KB Decoded-Size, max. 2000px Breite.
+            Nur über Admin-Dashboard hochladbar (mit Crop-UI).
+            Clients rendern als `data:image/jpeg;base64,<data>`.
         organizer:
           type: string
           nullable: true

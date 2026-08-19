@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+
 <div class="page-header">
     <div>
         <h1>{{eventName}}</h1>
@@ -8,6 +10,8 @@
         <button class="btn btn-sm btn-primary" onclick="toggleEditEventForm()">Event bearbeiten</button>
     </div>
 </div>
+
+{{eventImagePreview}}
 
 <div class="card" style="margin-bottom:1rem;">
     <div class="flex-between" style="margin-bottom:1rem;">
@@ -75,8 +79,11 @@
                 <input type="url" id="editEventUrl" name="url">
             </div>
             <div class="form-group">
-                <label for="editEventImage">Bild-URL</label>
-                <input type="url" id="editEventImage" name="image">
+                <label>Banner-Bild (3.5:1, max. 500 KB)</label>
+                <input type="file" id="editEventImageFile" accept="image/jpeg,image/png,image/webp" onchange="handleImageFile(this, 'editEventImage', 'editEventImagePreview')" style="padding:0.4rem 0;">
+                <input type="hidden" id="editEventImage" name="image">
+                <div id="editEventImagePreview" style="margin-top:0.5rem;"></div>
+                <button type="button" class="btn btn-sm btn-danger" id="removeEditEventImage" onclick="removeEventImage('editEventImage', 'editEventImagePreview')" style="margin-top:0.4rem;display:none;">Bild entfernen</button>
             </div>
         </div>
         <div class="form-row">
@@ -157,9 +164,26 @@
     <button class="btn btn-primary" id="createChatBtn" onclick="createEventChat()" style="{{chatInfo ? 'display:none;' : ''}}">Gruppenchat erstellen</button>
 </div>
 
+<!-- Crop Modal -->
+<div id="cropModal" class="modal" onclick="if(event.target===this)closeCropModal()">
+    <div class="card" style="max-width:700px;">
+        <h2 style="font-size:1.1rem;margin-bottom:1rem;color:#aaa;">Bild zuschneiden (3.5:1)</h2>
+        <div style="max-height:400px;overflow:hidden;margin-bottom:1rem;">
+            <img id="cropImage" src="" style="max-width:100%;display:block;">
+        </div>
+        <div class="flex" style="gap:0.5rem;">
+            <button type="button" class="btn btn-success" onclick="confirmCrop()">Zuschneiden & Übernehmen</button>
+            <button type="button" class="btn" onclick="closeCropModal()">Abbrechen</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script>
     const eventId = '{{eventId}}';
     const eventEditData = {{eventEditData}};
+    let cropper = null;
+    let cropResolve = null;
 
     function toggleEditEventForm() {
         const form = document.getElementById('editEventForm');
@@ -186,12 +210,17 @@
         document.getElementById('editEventTicket').value = d.ticket || '';
         document.getElementById('editEventTicketUrl').value = d.ticketUrl || '';
         document.getElementById('editEventUrl').value = d.url || '';
-        document.getElementById('editEventImage').value = d.image || '';
         document.getElementById('editEventOrganizer').value = d.organizer || '';
         document.getElementById('editEventAddress').value = d.address || '';
         document.getElementById('editEventLatitude').value = d.latitude || '';
         document.getElementById('editEventLongitude').value = d.longitude || '';
         document.getElementById('editEventOSMID').value = d.OSMID || '';
+        clearImagePreview('editEventImage', 'editEventImagePreview');
+        if (d.image) {
+            document.getElementById('editEventImage').value = d.image;
+            showImagePreview('editEventImagePreview', d.image);
+            document.getElementById('removeEditEventImage').style.display = 'inline-flex';
+        }
     }
 
     function toggleEditEventTickets() {
@@ -199,9 +228,96 @@
             document.getElementById('editEventHastickets').checked ? 'block' : 'none';
     }
 
+    // Image handling
+    function handleImageFile(input, hiddenId, previewId) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (file.size > 500 * 1024) {
+            showToast('Bild ist zu groß (max. 500 KB).', 'error');
+            input.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            openCropModal(e.target.result).then(function(croppedBase64) {
+                document.getElementById(hiddenId).value = croppedBase64;
+                showImagePreview(previewId, croppedBase64);
+                if (hiddenId === 'editEventImage') {
+                    document.getElementById('removeEditEventImage').style.display = 'inline-flex';
+                }
+            }).catch(function() {
+                input.value = '';
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function openCropModal(imageSrc) {
+        return new Promise(function(resolve, reject) {
+            cropResolve = { resolve: resolve, reject: reject };
+            const modal = document.getElementById('cropModal');
+            const img = document.getElementById('cropImage');
+            img.src = imageSrc;
+            modal.style.display = 'flex';
+
+            if (cropper) { cropper.destroy(); cropper = null; }
+
+            setTimeout(function() {
+                cropper = new Cropper(img, {
+                    aspectRatio: 3.5 / 1,
+                    viewMode: 1,
+                    autoCropArea: 1,
+                    responsive: true,
+                    background: false,
+                });
+            }, 100);
+        });
+    }
+
+    function confirmCrop() {
+        if (!cropper) return;
+        const canvas = cropper.getCroppedCanvas({
+            width: 3500,
+            height: 1000,
+            imageSmoothingQuality: 'high',
+        });
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const base64 = dataUrl.split(',')[1];
+        closeCropModal();
+        if (cropResolve) cropResolve.resolve(base64);
+    }
+
+    function closeCropModal() {
+        const modal = document.getElementById('cropModal');
+        modal.style.display = 'none';
+        if (cropper) { cropper.destroy(); cropper = null; }
+        document.getElementById('cropImage').src = '';
+        if (cropResolve) { cropResolve.reject(); cropResolve = null; }
+    }
+
+    function showImagePreview(previewId, base64) {
+        const el = document.getElementById(previewId);
+        el.innerHTML = '<img src="data:image/jpeg;base64,' + base64 + '" style="max-width:100%;border-radius:8px;aspect-ratio:3.5/1;object-fit:cover;">';
+    }
+
+    function clearImagePreview(hiddenId, previewId) {
+        document.getElementById(hiddenId).value = '';
+        document.getElementById(previewId).innerHTML = '';
+        const removeBtn = document.getElementById('removeEditEventImage');
+        if (removeBtn) removeBtn.style.display = 'none';
+    }
+
+    function removeEventImage(hiddenId, previewId) {
+        clearImagePreview(hiddenId, previewId);
+        document.getElementById(hiddenId).value = 'null';
+    }
+
     async function submitEditEvent(event) {
         event.preventDefault();
         const id = document.getElementById('editEventId').value;
+        const imageData = document.getElementById('editEventImage').value;
         const data = {
             name: document.getElementById('editEventName').value.trim(),
             description: document.getElementById('editEventDescription').value.trim() || null,
@@ -212,7 +328,7 @@
             ticket: document.getElementById('editEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('editEventTicketUrl').value.trim() || null,
             url: document.getElementById('editEventUrl').value.trim() || null,
-            image: document.getElementById('editEventImage').value.trim() || null,
+            image: imageData === 'null' ? null : (imageData || undefined),
             organizer: document.getElementById('editEventOrganizer').value.trim() || null,
             address: document.getElementById('editEventAddress').value.trim() || null,
             latitude: document.getElementById('editEventLatitude').value.trim() || null,

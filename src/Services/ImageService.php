@@ -9,6 +9,7 @@ final readonly class ImageService
     private const int MAX_IMAGE_SIZE = 200 * 1024;
     private const int MAX_IMAGE_DIMENSION = 1000;
     private const array ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+    private const float RATIO_TOLERANCE = 0.05;
 
     public function __construct(
         private LoggerInterface $logger,
@@ -20,10 +21,11 @@ final readonly class ImageService
      * @param string $imageData Base64-encoded image data
      * @param int|null $maxSize Max decoded size in bytes (null = self::MAX_IMAGE_SIZE)
      * @param int|null $maxDimension Max width or height in pixels (null = self::MAX_IMAGE_DIMENSION)
+     * @param float|null $expectedRatio Expected width/height ratio (e.g. 3.5 for banners). Tolerance ±5%.
      * @return string Original validated base64 data
      * @throws \InvalidArgumentException On validation failure
      */
-    public function validate(string $imageData, ?int $maxSize = null, ?int $maxDimension = null): string
+    public function validate(string $imageData, ?int $maxSize = null, ?int $maxDimension = null, ?float $expectedRatio = null): string
     {
         $maxSize ??= self::MAX_IMAGE_SIZE;
         $maxDimension ??= self::MAX_IMAGE_DIMENSION;
@@ -89,6 +91,21 @@ final readonly class ImageService
                 'max' => $maxDimension,
             ]);
             throw new \InvalidArgumentException('image_dimensions_too_large');
+        }
+
+        if ($expectedRatio !== null && $height > 0) {
+            $actualRatio = $width / $height;
+            $minRatio = $expectedRatio * (1 - self::RATIO_TOLERANCE);
+            $maxRatio = $expectedRatio * (1 + self::RATIO_TOLERANCE);
+            if ($actualRatio < $minRatio || $actualRatio > $maxRatio) {
+                $this->logger->debug('ImageService: aspect ratio mismatch', [
+                    'expected' => $expectedRatio,
+                    'actual' => round($actualRatio, 3),
+                    'min' => round($minRatio, 3),
+                    'max' => round($maxRatio, 3),
+                ]);
+                throw new \InvalidArgumentException('invalid_image_aspect_ratio');
+            }
         }
 
         $this->logger->debug('ImageService: validation passed');

@@ -31,6 +31,7 @@ use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
+use Sinclear\Api\Services\ImageService;
 use PDO;
 
 final readonly class AdminController
@@ -60,6 +61,7 @@ final readonly class AdminController
         private ChatConversationRepository $conversationRepo,
         private TravelChatRepository $travelChatRepo,
         private TravelChatService $travelChatService,
+        private ImageService $imageService,
         private PDO $pdo,
         private LoggerInterface $logger,
     ) {}
@@ -279,7 +281,7 @@ ROW;
                 <td>{$eStart}</td>
                 <td>{$eEnd}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editEvent('{$eId}', `{$eName}`, `{$eDesc}`, '{$eTripId}', '{$e['start']}', '{$e['end']}', '{$e['hastickets']}', `{$e['ticket']}`, `{$e['ticketUrl']}`, `{$e['url']}`, `{$e['image']}`, `{$e['organizer']}`, `{$e['address']}`, `{$e['latitude']}`, `{$e['longitude']}`, `{$e['OSMID']}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editEvent('{$eId}')">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteEvent('{$eId}', '{$eName}')">Löschen</button>
                 </td>
             </tr>
@@ -293,10 +295,33 @@ ROW;
             $tripOptions .= "<option value=\"{$tid}\">{$tname}</option>";
         }
 
+        $eventsData = [];
+        foreach ($allEvents as $e) {
+            $eventsData[$e['ID']] = [
+                'id' => $e['ID'],
+                'name' => $e['name'] ?? '',
+                'description' => $e['description'] ?? '',
+                'trip' => $e['trip'] ?? '',
+                'start' => $e['start'] ?? '',
+                'end' => $e['end'] ?? '',
+                'hastickets' => $e['hastickets'] ?? '0',
+                'ticket' => $e['ticket'] ?? '',
+                'ticketUrl' => $e['ticketUrl'] ?? '',
+                'url' => $e['url'] ?? '',
+                'image' => $e['image'] ?? '',
+                'organizer' => $e['organizer'] ?? '',
+                'address' => $e['address'] ?? '',
+                'latitude' => $e['latitude'] ?? '',
+                'longitude' => $e['longitude'] ?? '',
+                'OSMID' => $e['OSMID'] ?? '',
+            ];
+        }
+
         $contentHtml = $this->renderTemplate('travel.php', [
             'tripRows' => $tripRows,
             'eventRows' => $eventRows,
             'tripOptions' => $tripOptions,
+            'eventsData' => json_encode($eventsData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT),
         ]);
         $html = $this->renderLayout('Reisen & Events', $contentHtml, $user->email);
 
@@ -428,6 +453,16 @@ ROW;
         $tripId = isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
             ? trim($body['trip']) : null;
 
+        $image = isset($body['image']) && is_string($body['image']) && $body['image'] !== ''
+            ? $body['image'] : null;
+        if ($image !== null) {
+            try {
+                $image = $this->imageService->validate($image, 500 * 1024, 2000, 3.5);
+            } catch (\InvalidArgumentException $e) {
+                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            }
+        }
+
         $id = $this->eventRepo->create([
             'trip' => $tripId,
             'name' => $name,
@@ -442,8 +477,7 @@ ROW;
                 ? trim($body['ticketUrl']) : null,
             'url' => isset($body['url']) && is_string($body['url'])
                 ? trim($body['url']) : null,
-            'image' => isset($body['image']) && is_string($body['image'])
-                ? trim($body['image']) : null,
+            'image' => $image,
             'organizer' => isset($body['organizer']) && is_string($body['organizer'])
                 ? trim($body['organizer']) : null,
             'address' => isset($body['address']) && is_string($body['address'])
@@ -513,6 +547,16 @@ ROW;
         if (isset($body['OSMID'])) {
             $data['OSMID'] = $body['OSMID'] !== ''
                 ? (int) $body['OSMID'] : null;
+        }
+
+        if (isset($data['image']) && $data['image'] !== null && $data['image'] !== '') {
+            try {
+                $data['image'] = $this->imageService->validate($data['image'], 500 * 1024, 2000, 3.5);
+            } catch (\InvalidArgumentException $e) {
+                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            }
+        } elseif (isset($data['image']) && ($data['image'] === null || $data['image'] === '')) {
+            $data['image'] = null;
         }
 
         if ($data === []) {
@@ -1217,6 +1261,12 @@ ROW;
 HTML;
         }
 
+        // Banner image preview
+        $eventImagePreview = '';
+        if (!empty($event['image'])) {
+            $eventImagePreview = '<div class="card" style="margin-bottom:1rem;padding:0;overflow:hidden;"><img src="data:image/jpeg;base64,' . htmlspecialchars($event['image']) . '" alt="Banner-Bild" style="width:100%;aspect-ratio:3.5/1;object-fit:cover;display:block;"></div>';
+        }
+
         $contentHtml = $this->renderTemplate('event_detail.php', [
             'eventId' => $id,
             'eventName' => $eventName,
@@ -1227,6 +1277,7 @@ HTML;
             'eventOrganizer' => $eventOrganizer,
             'eventAddress' => $eventAddress,
             'eventDetailsExtras' => $extras,
+            'eventImagePreview' => $eventImagePreview,
             'participantRows' => $participantRows,
             'participantCount' => $participantCount,
             'userOptions' => $userOptions,

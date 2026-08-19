@@ -18,6 +18,31 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 | `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone) |
 | `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
 
+## Banner-Bild (TravelEvent.image)
+
+Jedes `TravelEvent` kann ein Banner-Bild im `image`-Feld speichern.
+
+**Eigenschaften:**
+- **Format:** Base64-kodierter String (JPEG, PNG oder WebP)
+- **Seitenverhältnis:** 3.5:1 (Breite:Höhe) – wird beim Upload per Cropper-UI erzwungen
+- **Max. Dateigröße:** 500 KB (decoded)
+- **Max. Abmessungen:** 2000px Breite
+- **Konvertierung:** Nicht-JPEG-Bilder werden automatisch in JPEG (Quality 0.85) konvertiert
+
+**Upload:**
+- Nur über Admin-Dashboard (Reisen & Events → Event erstellen/bearbeiten → Banner-Bild)
+- Datei auswählen → Cropper-Modal öffnet → Zuschnitt auf 3.5:1 → Übernehmen
+- Das Bild wird als Base64-String im JSON-Body an die API gesendet
+
+**Speicherung:**
+- Das API speichert den Base64-String direkt in der Datenbank (`TravelEvent.image`)
+- Kein Dateisystem-Upload, keine CDN-Verteilung
+
+**Client-Rendering:**
+```html
+<img src="data:image/jpeg;base64,{{image}}" style="aspect-ratio:3.5/1;object-fit:cover;">
+```
+
 ## Autorisierungs-Logik
 
 Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
@@ -54,6 +79,7 @@ Die Teilnehmer werden als `participants`-Array im Response mitgeliefert:
   "data": {
     "ID": "...",
     "name": "Konzert Berlin",
+    "image": "base64-kodiertes Banner-Bild (3.5:1) oder null",
     "participants": [
       { "id": "...", "displayName": "Max", "image": null }
     ]
