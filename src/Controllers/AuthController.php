@@ -27,7 +27,7 @@ final readonly class AuthController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
 
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -54,7 +54,7 @@ final readonly class AuthController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
         $code = trim($body['code'] ?? '');
 
@@ -65,9 +65,20 @@ final readonly class AuthController
         $otpToken = null;
 
         if (!empty($email)) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return ResponseFactory::json(['error' => 'invalid_email'], 400, $response);
+            }
             $otpToken = $this->otpTokenRepo->findValid($email, $code);
         } else {
-            $otpToken = $this->otpTokenRepo->findValidByCode($code);
+            $candidate = $this->otpTokenRepo->findValidByCode($code);
+            if ($candidate !== null) {
+                // Ensure email OTPs (TTL > 150s) cannot be redeemed without providing the target email address
+                $createdAt = new \DateTimeImmutable($candidate['createdAt']);
+                $expiresAt = new \DateTimeImmutable($candidate['expiresAt']);
+                if (($expiresAt->getTimestamp() - $createdAt->getTimestamp()) <= 150) {
+                    $otpToken = $candidate;
+                }
+            }
         }
 
         if ($otpToken === null) {
@@ -183,7 +194,7 @@ final readonly class AuthController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $refreshToken = trim($body['refresh_token'] ?? '');
 
         if (empty($refreshToken)) {
