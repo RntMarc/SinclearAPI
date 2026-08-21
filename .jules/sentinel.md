@@ -1,0 +1,4 @@
+## 2026-03-29 - Dual-Use OTP Token Disambiguation and Email Requirement
+**Vulnerability:** In `AuthController::loginOtpVerify`, omitting the `email` field in the request payload caused the endpoint to fall back to `findValidByCode($code)` for any matching token in the `OtpToken` table. Because `OtpToken` stored both 10-minute E-mail OTP tokens and 2-minute Discord pairing codes with user emails in the `email` column, an attacker could redeem any active E-mail OTP token without specifying or knowing the victim's email address.
+**Learning:** Shared OTP repositories or tables used for multiple authentication flows (e.g. email OTP vs third-party pairing codes) can introduce authorization bypasses if fallback lookups do not verify flow-specific constraints.
+**Prevention:** Always require target identity parameters (such as email) when verifying E-mail OTPs, or validate flow-specific token metadata/TTL constraints before allowing single-parameter lookups.
