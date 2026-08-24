@@ -702,8 +702,9 @@ ROW;
 
         try {
             $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
-        } catch (\Throwable) {
-            return ResponseFactory::json(['error' => 'chat_image_update_failed'], 500, $response);
+        } catch (\Throwable $e) {
+            $this->logger->error('updateTripChatImage: updateImage failed', ['exception' => $e]);
+            return ResponseFactory::json(['error' => 'chat_image_update_failed', 'detail' => $e->getMessage()], 500, $response);
         }
 
         return ResponseFactory::json(['data' => ['conversationId' => $travelChat['conversationId'], 'image' => $image]], 200, $response);
@@ -741,8 +742,9 @@ ROW;
 
         try {
             $this->conversationRepo->updateImage($travelChat['conversationId'], $image);
-        } catch (\Throwable) {
-            return ResponseFactory::json(['error' => 'chat_image_update_failed'], 500, $response);
+        } catch (\Throwable $e) {
+            $this->logger->error('updateEventChatImage: updateImage failed', ['exception' => $e]);
+            return ResponseFactory::json(['error' => 'chat_image_update_failed', 'detail' => $e->getMessage()], 500, $response);
         }
 
         return ResponseFactory::json(['data' => ['conversationId' => $travelChat['conversationId'], 'image' => $image]], 200, $response);
