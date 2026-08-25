@@ -181,11 +181,11 @@ Statt der direkten Nutzung der Flutter-App können Nutzer etablierte Tracking-Ap
 |-----|-----------|---------|-----------|
 | **OsmAnd** | `/log/osmand/{token}[/{name}]?lat={0}&lon={1}&acc={3}&timestamp={2}` | GET | `{0}=lat, {1}=lon, {2}=timestamp, {3}=accuracy, {4}=altitude, {5}=speed, {6}=bearing` |
 | **GpsLogger** | `/log/gpslogger/{token}[/{name}]?lat=%LAT&lon=%LON&acc=%ACC&timestamp=%TIMESTAMP` | GET | `%LAT, %LON, %ALT, %ACC, %SPD, %DIR, %TIMESTAMP, %BAT, %SAT` |
-| **Owntracks** | `/log/owntracks/{token}[/{name}]` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "ts":...}` |
+| **Owntracks** | `/log/owntracks/{token}[/{name}]` | POST | JSON: `{"_type":"location", "lat":..., "lon":..., "acc":..., "tst":...}` |
 | **Ulogger** | `/log/ulogger/{token}[/{name}]?lat=...&lon=...&time=...` | GET | `lat, lon, time` |
-| **Traccar** | `/log/traccar/{token}[/{name}]?lat=...&lon=...&accuracy=...&timestamp=...` | GET + POST | `lat, lon, accuracy, timestamp, altitude, speed, bearing`. POST akzeptiert JSON-Body oder Query-Parameter. |
+| **Traccar** | `/log/traccar/{token}[/{name}]?lat=...&lon=...&accuracy=...&timestamp=...` | GET + POST | `lat, lon, accuracy, timestamp`. POST akzeptiert JSON-Body oder Query-Parameter. |
 | **OpenGTS** | `/log/opengts/{token}[/{name}]?lat=...&lon=...&gpsAccuracy=...&time=...` | GET | `lat, lon, gpsAccuracy, time, speed, bearing` |
-| **Overland** | `/log/overland/{token}[/{name}]` | POST | GeoJSON: `{"geometry":{"coordinates":[lon,lat]},"properties":{"timestamp":...,"horizontal_accuracy":...}}` |
+| **Overland** | `/log/overland/{token}[/{name}]` | POST | Batch: `{"locations":[{GeoJSON Feature...}]}` oder einzelnes Feature. Response: `{"result":"ok"}` |
 | **Locus Maps** | `/log/locusmap/{token}[/{name}]?lat=...&lon=...&acc=...&time=...` | GET | `lat, lon, acc, time, alt, speed, bearing` |
 | **HTTP GET** | `/log/get/{token}[/{name}]?lat=...&lon=...&acc=...&timestamp=...` | GET | `lat, lon, alt, acc, timestamp, speed, bearing, bat, sat` |
 | **HTTP POST** | `/log/post/{token}[/{name}]` | POST | JSON: `{"lat":..., "lon":..., "acc":..., "timestamp":...}` |
@@ -208,7 +208,7 @@ Der `{name}`-Pfadparameter ist optional und kann weggelassen werden. Er ist ein 
 
 ### Zeitstempel
 
-Die meisten Drittanbieter senden Unix-Epoch-Timestamps (Sekunden oder Millisekunden). Die API erkennt automatisch das Format und konvertiert es nach `YYYY-MM-DD HH:MM:SS`. Wenn kein Timestamp gesendet wird, verwendet die API die aktuelle Serverzeit.
+Die meisten Drittanbieter senden Unix-Epoch-Timestamps (Sekunden oder Millisekunden). Die API erkennt automatisch das Format und konvertiert es nach `YYYY-MM-DD HH:MM:SS`. Zusätzlich werden ISO 8601-Formate mit Timezone-Offset (z.B. `2015-10-01T08:00:00-0700` oder `Z`-Suffix) unterstützt und automatisch nach UTC konvertiert. Wenn kein Timestamp gesendet wird, verwendet die API die aktuelle Serverzeit.
 
 ### Beispiel: Session erstellen
 
@@ -266,6 +266,46 @@ POST /api/v2/location-sharing/sessions
    ```
 3. Koordinaten-Format: `lat={0}&lon={1}&alt={4}&acc={3}&timestamp={2}`
 4. Automatische Übermittlung aktivieren
+
+### Beispiel: GPSLogger konfigurieren (Android)
+
+1. GPSLogger öffnen → Einstellungen → "Custom URL"
+2. URL eingeben:
+   ```
+   https://api.sinclear.de/api/v2/location-sharing/log/gpslogger/a1b2c3d4e5f678901234567890abcdef/yourname?lat=%LAT&lon=%LON&acc=%ACC&timestamp=%TIMESTAMP
+   ```
+3. HTTP Method: `GET`
+4. "Log to custom URL" aktivieren
+5. "Allow auto sending" aktivieren (empfohlen)
+
+### Beispiel: OwnTracks konfigurieren (iOS + Android)
+
+1. OwnTracks öffnen → Einstellungen (i-Symbol oben links)
+2. Connection → Mode: `HTTP`
+3. URL eingeben:
+   ```
+   https://api.sinclear.de/api/v2/location-sharing/log/owntracks/a1b2c3d4e5f678901234567890abcdef
+   ```
+4. identification → Tracker ID: frei wählbar (z.B. "mein-handy")
+5. Sicherstellen, dass "Position" aktiviert ist
+
+**Hinweis:** OwnTracks sendet automatisch `{"_type":"location", "lat":..., "lon":..., "acc":..., "tst":..., "batt":...}` per POST.
+
+### Beispiel: Overland konfigurieren (iOS)
+
+1. Overland öffnen → Settings → Server URL
+2. Server URL eingeben:
+   ```
+   https://api.sinclear.de/api/v2/location-sharing/log/overland/a1b2c3d4e5f678901234567890abcdef
+   ```
+3. Device ID: frei wählbar
+4. Access Token: (leer lassen – Token ist bereits in der URL)
+5. Settings → Overland Settings → Logging Mode: **"Only Latest"** wählen
+6. Settings → Tracking Enabled: aktivieren
+
+**Wichtig:** Overland erwartet die Antwort `{"result":"ok"}`. Die API liefert diese standardmäßig. Alternativ kann in den iOS-Einstellungen "Consider HTTP 2XX Successful" aktiviert werden.
+
+**Hinweis:** Overland sendet GeoJSON-Features als Batch. Die API speichert automatisch den letzten Standort pro Anfrage.
 
 ### Sicherheit
 

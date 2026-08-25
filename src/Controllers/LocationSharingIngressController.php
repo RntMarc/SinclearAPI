@@ -121,7 +121,7 @@ final readonly class LocationSharingIngressController
         }
 
         $accuracy = $this->parseFloat($body['acc'] ?? null);
-        $recordedAt = isset($body['ts']) ? $this->parseTimestamp((string) $body['ts']) : null;
+        $recordedAt = $this->parseTimestamp((string) ($body['tst'] ?? $body['ts'] ?? ''));
 
         try {
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
@@ -234,11 +234,24 @@ final readonly class LocationSharingIngressController
 
         $lat = null;
         $lon = null;
+        $accuracy = null;
+        $recordedAt = null;
 
-        if (isset($body['geometry']['coordinates']) && is_array($body['geometry']['coordinates'])) {
+        if (isset($body['locations']) && is_array($body['locations']) && count($body['locations']) > 0) {
+            $latest = end($body['locations']);
+            if (isset($latest['geometry']['coordinates']) && is_array($latest['geometry']['coordinates'])) {
+                $coords = $latest['geometry']['coordinates'];
+                $lon = $this->parseFloat($coords[0] ?? null);
+                $lat = $this->parseFloat($coords[1] ?? null);
+            }
+            $accuracy = $this->parseFloat($latest['properties']['horizontal_accuracy'] ?? null);
+            $recordedAt = isset($latest['properties']['timestamp']) ? $this->parseTimestamp((string) $latest['properties']['timestamp']) : null;
+        } elseif (isset($body['geometry']['coordinates']) && is_array($body['geometry']['coordinates'])) {
             $coords = $body['geometry']['coordinates'];
             $lon = $this->parseFloat($coords[0] ?? null);
             $lat = $this->parseFloat($coords[1] ?? null);
+            $accuracy = $this->parseFloat($body['properties']['horizontal_accuracy'] ?? null);
+            $recordedAt = isset($body['properties']['timestamp']) ? $this->parseTimestamp((string) $body['properties']['timestamp']) : null;
         }
 
         if ($lat === null || $lon === null) {
@@ -246,12 +259,9 @@ final readonly class LocationSharingIngressController
             return ResponseFactory::json(['error' => 'lat_lon_required'], 400, $response);
         }
 
-        $accuracy = $this->parseFloat($body['properties']['horizontal_accuracy'] ?? null);
-        $recordedAt = isset($body['properties']['timestamp']) ? $this->parseTimestamp($body['properties']['timestamp']) : null;
-
         try {
             $this->service->addLocationByToken($token, $lat, $lon, $accuracy, $recordedAt);
-            return ResponseFactory::noContent($response);
+            return ResponseFactory::json(['result' => 'ok'], 200, $response);
         } catch (\RuntimeException $e) {
             $this->logDebug($request, $e->getMessage());
             return ResponseFactory::json(['error' => $e->getMessage()], 404, $response);
@@ -394,6 +404,15 @@ final readonly class LocationSharingIngressController
         $dt = \DateTime::createFromFormat('Y-m-d\TH:i:s', $value, $utc);
         if ($dt !== false) {
             return $dt->format('Y-m-d H:i:s');
+        }
+
+        try {
+            $dt = new \DateTimeImmutable($value, $utc);
+            if ($dt !== false) {
+                return $dt->format('Y-m-d H:i:s');
+            }
+        } catch (\Exception) {
+            return null;
         }
 
         return null;

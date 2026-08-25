@@ -14105,6 +14105,9 @@ paths:
             schema:
               type: object
               properties:
+                _type:
+                  type: string
+                  description: Owntracks payload type (z.B. "location")
                 lat:
                   type: number
                   format: double
@@ -14114,7 +14117,7 @@ paths:
                 acc:
                   type: number
                   format: double
-                ts:
+                tst:
                   type: integer
                   description: Unix-Epoch Timestamp in Sekunden
       responses:
@@ -14146,6 +14149,9 @@ paths:
             schema:
               type: object
               properties:
+                _type:
+                  type: string
+                  description: Owntracks payload type (z.B. "location")
                 lat:
                   type: number
                   format: double
@@ -14155,7 +14161,7 @@ paths:
                 acc:
                   type: number
                   format: double
-                ts:
+                tst:
                   type: integer
                   description: Unix-Epoch Timestamp in Sekunden
       responses:
@@ -14470,7 +14476,9 @@ paths:
     post:
       summary: Standort via Overland übermitteln
       description: >
-        Unauthentifizierter Endpunkt für Overland-Client. Koordinaten werden als GeoJSON-Feature übermittelt.
+        Unauthentifizierter Endpunkt für Overland-Client. Akzeptiert ein Batch-Array
+        `locations[]` (GeoJSON Features) oder ein einzelnes GeoJSON Feature.
+        Nur der letzte Standort im Batch wird gespeichert.
       tags: [LocationSharing]
       parameters:
         - name: token
@@ -14491,8 +14499,37 @@ paths:
             schema:
               type: object
               properties:
+                locations:
+                  type: array
+                  description: Batch von GeoJSON Features (letzter wird gespeichert)
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [Feature]
+                      geometry:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          coordinates:
+                            type: array
+                            items:
+                              type: number
+                            description: "[longitude, latitude]"
+                      properties:
+                        type: object
+                        properties:
+                          timestamp:
+                            type: string
+                            description: ISO 8601 Timestamp (z.B. 2015-10-01T08:00:00-0700)
+                          horizontal_accuracy:
+                            type: number
+                            format: double
                 geometry:
                   type: object
+                  description: Einzelnes GeoJSON Feature (Fallback)
                   properties:
                     coordinates:
                       type: array
@@ -14504,13 +14541,21 @@ paths:
                   properties:
                     timestamp:
                       type: string
-                      format: date-time
+                      description: ISO 8601 Timestamp (z.B. 2015-10-01T08:00:00-0700)
                     horizontal_accuracy:
                       type: number
                       format: double
       responses:
-        '204':
+        '200':
           description: Erfolgreich gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    example: ok
         '400':
           description: Ungültiger Token oder fehlende Parameter
         '404':
@@ -14520,7 +14565,9 @@ paths:
     post:
       summary: Standort via Overland übermitteln (ohne Name)
       description: >
-        Unauthentifizierter Endpunkt für Overland-Client. Koordinaten werden als GeoJSON-Feature übermittelt.
+        Unauthentifizierter Endpunkt für Overland-Client. Akzeptiert ein Batch-Array
+        `locations[]` (GeoJSON Features) oder ein einzelnes GeoJSON Feature.
+        Nur der letzte Standort im Batch wird gespeichert.
         Der optionale {name}-Pfadparameter wird weggelassen.
       tags: [LocationSharing]
       parameters:
@@ -14537,8 +14584,37 @@ paths:
             schema:
               type: object
               properties:
+                locations:
+                  type: array
+                  description: Batch von GeoJSON Features (letzter wird gespeichert)
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [Feature]
+                      geometry:
+                        type: object
+                        properties:
+                          type:
+                            type: string
+                          coordinates:
+                            type: array
+                            items:
+                              type: number
+                            description: "[longitude, latitude]"
+                      properties:
+                        type: object
+                        properties:
+                          timestamp:
+                            type: string
+                            description: ISO 8601 Timestamp (z.B. 2015-10-01T08:00:00-0700)
+                          horizontal_accuracy:
+                            type: number
+                            format: double
                 geometry:
                   type: object
+                  description: Einzelnes GeoJSON Feature (Fallback)
                   properties:
                     coordinates:
                       type: array
@@ -14550,13 +14626,21 @@ paths:
                   properties:
                     timestamp:
                       type: string
-                      format: date-time
+                      description: ISO 8601 Timestamp (z.B. 2015-10-01T08:00:00-0700)
                     horizontal_accuracy:
                       type: number
                       format: double
       responses:
-        '204':
+        '200':
           description: Erfolgreich gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    example: ok
         '400':
           description: Ungültiger Token oder fehlende Parameter
         '404':
