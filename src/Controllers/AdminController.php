@@ -91,22 +91,18 @@ final readonly class AdminController
             return ResponseFactory::json(['error' => 'invalid_email'], 400, $response);
         }
 
-        $user = $this->userRepo->findByEmail($email);
-        if ($user === null) {
-            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
-        }
-
-        if (!($user['isAdmin'] ?? false)) {
-            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
-        }
-
+        // Security enhancement: Rate limit first regardless of user/admin existence to prevent
+        // side-channel enumeration, then return 200 'otp_sent' uniformly.
         if (!$this->otpService->canRequestCode($email)) {
             return ResponseFactory::json(['error' => 'too_many_requests'], 429, $response);
         }
 
-        $code = $this->otpService->generateCode();
-        $this->otpService->sendOtpEmail($email, $code);
-        $this->otpService->storeCode($email, $code);
+        $user = $this->userRepo->findByEmail($email);
+        if ($user !== null && ($user['isAdmin'] ?? false)) {
+            $code = $this->otpService->generateCode();
+            $this->otpService->sendOtpEmail($email, $code);
+            $this->otpService->storeCode($email, $code);
+        }
 
         return ResponseFactory::json(['message' => 'otp_sent'], 200, $response);
     }
