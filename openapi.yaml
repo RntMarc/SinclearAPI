@@ -60,7 +60,11 @@ components:
         email:
           type: string
           format: email
-          description: E-Mail (optional bei Discord-Pairing-Codes)
+          description: >
+            E-Mail-Adresse des Zielkontos. Pflicht bei E-Mail-OTPs
+            (10-Minuten-Codes aus der E-Mail). Nur bei Discord-Pairing-Codes
+            (2 Minuten gültig) darf das Feld weggelassen werden. Ohne `email`
+            werden ausschließlich Discord-Pairing-Codes akzeptiert.
           example: user@example.com
         code:
           type: string
@@ -5106,6 +5110,8 @@ paths:
         Bei erfolgreicher Prüfung wird ein Refresh-Token ausgestellt.
         Der Code darf nicht älter als 10 Minuten (E-Mail-OTP) bzw.
         2 Minuten (Discord-Pairing) sein und kann nur einmal verwendet werden.
+        E-Mail-OTPs erfordern zwingend das Feld `email`; ohne `email` werden
+        ausschließlich Discord-Pairing-Codes akzeptiert.
       tags: [Authentication]
       requestBody:
         required: true

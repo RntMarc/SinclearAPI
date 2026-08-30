@@ -27,7 +27,7 @@ final readonly class AuthController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
 
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -54,7 +54,7 @@ final readonly class AuthController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
         $code = trim($body['code'] ?? '');
 
@@ -65,9 +65,12 @@ final readonly class AuthController
         $otpToken = null;
 
         if (!empty($email)) {
-            $otpToken = $this->otpTokenRepo->findValid($email, $code);
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return ResponseFactory::json(['error' => 'invalid_email'], 400, $response);
+            }
+            $otpToken = $this->otpTokenRepo->findValidEmailOtp($email, $code);
         } else {
-            $otpToken = $this->otpTokenRepo->findValidByCode($code);
+            $otpToken = $this->otpTokenRepo->findValidDiscordPairing($code);
         }
 
         if ($otpToken === null) {
@@ -183,7 +186,7 @@ final readonly class AuthController
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $refreshToken = trim($body['refresh_token'] ?? '');
 
         if (empty($refreshToken)) {
