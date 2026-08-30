@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Repository;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 
 final readonly class OtpTokenRepository
@@ -21,7 +22,8 @@ final readonly class OtpTokenRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO OtpToken (id, email, code, type, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, NOW())'
         );
-        $stmt->execute([$id, $email, $code, $type, $expiresAt->format('Y-m-d H:i:s.v')]);
+        $utcExpiresAt = $expiresAt->setTimezone(new DateTimeZone('UTC'));
+        $stmt->execute([$id, $email, $code, $type, $utcExpiresAt->format('Y-m-d H:i:s.v')]);
         return $id;
     }
 
@@ -73,7 +75,8 @@ final readonly class OtpTokenRepository
         $stmt = $this->pdo->prepare(
             'SELECT COUNT(*) FROM OtpToken WHERE email = ? AND createdAt > ?'
         );
-        $stmt->execute([$email, $since->format('Y-m-d H:i:s.v')]);
+        $utcSince = $since->setTimezone(new DateTimeZone('UTC'));
+        $stmt->execute([$email, $utcSince->format('Y-m-d H:i:s.v')]);
         return (int) $stmt->fetchColumn();
     }
 }

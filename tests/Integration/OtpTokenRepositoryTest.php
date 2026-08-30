@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Tests\Integration;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Sinclear\Api\Repository\OtpTokenRepository;
@@ -65,7 +66,7 @@ final class OtpTokenRepositoryTest extends TestCase
 
     public function testEmailOtpCannotBeRedeemedAsDiscordPairing(): void
     {
-        $expiresAt = new DateTimeImmutable('+10 minutes');
+        $expiresAt = new DateTimeImmutable('+10 minutes', new DateTimeZone('UTC'));
         $this->createToken(
             OtpTokenRepository::TYPE_EMAIL_OTP,
             '123456',
@@ -89,7 +90,7 @@ final class OtpTokenRepositoryTest extends TestCase
 
     public function testDiscordPairingCannotBeRedeemedAsEmailOtp(): void
     {
-        $expiresAt = new DateTimeImmutable('+2 minutes');
+        $expiresAt = new DateTimeImmutable('+2 minutes', new DateTimeZone('UTC'));
         $this->createToken(
             OtpTokenRepository::TYPE_DISCORD_PAIRING,
             '654321',
@@ -114,7 +115,7 @@ final class OtpTokenRepositoryTest extends TestCase
             'userId' => 'user-123',
             'newDiscordId' => 'discord-456',
         ]);
-        $expiresAt = new DateTimeImmutable('+2 minutes');
+        $expiresAt = new DateTimeImmutable('+2 minutes', new DateTimeZone('UTC'));
         $this->createToken(
             OtpTokenRepository::TYPE_DISCORD_RELINK,
             '111222',
@@ -134,7 +135,7 @@ final class OtpTokenRepositoryTest extends TestCase
 
     public function testUsedTokenCannotBeRedeemedAgain(): void
     {
-        $expiresAt = new DateTimeImmutable('+10 minutes');
+        $expiresAt = new DateTimeImmutable('+10 minutes', new DateTimeZone('UTC'));
         $id = $this->createToken(
             OtpTokenRepository::TYPE_EMAIL_OTP,
             '777888',
@@ -149,7 +150,7 @@ final class OtpTokenRepositoryTest extends TestCase
 
     public function testExpiredTokenCannotBeRedeemed(): void
     {
-        $expiredAt = new DateTimeImmutable('-1 second');
+        $expiredAt = new DateTimeImmutable('-5 minutes', new DateTimeZone('UTC'));
         $this->createToken(
             OtpTokenRepository::TYPE_EMAIL_OTP,
             '999000',
