@@ -95,7 +95,7 @@ final readonly class DiscordOAuthService
 
         $pairingCode = $this->generatePairingCode();
         $expiresAt = new \DateTimeImmutable('+' . self::PAIRING_CODE_TTL . ' seconds');
-        $this->otpTokenRepo->create($user['email'], $pairingCode, $expiresAt);
+        $this->otpTokenRepo->create($user['email'], $pairingCode, $expiresAt, OtpTokenRepository::TYPE_DISCORD_PAIRING);
 
         return [
             'pairing_code' => $pairingCode,
@@ -198,7 +198,7 @@ final readonly class DiscordOAuthService
             'newDiscordId' => $discordUser['id'],
             'discordAvatarHash' => $discordUser['avatar'] ?? null,
         ]);
-        $this->otpTokenRepo->create($metadata, $pairingCode, $expiresAt);
+        $this->otpTokenRepo->create($metadata, $pairingCode, $expiresAt, OtpTokenRepository::TYPE_DISCORD_RELINK);
 
         return [
             'pairing_code' => $pairingCode,
@@ -321,7 +321,7 @@ final readonly class DiscordOAuthService
 
         $pairingCode = $this->generatePairingCode();
         $expiresAt = new \DateTimeImmutable('+' . self::PAIRING_CODE_TTL . ' seconds');
-        $this->otpTokenRepo->create($user['email'], $pairingCode, $expiresAt);
+        $this->otpTokenRepo->create($user['email'], $pairingCode, $expiresAt, OtpTokenRepository::TYPE_DISCORD_PAIRING);
 
         return [
             'pairing_code' => $pairingCode,

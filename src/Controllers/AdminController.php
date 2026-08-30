@@ -84,7 +84,7 @@ final readonly class AdminController
 
     public function loginOtpRequest(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
 
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -113,7 +113,7 @@ final readonly class AdminController
 
     public function loginOtpVerify(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $body = $request->getParsedBody();
+        $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
         $code = trim($body['code'] ?? '');
 
@@ -121,7 +121,7 @@ final readonly class AdminController
             return ResponseFactory::json(['error' => 'invalid_code'], 400, $response);
         }
 
-        $otpToken = $this->otpTokenRepo->findValid($email, $code);
+        $otpToken = $this->otpTokenRepo->findValidEmailOtp($email, $code);
         if ($otpToken === null) {
             return ResponseFactory::json(['error' => 'invalid_or_expired_code'], 400, $response);
         }

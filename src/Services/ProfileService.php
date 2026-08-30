@@ -232,7 +232,7 @@ final readonly class ProfileService
             throw new \InvalidArgumentException('invalid_code');
         }
 
-        $otpToken = $this->otpTokenRepo->findValid($newEmail, $code);
+        $otpToken = $this->otpTokenRepo->findValidEmailOtp($newEmail, $code);
         if ($otpToken === null) {
             throw new \InvalidArgumentException('invalid_or_expired_code');
         }
@@ -269,7 +269,7 @@ final readonly class ProfileService
             throw new \InvalidArgumentException('invalid_code');
         }
 
-        $otpToken = $this->otpTokenRepo->findValidByCode($code);
+        $otpToken = $this->otpTokenRepo->findValidDiscordRelink($code);
         if ($otpToken === null) {
             throw new \InvalidArgumentException('invalid_or_expired_code');
         }

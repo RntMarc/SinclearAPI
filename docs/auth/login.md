@@ -46,7 +46,7 @@ sequenceDiagram
     Note over Client: Nutzer gibt Code aus E-Mail ein
 
     Client->>API: POST /auth/login/otp/verify { email, code }
-    API->>DB: Code in OtpToken suchen<br/>(email + code, unused, not expired)
+    API->>DB: Code in OtpToken suchen<br/>(type=email_otp, email + code, unused, not expired)
     alt Code ungültig/abgelaufen
         API-->>Client: 400 invalid_or_expired_code
     else Code gültig
@@ -111,7 +111,7 @@ sequenceDiagram
                 else Sync deaktiviert
                     API->>API: Profilbild überspringen (bleibt unverändert)
                 end
-                API->>DB: 6-stelligen Pairing-Code in OtpToken speichern<br/>(expiresAt = now + 2 min)
+                API->>DB: 6-stelligen Pairing-Code in OtpToken speichern<br/>(type=discord_pairing, expiresAt = now + 2 min)
                 API-->>Browser: HTML-Seite mit Pairing-Code
             end
         end
@@ -120,7 +120,7 @@ sequenceDiagram
     Note over Client: Nutzer kopiert Code aus Browser in App
 
     Client->>API: POST /auth/login/otp/verify { code }
-    API->>DB: OtpToken.findValidByCode(code)
+    API->>DB: OtpToken.findValidDiscordPairing(code)<br/>(type=discord_pairing, unused, not expired)
     alt Code ungültig/abgelaufen
         API-->>Client: 400 invalid_or_expired_code
     else Code gültig
@@ -179,7 +179,7 @@ sequenceDiagram
                     else Kein Avatar
                         API->>API: Überspringen (image bleibt NULL)
                     end
-                    API->>DB: 6-stelligen Pairing-Code in OtpToken speichern<br/>(expiresAt = now + 2 min)
+                    API->>DB: 6-stelligen Pairing-Code in OtpToken speichern<br/>(type=discord_pairing, expiresAt = now + 2 min)
                     API-->>Browser: HTML-Seite mit Pairing-Code
                 end
             end
@@ -189,7 +189,7 @@ sequenceDiagram
     Note over Client: Nutzer kopiert Code aus Browser in App
 
     Client->>API: POST /auth/login/otp/verify { code }
-    API->>DB: OtpToken.findValidByCode(code)
+    API->>DB: OtpToken.findValidDiscordPairing(code)<br/>(type=discord_pairing, unused, not expired)
     alt Code ungültig/abgelaufen
         API-->>Client: 400 invalid_or_expired_code
     else Code gültig
@@ -236,11 +236,16 @@ sequenceDiagram
 ```json
 { "email": "user@example.com", "code": "482731" }
 ```
+Das Feld `email` ist bei E-Mail-OTPs zwingend erforderlich. Codes aus der
+E-Mail (10 Minuten gültig) können ohne die zugehörige E-Mail-Adresse nicht
+eingelöst werden.
 
 **Request (Discord-Pairing):**
 ```json
 { "code": "482731" }
 ```
+Bei Discord-Pairing-Codes (2 Minuten gültig) darf `email` weggelassen werden.
+Ohne `email` akzeptiert der Endpunkt ausschließlich Discord-Pairing-Codes.
 
 **Response (200):**
 ```json
@@ -250,7 +255,7 @@ sequenceDiagram
 }
 ```
 
-**Fehler:** `400 invalid_code`, `400 invalid_or_expired_code`, `404 user_not_found`
+**Fehler:** `400 invalid_code`, `400 invalid_email`, `400 invalid_or_expired_code`, `404 user_not_found`
 
 ### POST /api/v2/auth/login/discord/start
 

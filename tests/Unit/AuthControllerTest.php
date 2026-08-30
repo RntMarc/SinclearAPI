@@ -109,15 +109,14 @@ final class AuthControllerTest extends TestCase
             'code' => '123456',
         ]);
 
+        // The no-email path MUST only search for Discord pairing tokens, never
+        // for email OTP tokens. The repository scopes the query by type, so a
+        // matching email OTP row can never be redeemed without the email.
         $stmt = $this->createMock(PDOStatement::class);
-        $stmt->method('fetch')->willReturn([
-            'id' => 'token-1',
-            'email' => 'victim@example.com',
-            'code' => '123456',
-            'createdAt' => '2026-03-29 12:00:00',
-            'expiresAt' => '2026-03-29 12:10:00', // 600s TTL (Email OTP)
-            'usedAt' => null,
-        ]);
+        $stmt->method('fetch')->willReturn(false);
+        $stmt->expects($this->once())
+            ->method('execute')
+            ->with([OtpTokenRepository::TYPE_DISCORD_PAIRING, '123456']);
 
         $this->pdo->method('prepare')->willReturn($stmt);
 
@@ -141,10 +140,14 @@ final class AuthControllerTest extends TestCase
             'id' => 'token-1',
             'email' => 'user@example.com',
             'code' => '123456',
+            'type' => OtpTokenRepository::TYPE_DISCORD_PAIRING,
             'createdAt' => '2026-03-29 12:00:00',
-            'expiresAt' => '2026-03-29 12:02:00', // 120s TTL (Discord pairing code)
+            'expiresAt' => '2026-03-29 12:02:00',
             'usedAt' => null,
         ]);
+        $stmt1->expects($this->once())
+            ->method('execute')
+            ->with([OtpTokenRepository::TYPE_DISCORD_PAIRING, '123456']);
 
         $stmt2 = $this->createMock(PDOStatement::class);
         $stmt2->method('fetch')->willReturn([
@@ -181,10 +184,14 @@ final class AuthControllerTest extends TestCase
             'id' => 'token-1',
             'email' => 'user@example.com',
             'code' => '123456',
+            'type' => OtpTokenRepository::TYPE_EMAIL_OTP,
             'createdAt' => '2026-03-29 12:00:00',
             'expiresAt' => '2026-03-29 12:10:00',
             'usedAt' => null,
         ]);
+        $stmt1->expects($this->once())
+            ->method('execute')
+            ->with([OtpTokenRepository::TYPE_EMAIL_OTP, '123456', 'user@example.com']);
 
         $stmt2 = $this->createMock(PDOStatement::class);
         $stmt2->method('fetch')->willReturn([

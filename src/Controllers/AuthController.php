@@ -68,17 +68,9 @@ final readonly class AuthController
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 return ResponseFactory::json(['error' => 'invalid_email'], 400, $response);
             }
-            $otpToken = $this->otpTokenRepo->findValid($email, $code);
+            $otpToken = $this->otpTokenRepo->findValidEmailOtp($email, $code);
         } else {
-            $candidate = $this->otpTokenRepo->findValidByCode($code);
-            if ($candidate !== null) {
-                // Ensure email OTPs (TTL > 150s) cannot be redeemed without providing the target email address
-                $createdAt = new \DateTimeImmutable($candidate['createdAt']);
-                $expiresAt = new \DateTimeImmutable($candidate['expiresAt']);
-                if (($expiresAt->getTimestamp() - $createdAt->getTimestamp()) <= 150) {
-                    $otpToken = $candidate;
-                }
-            }
+            $otpToken = $this->otpTokenRepo->findValidDiscordPairing($code);
         }
 
         if ($otpToken === null) {

@@ -57,7 +57,7 @@ final readonly class OtpService
     public function storeCode(string $email, string $code): void
     {
         $expiresAt = new DateTimeImmutable('+' . self::CODE_TTL . ' seconds');
-        $this->otpTokenRepo->create($email, $code, $expiresAt);
+        $this->otpTokenRepo->create($email, $code, $expiresAt, OtpTokenRepository::TYPE_EMAIL_OTP);
     }
 
     public function isCodeExpired(\DateTimeInterface $expiresAt): bool
