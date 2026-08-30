@@ -22,6 +22,8 @@
             <option value="">– Typ auswählen –</option>
             <option value="forum_reply">Foren-Antwort (forum_reply)</option>
             <option value="forum_comment">Foren-Kommentar (forum_comment)</option>
+            <option value="forum_post">Foren-Beitrag (forum_post)</option>
+            <option value="forum_upvote">Foren-Upvote (forum_upvote)</option>
             <option value="story_post">Story (story_post)</option>
         </select>
     </div>
@@ -37,7 +39,7 @@
     <div class="form-group">
         <label for="notifData">Strukturierte Daten *</label>
         <textarea id="notifData" required placeholder='[{"relation":"reply_author","object":"User","identifier":"..."}]'></textarea>
-        <div style="font-size:0.8rem;color:#888;margin-top:0.3rem;">Für <code>forum_reply</code> müssen reply_author, comment_author, post_author, parent_comment, parent_post und parent_forum enthalten sein. Für <code>forum_comment</code> müssen comment_author, post_author, parent_post und parent_forum enthalten sein. Für <code>story_post</code> müssen story_author und story enthalten sein.</div>
+        <div style="font-size:0.8rem;color:#888;margin-top:0.3rem;">Für <code>forum_reply</code> müssen reply_author, comment_author, post_author, parent_comment, parent_post und parent_forum enthalten sein. Für <code>forum_comment</code> müssen comment_author, post_author, parent_post und parent_forum enthalten sein. Für <code>forum_post</code> müssen post_author, parent_post und parent_forum enthalten sein. Für <code>forum_upvote</code> müssen voter, post_author, parent_post und parent_forum enthalten sein. Für <code>story_post</code> müssen story_author und story enthalten sein.</div>
     </div>
 
     <div class="form-group">
@@ -67,7 +69,7 @@
     <h2 style="font-size:1.1rem;margin-bottom:0.5rem;color:#aaa;">Hinweise</h2>
     <ul style="font-size:0.85rem;color:#888;padding-left:1.2rem;line-height:1.7;">
         <li>Die Benachrichtigung wird exakt identisch zu einer echten Benachrichtigung erstellt.</li>
-        <li>Als strukturierte Benachrichtigungstypen werden <code>forum_reply</code>, <code>forum_comment</code> und <code>story_post</code> unterstützt.</li>
+        <li>Als strukturierte Benachrichtigungstypen werden <code>forum_reply</code>, <code>forum_comment</code>, <code>forum_post</code>, <code>forum_upvote</code> und <code>story_post</code> unterstützt.</li>
         <li>Titel und Text werden von der API generiert, wenn die Felder leer gelassen werden.</li>
         <li>Die API sendet keine Deep-Link-Routen an Clients; Clients erzeugen das Routing aus <code>type</code> und <code>data</code>.</li>
         <li>Push-Nachrichten werden automatisch an alle registrierten Geräte des Empfängers zugestellt.</li>
@@ -88,6 +90,8 @@
     const typeConfig = {
         forum_reply: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
         forum_comment: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
+        forum_post: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
+        forum_upvote: { entityKey: 'forumPosts', entityLabel: 'title', defaultTitle: '', defaultBody: '' },
         story_post: { entityKey: null, entityLabel: null, defaultTitle: '', defaultBody: '' },
     };
 
@@ -166,6 +170,21 @@
             const selected = document.getElementById('notifEntity').selectedOptions[0];
             dataInput.value = JSON.stringify([
                 { relation: 'comment_author', object: 'User', identifier: 'COMMENT_AUTHOR_ID' },
+                { relation: 'post_author', object: 'User', identifier: selected.dataset.userId || 'POST_AUTHOR_ID' },
+                { relation: 'parent_post', object: 'ForumPost', identifier: entityId },
+                { relation: 'parent_forum', object: 'Forum', identifier: selected.dataset.forumId || 'PARENT_FORUM_ID' },
+            ], null, 2);
+        } else if (entityId && type === 'forum_post') {
+            const selected = document.getElementById('notifEntity').selectedOptions[0];
+            dataInput.value = JSON.stringify([
+                { relation: 'post_author', object: 'User', identifier: selected.dataset.userId || 'POST_AUTHOR_ID' },
+                { relation: 'parent_post', object: 'ForumPost', identifier: entityId },
+                { relation: 'parent_forum', object: 'Forum', identifier: selected.dataset.forumId || 'PARENT_FORUM_ID' },
+            ], null, 2);
+        } else if (entityId && type === 'forum_upvote') {
+            const selected = document.getElementById('notifEntity').selectedOptions[0];
+            dataInput.value = JSON.stringify([
+                { relation: 'voter', object: 'User', identifier: document.getElementById('notifUser').value || 'VOTER_ID' },
                 { relation: 'post_author', object: 'User', identifier: selected.dataset.userId || 'POST_AUTHOR_ID' },
                 { relation: 'parent_post', object: 'ForumPost', identifier: entityId },
                 { relation: 'parent_forum', object: 'Forum', identifier: selected.dataset.forumId || 'PARENT_FORUM_ID' },

@@ -77,6 +77,8 @@ class NotificationPreferenceServiceTest extends TestCase
         $this->assertSame('enabled', $all['forum_comment']['state']);
         $this->assertSame(null, $all['forum_comment']['customData']);
         $this->assertTrue($all['forum_comment']['customAllowed']);
+        $this->assertTrue($all['forum_post']['customAllowed']);
+        $this->assertFalse($all['forum_upvote']['customAllowed']);
         $this->assertFalse($all['trip_user_added']['customAllowed']);
     }
 
@@ -105,6 +107,16 @@ class NotificationPreferenceServiceTest extends TestCase
 
         $this->assertSame('custom', $result['forum_comment']['state']);
         $this->assertSame(['forumIds' => ['f1', 'f2']], $result['forum_comment']['customData']);
+    }
+
+    public function testUpdateCustomForForumPostStoresData(): void
+    {
+        $result = $this->service->update('user-1', [
+            ['type' => 'forum_post', 'state' => 'custom', 'customData' => ['forumIds' => ['f1']]],
+        ]);
+
+        $this->assertSame('custom', $result['forum_post']['state']);
+        $this->assertSame(['forumIds' => ['f1']], $result['forum_post']['customData']);
     }
 
     public function testUpdateCustomForNonCustomizableTypeThrows(): void

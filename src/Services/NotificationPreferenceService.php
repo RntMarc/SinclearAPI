@@ -18,6 +18,8 @@ final readonly class NotificationPreferenceService
     public const KNOWN_TYPES = [
         'forum_reply',
         'forum_comment',
+        'forum_post',
+        'forum_upvote',
         'story_post',
         'direct_message',
         'trip_user_added',
@@ -63,6 +65,7 @@ final readonly class NotificationPreferenceService
     private const CUSTOMIZABLE_TYPES = [
         'forum_comment' => ['relation' => 'parent_forum', 'dataKey' => 'forumIds'],
         'forum_reply' => ['relation' => 'parent_forum', 'dataKey' => 'forumIds'],
+        'forum_post' => ['relation' => 'parent_forum', 'dataKey' => 'forumIds'],
         'story_post' => ['relation' => 'story_author', 'dataKey' => 'userIds'],
         'direct_message' => ['relation' => 'sender', 'dataKey' => 'userIds'],
     ];

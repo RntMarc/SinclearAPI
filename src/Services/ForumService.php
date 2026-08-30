@@ -8,6 +8,7 @@ use Sinclear\Api\Repository\FeedPostVoteRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
 use Sinclear\Api\Repository\ForumRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
+use Sinclear\Api\Repository\UserRepository;
 
 final readonly class ForumService
 {
@@ -25,6 +26,7 @@ final readonly class ForumService
         private ImageService $imageService,
         private TravelRelationRepository $travelRelationRepo,
         private NotificationService $notificationService,
+        private UserRepository $userRepo,
     ) {}
 
     // ── Forum ──────────────────────────────────────────────
@@ -238,6 +240,8 @@ final readonly class ForumService
 
         $post = $this->postRepo->findById($id);
 
+        $this->notifyOnPostCreated($post, $forumId, $userId);
+
         return $this->formatPost($post, $userId);
     }
 
@@ -325,6 +329,8 @@ final readonly class ForumService
         }
 
         $this->voteRepo->create($postId, $userId);
+
+        $this->notifyOnVoteCreated($post, $userId);
     }
 
     public function removeVote(string $postId, string $userId): void
@@ -439,6 +445,84 @@ final readonly class ForumService
                 ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $post['forumId']],
             ],
         );
+    }
+
+    private function notifyOnPostCreated(array $post, string $forumId, string $authorId): void
+    {
+        $members = $this->memberRepo->listByForum($forumId);
+        $relations = [
+            ['relation' => 'post_author', 'object' => 'User', 'identifier' => $authorId],
+            ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => $post['id']],
+            ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $forumId],
+        ];
+
+        foreach ($members as $member) {
+            if ($member['userId'] === $authorId) {
+                continue;
+            }
+
+            $this->notificationService->create(
+                userId: $member['userId'],
+                type: 'forum_post',
+                title: '',
+                body: '',
+                data: $relations,
+                dedupeKey: 'post:' . $post['id'] . ':user:' . $member['userId'],
+            );
+        }
+    }
+
+    private function notifyOnVoteCreated(array $post, string $voterId): void
+    {
+        if ($post['userId'] === $voterId) {
+            return;
+        }
+
+        $voter = $this->userRepo->findById($voterId);
+        $voterName = $voter !== null ? $voter['displayName'] : null;
+
+        $postContent = json_decode($post['content'], true);
+        $postPreview = $this->extractPostPreview($postContent);
+
+        $body = ($voterName !== null && $postPreview !== '')
+            ? $voterName . ' hat deinen Beitrag „' . $postPreview . '“ positiv bewertet.'
+            : '';
+
+        $this->notificationService->create(
+            userId: $post['userId'],
+            type: 'forum_upvote',
+            title: '',
+            body: $body,
+            data: [
+                ['relation' => 'voter', 'object' => 'User', 'identifier' => $voterId],
+                ['relation' => 'post_author', 'object' => 'User', 'identifier' => $post['userId']],
+                ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => $post['id']],
+                ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $post['forumId']],
+            ],
+        );
+    }
+
+    private function extractPostPreview(?array $content): string
+    {
+        if ($content === null) {
+            return '';
+        }
+
+        $text = $content['text'] ?? null;
+        if (is_string($text) && trim($text) !== '') {
+            $trimmed = trim($text);
+            return mb_strlen($trimmed) > 80 ? mb_substr($trimmed, 0, 80) . '…' : $trimmed;
+        }
+
+        $type = $content['type'] ?? null;
+        if ($type === 'music' || $type === 'video') {
+            $urls = $content['urls'] ?? [];
+            if (is_array($urls) && count($urls) > 0) {
+                return $urls[0]['platform'] ?? 'Link';
+            }
+        }
+
+        return '';
     }
 
     public function updateComment(string $postId, string $commentId, string $text): array

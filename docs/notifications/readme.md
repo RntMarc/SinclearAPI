@@ -245,6 +245,7 @@ geleert werden, ohne den State zu ändern.
 |-----|------------------------|-------------------|----------------------------------------|
 | `forum_comment` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
 | `forum_reply` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
+| `forum_post` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
 | `story_post` | `userIds` | Nutzer-IDs (Story-Autoren), deren Stories unterdrückt werden | `story_author` |
 | `direct_message` | `userIds` | Nutzer-IDs (Absender), deren Nachrichten unterdrückt werden | `sender` |
 
@@ -262,7 +263,7 @@ außer aus den beiden genannten.
 → Der Nutzer bekommt `story_post`-Benachrichtigungen zu **allen** Stories
 aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 
-**Hinweis zur Foren-Migration:** Das bisherige per-Forum-Feld `ForumMember.notificationsEnabled` samt Endpunkt `PUT /forums/{id}/members/notifications` ist seit Einführung der Präferenzen **deprecated**. Clients sollen stattdessen `forum_comment`/`forum_reply` mit `state=custom` und `customData.forumIds` verwenden. Das alte Feld bleibt vorerst bestehen, wird aber nicht mehr weiterentwickelt.
+**Hinweis zur Foren-Migration:** Das bisherige per-Forum-Feld `ForumMember.notificationsEnabled` samt Endpunkt `PUT /forums/{id}/members/notifications` ist seit Einführung der Präferenzen **deprecated**. Clients sollen stattdessen `forum_comment`/`forum_reply`/`forum_post` mit `state=custom` und `customData.forumIds` verwenden. Das alte Feld bleibt vorerst bestehen, wird aber nicht mehr weiterentwickelt.
 
 ## Datenbank-Schema
 
@@ -323,7 +324,7 @@ die internen Reise-/Standalone-Varianten bleiben davon getrennt.
 Nicht unterstützte Typen oder unvollständige/abweichende Relationsdaten werden
 beim Erstellen serverseitig mit `InvalidArgumentException` abgelehnt.
 
-Die Forum-Typen werden automatisch in `ForumService::createComment()` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Eigene Kommentare/Antworten lösen keine Benachrichtigung aus (kein Self-Trigger).
+Die Forum-Typen werden automatisch in `ForumService` getriggert: ein Top-Level-Kommentar erzeugt `forum_comment` für den Post-Autor, eine Antwort erzeugt `forum_reply` für den Autor des beantworteten Kommentars. Ein neuer Post erzeugt `forum_post` für alle anderen Mitglieder des Forums (dedupliziert pro Post und Empfänger). Ein Upvote erzeugt `forum_upvote` für den Post-Autor. Eigene Kommentare/Antworten/Upvotes lösen keine Benachrichtigung aus (kein Self-Trigger).
 
 Der Story-Typ wird automatisch in `StoryController::create()` getriggert: eine neue Story erzeugt `story_post` für alle übrigen Nutzer (kein Self-Trigger).
 
@@ -369,6 +370,46 @@ Benachrichtigt darüber, dass ein neuer Top-Level-Kommentar direkt auf einen For
 ```json
 [
   { "relation": "comment_author", "object": "User", "identifier": "123456" },
+  { "relation": "post_author", "object": "User", "identifier": "345678" },
+  { "relation": "parent_post", "object": "ForumPost", "identifier": "456789" },
+  { "relation": "parent_forum", "object": "Forum", "identifier": "567890" }
+]
+```
+
+### `forum_post`
+
+Benachrichtigt darüber, dass ein neuer Post in einem Forum erstellt wurde, in dem der Empfänger Mitglied ist. Empfänger sind alle Mitglieder außer dem Autor selbst (kein Self-Trigger). Wird pro Post und Empfänger dedupliziert (`dedupeKey = "post:<postId>:user:<userId>"`), sodass pro Post nur eine Notification pro Nutzer existiert.
+
+| Relation | Objekt | Pflicht | Bedeutung |
+|----------|--------|---------|-----------|
+| `post_author` | `User` | Ja | Nutzer, der den neuen Post erstellt hat |
+| `parent_post` | `ForumPost` | Ja | Der neue Forum-Post |
+| `parent_forum` | `Forum` | Ja | Forum, in dem der Post liegt |
+
+**Data-Format:**
+```json
+[
+  { "relation": "post_author", "object": "User", "identifier": "123456" },
+  { "relation": "parent_post", "object": "ForumPost", "identifier": "456789" },
+  { "relation": "parent_forum", "object": "Forum", "identifier": "567890" }
+]
+```
+
+### `forum_upvote`
+
+Benachrichtigt den Ersteller eines Forum-Posts darüber, dass ein anderer Nutzer seinen Post upgevotet hat. Kein Self-Trigger ( eigene Upvotes lösen keine Benachrichtigung aus). Der Body ist dynamisch: `{voter.displayName} hat deinen Beitrag „{Vorschau}“ positiv bewertet.` — Falls der Voter-Name oder die Post-Vorschau nicht ermittelbar sind, wird der Fallback-Text `Jemand hat deinen Beitrag positiv bewertet.` verwendet.
+
+| Relation | Objekt | Pflicht | Bedeutung |
+|----------|--------|---------|-----------|
+| `voter` | `User` | Ja | Nutzer, der den Upvote gegeben hat |
+| `post_author` | `User` | Ja | Ersteller des Posts |
+| `parent_post` | `ForumPost` | Ja | Der Post, der upgevotet wurde |
+| `parent_forum` | `Forum` | Ja | Forum, in dem der Post liegt |
+
+**Data-Format:**
+```json
+[
+  { "relation": "voter", "object": "User", "identifier": "123456" },
   { "relation": "post_author", "object": "User", "identifier": "345678" },
   { "relation": "parent_post", "object": "ForumPost", "identifier": "456789" },
   { "relation": "parent_forum", "object": "Forum", "identifier": "567890" }

@@ -89,6 +89,14 @@ final readonly class NotificationService
             'title' => 'Neue Nachricht',
             'text' => '',
         ],
+        'forum_post' => [
+            'title' => 'Neuer Beitrag im Forum',
+            'text' => 'Jemand hat einen neuen Beitrag im Forum veröffentlicht.',
+        ],
+        'forum_upvote' => [
+            'title' => 'Neue Bewertung',
+            'text' => 'Jemand hat deinen Beitrag positiv bewertet.',
+        ],
     ];
 
     public function __construct(
@@ -179,6 +187,8 @@ final readonly class NotificationService
             'trip_event_info_changed' => $this->normalizeTripEventInfoChangedData($data),
             'trip_subscription_added' => $this->normalizeTripSubscriptionAddedData($data),
             'direct_message' => $this->normalizeDirectMessageData($data),
+            'forum_post' => $this->normalizeForumPostData($data),
+            'forum_upvote' => $this->normalizeForumUpvoteData($data),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }
@@ -279,6 +289,105 @@ final readonly class NotificationService
         foreach ($requiredRelations as $relation => $_object) {
             if (!isset($normalized[$relation])) {
                 throw new \InvalidArgumentException('forum_comment data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeForumPostData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('forum_post data is required');
+        }
+
+        $requiredRelations = [
+            'post_author' => 'User',
+            'parent_post' => 'ForumPost',
+            'parent_forum' => 'Forum',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('forum_post data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('forum_post data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('forum_post data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('forum_post data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeForumUpvoteData(?array $data): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException('forum_upvote data is required');
+        }
+
+        $requiredRelations = [
+            'voter' => 'User',
+            'post_author' => 'User',
+            'parent_post' => 'ForumPost',
+            'parent_forum' => 'Forum',
+        ];
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException('forum_upvote data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException('forum_upvote data entries require relation, object, and identifier');
+            }
+
+            if (!isset($requiredRelations[$relation]) || $requiredRelations[$relation] !== $object) {
+                throw new \InvalidArgumentException('forum_upvote data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($requiredRelations as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException('forum_upvote data is missing relation: ' . $relation);
             }
         }
 

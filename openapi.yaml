@@ -4103,12 +4103,14 @@ components:
       properties:
         relation:
           type: string
-          enum: [reply_author, comment_author, post_author, parent_comment, parent_post, parent_forum, story_author, story]
+          enum: [reply_author, comment_author, post_author, parent_comment, parent_post, parent_forum, story_author, story, voter]
           description: >-
             Beziehung des referenzierten Objekts zur Benachrichtigung. `forum_reply`
             benötigt reply_author, comment_author, post_author, parent_comment,
             parent_post und parent_forum. `forum_comment` benötigt comment_author,
-            post_author, parent_post und parent_forum. `story_post` benötigt
+            post_author, parent_post und parent_forum. `forum_post` benötigt
+            post_author, parent_post und parent_forum. `forum_upvote` benötigt
+            voter, post_author, parent_post und parent_forum. `story_post` benötigt
             story_author und story.
         object:
           type: string
@@ -4135,7 +4137,10 @@ components:
           enum:
             - forum_reply
             - forum_comment
+            - forum_post
+            - forum_upvote
             - story_post
+            - direct_message
             - trip_user_added
             - trip_user_added_others
             - standalone_event_user_added
@@ -4238,7 +4243,7 @@ components:
           description: >
             Denylist bei `state=custom`: IDs, deren Benachrichtigungen
             unterdrückt werden. Format: `{ "forumIds": ["..."] }` für
-            `forum_comment`/`forum_reply`, `{ "userIds": ["..."] }` für
+            `forum_comment`/`forum_reply`/`forum_post`, `{ "userIds": ["..."] }` für
             `story_post`. Leeres Array erlaubt (= nichts ausgeschlossen).
           additionalProperties: true
 
@@ -4255,7 +4260,10 @@ components:
           required:
             - forum_reply
             - forum_comment
+            - forum_post
+            - forum_upvote
             - story_post
+            - direct_message
             - trip_user_added
             - trip_user_added_others
             - trip_event_added
@@ -4273,7 +4281,13 @@ components:
               $ref: '#/components/schemas/NotificationPreferenceItem'
             forum_comment:
               $ref: '#/components/schemas/NotificationPreferenceItem'
+            forum_post:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            forum_upvote:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
             story_post:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            direct_message:
               $ref: '#/components/schemas/NotificationPreferenceItem'
             trip_user_added:
               $ref: '#/components/schemas/NotificationPreferenceItem'
@@ -4307,7 +4321,10 @@ components:
           enum:
             - forum_reply
             - forum_comment
+            - forum_post
+            - forum_upvote
             - story_post
+            - direct_message
             - trip_user_added
             - trip_user_added_others
             - trip_event_added
@@ -4336,7 +4353,7 @@ components:
           description: >
             Nur bei `state=custom` erforderlich. Denylist im exakt
             festgelegten Format: `{ "forumIds": ["..."] }` für
-            `forum_comment`/`forum_reply`, `{ "userIds": ["..."] }` für
+            `forum_comment`/`forum_reply`/`forum_post`, `{ "userIds": ["..."] }` für
             `story_post`. Der Wert ist ein Array aus nicht-leeren Strings
             und darf leer sein (`[]` = nichts ausgeschlossen). Die IDs in
             der Denylist werden vom Versand ausgeschlossen.
@@ -10092,7 +10109,7 @@ paths:
                   description: ID des Empfängers
                 type:
                   type: string
-                  enum: [forum_reply, forum_comment, story_post]
+                  enum: [forum_reply, forum_comment, forum_post, forum_upvote, story_post]
                   description: Unterstützter strukturierter Benachrichtigungstyp.
                   example: forum_comment
                 title:

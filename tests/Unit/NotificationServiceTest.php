@@ -28,6 +28,17 @@ class NotificationServiceTest extends TestCase
         ['relation' => 'story_author', 'object' => 'User', 'identifier' => 'user-story'],
         ['relation' => 'story', 'object' => 'Story', 'identifier' => 'story-1'],
     ];
+    private const FORUM_POST_DATA = [
+        ['relation' => 'post_author', 'object' => 'User', 'identifier' => 'user-post'],
+        ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
+        ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
+    ];
+    private const FORUM_UPVOTE_DATA = [
+        ['relation' => 'voter', 'object' => 'User', 'identifier' => 'user-voter'],
+        ['relation' => 'post_author', 'object' => 'User', 'identifier' => 'user-post'],
+        ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
+        ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
+    ];
     private PDO $db;
     private NotificationService $service;
 
@@ -217,6 +228,117 @@ class NotificationServiceTest extends TestCase
         ]];
 
         $this->service->create('user-1', 'forum_comment', 'Title', 'Body', $data);
+    }
+
+    public function testCreateStoresStructuredForumPostData(): void
+    {
+        $id = $this->service->create(
+            userId: 'user-1',
+            type: 'forum_post',
+            title: '',
+            body: '',
+            data: self::FORUM_POST_DATA,
+        );
+
+        $stmt = $this->db->prepare('SELECT type, data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('forum_post', $row['type']);
+        $this->assertStringContainsString('post_author', $row['data']);
+        $this->assertStringContainsString('parent_post', $row['data']);
+        $this->assertStringContainsString('parent_forum', $row['data']);
+    }
+
+    public function testCreateGeneratesTitleAndTextForForumPost(): void
+    {
+        $id = $this->service->create('user-1', 'forum_post', '', '', self::FORUM_POST_DATA);
+
+        $stmt = $this->db->prepare('SELECT title, body FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('Neuer Beitrag im Forum', $row['title']);
+        $this->assertSame('Jemand hat einen neuen Beitrag im Forum veröffentlicht.', $row['body']);
+    }
+
+    public function testCreateThrowsOnMissingForumPostRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = self::FORUM_POST_DATA;
+        array_pop($data);
+
+        $this->service->create('user-1', 'forum_post', 'Title', 'Body', $data);
+    }
+
+    public function testCreateThrowsWhenForumPostContainsUnsupportedRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = [...self::FORUM_POST_DATA, [
+            'relation' => 'reply_author',
+            'object' => 'User',
+            'identifier' => 'user-1',
+        ]];
+
+        $this->service->create('user-1', 'forum_post', 'Title', 'Body', $data);
+    }
+
+    public function testCreateStoresStructuredForumUpvoteData(): void
+    {
+        $id = $this->service->create(
+            userId: 'user-1',
+            type: 'forum_upvote',
+            title: '',
+            body: '',
+            data: self::FORUM_UPVOTE_DATA,
+        );
+
+        $stmt = $this->db->prepare('SELECT type, data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('forum_upvote', $row['type']);
+        $this->assertStringContainsString('voter', $row['data']);
+        $this->assertStringContainsString('post_author', $row['data']);
+        $this->assertStringContainsString('parent_post', $row['data']);
+        $this->assertStringContainsString('parent_forum', $row['data']);
+    }
+
+    public function testCreateGeneratesTitleAndTextForForumUpvote(): void
+    {
+        $id = $this->service->create('user-1', 'forum_upvote', '', '', self::FORUM_UPVOTE_DATA);
+
+        $stmt = $this->db->prepare('SELECT title, body FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('Neue Bewertung', $row['title']);
+        $this->assertSame('Jemand hat deinen Beitrag positiv bewertet.', $row['body']);
+    }
+
+    public function testCreateThrowsOnMissingForumUpvoteRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = self::FORUM_UPVOTE_DATA;
+        array_pop($data);
+
+        $this->service->create('user-1', 'forum_upvote', 'Title', 'Body', $data);
+    }
+
+    public function testCreateThrowsWhenForumUpvoteContainsUnsupportedRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = [...self::FORUM_UPVOTE_DATA, [
+            'relation' => 'parent_comment',
+            'object' => 'ForumPostComment',
+            'identifier' => 'comment-1',
+        ]];
+
+        $this->service->create('user-1', 'forum_upvote', 'Title', 'Body', $data);
     }
 
     public function testCreateThrowsOnEmptyType(): void
