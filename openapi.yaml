@@ -4510,6 +4510,36 @@ components:
               type: boolean
               description: Bestätigung, dass die Story als gesehen markiert wurde
 
+    StoryViewer:
+      type: object
+      required: [userId, viewedAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID des Viewers
+        displayName:
+          type: string
+          nullable: true
+          description: Anzeigename des Viewers
+        avatar:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Profilbild des Viewers
+        viewedAt:
+          type: string
+          description: Zeitpunkt des Aufrufs (UTC), Format `YYYY-MM-DD HH:MM:SS`
+
+    StoryViewersResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryViewer'
+          description: Liste der Nutzer, die die Story gesehen haben
+
     ChatConversation:
       type: object
       required: [id, type, createdAt, updatedAt]
@@ -15423,6 +15453,51 @@ paths:
                 $ref: '#/components/schemas/StoryViewedResponse'
         '401':
           description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /stories/{id}/viewers:
+    get:
+      summary: Story-Viewer abrufen
+      description: >
+        Gibt die Liste aller Nutzer zurück, die die angegebene Story gesehen
+        haben. Nur der Autor der Story (oder ein Admin) darf diese Liste
+        abrufen. Die Sortierung erfolgt nach Sichtzeitpunkt (neueste zuerst).
+        Der Autor selbst wird nicht in der Liste angezeigt.
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      responses:
+        '200':
+          description: Liste der Viewer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryViewersResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Berechtigung (nur Story-Autor oder Admin)
           content:
             application/json:
               schema:

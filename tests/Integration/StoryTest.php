@@ -415,4 +415,111 @@ class StoryTest extends TestCase
 
         $this->assertSame(404, $response->getStatusCode());
     }
+
+    // ── GET /stories/{id}/viewers ─────────────────────────
+
+    public function testGetViewersReturns200(): void
+    {
+        $storyId = $this->createStory('user-1');
+        $this->repo->markViewed($storyId, 'user-2');
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(1, $data['data']);
+        $this->assertSame('user-2', $data['data'][0]['userId']);
+        $this->assertSame('Bob', $data['data'][0]['displayName']);
+        $this->assertNotNull($data['data'][0]['viewedAt']);
+    }
+
+    public function testGetViewersExcludesAuthor(): void
+    {
+        $storyId = $this->createStory('user-1');
+        $this->repo->markViewed($storyId, 'user-2');
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
+
+        $data = json_decode((string) $response->getBody(), true);
+        $userIds = array_column($data['data'], 'userId');
+        $this->assertNotContains('user-1', $userIds);
+    }
+
+    public function testGetViewersEmptyReturnsEmptyArray(): void
+    {
+        $storyId = $this->createStory('user-1');
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(0, $data['data']);
+    }
+
+    public function testGetViewersForeignStoryReturns403(): void
+    {
+        $storyId = $this->createStory('user-1');
+        $this->repo->markViewed($storyId, 'user-2');
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers', userId: 'user-2');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(403, $response->getStatusCode());
+    }
+
+    public function testGetViewersUnknownStoryReturns404(): void
+    {
+        $request = $this->requestWithUser('GET', '/stories/unknown/viewers');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => 'unknown']);
+
+        $this->assertSame(404, $response->getStatusCode());
+    }
+
+    public function testGetViewersSortedByViewedAtDesc(): void
+    {
+        $storyId = $this->createStory('user-1');
+
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-3', 'c@test.com', 'hash', 'Charlie', NOW(3))");
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-4', 'd@test.com', 'hash', 'Diana', NOW(3))");
+
+        $this->repo->markViewed($storyId, 'user-2');
+        $this->db->prepare('UPDATE StoryView SET viewedAt = ? WHERE storyId = ? AND userId = ?')
+            ->execute(['2026-09-01 10:00:00.000', $storyId, 'user-2']);
+
+        $this->repo->markViewed($storyId, 'user-3');
+        $this->db->prepare('UPDATE StoryView SET viewedAt = ? WHERE storyId = ? AND userId = ?')
+            ->execute(['2026-09-01 12:00:00.000', $storyId, 'user-3']);
+
+        $this->repo->markViewed($storyId, 'user-4');
+        $this->db->prepare('UPDATE StoryView SET viewedAt = ? WHERE storyId = ? AND userId = ?')
+            ->execute(['2026-09-01 11:00:00.000', $storyId, 'user-4']);
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(3, $data['data']);
+        $this->assertSame('user-3', $data['data'][0]['userId']);
+        $this->assertSame('user-4', $data['data'][1]['userId']);
+        $this->assertSame('user-2', $data['data'][2]['userId']);
+    }
+
+    public function testGetViewersAdminCanView(): void
+    {
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt, isAdmin) VALUES ('admin-1', 'admin@test.com', 'hash', 'Admin', NOW(3), 1)");
+
+        $storyId = $this->createStory('user-1');
+        $this->repo->markViewed($storyId, 'user-2');
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers', userId: 'admin-1');
+        $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(1, $data['data']);
+    }
 }

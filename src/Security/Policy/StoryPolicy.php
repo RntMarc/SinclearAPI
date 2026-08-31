@@ -29,4 +29,13 @@ final readonly class StoryPolicy
 
         return $user->id === $creatorId;
     }
+
+    public function canViewViewers(AuthenticatedUser $user, string $creatorId): bool
+    {
+        if ($user->isAdmin) {
+            return true;
+        }
+
+        return $user->id === $creatorId;
+    }
 }

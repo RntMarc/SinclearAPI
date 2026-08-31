@@ -25,6 +25,7 @@ Migrationen: `database/migrations/create_stories_table.sql` und
 | `GET` | `/stories/{id}` | Einzelne Story inkl. Autor, Gesehen-Status und `viewCount` |
 | `DELETE` | `/stories/{id}` | Eigene Story löschen (nur Ersteller oder Admin) |
 | `POST` | `/stories/{id}/view` | Story für den aktuellen Nutzer als gesehen markieren (idempotent) |
+| `GET` | `/stories/{id}/viewers` | Liste der Nutzer, die die Story gesehen haben (nur Ersteller oder Admin) |
 
 ### Story erstellen (`POST /stories`)
 
@@ -72,10 +73,43 @@ Abgelaufene Stories (`expiresAt <= now`) werden weder im Feed noch einzeln
 eingeschränkt angezeigt – `GET /stories/{id}` liefert sie weiterhin, solange
 sie nicht gelöscht wurden.
 
+### Story-Viewer abrufen (`GET /stories/{id}/viewers`)
+
+Gibt die Liste aller Nutzer zurück, die die angegebene Story gesehen haben.
+Nur der **Ersteller** der Story (oder ein Admin) darf diese Liste abrufen.
+Die Sortierung erfolgt nach Sichtzeitpunkt (neueste zuerst).
+Der Autor selbst wird **nicht** in der Liste angezeigt.
+
+Antwort:
+
+```json
+{
+  "data": [
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440002",
+      "displayName": "Bob",
+      "avatar": "<base64 Profilbild>",
+      "viewedAt": "2026-08-16 10:30:00"
+    },
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440003",
+      "displayName": "Charlie",
+      "avatar": null,
+      "viewedAt": "2026-08-16 09:15:00"
+    }
+  ]
+}
+```
+
+Fehlerantworten:
+- `403` (`forbidden`): Der anfragende Nutzer ist weder Ersteller noch Admin.
+- `404` (`story_not_found`): Die Story existiert nicht.
+
 ## Berechtigungen
 
 - Alle authentifizierten Nutzer dürfen Stories **erstellen, lesen und als gesehen markieren**.
 - Nur der **Ersteller** (oder ein Admin) darf eine Story **löschen**.
+- Nur der **Ersteller** (oder ein Admin) darf die **Viewer-Liste** einer Story abrufen (`GET /stories/{id}/viewers`).
 - `StoryView`-Einträge werden beim Löschen der Story automatisch entfernt (FK `ON DELETE CASCADE`).
 
 ## Melden & Anmerken von Stories

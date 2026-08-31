@@ -344,6 +344,7 @@ return function (App $app): void {
         $group->get('/{id}', [StoryController::class, 'get']);
         $group->delete('/{id}', [StoryController::class, 'delete']);
         $group->post('/{id}/view', [StoryController::class, 'markViewed']);
+        $group->get('/{id}/viewers', [StoryController::class, 'getViewers']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Chat / Direktnachrichten (authenticated)

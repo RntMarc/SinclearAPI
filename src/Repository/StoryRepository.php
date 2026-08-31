@@ -98,4 +98,23 @@ final readonly class StoryRepository
         $stmt->execute([$storyId]);
         return (int) $stmt->fetchColumn();
     }
+
+    /**
+     * Returns all viewers of a story with user details and viewedAt timestamp,
+     * excluding the story author. Sorted by newest viewers first.
+     *
+     * @return list<array{userId: string, viewedAt: string, displayName: string|null, image: string|null}>
+     */
+    public function findViewers(string $storyId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT sv.userId, sv.viewedAt, u.displayName, u.image
+             FROM StoryView sv
+             JOIN User u ON u.id = sv.userId
+             WHERE sv.storyId = ? AND sv.userId != (SELECT userId FROM Story WHERE id = ?)
+             ORDER BY sv.viewedAt DESC'
+        );
+        $stmt->execute([$storyId, $storyId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

@@ -174,6 +174,33 @@ final readonly class StoryController
         return ResponseFactory::json(['data' => ['viewed' => true]], 200, $response);
     }
 
+    public function getViewers(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        $story = $this->storyRepo->findById($args['id']);
+        if ($story === null) {
+            return ResponseFactory::json(['error' => 'story_not_found'], 404, $response);
+        }
+
+        if (!$this->policy->canViewViewers($user, $story['userId'])) {
+            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        }
+
+        $viewers = $this->storyRepo->findViewers($story['id']);
+
+        $formatted = array_map(function (array $v): array {
+            return [
+                'userId' => $v['userId'],
+                'displayName' => $v['displayName'] ?? null,
+                'avatar' => $v['image'] ?? null,
+                'viewedAt' => self::stripFractionalSeconds($v['viewedAt']),
+            ];
+        }, $viewers);
+
+        return ResponseFactory::json(['data' => $formatted], 200, $response);
+    }
+
     private function notifyOnStoryCreated(string $authorId, string $storyId): void
     {
         $recipientIds = array_filter(
