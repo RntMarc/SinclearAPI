@@ -163,14 +163,14 @@ class StoryTest extends TestCase
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
 
-    private function requestWithUser(string $method, string $path, ?array $body = null, ?string $userId = 'user-1'): ServerRequestInterface
+    private function requestWithUser(string $method, string $path, ?array $body = null, ?string $userId = 'user-1', bool $isAdmin = false): ServerRequestInterface
     {
         $request = (new ServerRequestFactory())->createServerRequest($method, $path);
         if ($body !== null) {
             $request = $request->withParsedBody($body);
         }
         if ($userId !== null) {
-            $user = new AuthenticatedUser(id: $userId, email: 'test@test.com', isAdmin: false, jti: 'test-jti');
+            $user = new AuthenticatedUser(id: $userId, email: 'test@test.com', isAdmin: $isAdmin, jti: 'test-jti');
             $request = $request->withAttribute(AuthenticatedUser::class, $user);
         }
         return $request;
@@ -515,7 +515,7 @@ class StoryTest extends TestCase
         $storyId = $this->createStory('user-1');
         $this->repo->markViewed($storyId, 'user-2');
 
-        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers', userId: 'admin-1');
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/viewers', userId: 'admin-1', isAdmin: true);
         $response = $this->controller->getViewers($request, new Response(), ['id' => $storyId]);
 
         $this->assertSame(200, $response->getStatusCode());
