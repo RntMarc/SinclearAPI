@@ -36,9 +36,12 @@ final readonly class ExploreController
             return ResponseFactory::json(['error' => 'invalid_category'], 400, $response);
         }
 
-        $result = $this->exploreService->listPlaces($category, $page, $limit, $sort, $cuisine);
-
         $authUser = $request->getAttribute(AuthenticatedUser::class);
+        $mine = !empty($params['mine']) && $params['mine'] === 'true' && $authUser instanceof AuthenticatedUser;
+        $creatorId = $mine ? $authUser->id : null;
+
+        $result = $this->exploreService->listPlaces($category, $page, $limit, $sort, $cuisine, $creatorId);
+
         if (!$authUser instanceof AuthenticatedUser) {
             $result['data'] = array_map(
                 fn(array $p) => $this->exploreService->sanitizePlacePublic($p),

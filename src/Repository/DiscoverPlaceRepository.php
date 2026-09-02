@@ -151,6 +151,57 @@ final readonly class DiscoverPlaceRepository
         ];
     }
 
+    public function listByCreator(string $creatorId, ?string $category, int $page, int $limit, ?string $sort = null): array
+    {
+        $conditions = 'WHERE p.creatorId = ?';
+        $params = [$creatorId];
+
+        if ($category !== null) {
+            $conditions .= ' AND p.category = ?';
+            $params[] = $category;
+        }
+
+        $orderMap = [
+            'name_asc' => 'p.name ASC',
+            'name_desc' => 'p.name DESC',
+            'created_asc' => 'p.createdAt ASC',
+            'created_desc' => 'p.createdAt DESC',
+            'rating_asc' => 'avg_rating ASC',
+            'rating_desc' => 'avg_rating DESC',
+        ];
+
+        $select = 'p.*, ROUND(AVG(r.rating), 1) AS avg_rating';
+        $from = 'FROM DiscoverPlace p LEFT JOIN DiscoverReview r ON r.placeId = p.id';
+        $groupBy = ' GROUP BY p.id';
+
+        $orderBy = $sort !== null && isset($orderMap[$sort])
+            ? $orderMap[$sort]
+            : 'p.createdAt DESC';
+
+        $countFrom = 'FROM DiscoverPlace p LEFT JOIN DiscoverReview r ON r.placeId = p.id';
+
+        $countStmt = $this->pdo->prepare("SELECT COUNT(DISTINCT p.id) $countFrom $conditions");
+        $countStmt->execute($params);
+        $total = (int) $countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+        $dataStmt = $this->pdo->prepare(
+            "SELECT $select $from $conditions $groupBy ORDER BY $orderBy LIMIT ? OFFSET ?"
+        );
+        $dataStmt->execute([...$params, $limit, $offset]);
+        $places = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'data' => $places,
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function random(int $limit, ?string $category = null): array
     {
         $conditions = '';

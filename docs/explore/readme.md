@@ -97,6 +97,7 @@ Die Suche unterstützt mehrere Filter gleichzeitig:
 | `city` | string | Filtert nach Stadt (LIKE-Suche in der `address`-Spalte) |
 | `lat` + `lon` + `radius` | float + int | Umkreissuche in Metern |
 | `location` + `radius` | string + int | Ortsname (wird geocoded) + Radius |
+| `mine` | boolean | Nur eigene Orte (nur authentifiziert, `creatorId` des Nutzers) |
 | `page` / `limit` | int | Paginierung |
 
 **Umkreissuche:** Verwendet die Haversine-Formel in SQL. Die Ergebnisse
@@ -107,6 +108,11 @@ Sortierkriterium angewandt.
 **Geocoding:** Wenn `location` statt `lat`/`lon` übergeben wird, löst die
 API den Ortsnamen über Nominatim in Koordinaten auf und führt dann die
 Umkreissuche durch. Default-Radius: 5000m, Maximum: 50000m.
+
+**Eigene Orte (`mine`):** Bei Angabe von `mine=true` werden nur Orte
+zurückgegeben, bei denen der authentifizierte Nutzer der Ersteller ist
+(`creatorId = aktueller Nutzer`). Ohne gültiges JWT wird der Parameter
+ignoriert. Kombinierbar mit `category` und `sort`.
 
 ### Beispiele
 
@@ -134,6 +140,12 @@ GET /explore?category=gastronomy&page=1&limit=20
 
 # Suche sortiert nach Bewertung
 GET /explore/search?cuisine=italian&sort=rating_desc
+
+# Eigene Orte (nur authentifiziert)
+GET /explore?mine=true
+
+# Eigene Gastronomie-Orte sortiert nach Bewertung
+GET /explore?mine=true&category=gastronomy&sort=rating_desc
 ```
 
 ## OSM/Nominatim-Integration
@@ -216,7 +228,7 @@ Sie nutzen `auth.optional`: Wird ein gültiges JWT mitgesendet, werden alle Feld
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
-| `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`, `cuisine`) |
+| `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`, `cuisine`, `mine`) |
 | `POST` | `/explore` | JWT | Neuen Ort anlegen |
 | `GET` | `/explore/search` | JWT | Suche + Umkreissuche |
 | `GET` | `/explore/random` | JWT | Zufällige Orte (optional nach Kategorie) |

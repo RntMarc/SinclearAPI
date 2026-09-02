@@ -6626,6 +6626,13 @@ paths:
             type: string
             enum: [gastronomy, leisure]
           description: Filter nach Kategorie
+        - name: mine
+          in: query
+          schema:
+            type: boolean
+          description: >
+            Filtert auf nur eigene Orte (creatorId des authentifizierten Nutzers).
+            Ohne gültiges JWT wird dieser Parameter ignoriert.
       responses:
         '200':
           description: Liste der Orte
@@ -6854,6 +6861,13 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
+        - name: mine
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: >
+            Filtert auf nur eigene Orte (creatorId des authentifizierten Nutzers).
       responses:
         '200':
           description: Paginierte Liste der Orte
