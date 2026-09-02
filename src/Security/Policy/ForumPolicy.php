@@ -65,4 +65,13 @@ final readonly class ForumPolicy
 
         return $diff <= 600;
     }
+
+    public function canPublishPost(AuthenticatedUser $user, string $ownerId): bool
+    {
+        if ($user->isAdmin) {
+            return true;
+        }
+
+        return $user->id === $ownerId;
+    }
 }

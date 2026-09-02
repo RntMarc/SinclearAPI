@@ -217,7 +217,7 @@ final readonly class ForumService
 
     // ── Posts ──────────────────────────────────────────────
 
-    public function createPost(string $forumId, string $userId, string $type, mixed $content): array
+    public function createPost(string $forumId, string $userId, string $type, mixed $content, bool $isDraft = true): array
     {
         $type = strtolower(trim($type));
         if (!in_array($type, self::VALID_TYPES, true)) {
@@ -236,11 +236,14 @@ final readonly class ForumService
             'userId' => $userId,
             'type' => $type,
             'content' => $content,
+            'isDraft' => $isDraft ? 1 : 0,
         ]);
 
         $post = $this->postRepo->findById($id);
 
-        $this->notifyOnPostCreated($post, $forumId, $userId);
+        if (!$isDraft) {
+            $this->notifyOnPostCreated($post, $forumId, $userId);
+        }
 
         return $this->formatPost($post, $userId);
     }
@@ -300,10 +303,30 @@ final readonly class ForumService
         return $result;
     }
 
+    public function listDrafts(string $forumId, string $userId, int $page, int $limit): array
+    {
+        $forum = $this->forumRepo->findById($forumId);
+        if ($forum === null) {
+            throw new \RuntimeException('forum_not_found');
+        }
+
+        $result = $this->postRepo->listDraftsByForum($forumId, $page, $limit, $userId);
+        $result['data'] = array_map(
+            fn(array $p) => $this->formatPost($p, $userId),
+            $result['data']
+        );
+
+        return $result;
+    }
+
     public function getPost(string $forumId, string $postId, ?string $userId): array
     {
         $post = $this->postRepo->findById($postId);
         if ($post === null || $post['forumId'] !== $forumId) {
+            throw new \RuntimeException('post_not_found');
+        }
+
+        if ((int) $post['isDraft'] === 1 && $post['userId'] !== $userId) {
             throw new \RuntimeException('post_not_found');
         }
 
@@ -312,6 +335,26 @@ final readonly class ForumService
         $formatted['commentCount'] = $this->commentRepo->countByPost($postId);
 
         return $formatted;
+    }
+
+    public function publishPost(string $postId, string $userId): array
+    {
+        $post = $this->postRepo->findById($postId);
+        if ($post === null) {
+            throw new \RuntimeException('post_not_found');
+        }
+
+        if ((int) $post['isDraft'] !== 1) {
+            throw new \RuntimeException('already_published');
+        }
+
+        $this->postRepo->publish($postId);
+
+        $post = $this->postRepo->findById($postId);
+
+        $this->notifyOnPostCreated($post, $post['forumId'], $post['userId']);
+
+        return $this->formatPost($post, $userId);
     }
 
     // ── Votes ──────────────────────────────────────────────
@@ -686,6 +729,7 @@ final readonly class ForumService
             'userImage' => $p['userImage'] ?? null,
             'type' => $p['type'],
             'content' => $content,
+            'isDraft' => (bool) $p['isDraft'],
             'createdAt' => $p['createdAt'],
             'updatedAt' => $p['updatedAt'],
         ];

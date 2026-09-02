@@ -74,11 +74,13 @@ Nutzer können beitreten und eigene Beiträge verfassen.
 | `DELETE` | `/forums/{id}/members` | JWT | Forum verlassen |
 | `GET` | `/forums/{id}/members` | JWT | Mitglieder auflisten |
 | `PUT` | `/forums/{id}/members/notifications` | JWT | Benachrichtigung umschalten |
+| `GET` | `/forums/{id}/posts/drafts` | JWT | Eigene Entwürfe im Forum (nur eigener Nutzer) |
 | `GET` | `/forums/{id}/posts` | JWT | Posts im Forum (paginiert) |
 | `POST` | `/forums/{id}/posts` | JWT | Post erstellen (nur Mitglieder) |
 | `GET` | `/forums/{id}/posts/{postId}` | JWT | Einzelnen Post abrufen |
 | `PUT` | `/forums/{id}/posts/{postId}` | JWT | Post bearbeiten (nur Eigentümer) |
 | `DELETE` | `/forums/{id}/posts/{postId}` | JWT | Post löschen |
+| `POST` | `/forums/{id}/posts/{postId}/publish` | JWT | Entwurf veröffentlichen |
 | `POST` | `/forums/{id}/posts/{postId}/vote` | JWT | Post upvoten |
 | `DELETE` | `/forums/{id}/posts/{postId}/vote` | JWT | Vote zurückziehen |
 | `GET` | `/forums/{id}/posts/{postId}/comments` | JWT | Kommentare abrufen (Baumstruktur) |
@@ -221,13 +223,38 @@ Jeder Eintrag enthält:
 ```
 POST /forums/{id}/posts
 Body: { "type": "music", "content": { "text": "Schaut euch das an!", "urls": [{ "platform": "spotify", "url": "https://open.spotify.com/..." }] } }
-→ 201 { "data": { "id": "...", "type": "music", "content": { ... }, ... } }
+→ 201 { "data": { "id": "...", "type": "music", "content": { ... }, "isDraft": true, ... } }
 ```
 
 **Bedingungen:**
 - Nur Mitglieder des Forums dürfen posten
 - `type` ist optional, Default ist `text`
 - `content` muss der Struktur des jeweiligen Typs entsprechen
+- `isDraft` ist optional, Default ist `true` (Entwurf)
+- Entwürfe lösen keine Benachrichtigungen aus
+
+### Entwürfe
+
+Forum-Beiträge werden standardmäßig als Entwurf erstellt (`isDraft: true`).
+Entwürfe sind nur für den Ersteller sichtbar und lösen keine Benachrichtigungen aus.
+
+**Entwurf veröffentlichen:**
+```
+POST /forums/{id}/posts/{postId}/publish
+→ 200 { "data": { "id": "...", "isDraft": false, ... } }
+```
+
+**Veröffentlichungsrechte:**
+- Eigentümer: Ja
+- Administrator: Ja
+
+**Entwürfe auflisten:**
+```
+GET /forums/{id}/posts/drafts?page=1&limit=20
+→ 200 { "data": [...], "meta": { "page": 1, "limit": 20, "total": 5, "totalPages": 1 } }
+```
+
+Zeigt nur die eigenen Entwürfe des eingeloggten Nutzers im Forum.
 
 ### Post bearbeiten
 ```

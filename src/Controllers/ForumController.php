@@ -26,6 +26,7 @@ final readonly class ForumController
         'not_member' => ['error' => 'not_member', 'status' => 409],
         'cannot_leave_trip_forum' => ['error' => 'cannot_leave_trip_forum', 'status' => 403],
         'already_voted' => ['error' => 'already_voted', 'status' => 409],
+        'already_published' => ['error' => 'already_published', 'status' => 409],
         'edit_window_expired' => ['error' => 'edit_window_expired', 'status' => 403],
         'not_found' => ['error' => 'not_found', 'status' => 404],
         'invalid_image' => ['error' => 'invalid_image', 'status' => 400],
@@ -231,6 +232,21 @@ final readonly class ForumController
         }
     }
 
+    public function listDrafts(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(100, max(1, (int) ($params['limit'] ?? 20)));
+
+        try {
+            $result = $this->forumService->listDrafts($args['id'], $user->id, $page, $limit);
+            return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
+        }
+    }
+
     public function getPost(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);
@@ -250,9 +266,10 @@ final readonly class ForumController
 
         $type = isset($body['type']) ? trim((string) $body['type']) : 'text';
         $content = $body['content'] ?? null;
+        $isDraft = isset($body['isDraft']) ? (bool) $body['isDraft'] : true;
 
         try {
-            $post = $this->forumService->createPost($args['id'], $user->id, $type, $content);
+            $post = $this->forumService->createPost($args['id'], $user->id, $type, $content, $isDraft);
             return ResponseFactory::json(['data' => $post], 201, $response);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), $response);
@@ -269,6 +286,24 @@ final readonly class ForumController
         try {
             $post = $this->forumService->updatePost($args['id'], $args['postId'], $user->id, $content);
             return ResponseFactory::json(['data' => $post], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
+        }
+    }
+
+    public function publishPost(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $post = $this->forumService->getPost($args['id'], $args['postId'], $user->id);
+
+            if (!$this->policy->canPublishPost($user, $post['userId'])) {
+                return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+            }
+
+            $published = $this->forumService->publishPost($args['postId'], $user->id);
+            return ResponseFactory::json(['data' => $published], 200, $response);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), $response);
         }

@@ -280,11 +280,13 @@ return function (App $app): void {
         $group->put('/{id}/members/notifications', [ForumController::class, 'updateNotifications']);
 
         // Posts
+        $group->get('/{id}/posts/drafts', [ForumController::class, 'listDrafts']);
         $group->get('/{id}/posts', [ForumController::class, 'listPosts']);
         $group->post('/{id}/posts', [ForumController::class, 'createPost']);
         $group->get('/{id}/posts/{postId}', [ForumController::class, 'getPost']);
         $group->put('/{id}/posts/{postId}', [ForumController::class, 'updatePost']);
         $group->delete('/{id}/posts/{postId}', [ForumController::class, 'deletePost']);
+        $group->post('/{id}/posts/{postId}/publish', [ForumController::class, 'publishPost']);
 
         // Votes
         $group->post('/{id}/posts/{postId}/vote', [ForumController::class, 'vote']);

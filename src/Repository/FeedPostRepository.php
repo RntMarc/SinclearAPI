@@ -21,7 +21,7 @@ final readonly class FeedPostRepository
 
     public function listByForum(string $forumId, int $page, int $limit, ?string $userId): array
     {
-        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM FeedPosts WHERE forumId = ?');
+        $countStmt = $this->pdo->prepare('SELECT COUNT(*) FROM FeedPosts WHERE forumId = ? AND isDraft = 0');
         $countStmt->execute([$forumId]);
         $total = (int) $countStmt->fetchColumn();
 
@@ -35,7 +35,7 @@ final readonly class FeedPostRepository
             . ' LEFT JOIN FeedPostVote v ON v.postId = p.id'
             . ' LEFT JOIN FeedPostComment fc ON fc.postId = p.id AND fc.text IS NOT NULL'
             . ' LEFT JOIN User u ON u.id = p.userId'
-            . ' WHERE p.forumId = ?';
+            . ' WHERE p.forumId = ? AND p.isDraft = 0';
         if ($userId !== null) {
             $sql .= ' GROUP BY p.id ORDER BY p.createdAt DESC LIMIT ? OFFSET ?';
             $dataStmt = $this->pdo->prepare($sql);
@@ -59,6 +59,37 @@ final readonly class FeedPostRepository
         ];
     }
 
+    public function listDraftsByForum(string $forumId, int $page, int $limit, string $userId): array
+    {
+        $countStmt = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM FeedPosts WHERE forumId = ? AND userId = ? AND isDraft = 1'
+        );
+        $countStmt->execute([$forumId, $userId]);
+        $total = (int) $countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+
+        $dataStmt = $this->pdo->prepare(
+            'SELECT p.*, u.displayName AS userDisplayName, u.image AS userImage'
+            . ' FROM FeedPosts p'
+            . ' LEFT JOIN User u ON u.id = p.userId'
+            . ' WHERE p.forumId = ? AND p.userId = ? AND p.isDraft = 1'
+            . ' GROUP BY p.id ORDER BY p.createdAt DESC LIMIT ? OFFSET ?'
+        );
+        $dataStmt->execute([$forumId, $userId, $limit, $offset]);
+        $rows = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'data' => $rows,
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function listFeedPosts(int $page, int $limit, string $userId): array
     {
         $forumFilter = 'p.forumId NOT IN (
@@ -68,7 +99,7 @@ final readonly class FeedPostRepository
         )';
 
         $countStmt = $this->pdo->prepare(
-            "SELECT COUNT(*) FROM FeedPosts p WHERE $forumFilter"
+            "SELECT COUNT(*) FROM FeedPosts p WHERE $forumFilter AND p.isDraft = 0"
         );
         $countStmt->execute([$userId]);
         $total = (int) $countStmt->fetchColumn();
@@ -83,7 +114,7 @@ final readonly class FeedPostRepository
             . ' LEFT JOIN FeedPostVote v ON v.postId = p.id'
             . ' LEFT JOIN FeedPostComment fc ON fc.postId = p.id AND fc.text IS NOT NULL'
             . ' LEFT JOIN User u ON u.id = p.userId'
-            . " WHERE $forumFilter"
+            . " WHERE $forumFilter AND p.isDraft = 0"
             . ' GROUP BY p.id'
             . ' ORDER BY p.createdAt DESC'
             . ' LIMIT ? OFFSET ?';
@@ -107,8 +138,8 @@ final readonly class FeedPostRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO FeedPosts (id, userId, type, content, createdAt, updatedAt, forumId)
-             VALUES (?, ?, ?, ?, NOW(3), NOW(3), ?)'
+            'INSERT INTO FeedPosts (id, userId, type, content, createdAt, updatedAt, forumId, isDraft)
+             VALUES (?, ?, ?, ?, NOW(3), NOW(3), ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -116,6 +147,7 @@ final readonly class FeedPostRepository
             $data['type'],
             json_encode($data['content'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             $data['forumId'],
+            $data['isDraft'] ?? 1,
         ]);
         return $id;
     }
@@ -135,6 +167,11 @@ final readonly class FeedPostRepository
             $values[] = $data['type'];
         }
 
+        if (array_key_exists('isDraft', $data)) {
+            $sets[] = 'isDraft = ?';
+            $values[] = $data['isDraft'] ? 1 : 0;
+        }
+
         if ($sets === []) {
             return;
         }
@@ -145,6 +182,14 @@ final readonly class FeedPostRepository
         $sql = 'UPDATE FeedPosts SET ' . implode(', ', $sets) . ' WHERE id = ?';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($values);
+    }
+
+    public function publish(string $id): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE FeedPosts SET isDraft = 0, createdAt = NOW(3), updatedAt = NOW(3) WHERE id = ?'
+        );
+        $stmt->execute([$id]);
     }
 
     public function delete(string $id): void
