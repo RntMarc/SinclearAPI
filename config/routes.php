@@ -25,6 +25,7 @@ use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Controllers\DavTokenController;
+use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -339,6 +340,15 @@ return function (App $app): void {
     // Notifications (public — no auth required)
     $app->get('/notifications/vapid-public-key', [NotificationController::class, 'vapidPublicKey']);
 
+    // External Data (weather, air quality, pollen, etc.)
+    $app->group('/external-data', function (RouteCollectorProxy $group) {
+        $group->get('/weather', [ExternalDataController::class, 'weather']);
+        $group->get('/weather/warnings', [ExternalDataController::class, 'weatherWarnings']);
+        $group->get('/pollen-uv', [ExternalDataController::class, 'pollenUv']);
+        $group->get('/air-quality', [ExternalDataController::class, 'airQuality']);
+        $group->get('/types', [ExternalDataController::class, 'availableTypes']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
     // Stories — 7-Tage-Stories (authenticated)
     $app->group('/stories', function (RouteCollectorProxy $group) {
         $group->get('', [StoryController::class, 'feed']);
@@ -434,5 +444,9 @@ return function (App $app): void {
         $group->get('/notifications', [AdminController::class, 'notifications']);
         $group->get('/notifications/json', [AdminController::class, 'adminNotificationsJson']);
         $group->post('/notifications/send', [AdminController::class, 'sendTestNotification']);
+        $group->get('/external-data-cache', [AdminController::class, 'externalDataCache']);
+        $group->get('/external-data-cache/json', [AdminController::class, 'adminExternalDataCacheJson']);
+        $group->delete('/external-data-cache/{id}', [AdminController::class, 'deleteExternalDataCacheEntry']);
+        $group->delete('/external-data-cache', [AdminController::class, 'clearExternalDataCache']);
     })->add($container->get(AdminMiddleware::class));
 };

@@ -4896,6 +4896,250 @@ components:
           type: boolean
           description: True = tippt, False = nicht mehr tippend
 
+    ExternalDataResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          description: Äußere-Daten-Antwort (variiert je nach data_type)
+        meta:
+          type: object
+          required: [source, data_type, available_sections, missing_sections, retrieved_at]
+          properties:
+            source:
+              type: string
+              enum: [infranode, open-meteo, mixed, cache]
+              nullable: true
+              description: Datenquelle
+            data_type:
+              type: string
+              description: Art der Daten (weather, weather_warnings, pollen_uv, air_quality)
+            city_slug:
+              type: string
+              nullable: true
+              description: Übergebener City-Slug (null bei Koordinaten-Abfrage)
+            coordinates:
+              type: object
+              nullable: true
+              properties:
+                lat:
+                  type: number
+                  format: float
+                lon:
+                  type: number
+                  format: float
+            available_sections:
+              type: array
+              items:
+                type: string
+              description: Verfügbare Abschnitte der Antwort
+            missing_sections:
+              type: array
+              items:
+                type: string
+              description: Fehlende Abschnitte (nicht von Quelle geliefert)
+            cached_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Zeitpunkt des Cache-Eintrags (nur bei Cache-Treffer)
+            expires_at:
+              type: string
+              format: date-time
+              nullable: true
+              description: Ablaufzeit des Cache-Eintrags (nur bei Cache-Treffer)
+            retrieved_at:
+              type: string
+              format: date-time
+              description: Zeitpunkt der Datenabfrage (UTC)
+
+    ExternalDataWeatherCurrent:
+      type: object
+      properties:
+        temperature_c:
+          type: number
+          format: float
+          nullable: true
+        humidity:
+          type: number
+          format: float
+          nullable: true
+        apparent_temperature:
+          type: number
+          format: float
+          nullable: true
+          description: Gefühlte Temperatur (nur Open-Meteo)
+        precipitation:
+          type: number
+          format: float
+          nullable: true
+        weather_code:
+          type: integer
+          nullable: true
+        condition:
+          type: string
+          nullable: true
+          description: Wetterbeschreibung (nur InfraNode)
+        cloud_cover:
+          type: integer
+          nullable: true
+        wind_speed:
+          type: number
+          format: float
+          nullable: true
+        wind_direction:
+          type: number
+          format: float
+          nullable: true
+        wind_gusts:
+          type: number
+          format: float
+          nullable: true
+        observed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ExternalDataWeatherHourly:
+      type: object
+      properties:
+        time:
+          type: string
+          format: date-time
+        temperature_c:
+          type: number
+          format: float
+          nullable: true
+        precipitation_probability:
+          type: integer
+          nullable: true
+        weather_code:
+          type: integer
+          nullable: true
+        wind_speed:
+          type: number
+          format: float
+          nullable: true
+
+    ExternalDataWeatherDaily:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        weather_code:
+          type: integer
+          nullable: true
+        temperature_max_c:
+          type: number
+          format: float
+          nullable: true
+        temperature_min_c:
+          type: number
+          format: float
+          nullable: true
+        precipitation_sum:
+          type: number
+          format: float
+          nullable: true
+        precipitation_probability_max:
+          type: integer
+          nullable: true
+        sunrise:
+          type: string
+          format: date-time
+          nullable: true
+        sunset:
+          type: string
+          format: date-time
+          nullable: true
+        uv_index_max:
+          type: number
+          format: float
+          nullable: true
+        wind_speed_max:
+          type: number
+          format: float
+          nullable: true
+
+    ExternalDataWarning:
+      type: object
+      properties:
+        event:
+          type: string
+        level:
+          type: integer
+        headline:
+          type: string
+        start:
+          type: string
+          format: date-time
+          nullable: true
+        end:
+          type: string
+          format: date-time
+          nullable: true
+
+    ExternalDataPollen:
+      type: object
+      properties:
+        today:
+          type: string
+        tomorrow:
+          type: string
+        day_after_tomorrow:
+          type: string
+
+    ExternalDataAirQuality:
+      type: object
+      properties:
+        pm10:
+          type: number
+          format: float
+          nullable: true
+        pm25:
+          type: number
+          format: float
+          nullable: true
+        no2:
+          type: number
+          format: float
+          nullable: true
+        o3:
+          type: number
+          format: float
+          nullable: true
+        so2:
+          type: number
+          format: float
+          nullable: true
+        station_id:
+          type: string
+          nullable: true
+        observed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ExternalDataAvailableType:
+      type: object
+      properties:
+        label:
+          type: string
+        label_en:
+          type: string
+        sections:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: string
+        requires:
+          type: string
+
 paths:
   /mcp:
     get:
@@ -15606,46 +15850,213 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /stories/{id}/viewers:
+  /external-data/weather:
     get:
-      summary: Story-Viewer abrufen
+      summary: Wetterdaten abrufen
       description: >
-        Gibt die Liste aller Nutzer zurück, die die angegebene Story gesehen
-        haben. Nur der Autor der Story (oder ein Admin) darf diese Liste
-        abrufen. Die Sortierung erfolgt nach Sichtzeitpunkt (neueste zuerst).
-        Der Autor selbst wird nicht in der Liste angezeigt.
-      tags: [Stories]
+        Aktuelle Wetterdaten für einen Standort. Primär InfraNode (deutsche
+        Städte), Fallback Open-Meteo (global). Teilweise abhängig von der
+        available_sections in meta.
+      tags: [External Data]
       security:
         - BearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
+        - name: city_slug
+          in: query
           schema:
             type: string
-            format: uuid
-          description: Story-ID
+          description: City-Slug (z.B. berlin, muenchen). Muss korrekt sein.
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Breitengrad (für Open-Meteo Fallback)
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: float
+          description: Längengrad (für Open-Meteo Fallback)
       responses:
         '200':
-          description: Liste der Viewer
+          description: Wetterdaten
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/StoryViewersResponse'
+                $ref: '#/components/schemas/ExternalDataResponse'
+        '400':
+          description: Kein Standort angegeben
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Nicht autorisiert
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '403':
-          description: Keine Berechtigung (nur Story-Autor oder Admin)
+
+  /external-data/weather/warnings:
+    get:
+      summary: Wetterwarnungen abrufen
+      description: >
+        Aktuelle Wetterwarnungen für einen Standort (InfraNode). Nur für
+        deutsche Städte verfügbar.
+      tags: [External Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: city_slug
+          in: query
+          schema:
+            type: string
+          description: City-Slug (z.B. berlin)
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: float
+      responses:
+        '200':
+          description: Wetterwarnungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalDataResponse'
+        '400':
+          description: Kein Standort angegeben
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '404':
-          description: Story nicht gefunden
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /external-data/pollen-uv:
+    get:
+      summary: Pollenbelastung und UV-Index abrufen
+      description: >
+        Pollenbelastung (InfraNode) und UV-Index (InfraNode + Open-Meteo).
+        Für deutsche Städte vollständig, global nur UV-Index.
+      tags: [External Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: city_slug
+          in: query
+          schema:
+            type: string
+          description: City-Slug (z.B. berlin)
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: float
+      responses:
+        '200':
+          description: Pollen- und UV-Daten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalDataResponse'
+        '400':
+          description: Kein Standort angegeben
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /external-data/air-quality:
+    get:
+      summary: Luftqualitätsdaten abrufen
+      description: >
+        Aktuelle Luftqualität (PM10, PM2.5, NO2, O3, SO2). InfraNode oder
+        Open-Meteo Fallback.
+      tags: [External Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: city_slug
+          in: query
+          schema:
+            type: string
+          description: City-Slug (z.B. berlin)
+        - name: lat
+          in: query
+          schema:
+            type: number
+            format: float
+        - name: lon
+          in: query
+          schema:
+            type: number
+            format: float
+      responses:
+        '200':
+          description: Luftqualitätsdaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalDataResponse'
+        '400':
+          description: Kein Standort angegeben
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /external-data/types:
+    get:
+      summary: Verfügbare Datentypen auflisten
+      description: >
+        Gibt eine Übersicht aller unterstützten external-data Datentypen,
+        deren Abschnitte und benötigten Parameter zurück.
+      tags: [External Data]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der verfügbaren Datentypen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties:
+                      $ref: '#/components/schemas/ExternalDataAvailableType'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

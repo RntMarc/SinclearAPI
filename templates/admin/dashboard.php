@@ -21,4 +21,9 @@
         <div class="label">Offene Moderations-Anfragen</div>
         <a href="/api/v2/admin/moderation-requests" class="btn btn-sm mt-2">Bearbeiten</a>
     </div>
+    <div class="card stat-card">
+        <div class="number">{{externalDataCacheCount}}</div>
+        <div class="label">Cache-Einträge (extern)</div>
+        <a href="/api/v2/admin/external-data-cache" class="btn btn-sm mt-2">Verwalten</a>
+    </div>
 </div>

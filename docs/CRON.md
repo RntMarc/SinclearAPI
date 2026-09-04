@@ -30,6 +30,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 2 | `cleanup_location_sharing` | 24 Stunden | Bereinigt alte Location-Sharing-Sessions |
 | 3 | `cleanup_direct_messages` | 24 Stunden | Löscht Chat-Nachrichten älter als 90 Tage |
 | 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
+| 5 | `cleanup_external_data_cache` | 24 Stunden | Entfernt abgelaufene Cache-Einträge (ExternalDataCache) |
 
 ## Details
 
@@ -55,6 +56,12 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Intervall:** 86400 Sekunden (24 Stunden)
 - **Aktion:** Löscht `DirectMessage`- und `ChatEvent`-Einträge älter als 90 Tage in Batches (LIMIT 1000, um lange Locks zu vermeiden). Räumt verwaiste `ChatConversation`-Einträge (keine Nachrichten, älter als 1 Tag), abgelaufene `ChatPresence`- und `ChatTyping`-Einträge auf.
 - **Datei:** `src/Services/Cron/Tasks/CleanupOldDirectMessagesTask.php`
+
+### External Data Cache Cleanup
+- **Task-Name:** `cleanup_external_data_cache`
+- **Intervall:** 86400 Sekunden (24 Stunden)
+- **Aktion:** `DELETE FROM ExternalDataCache WHERE expires_at < NOW()` — entfernt alle abgelaufenen Cache-Einträge für externe Datenquellen (Wetter, Warnungen, Pollen/UV, Luftqualität).
+- **Datei:** `src/Services/Cron/Tasks/CleanupExternalDataCacheTask.php`
 
 ## CronSchedule-Tabelle
 

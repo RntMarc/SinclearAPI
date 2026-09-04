@@ -68,4 +68,20 @@ $settings['vapid'] = [
     'subject' => $_ENV['VAPID_SUBJECT'] ?? 'mailto:contact@sinclear.de',
 ];
 
+$settings['external_data'] = [
+    'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://api.infranode.dev/v1',
+    'open_meteo_base_url' => $_ENV['OPEN_METEO_BASE_URL'] ?? 'https://api.open-meteo.com/v1',
+    'cache_ttl' => [
+        'weather' => (int)($_ENV['EXTERNAL_DATA_CACHE_WEATHER'] ?? 600),
+        'weather_warnings' => (int)($_ENV['EXTERNAL_DATA_CACHE_WARNINGS'] ?? 300),
+        'pollen_uv' => (int)($_ENV['EXTERNAL_DATA_CACHE_POLLEN'] ?? 1800),
+        'air_quality' => (int)($_ENV['EXTERNAL_DATA_CACHE_AIR'] ?? 600),
+        'traffic' => (int)($_ENV['EXTERNAL_DATA_CACHE_TRAFFIC'] ?? 300),
+        'holidays' => (int)($_ENV['EXTERNAL_DATA_CACHE_HOLIDAYS'] ?? 604800),
+        'demographics' => (int)($_ENV['EXTERNAL_DATA_CACHE_DEMOGRAPHICS'] ?? 86400),
+        'events' => (int)($_ENV['EXTERNAL_DATA_CACHE_EVENTS'] ?? 3600),
+        'default' => (int)($_ENV['EXTERNAL_DATA_CACHE_DEFAULT'] ?? 1800),
+    ],
+];
+
 return $settings;

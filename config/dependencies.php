@@ -32,6 +32,7 @@ use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Controllers\DavTokenController;
+use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
@@ -97,6 +98,7 @@ use Sinclear\Api\Repository\StoryRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
+use Sinclear\Api\Repository\ExternalDataCacheRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
@@ -133,6 +135,7 @@ use Sinclear\Api\Services\Mcp\McpServer;
 use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\RecipeService;
+use Sinclear\Api\Services\ExternalDataService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
@@ -458,6 +461,10 @@ return [
     DavTokenRepository::class => autowire(),
     DavTokenService::class => autowire(),
     DavTokenController::class => autowire(),
+
+    ExternalDataCacheRepository::class => autowire(),
+    ExternalDataService::class => autowire(),
+    ExternalDataController::class => autowire(),
 
     \Sinclear\Api\Dav\IcsFactory::class => autowire(),
     \Sinclear\Api\Dav\VcardFactory::class => autowire(),

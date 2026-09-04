@@ -32,6 +32,7 @@ use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Repository\ExternalDataCacheRepository;
 use PDO;
 
 final readonly class AdminController
@@ -62,6 +63,7 @@ final readonly class AdminController
         private TravelChatRepository $travelChatRepo,
         private TravelChatService $travelChatService,
         private ImageService $imageService,
+        private ExternalDataCacheRepository $externalDataCacheRepo,
         private PDO $pdo,
         private LoggerInterface $logger,
     ) {}
@@ -159,11 +161,14 @@ final readonly class AdminController
         $tripCount = $this->tripRepo->countAll();
         $moderationCounts = $this->moderationRequestService->getStatusCounts();
         $openModerationCount = $moderationCounts['unread'] + $moderationCounts['read'] + $moderationCounts['in_work'];
+        $cacheStats = $this->externalDataCacheRepo->getStats();
+        $externalDataCacheCount = $cacheStats['total'];
 
         $contentHtml = $this->renderTemplate('dashboard.php', [
             'userCount' => $userCount,
             'tripCount' => $tripCount,
             'openModerationCount' => $openModerationCount,
+            'externalDataCacheCount' => $externalDataCacheCount,
         ]);
         $html = $this->renderLayout('Dashboard', $contentHtml, $user->email);
 
@@ -2921,5 +2926,67 @@ ROW;
                 ],
             );
         }
+    }
+
+    public function externalDataCache(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $stats = $this->externalDataCacheRepo->getStats();
+
+        $contentHtml = $this->renderTemplate('external_data_cache.php', [
+            'totalEntries' => $stats['total'],
+            'expiredEntries' => $stats['expired'],
+        ]);
+        $html = $this->renderLayout('Externe Daten – Cache', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminExternalDataCacheJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $params = $request->getQueryParams();
+        $dataType = !empty($params['data_type']) ? $params['data_type'] : null;
+
+        $entries = $this->externalDataCacheRepo->findAll($dataType);
+
+        return ResponseFactory::json(['entries' => $entries], 200, $response);
+    }
+
+    public function deleteExternalDataCacheEntry(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $id = $args['id'] ?? '';
+        if ($id === '') {
+            return ResponseFactory::json(['error' => 'id_required'], 400, $response);
+        }
+
+        $stmt = $this->pdo->prepare('DELETE FROM ExternalDataCache WHERE id = ?');
+        $stmt->execute([$id]);
+
+        if ($stmt->rowCount() === 0) {
+            return ResponseFactory::json(['error' => 'not_found'], 404, $response);
+        }
+
+        return ResponseFactory::json(['message' => 'deleted'], 200, $response);
+    }
+
+    public function clearExternalDataCache(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $params = $request->getQueryParams();
+        $dataType = !empty($params['data_type']) ? $params['data_type'] : null;
+
+        if ($dataType !== null) {
+            $count = $this->externalDataCacheRepo->deleteByType($dataType);
+        } else {
+            $count = $this->externalDataCacheRepo->deleteAll();
+        }
+
+        return ResponseFactory::json(['message' => 'cleared', 'deleted' => $count], 200, $response);
     }
 }
