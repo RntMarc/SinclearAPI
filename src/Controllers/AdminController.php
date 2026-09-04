@@ -255,7 +255,7 @@ ROW;
                 <td>{$start} – {$end}</td>
                 <td>{$hastickets}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['start']}', '{$t['end']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['start']}', '{$t['end']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`, `{$t['citySlug']}`)">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteTrip('{$id}', '{$name}')">Löschen</button>
                 </td>
             </tr>
@@ -315,6 +315,7 @@ ROW;
                 'latitude' => $e['latitude'] ?? '',
                 'longitude' => $e['longitude'] ?? '',
                 'OSMID' => $e['OSMID'] ?? '',
+                'citySlug' => $e['citySlug'] ?? '',
             ];
         }
 
@@ -357,6 +358,8 @@ ROW;
                 ? trim($body['ticket']) : null,
             'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
                 ? trim($body['ticketUrl']) : null,
+            'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
+                ? trim($body['citySlug']) : null,
         ]);
 
         $trip = $this->tripRepo->findById($id);
@@ -402,6 +405,10 @@ ROW;
         if (isset($body['ticketUrl'])) {
             $data['ticketUrl'] = is_string($body['ticketUrl'])
                 ? trim($body['ticketUrl']) : null;
+        }
+        if (isset($body['citySlug'])) {
+            $data['citySlug'] = is_string($body['citySlug'])
+                ? trim($body['citySlug']) : null;
         }
 
         if ($data === []) {
@@ -489,6 +496,8 @@ ROW;
                 ? (float) $body['longitude'] : null,
             'OSMID' => isset($body['OSMID']) && $body['OSMID'] !== ''
                 ? (int) $body['OSMID'] : null,
+            'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
+                ? trim($body['citySlug']) : null,
         ]);
 
         $event = $this->eventRepo->findById($id);
@@ -548,6 +557,10 @@ ROW;
         if (isset($body['OSMID'])) {
             $data['OSMID'] = $body['OSMID'] !== ''
                 ? (int) $body['OSMID'] : null;
+        }
+        if (isset($body['citySlug'])) {
+            $data['citySlug'] = is_string($body['citySlug'])
+                ? trim($body['citySlug']) : null;
         }
 
         if (isset($data['image']) && $this->isValidImageData($data['image'])) {
@@ -1357,6 +1370,7 @@ ROW;
             'latitude' => $event['latitude'] ?? '',
             'longitude' => $event['longitude'] ?? '',
             'OSMID' => $event['OSMID'] ?? '',
+            'citySlug' => $event['citySlug'] ?? '',
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
         // Trip options for the edit form
@@ -2806,6 +2820,7 @@ ROW;
             'hastickets' => 'Ticket-Status',
             'ticket' => 'Ticket-Informationen',
             'ticketUrl' => 'Ticket-URL',
+            'citySlug' => 'City-Slug',
         ];
 
         $changed = [];
@@ -2841,6 +2856,7 @@ ROW;
             'image' => 'Bild',
             'organizer' => 'Veranstalter',
             'address' => 'Adresse',
+            'citySlug' => 'City-Slug',
         ];
 
         $changed = [];

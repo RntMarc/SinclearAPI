@@ -92,6 +92,10 @@
                 </div>
             </div>
         </div>
+        <div class="form-group">
+            <label for="newTripCitySlug">City-Slug (optional)</label>
+            <input type="text" id="newTripCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
+        </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-success">Erstellen</button>
             <button type="button" class="btn" onclick="hideCreateTripForm()">Abbrechen</button>
@@ -139,6 +143,10 @@
                     <input type="url" id="editTripTicketUrl" name="ticketUrl">
                 </div>
             </div>
+        </div>
+        <div class="form-group">
+            <label for="editTripCitySlug">City-Slug (optional)</label>
+            <input type="text" id="editTripCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
         </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-primary">Speichern</button>
@@ -228,6 +236,10 @@
         <div class="form-group">
             <label for="newEventOSMID">OpenStreetMap ID</label>
             <input type="number" id="newEventOSMID" name="OSMID" placeholder="z. B. 123456789">
+        </div>
+        <div class="form-group">
+            <label for="newEventCitySlug">City-Slug (optional)</label>
+            <input type="text" id="newEventCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
         </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-success">Erstellen</button>
@@ -319,6 +331,10 @@
         <div class="form-group">
             <label for="editEventOSMID">OpenStreetMap ID</label>
             <input type="number" id="editEventOSMID" name="OSMID">
+        </div>
+        <div class="form-group">
+            <label for="editEventCitySlug">City-Slug (optional)</label>
+            <input type="text" id="editEventCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
         </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-primary">Speichern</button>
@@ -539,6 +555,7 @@
             hastickets: document.getElementById('newTripHastickets').checked ? '1' : '0',
             ticket: document.getElementById('newTripTicket').value.trim() || null,
             ticketUrl: document.getElementById('newTripTicketUrl').value.trim() || null,
+            citySlug: document.getElementById('newTripCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
         if (!data.start || !data.end) { showToast('Start und Ende sind erforderlich.', 'error'); return; }
@@ -576,6 +593,7 @@
         document.getElementById('editEventLatitude').value = d.latitude || '';
         document.getElementById('editEventLongitude').value = d.longitude || '';
         document.getElementById('editEventOSMID').value = d.OSMID || '';
+        document.getElementById('editEventCitySlug').value = d.citySlug || '';
         clearImagePreview('editEventImage', 'editEventImagePreview');
         if (isValidImageData(d.image)) {
             document.getElementById('editEventImage').value = d.image;
@@ -591,7 +609,7 @@
         return value.startsWith('/9j/') || value.startsWith('iVBOR') || value.startsWith('UklGR');
     }
 
-    function editTrip(id, name, description, start, end, hastickets, ticket, ticketUrl) {
+    function editTrip(id, name, description, start, end, hastickets, ticket, ticketUrl, citySlug) {
         document.getElementById('editTripId').value = id;
         document.getElementById('editTripName').value = name;
         document.getElementById('editTripDescription').value = description;
@@ -602,6 +620,7 @@
         document.getElementById('editTripTicketFields').style.display = hasTickets ? 'block' : 'none';
         document.getElementById('editTripTicket').value = ticket || '';
         document.getElementById('editTripTicketUrl').value = ticketUrl || '';
+        document.getElementById('editTripCitySlug').value = citySlug || '';
         showEditTripForm();
     }
 
@@ -617,6 +636,7 @@
             hastickets: document.getElementById('editTripHastickets').checked ? '1' : '0',
             ticket: document.getElementById('editTripTicket').value.trim() || null,
             ticketUrl: document.getElementById('editTripTicketUrl').value.trim() || null,
+            citySlug: document.getElementById('editTripCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
 
@@ -667,6 +687,7 @@
             latitude: document.getElementById('newEventLatitude').value.trim() || null,
             longitude: document.getElementById('newEventLongitude').value.trim() || null,
             OSMID: document.getElementById('newEventOSMID').value.trim() || null,
+            citySlug: document.getElementById('newEventCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
         if (!data.start || !data.end) { showToast('Start und Ende sind erforderlich.', 'error'); return; }
@@ -705,6 +726,7 @@
             latitude: document.getElementById('editEventLatitude').value.trim() || null,
             longitude: document.getElementById('editEventLongitude').value.trim() || null,
             OSMID: document.getElementById('editEventOSMID').value.trim() || null,
+            citySlug: document.getElementById('editEventCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
 

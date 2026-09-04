@@ -347,6 +347,8 @@ return function (App $app): void {
         $group->get('/pollen-uv', [ExternalDataController::class, 'pollenUv']);
         $group->get('/air-quality', [ExternalDataController::class, 'airQuality']);
         $group->get('/types', [ExternalDataController::class, 'availableTypes']);
+        $group->get('/locations/search', [ExternalDataController::class, 'searchLocations']);
+        $group->get('/locations', [ExternalDataController::class, 'listLocations']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Stories — 7-Tage-Stories (authenticated)

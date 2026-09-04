@@ -110,6 +110,10 @@
             <label for="editEventOSMID">OpenStreetMap ID</label>
             <input type="number" id="editEventOSMID" name="OSMID">
         </div>
+        <div class="form-group">
+            <label for="editEventCitySlug">City-Slug (optional)</label>
+            <input type="text" id="editEventCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
+        </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-primary">Speichern</button>
             <button type="button" class="btn" onclick="toggleEditEventForm()">Abbrechen</button>
@@ -228,6 +232,7 @@
         document.getElementById('editEventLatitude').value = d.latitude || '';
         document.getElementById('editEventLongitude').value = d.longitude || '';
         document.getElementById('editEventOSMID').value = d.OSMID || '';
+        document.getElementById('editEventCitySlug').value = d.citySlug || '';
         clearImagePreview('editEventImage', 'editEventImagePreview');
         if (isValidImageData(d.image)) {
             document.getElementById('editEventImage').value = d.image;
@@ -387,6 +392,7 @@
             latitude: document.getElementById('editEventLatitude').value.trim() || null,
             longitude: document.getElementById('editEventLongitude').value.trim() || null,
             OSMID: document.getElementById('editEventOSMID').value.trim() || null,
+            citySlug: document.getElementById('editEventCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
 

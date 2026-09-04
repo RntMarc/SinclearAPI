@@ -181,8 +181,8 @@ final readonly class TravelEventRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelEvent (ID, trip, name, description, start, end, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelEvent (ID, trip, name, description, start, end, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID, citySlug)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -201,6 +201,7 @@ final readonly class TravelEventRepository
             $data['latitude'] ?? null,
             $data['longitude'] ?? null,
             $data['OSMID'] ?? null,
+            $data['citySlug'] ?? null,
         ]);
         return $id;
     }
@@ -210,7 +211,7 @@ final readonly class TravelEventRepository
         $sets = [];
         $values = [];
 
-        foreach (['trip', 'name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address', 'latitude', 'longitude', 'OSMID'] as $field) {
+        foreach (['trip', 'name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address', 'latitude', 'longitude', 'OSMID', 'citySlug'] as $field) {
             if (array_key_exists($field, $data)) {
                 $sets[] = "`$field` = ?";
                 $values[] = $data[$field];

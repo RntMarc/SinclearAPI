@@ -1036,6 +1036,13 @@ components:
           format: uuid
           nullable: true
           description: ID des zugehörigen Gruppenchats (falls vorhanden)
+        citySlug:
+          type: string
+          nullable: true
+          description: >
+            InfraNode-Stadt-Slug für externe Datenabfragen (z.B. "berlin",
+            "muenchen"). NULL = kein unterstützter Slug (Ausland, unbekannte Stadt).
+            Clients können diesen Wert direkt für `/external-data/weather` etc. nutzen.
 
     TravelTripListResponse:
       type: object
@@ -1128,6 +1135,12 @@ components:
           format: uuid
           nullable: true
           description: ID des zugehörigen Gruppenchats (falls vorhanden)
+        citySlug:
+          type: string
+          nullable: true
+          description: >
+            InfraNode-Stadt-Slug für externe Datenabfragen (z.B. "berlin",
+            "muenchen"). NULL = kein unterstützter Slug (Ausland, unbekannte Stadt).
 
     TravelParticipantBrief:
       type: object
@@ -5139,6 +5152,71 @@ components:
             type: string
         requires:
           type: string
+
+    ExternalDataLocation:
+      type: object
+      description: Ein Suchergebnis für einen Wetter-Ort
+      required: [name, slug, lat, lon, recommended, source]
+      properties:
+        name:
+          type: string
+          description: Ortsname (deutsch für InfraNode, lokalisierter Name für Nominatim)
+        slug:
+          type: string
+          nullable: true
+          description: InfraNode-Slug für unterstützte deutsche Städte, null für weltweite Orte
+        lat:
+          type: number
+          format: float
+          description: Breitengrad
+        lon:
+          type: number
+          format: float
+          description: Längengrad
+        recommended:
+          type: boolean
+          description: true wenn InfraNode-gestützt (empfohlen für /external-data Endpunkte)
+        source:
+          type: string
+          enum: [infranode, nominatim]
+          description: Datenquelle
+        state:
+          type: string
+          nullable: true
+          description: Bundesland (bei InfraNode) bzw. Staat/Region (bei Nominatim)
+        population:
+          type: integer
+          nullable: true
+          description: Einwohnerzahl (nur bei InfraNode)
+
+    ExternalDataInfraNodeCity:
+      type: object
+      description: Ein von InfraNode unterstützter Ort
+      required: [name, slug, lat, lon, state, population, coverage]
+      properties:
+        name:
+          type: string
+          description: Ortsname (deutsch)
+        slug:
+          type: string
+          description: InfraNode-Slug für /external-data Endpunkte
+        lat:
+          type: number
+          format: float
+          description: Breitengrad
+        lon:
+          type: number
+          format: float
+          description: Längengrad
+        state:
+          type: string
+          description: Bundesland-Kürzel
+        population:
+          type: integer
+          description: Einwohnerzahl
+        coverage:
+          type: string
+          description: Abdeckungsstatus (full, auto)
 
 paths:
   /mcp:
@@ -16055,6 +16133,83 @@ paths:
                     type: object
                     additionalProperties:
                       $ref: '#/components/schemas/ExternalDataAvailableType'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /external-data/locations/search:
+    get:
+      summary: Wetter-Orte suchen
+      description: >
+        Sucht nach Orten für Wetterdaten. Kombiniert InfraNode-gestützte
+        deutsche Städte (empfohlen, mit Slug) mit weltweiten Orten über
+        Nominatim-Geocoding. InfraNode-Ergebnisse werden mit `recommended: true`
+        und einem `slug` markiert, Nominatim-Ergebnisse mit `recommended: false`
+        und `slug: null`.
+      tags: [External Data]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Suchbegriff (mindestens 2 Zeichen)
+          schema:
+            type: string
+            minLength: 2
+            example: Berlin
+      responses:
+        '200':
+          description: Suchergebnisse
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExternalDataLocation'
+        '400':
+          description: Query zu kurz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /external-data/locations:
+    get:
+      summary: Alle InfraNode-Orte auflisten
+      description: >
+        Gibt alle von InfraNode unterstützten deutschen Städte mit Slugs,
+        Koordinaten und Metadaten zurück. Nützlich für Admin-Interfaces
+        oder Debugging.
+      tags: [External Data]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste aller InfraNode-Orte
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExternalDataInfraNodeCity'
         '401':
           description: Nicht autorisiert
           content:

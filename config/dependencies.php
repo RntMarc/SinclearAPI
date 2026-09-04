@@ -136,6 +136,7 @@ use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\ExternalDataService;
+use Sinclear\Api\Services\ExternalDataLocationService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
@@ -464,6 +465,7 @@ return [
 
     ExternalDataCacheRepository::class => autowire(),
     ExternalDataService::class => autowire(),
+    ExternalDataLocationService::class => autowire(),
     ExternalDataController::class => autowire(),
 
     \Sinclear\Api\Dav\IcsFactory::class => autowire(),

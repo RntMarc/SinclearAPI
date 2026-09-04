@@ -11,6 +11,8 @@ Aggregierte externe Daten (Wetter, Luftqualität, Pollenbelastung) für beliebig
 | `GET /external-data/pollen-uv` | Pollenbelastung + UV-Index | ✅ (DE) | ✅ (nur UV) |
 | `GET /external-data/air-quality` | Luftqualität (PM10, NO2, O3…) | ✅ (DE) | ✅ (global) |
 | `GET /external-data/types` | Verfügbare Datentypen | — | — |
+| `GET /external-data/locations/search` | Orte für Wetterdaten suchen | ✅ | ✅ (Nominatim) |
+| `GET /external-data/locations` | Alle InfraNode-Orte auflisten | ✅ | — |
 
 ## Authentifizierung
 
@@ -24,6 +26,71 @@ Für Wetter-, Warn- und Luftqualitäts-Endpoints muss ein Standort angegeben wer
 - **`lat` + `lon`** — Koordinaten (Dezimalgrad). Für Open-Meteo Fallback.
 
 Mindestens eines von beiden muss angegeben werden.
+
+## Orts-Suche
+
+### `GET /external-data/locations/search`
+
+Sucht nach Orten für Wetterdaten. Kombiniert InfraNode-gestützte deutsche Städte mit weltweiten Orten über Nominatim-Geocoding.
+
+**Parameter:**
+- `q` (required) — Suchbigriff, mindestens 2 Zeichen
+
+**Antwort:**
+```json
+{
+  "data": [
+    {
+      "name": "Berlin",
+      "slug": "berlin",
+      "lat": 52.52,
+      "lon": 13.405,
+      "recommended": true,
+      "source": "infranode",
+      "state": "BE",
+      "population": 3782202
+    },
+    {
+      "name": "Paris, Île-de-France, Frankreich",
+      "slug": null,
+      "lat": 48.8566,
+      "lon": 2.3522,
+      "recommended": false,
+      "source": "nominatim",
+      "state": "Île-de-France",
+      "population": null
+    }
+  ]
+}
+```
+
+**Felder:**
+- `slug` — InfraNode-Slug für unterstützte deutsche Städte, `null` für weltweite Orte
+- `recommended` — `true` wenn InfraNode-gestützt (empfohlen für /external-data Endpunkte)
+- `source` — `infranode` oder `nominatim`
+- `state` — Bundesland (bei InfraNode) bzw. Staat/Region (bei Nominatim)
+- `population` — Einwohnerzahl (nur bei InfraNode)
+
+### `GET /external-data/locations`
+
+Gibt alle von InfraNode unterstützten deutschen Städte zurück.
+
+**Antwort:**
+```json
+{
+  "data": [
+    {
+      "name": "Berlin",
+      "slug": "berlin",
+      "lat": 52.52,
+      "lon": 13.405,
+      "state": "BE",
+      "population": 3782202,
+      "coverage": "full"
+    }
+  ]
+}
+```
 
 ## Datenfluss
 

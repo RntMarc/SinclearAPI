@@ -7,12 +7,14 @@ namespace Sinclear\Api\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Services\ExternalDataLocationService;
 use Sinclear\Api\Services\ExternalDataService;
 
 final readonly class ExternalDataController
 {
     public function __construct(
         private ExternalDataService $externalDataService,
+        private ExternalDataLocationService $locationService,
     ) {}
 
     public function weather(
@@ -110,5 +112,34 @@ final readonly class ExternalDataController
         $result = $this->externalDataService->getAvailableTypes();
 
         return ResponseFactory::json(['data' => $result], 200, $response);
+    }
+
+    public function searchLocations(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $params = $request->getQueryParams();
+        $query = trim((string) ($params['q'] ?? ''));
+
+        if (mb_strlen($query) < 2) {
+            return ResponseFactory::json(
+                ['error' => 'query_too_short', 'message' => 'Query must be at least 2 characters'],
+                400,
+                $response,
+            );
+        }
+
+        $result = $this->locationService->search($query);
+
+        return ResponseFactory::json($result, 200, $response);
+    }
+
+    public function listLocations(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $result = $this->locationService->listInfraNodeCities();
+
+        return ResponseFactory::json($result, 200, $response);
     }
 }
