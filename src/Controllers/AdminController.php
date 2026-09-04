@@ -136,6 +136,8 @@ final readonly class AdminController
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
+        // Regenerate session ID upon successful admin authentication to prevent session fixation attacks
+        session_regenerate_id(true);
         $_SESSION['admin_id'] = $user['id'];
         $_SESSION['admin_email'] = $user['email'];
 
