@@ -163,7 +163,16 @@ final readonly class ExternalDataLocationService
     }
 
     /**
-     * Search InfraNode cities by name (case-insensitive substring match).
+     * Search InfraNode cities by name or slug (case-insensitive).
+     *
+     * Priority order:
+     * 1. Exact slug match
+     * 2. Slug starts with query
+     * 3. Name starts with query
+     * 4. Slug contains query
+     * 5. Name contains query
+     *
+     * Within each tier, sorted by population (descending).
      *
      * @param list<array> $cities
      * @return list<array>
@@ -172,21 +181,40 @@ final readonly class ExternalDataLocationService
     {
         $cities = $this->fetchInfraNodeCities();
         $queryLower = mb_strtolower($query);
-        $results = [];
+
+        $exactSlug = [];
+        $slugPrefix = [];
+        $namePrefix = [];
+        $slugContains = [];
+        $nameContains = [];
 
         foreach ($cities as $city) {
             $name = mb_strtolower($city['name_de'] ?? '');
             $slug = mb_strtolower($city['slug'] ?? '');
 
-            if (str_contains($name, $queryLower) || str_contains($slug, $queryLower)) {
-                $results[] = $city;
+            if ($slug === $queryLower) {
+                $exactSlug[] = $city;
+            } elseif (str_starts_with($slug, $queryLower)) {
+                $slugPrefix[] = $city;
+            } elseif (str_starts_with($name, $queryLower)) {
+                $namePrefix[] = $city;
+            } elseif (str_contains($slug, $queryLower)) {
+                $slugContains[] = $city;
+            } elseif (str_contains($name, $queryLower)) {
+                $nameContains[] = $city;
             }
         }
 
-        // Sort by population (descending) for relevance
-        usort($results, static fn (array $a, array $b): int =>
-            ($b['population'] ?? 0) <=> ($a['population'] ?? 0)
-        );
+        $sortByPop = static fn (array $a, array $b): int =>
+            ($b['population'] ?? 0) <=> ($a['population'] ?? 0);
+
+        usort($exactSlug, $sortByPop);
+        usort($slugPrefix, $sortByPop);
+        usort($namePrefix, $sortByPop);
+        usort($slugContains, $sortByPop);
+        usort($nameContains, $sortByPop);
+
+        $results = array_merge($exactSlug, $slugPrefix, $namePrefix, $slugContains, $nameContains);
 
         return array_slice($results, 0, 10);
     }

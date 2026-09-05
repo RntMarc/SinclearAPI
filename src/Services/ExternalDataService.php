@@ -35,7 +35,7 @@ final readonly class ExternalDataService
     // Weather
     // =========================================================================
 
-    public function getWeather(string $citySlug, ?float $lat, ?float $lon): array
+    public function getWeather(?string $citySlug, ?float $lat, ?float $lon): array
     {
         $locationKey = $this->buildLocationKey($citySlug, $lat, $lon);
         $cached = $this->cacheRepo->find('weather', $locationKey);
@@ -66,7 +66,7 @@ final readonly class ExternalDataService
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
 
-    public function getWeatherWarnings(string $citySlug, ?float $lat, ?float $lon): array
+    public function getWeatherWarnings(?string $citySlug, ?float $lat, ?float $lon): array
     {
         $locationKey = $this->buildLocationKey($citySlug, $lat, $lon);
         $cached = $this->cacheRepo->find('weather_warnings', $locationKey);
@@ -86,7 +86,7 @@ final readonly class ExternalDataService
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
 
-    public function getPollenUv(string $citySlug, ?float $lat, ?float $lon): array
+    public function getPollenUv(?string $citySlug, ?float $lat, ?float $lon): array
     {
         $locationKey = $this->buildLocationKey($citySlug, $lat, $lon);
         $cached = $this->cacheRepo->find('pollen_uv', $locationKey);
@@ -120,7 +120,7 @@ final readonly class ExternalDataService
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
 
-    public function getAirQuality(string $citySlug, ?float $lat, ?float $lon): array
+    public function getAirQuality(?string $citySlug, ?float $lat, ?float $lon): array
     {
         $locationKey = $this->buildLocationKey($citySlug, $lat, $lon);
         $cached = $this->cacheRepo->find('air_quality', $locationKey);
@@ -187,8 +187,12 @@ final readonly class ExternalDataService
     // InfraNode Fetchers
     // =========================================================================
 
-    private function fetchWeatherFromInfraNode(string $citySlug): ?array
+    private function fetchWeatherFromInfraNode(?string $citySlug): ?array
     {
+        if ($citySlug === null || $citySlug === '') {
+            return null;
+        }
+
         try {
             $response = $this->httpClient->request(
                 'GET',
@@ -207,8 +211,12 @@ final readonly class ExternalDataService
         }
     }
 
-    private function fetchWeatherWarningsFromInfraNode(string $citySlug): ?array
+    private function fetchWeatherWarningsFromInfraNode(?string $citySlug): ?array
     {
+        if ($citySlug === null || $citySlug === '') {
+            return null;
+        }
+
         try {
             $response = $this->httpClient->request(
                 'GET',
@@ -227,8 +235,12 @@ final readonly class ExternalDataService
         }
     }
 
-    private function fetchPollenUvFromInfraNode(string $citySlug): ?array
+    private function fetchPollenUvFromInfraNode(?string $citySlug): ?array
     {
+        if ($citySlug === null || $citySlug === '') {
+            return null;
+        }
+
         try {
             $response = $this->httpClient->request(
                 'GET',
@@ -247,8 +259,12 @@ final readonly class ExternalDataService
         }
     }
 
-    private function fetchAirQualityFromInfraNode(string $citySlug): ?array
+    private function fetchAirQualityFromInfraNode(?string $citySlug): ?array
     {
+        if ($citySlug === null || $citySlug === '') {
+            return null;
+        }
+
         try {
             $response = $this->httpClient->request(
                 'GET',
