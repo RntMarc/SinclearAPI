@@ -127,6 +127,10 @@
                 </label>
             </div>
         </div>
+        <div class="form-group">
+            <label for="newAccCitySlug">City-Slug (optional)</label>
+            <input type="text" id="newAccCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
+        </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-success">Erstellen</button>
             <button type="button" class="btn" onclick="hideCreateAccommodationForm()">Abbrechen</button>
@@ -182,6 +186,10 @@
                     Ist ein Hotel
                 </label>
             </div>
+        </div>
+        <div class="form-group">
+            <label for="editAccCitySlug">City-Slug (optional)</label>
+            <input type="text" id="editAccCitySlug" name="citySlug" placeholder="z. B. berlin, muenchen">
         </div>
         <div class="flex" style="gap:0.5rem;">
             <button type="submit" class="btn btn-primary">Speichern</button>
@@ -414,6 +422,7 @@
             longitude: document.getElementById('newAccLongitude').value.trim() || null,
             OSMID: document.getElementById('newAccOSMID').value.trim() || null,
             ishotel: document.getElementById('newAccIshotel').checked ? 1 : 0,
+            citySlug: document.getElementById('newAccCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
 
@@ -430,7 +439,7 @@
         } catch (e) { showToast('Fehler beim Erstellen', 'error'); }
     }
 
-    function editAccommodation(id, name, description, address, phone, mail, latitude, longitude, OSMID, ishotel) {
+    function editAccommodation(id, name, description, address, phone, mail, latitude, longitude, OSMID, ishotel, citySlug) {
         document.getElementById('editAccId').value = id;
         document.getElementById('editAccName').value = name;
         document.getElementById('editAccDescription').value = description;
@@ -441,6 +450,7 @@
         document.getElementById('editAccLongitude').value = longitude || '';
         document.getElementById('editAccOSMID').value = OSMID || '';
         document.getElementById('editAccIshotel').checked = ishotel == 1;
+        document.getElementById('editAccCitySlug').value = citySlug || '';
         showEditAccommodationForm();
     }
 
@@ -457,6 +467,7 @@
             longitude: document.getElementById('editAccLongitude').value.trim() || null,
             OSMID: document.getElementById('editAccOSMID').value.trim() || null,
             ishotel: document.getElementById('editAccIshotel').checked ? 1 : 0,
+            citySlug: document.getElementById('editAccCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
 

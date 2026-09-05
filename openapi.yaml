@@ -1036,13 +1036,6 @@ components:
           format: uuid
           nullable: true
           description: ID des zugehörigen Gruppenchats (falls vorhanden)
-        citySlug:
-          type: string
-          nullable: true
-          description: >
-            InfraNode-Stadt-Slug für externe Datenabfragen (z.B. "berlin",
-            "muenchen"). NULL = kein unterstützter Slug (Ausland, unbekannte Stadt).
-            Clients können diesen Wert direkt für `/external-data/weather` etc. nutzen.
 
     TravelTripListResponse:
       type: object
@@ -1217,6 +1210,13 @@ components:
         ishotel:
           type: integer
           description: '1 = Hotel, 0 = andere Unterkunft'
+        citySlug:
+          type: string
+          nullable: true
+          description: >
+            InfraNode-Stadt-Slug für externe Datenabfragen (z.B. "berlin",
+            "muenchen"). NULL = kein unterstützter Slug (Ausland, unbekannte Stadt).
+            Clients können diesen Wert direkt für `/external-data/weather` etc. nutzen.
         users:
           type: array
           description: Nutzer, die dieser Unterkunft zugeordnet sind (über TravelRelation)

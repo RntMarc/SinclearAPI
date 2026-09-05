@@ -72,8 +72,8 @@ final readonly class TravelTripRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelTrip (id, name, description, start, end, hastickets, ticket, ticketUrl, forumId, citySlug)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelTrip (id, name, description, start, end, hastickets, ticket, ticketUrl, forumId)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -85,7 +85,6 @@ final readonly class TravelTripRepository
             $data['ticket'] ?? null,
             $data['ticketUrl'] ?? null,
             $data['forumId'] ?? null,
-            $data['citySlug'] ?? null,
         ]);
         return $id;
     }
@@ -95,7 +94,7 @@ final readonly class TravelTripRepository
         $sets = [];
         $values = [];
 
-        foreach (['name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'forumId', 'citySlug'] as $field) {
+        foreach (['name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'forumId'] as $field) {
             if (array_key_exists($field, $data)) {
                 $sets[] = "$field = ?";
                 $values[] = $data[$field];

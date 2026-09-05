@@ -255,7 +255,7 @@ ROW;
                 <td>{$start} – {$end}</td>
                 <td>{$hastickets}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['start']}', '{$t['end']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`, `{$t['citySlug']}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['start']}', '{$t['end']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`)">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteTrip('{$id}', '{$name}')">Löschen</button>
                 </td>
             </tr>
@@ -358,8 +358,6 @@ ROW;
                 ? trim($body['ticket']) : null,
             'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
                 ? trim($body['ticketUrl']) : null,
-            'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
-                ? trim($body['citySlug']) : null,
         ]);
 
         $trip = $this->tripRepo->findById($id);
@@ -405,10 +403,6 @@ ROW;
         if (isset($body['ticketUrl'])) {
             $data['ticketUrl'] = is_string($body['ticketUrl'])
                 ? trim($body['ticketUrl']) : null;
-        }
-        if (isset($body['citySlug'])) {
-            $data['citySlug'] = is_string($body['citySlug'])
-                ? trim($body['citySlug']) : null;
         }
 
         if ($data === []) {
@@ -927,7 +921,7 @@ ROW;
                 <td>{$aIshotel}</td>
                 <td>{$aContact}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editAccommodation('{$aId}', `{$aName}`, `{$a['description']}`, `{$aAddress}`, '{$aPhone}', '{$aMail}', '{$a['latitude']}', '{$a['longitude']}', '{$a['OSMID']}', '{$a['ishotel']}')">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editAccommodation('{$aId}', `{$aName}`, `{$a['description']}`, `{$aAddress}`, '{$aPhone}', '{$aMail}', '{$a['latitude']}', '{$a['longitude']}', '{$a['OSMID']}', '{$a['ishotel']}', `{$a['citySlug']}`)">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteAccommodation('{$aId}', '{$aName}')">Löschen</button>
                 </td>
             </tr>
@@ -1213,6 +1207,8 @@ HTML;
             'mail' => isset($body['mail']) && is_string($body['mail'])
                 ? trim($body['mail']) : null,
             'ishotel' => !empty($body['ishotel']) ? 1 : 0,
+            'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
+                ? trim($body['citySlug']) : null,
         ]);
 
         $accommodation = $this->accommodationRepo->findById($id);
@@ -1256,6 +1252,10 @@ HTML;
         }
         if (isset($body['ishotel'])) {
             $data['ishotel'] = !empty($body['ishotel']) ? 1 : 0;
+        }
+        if (isset($body['citySlug'])) {
+            $data['citySlug'] = is_string($body['citySlug'])
+                ? trim($body['citySlug']) : null;
         }
 
         if ($data === []) {
@@ -2820,7 +2820,6 @@ ROW;
             'hastickets' => 'Ticket-Status',
             'ticket' => 'Ticket-Informationen',
             'ticketUrl' => 'Ticket-URL',
-            'citySlug' => 'City-Slug',
         ];
 
         $changed = [];

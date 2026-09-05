@@ -10,10 +10,10 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 
 | Tabelle | Beschreibung |
 |---------|-------------|
-| `TravelTrip` | Reisedaten (Name, Beschreibung, Zeitraum, citySlug) |
+| `TravelTrip` | Reisedaten (Name, Beschreibung, Zeitraum) |
 | `TravelEvent` | Ereignisse (Reise-Events + Standalone-Events via `trip IS NULL`, citySlug) |
 | `TravelEventTicket` | Tickets für Reisen, Events oder persönliche Nutzer-Tickets |
-| `TravelAccommodation` | Unterkünfte (Hotels, Ferienwohnungen, etc.) |
+| `TravelAccommodation` | Unterkünfte (Hotels, Ferienwohnungen, etc., citySlug) |
 | `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften |
 | `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone) |
 | `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
@@ -220,18 +220,19 @@ Die Response von `GET /trips` und `GET /trips/{id}` enthält zusätzliche Felder
 | `forumId` | string\|null | ID des verknüpften Forums (falls vorhanden) |
 | `forum` | object\|null | Kurzinfo des verknüpften Forums (`id`, `name`, `description`, `image`) |
 | `subscriptionCount` | integer | Anzahl der mit dieser Reise verknüpften Abos |
-| `citySlug` | string\|null | InfraNode-Stadt-Slug für externe Datenabfragen (z.B. `"berlin"`) |
 
 ## City-Slug (Externe Daten)
 
-Jede Reise und jedes Event kann optional einen `citySlug` speichern.
+Jede Unterkunft und jedes Event kann optional einen `citySlug` speichern.
 Der Slug entspricht dem InfraNode-Stadt-Slug (z.B. `berlin`, `muenchen`)
 und ermöglicht es Clients, direkt die passenden externen Daten
 (Wetter, Luftqualität etc.) über `/external-data/weather?city_slug=<slug>` abzufragen.
 
-- **Vergeben:** Über Admin Dashboard beim Erstellen/Bearbeiten von Reisen und Events
+- **Unterkünfte:** Jede Unterkunft hat ihren eigenen Slug (unterschiedliche Städte pro Mitreisendem möglich)
+- **Events:** Events haben ihren eigenen Slug (z.B. bei mehrtägigen Reisen mit Städtewechsel)
+- **Reisen:** Reisen haben keinen Slug (da Unterkünfte in verschiedenen Städten liegen können)
 - **NULL:** Kein unterstützter Slug (Ausland, unbekannte Stadt) – Clients müssen Koordinaten verwenden
-- **Konsistenz:** Ein Event innerhalb einer Reise kann einen abweichenden Slug haben (z.B. bei mehrtägigen Reisen mit Städtewechsel)
+- **Vergeben:** Über Admin Dashboard beim Erstellen/Bearbeiten von Unterkünften und Events
 
 ## Unified Event Endpoint
 
