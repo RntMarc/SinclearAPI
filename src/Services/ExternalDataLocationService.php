@@ -36,11 +36,10 @@ final readonly class ExternalDataLocationService
     /**
      * Search for weather locations by query string.
      *
-     * Returns a unified list of:
-     * - InfraNode supported cities (recommended: true, slug provided)
-     * - Nominatim geocoding results (recommended: false, slug null)
+     * Uses Nominatim for global geocoding. Results matching InfraNode-supported
+     * cities (via OSM relation ID mapping) get the InfraNode slug and recommended=true.
      *
-     * @return array{data: list<array{name: string, slug: ?string, lat: float, lon: float, recommended: bool, source: string, state: ?string, population: ?int}>}
+     * @return array{data: list<array{name: string, slug: ?string, lat: float, lon: float, recommended: bool, source: string, state: ?string, population: ?int, osm_id: ?int, osm_type: ?string}>}
      */
     public function search(string $query): array
     {
@@ -50,35 +49,39 @@ final readonly class ExternalDataLocationService
             return ['data' => []];
         }
 
-        $results = [];
+        // Load OSM-to-slug mapping
+        $osmToSlugMap = $this->loadOsmToSlugMapping();
 
-        // 1. Search InfraNode cities (recommended, with slug)
-        $infranodeResults = $this->searchInfraNodeCities($query);
-        foreach ($infranodeResults as $city) {
-            $results[] = [
-                'name' => $city['name_de'],
-                'slug' => $city['slug'],
-                'lat' => $city['geo']['lat'],
-                'lon' => $city['geo']['lon'],
-                'recommended' => true,
-                'source' => 'infranode',
-                'state' => $city['state'] ?? null,
-                'population' => $city['population'] ?? null,
-            ];
-        }
-
-        // 2. Search Nominatim for geocoding (arbitrary worldwide locations)
+        // Search Nominatim (global coverage, returns OSM IDs)
         $nominatimResults = $this->searchNominatim($query);
+
+        $results = [];
         foreach ($nominatimResults as $place) {
+            $osmId = $place['osm_id'] ?? null;
+            $osmType = $place['osm_type'] ?? null;
+
+            // Check if this is a relation (type 'R') that matches an InfraNode city
+            $slug = null;
+            $recommended = false;
+            $source = 'nominatim';
+
+            if ($osmType === 'R' && $osmId !== null && isset($osmToSlugMap[$osmId])) {
+                $slug = $osmToSlugMap[$osmId];
+                $recommended = true;
+                $source = 'infranode';
+            }
+
             $results[] = [
                 'name' => $place['display_name'],
-                'slug' => null,
+                'slug' => $slug,
                 'lat' => (float) $place['lat'],
                 'lon' => (float) $place['lon'],
-                'recommended' => false,
-                'source' => 'nominatim',
+                'recommended' => $recommended,
+                'source' => $source,
                 'state' => $place['state'] ?? null,
                 'population' => null,
+                'osm_id' => $osmId,
+                'osm_type' => $osmType,
             ];
         }
 
@@ -86,6 +89,23 @@ final readonly class ExternalDataLocationService
         $results = array_slice($results, 0, self::MAX_RESULTS);
 
         return ['data' => $results];
+    }
+
+    /**
+     * Load OSM relation ID to InfraNode slug mapping.
+     *
+     * @return array<int, string>
+     */
+    private function loadOsmToSlugMapping(): array
+    {
+        $mappingPath = __DIR__ . '/../../config/infranode_osm_mapping.php';
+        if (is_file($mappingPath)) {
+            $mapping = require $mappingPath;
+            if (is_array($mapping)) {
+                return $mapping;
+            }
+        }
+        return [];
     }
 
     /**
@@ -162,63 +182,6 @@ final readonly class ExternalDataLocationService
         }
     }
 
-    /**
-     * Search InfraNode cities by name or slug (case-insensitive).
-     *
-     * Priority order:
-     * 1. Exact slug match
-     * 2. Slug starts with query
-     * 3. Name starts with query
-     * 4. Slug contains query
-     * 5. Name contains query
-     *
-     * Within each tier, sorted by population (descending).
-     *
-     * @param list<array> $cities
-     * @return list<array>
-     */
-    private function searchInfraNodeCities(string $query): array
-    {
-        $cities = $this->fetchInfraNodeCities();
-        $queryLower = mb_strtolower($query);
-
-        $exactSlug = [];
-        $slugPrefix = [];
-        $namePrefix = [];
-        $slugContains = [];
-        $nameContains = [];
-
-        foreach ($cities as $city) {
-            $name = mb_strtolower($city['name_de'] ?? '');
-            $slug = mb_strtolower($city['slug'] ?? '');
-
-            if ($slug === $queryLower) {
-                $exactSlug[] = $city;
-            } elseif (str_starts_with($slug, $queryLower)) {
-                $slugPrefix[] = $city;
-            } elseif (str_starts_with($name, $queryLower)) {
-                $namePrefix[] = $city;
-            } elseif (str_contains($slug, $queryLower)) {
-                $slugContains[] = $city;
-            } elseif (str_contains($name, $queryLower)) {
-                $nameContains[] = $city;
-            }
-        }
-
-        $sortByPop = static fn (array $a, array $b): int =>
-            ($b['population'] ?? 0) <=> ($a['population'] ?? 0);
-
-        usort($exactSlug, $sortByPop);
-        usort($slugPrefix, $sortByPop);
-        usort($namePrefix, $sortByPop);
-        usort($slugContains, $sortByPop);
-        usort($nameContains, $sortByPop);
-
-        $results = array_merge($exactSlug, $slugPrefix, $namePrefix, $slugContains, $nameContains);
-
-        return array_slice($results, 0, 10);
-    }
-
     private function getInfraNodeCachePath(): string
     {
         return __DIR__ . '/../../var/cache/infranode/cities.json';
@@ -231,7 +194,7 @@ final readonly class ExternalDataLocationService
     /**
      * Search Nominatim for geocoding results.
      *
-     * @return list<array{display_name: string, lat: string, lon: string, state: ?string}>
+     * @return list<array{display_name: string, lat: string, lon: string, state: ?string, osm_id: ?int, osm_type: ?string}>
      */
     private function searchNominatim(string $query): array
     {
@@ -250,6 +213,7 @@ final readonly class ExternalDataLocationService
                     'format' => 'json',
                     'limit' => 10,
                     'addressdetails' => 1,
+                    'extratags' => 1,
                 ],
                 'headers' => [
                     'Accept-Language' => 'de,en',
@@ -263,7 +227,7 @@ final readonly class ExternalDataLocationService
                 return [];
             }
 
-            // Normalize results
+            // Normalize results - include OSM ID and type for mapping
             $normalized = [];
             foreach ($results as $item) {
                 $normalized[] = [
@@ -271,6 +235,8 @@ final readonly class ExternalDataLocationService
                     'lat' => $item['lat'] ?? '0',
                     'lon' => $item['lon'] ?? '0',
                     'state' => $item['address']['state'] ?? null,
+                    'osm_id' => isset($item['osm_id']) ? (int) $item['osm_id'] : null,
+                    'osm_type' => $item['osm_type'] ?? null,
                 ];
             }
 
