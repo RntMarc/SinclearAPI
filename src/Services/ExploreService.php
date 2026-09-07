@@ -91,6 +91,8 @@ final readonly class ExploreService
         error_log('  lat: ' . ($osmData['lat'] ?? 'FEHLT'));
         error_log('  lon: ' . ($osmData['lon'] ?? 'FEHLT'));
         error_log('  display_name: ' . ($osmData['display_name'] ?? 'FEHLT'));
+        error_log('  category: ' . ($osmData['category'] ?? 'FEHLT'));
+        error_log('  type: ' . ($osmData['type'] ?? 'FEHLT'));
         error_log('  extratags.phone: ' . ($extratags['phone'] ?? 'FEHLT'));
         error_log('  extratags.website: ' . ($extratags['website'] ?? 'FEHLT'));
         error_log('  extratags.url: ' . ($extratags['url'] ?? 'FEHLT'));
@@ -145,12 +147,14 @@ final readonly class ExploreService
         $osmType = $osmData['osm_type'] ?? '';
         $category = $osmData['category'] ?? '';
 
-        $amenity = $tags['amenity'] ?? $category;
+        $amenity = $tags['amenity'] ?? $osmData['type'] ?? $osmData['amenity'] ?? $category;
         $cuisine = $tags['cuisine'] ?? '';
         $shop = $tags['shop'] ?? '';
         $leisure = $tags['leisure'] ?? '';
         $tourism = $tags['tourism'] ?? '';
         $historic = $tags['historic'] ?? '';
+
+        error_log('[CATEGORY] amenity=' . $amenity . ' cuisine=' . $cuisine . ' shop=' . $shop . ' leisure=' . $leisure . ' tourism=' . $tourism . ' historic=' . $historic);
 
         if ($cuisine !== '') {
             return 'gastronomy';
