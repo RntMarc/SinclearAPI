@@ -4909,6 +4909,142 @@ components:
           type: boolean
           description: True = tippt, False = nicht mehr tippend
 
+    ExternalDataWeatherResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          description: Wetterdaten
+          properties:
+            current:
+              $ref: '#/components/schemas/ExternalDataWeatherCurrent'
+            hourly:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExternalDataWeatherHourly'
+            daily:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExternalDataWeatherDaily'
+            _attribution:
+              type: object
+              description: Quellen-Angabe
+              properties:
+                text:
+                  type: string
+                url:
+                  type: string
+        meta:
+          $ref: '#/components/schemas/ExternalDataResponseMeta'
+
+    ExternalDataWarningsResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          description: Wetterwarnungen
+          properties:
+            warnings:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExternalDataWarning'
+            max_level:
+              type: integer
+        meta:
+          $ref: '#/components/schemas/ExternalDataResponseMeta'
+
+    ExternalDataPollenUvResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          description: Pollenbelastung und UV-Index
+          properties:
+            pollen:
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/ExternalDataPollen'
+            uv_index:
+              type: number
+              format: float
+              nullable: true
+            region_name:
+              type: string
+              nullable: true
+            _attribution:
+              type: object
+              description: Quellen-Angabe
+              properties:
+                text:
+                  type: string
+                url:
+                  type: string
+        meta:
+          $ref: '#/components/schemas/ExternalDataResponseMeta'
+
+    ExternalDataAirQualityResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          $ref: '#/components/schemas/ExternalDataAirQuality'
+        meta:
+          $ref: '#/components/schemas/ExternalDataResponseMeta'
+
+    ExternalDataResponseMeta:
+      type: object
+      required: [source, data_type, available_sections, missing_sections, retrieved_at]
+      properties:
+        source:
+          type: string
+          enum: [infranode, open-meteo, mixed, cache]
+          nullable: true
+          description: Datenquelle
+        data_type:
+          type: string
+          description: Art der Daten (weather, weather_warnings, pollen_uv, air_quality)
+        city_slug:
+          type: string
+          nullable: true
+          description: Übergebener City-Slug (null bei Koordinaten-Abfrage)
+        coordinates:
+          type: object
+          nullable: true
+          properties:
+            lat:
+              type: number
+              format: float
+            lon:
+              type: number
+              format: float
+        available_sections:
+          type: array
+          items:
+            type: string
+          description: Verfügbare Abschnitte der Antwort
+        missing_sections:
+          type: array
+          items:
+            type: string
+          description: Fehlende Abschnitte (nicht von Quelle geliefert)
+        cached_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Zeitpunkt des Cache-Eintrags (nur bei Cache-Treffer)
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ablaufzeit des Cache-Eintrags (nur bei Cache-Treffer)
+        retrieved_at:
+          type: string
+          format: date-time
+          description: Zeitpunkt der Datenabfrage (UTC)
+
     ExternalDataResponse:
       type: object
       required: [data, meta]
@@ -15962,7 +16098,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExternalDataResponse'
+                $ref: '#/components/schemas/ExternalDataWeatherResponse'
         '400':
           description: Kein Standort angegeben
           content:
@@ -16007,7 +16143,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExternalDataResponse'
+                $ref: '#/components/schemas/ExternalDataWarningsResponse'
         '400':
           description: Kein Standort angegeben
           content:
@@ -16052,7 +16188,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExternalDataResponse'
+                $ref: '#/components/schemas/ExternalDataPollenUvResponse'
         '400':
           description: Kein Standort angegeben
           content:
@@ -16097,7 +16233,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExternalDataResponse'
+                $ref: '#/components/schemas/ExternalDataAirQualityResponse'
         '400':
           description: Kein Standort angegeben
           content:

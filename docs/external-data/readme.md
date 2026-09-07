@@ -133,6 +133,28 @@ Cache-Einträge laufen nach Ablauf automatisch ab und werden durch den Cron-Job 
 
 Die API liefert immer die bestmögliche Antwort. Fehlende Abschnitte werden in `meta.missing_sections` aufgelistet, aber **nie** als `null` im `data`-Objekt zurückgegeben. Fehlende Felder werden einfach weggelassen.
 
+## Datenquelle (source)
+
+Jede Antwort enthält in `meta.source` die Information, welche Quelle die Daten liefert:
+
+| `meta.source` | Beschreibung |
+|---------------|--------------|
+| `infranode` | Daten ausschließlich von InfraNode (deutsche Städte) |
+| `open-meteo` | Daten ausschließlich von Open-Meteo (global) |
+| `mixed` | InfraNode + Open-Meteo kombiniert |
+| `cache` | Gecachte Antwort aus der Datenbank |
+
+Zusätzlich enthält `data._attribution` (sofern vorhanden) die Quellen-Angabe des Providers:
+
+```json
+{
+  "_attribution": {
+    "text": "Open-Meteo (open-meteo.com) — Non-commercial use",
+    "url": "https://open-meteo.com/en/docs"
+  }
+}
+```
+
 Beispiel bei fehlenden Pollen-Daten:
 ```json
 {

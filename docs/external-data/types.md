@@ -46,6 +46,7 @@ Gibt eine Übersicht aller unterstützten external-data Datentypen zurück.
 ### `weather`
 - **Abschnitte:** `current` (aktuell), `hourly` (stündlich), `daily` (täglich)
 - **Quellen:** InfraNode (DE), Open-Meteo (global)
+- **Quellen-Info:** `meta.source` zeigt die verwendete Quelle an
 - **Beispiel:** `GET /external-data/weather?city_slug=berlin`
 
 ### `weather_warnings`
