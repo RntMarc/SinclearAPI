@@ -237,6 +237,47 @@ final readonly class ExploreService
         return $result;
     }
 
+    public function previewCategory(int $osmId, string $osmType): array
+    {
+        $osmData = $this->fetchOsmData($osmId, $osmType);
+        $category = $this->determineCategory($osmData);
+        $cuisine = $osmData['extratags']['cuisine'] ?? null;
+
+        return [
+            'category' => $category,
+            'cuisine' => $cuisine,
+            'name' => $osmData['name'] ?? null,
+        ];
+    }
+
+    public function searchOsm(string $query, int $limit = 5): array
+    {
+        $this->rateLimiter->waitForSlot();
+
+        $response = $this->nominatimRequest('GET', self::NOMINATIM_BASE . '/search', [
+            'query' => [
+                'q' => $query,
+                'format' => 'json',
+                'limit' => min(10, max(1, $limit)),
+                'addressdetails' => 1,
+            ],
+        ]);
+
+        $data = json_decode((string) $response->getBody(), true);
+
+        if (!is_array($data)) {
+            return [];
+        }
+
+        return array_map(fn(array $item) => [
+            'osmId' => (int) $item['osm_id'],
+            'osmType' => strtoupper($item['osm_type']),
+            'name' => $item['display_name'] ?? '',
+            'lat' => (float) $item['lat'],
+            'lon' => (float) $item['lon'],
+        ], $data);
+    }
+
     public function createPlace(int $osmId, string $osmType, string $userId): array
     {
         $existing = $this->placeRepo->findByOsmId($osmId, $osmType);

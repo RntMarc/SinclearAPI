@@ -17,9 +17,10 @@ mit **OpenStreetMap** (Nominatim), um Ortsdaten automatisch abzurufen.
 
 ## Create-Flow (Ort anlegen)
 
-Der Benutzer sucht den Ort zunächst selbstständig über den Nominatim-Dienst
-(z. B. via Client-seitiger Suche). Der Client sendet dann die OSM-ID und den
-OSM-Typ an die API, die daraufhin die Detaildaten von Nominatim abruft.
+Der Benutzer sucht den Ort über den API-Endpunkt `/explore/search`.
+Optional kann vorab die Kategorie über `/explore/preview-category` abgefragt werden.
+Der Client sendet dann die OSM-ID und den OSM-Typ an die API, die daraufhin
+die Detaildaten von Nominatim abruft.
 
 ```mermaid
 sequenceDiagram
@@ -28,10 +29,18 @@ sequenceDiagram
     participant Nominatim
     participant DB
 
-    Client->>Nominatim: GET /search?q=Restaurant+Berlin
-    Nominatim-->>Client: [{osm_id, osm_type, display_name, ...}]
+    Client->>API: GET /explore/search?q=Restaurant+Berlin
+    API-->>Client: [{ id, osmId, osmType, name, ... }]
 
     Note over Client: Nutzer wählt Ort aus
+
+    Client->>API: POST /explore/preview-category { osmId, osmType }
+    API->>Nominatim: GET /lookup?osm_ids=N12345&extratags=1
+    Nominatim-->>API: { name, lat, lon, address, extratags }
+    API->>API: Kategorie ableiten (gastronomy / leisure)
+    API-->>Client: { category, cuisine, name }
+
+    Note over Client: Nutzer bestätigt
 
     Client->>API: POST /explore { osmId, osmType }
     API->>Nominatim: GET /lookup?osm_ids=N12345&extratags=1
@@ -152,6 +161,11 @@ GET /explore?mine=true&category=gastronomy&sort=rating_desc
 
 ### Nutzung
 
+> **Wichtig:** Clients dürfen Nominatim **nicht** direkt aufrufen. Alle
+> OSM-Datenabfragen laufen über die API (Suche, Lookup, Geocoding).
+> Dies gewährleistet Caching, konsistente Kategoriezuordnung und
+> verhindert Datenmanipulation durch Clients.
+
 - **Endpunkt:** `https://nominatim.openstreetmap.org`
 - **Lookup:** `/lookup?osm_ids=N12345&format=json&addressdetails=1&extratags=1`
 - **Geocode:** `/search?q=Berlin&format=json&limit=1`
@@ -212,26 +226,16 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 
 ## API-Endpunkte
 
-### Öffentliche Endpunkte (ohne Authentifizierung)
-
-Lesende Grunddaten sind über dedizierte öffentliche Endpunkte ohne Login erreichbar.
-Sie nutzen `auth.optional`: Wird ein gültiges JWT mitgesendet, werden alle Felder geliefert.
-
-| Methode | Pfad | Auth | Beschreibung |
-|---------|------|------|-------------|
-| `GET` | `/public/explore` | Optional | Paginierte Liste — ohne Auth: `creatorId` ausgeblendet |
-| `GET` | `/public/explore/search` | Optional | Suche + Umkreissuche — ohne Auth: `creatorId` ausgeblendet |
-| `GET` | `/public/explore/random` | Optional | Zufällige Orte (optional nach Kategorie) — ohne Auth: `creatorId` ausgeblendet |
-| `GET` | `/public/explore/{id}` | Optional | Detailansicht — ohne Auth: `creatorId` ausgeblendet |
-
-### Private Endpunkte (JWT erforderlich)
+Alle Endpunkte erfordern Authentifizierung (JWT), sofern nicht anders angegeben.
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
 | `GET` | `/explore` | JWT | Paginierte Liste (optional mit `sort`, `cuisine`, `mine`) |
-| `POST` | `/explore` | JWT | Neuen Ort anlegen |
 | `GET` | `/explore/search` | JWT | Suche + Umkreissuche |
 | `GET` | `/explore/random` | JWT | Zufällige Orte (optional nach Kategorie) |
+| `GET` | `/explore/osm-search` | JWT | OSM-Orte durchsuchen (für das Anlegen neuer Orte) |
+| `POST` | `/explore/preview-category` | JWT | Kategorie-Vorschau für OSM-Ort (vor dem Anlegen) |
+| `POST` | `/explore` | JWT | Neuen Ort anlegen |
 | `GET` | `/explore/bookmarks` | JWT | Eigene Lesezeichen (paginated) |
 | `GET` | `/explore/{id}` | JWT | Detailansicht |
 | `PUT` | `/explore/{id}` | JWT | OSM-Refresh |
@@ -251,21 +255,26 @@ Sie nutzen `auth.optional`: Wird ein gültiges JWT mitgesendet, werden alle Feld
 | `GET` | `/explore/submissions/{id}` | JWT | Details einer eigenen Einreichung |
 | `PUT` | `/explore/submissions/{id}` | JWT | Eigene pending-Einreichung bearbeiten |
 
-## Öffentlicher Zugriff (ohne Authentifizierung)
+### Kategorie-Vorschau (Preview)
 
-Die privaten lesenden Endpunkte (`GET /explore`, `GET /explore/search`,
-`GET /explore/random`, `GET /explore/{id}`, `GET /explore/{placeId}/reviews`)
-erfordern ein gültiges JWT.
+Der Endpunkt `POST /explore/preview-category` erlaubt es dem Client, die
+voraussichtliche Kategorie eines OSM-Ortes abzufragen, ohne diesen anzulegen.
+Dies ist nützlich für die Vorschau im Client-Flow.
 
-Für Gäste ohne Login stehen die öffentlichen Endpunkte unter `/public/explore`
-bereit (Liste, Suche, Zufall, Details). Sie nutzen die `auth.optional` Middleware:
-Wenn ein gültiger JWT übergeben wird, werden alle Felder zurückgegeben.
-Ohne Token werden folgende sensible Felder ausgeblendet:
-
-- **Orte:** `creatorId` wird nicht zurückgegeben
-
-Dies schützt die Privatsphäre der Nutzer, während die Inhalte für alle sichtbar
-bleiben. Bewertungen sind nur für angemeldete Nutzer einsehbar.
+```json
+POST /explore/preview-category
+{
+    "osmId": 123456789,
+    "osmType": "N"
+}
+→ 200 {
+    "data": {
+        "category": "gastronomy",
+        "cuisine": "italian",
+        "name": "Restaurant Beispiel"
+    }
+}
+```
 
 ## Manuelle Ort-Einreichung (Missing Place)
 

@@ -7054,226 +7054,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /public/explore:
-    get:
-      summary: Orte auflisten (öffentlich)
-      description: >
-        Öffentlicher Endpunkt ohne Authentifizierung. Gibt eine paginierte Liste
-        aller Entdecken-Orte zurück. Optional filterbar nach Kategorie.
-        Für anonyme Nutzer wird das Feld creatorId ausgeblendet. Mit gültigem
-        JWT (Bearer-Header) werden alle Felder geliefert.
-      tags: [Explore]
-      security: []
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-          description: Seitennummer
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-            maximum: 100
-          description: Einträge pro Seite
-        - name: category
-          in: query
-          schema:
-            type: string
-            enum: [gastronomy, leisure]
-          description: Filter nach Kategorie
-        - name: mine
-          in: query
-          schema:
-            type: boolean
-          description: >
-            Filtert auf nur eigene Orte (creatorId des authentifizierten Nutzers).
-            Ohne gültiges JWT wird dieser Parameter ignoriert.
-      responses:
-        '200':
-          description: Liste der Orte
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExploreListResponse'
-        '400':
-          description: Ungültige Parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /public/explore/search:
-    get:
-      summary: Orte durchsuchen (öffentlich)
-      description: >
-        Öffentlicher Endpunkt ohne Authentifizierung. Durchsucht die
-        Entdecken-Orte nach Namen, Kategorie, Küche oder geografischer Lage.
-        Für anonyme Nutzer wird das Feld creatorId ausgeblendet. Mit gültigem
-        JWT (Bearer-Header) werden alle Felder geliefert.
-      tags: [Explore]
-      security: []
-      parameters:
-        - name: q
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Volltextsuche im Namen
-        - name: category
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [gastronomy, leisure]
-        - name: cuisine
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Küchen-Typ (nur bei Gastronomie)
-        - name: sort
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [name_asc, name_desc, created_asc, created_desc, rating_asc, rating_desc]
-          description: Sortierung der Ergebnisse
-        - name: city
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Filtert nach Stadt (LIKE-Suche in der address-Spalte)
-        - name: lat
-          in: query
-          required: false
-          schema:
-            type: number
-            format: float
-          description: Breitengrad für Umkreissuche
-        - name: lon
-          in: query
-          required: false
-          schema:
-            type: number
-            format: float
-          description: Längengrad für Umkreissuche
-        - name: radius
-          in: query
-          required: false
-          schema:
-            type: number
-            format: float
-            default: 10
-          description: Suchradius in Kilometern (nur mit lat/lon)
-        - name: location
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Ortsname, der über Nominatim geocoded wird
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 1
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 20
-            minimum: 1
-            maximum: 100
-      responses:
-        '200':
-          description: Suchergebnisse
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExploreListResponse'
-        '400':
-          description: Ungültige Parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /public/explore/random:
-    get:
-      summary: Zufällige Orte abrufen (öffentlich)
-      description: >
-        Öffentlicher Endpunkt ohne Authentifizierung. Gibt eine Liste
-        zufälliger Entdecken-Orte zurück. Optional filterbar nach Kategorie.
-        Für anonyme Nutzer wird das Feld creatorId ausgeblendet.
-      tags: [Explore]
-      security: []
-      parameters:
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            default: 20
-            minimum: 1
-            maximum: 100
-        - name: category
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [gastronomy, leisure]
-          description: Filter nach Kategorie
-      responses:
-        '200':
-          description: Liste zufälliger Orte
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExploreListResponse'
-        '400':
-          description: Ungültige Kategorie
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /public/explore/{id}:
-    get:
-      summary: Ortsdetails abrufen (öffentlich)
-      description: >
-        Öffentlicher Endpunkt ohne Authentifizierung. Gibt die Detaildaten eines
-        einzelnen Entdecken-Ortes zurück. Für anonyme Nutzer wird das Feld
-        creatorId ausgeblendet. Mit gültigem JWT (Bearer-Header) werden alle
-        Felder geliefert.
-      tags: [Explore]
-      security: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: ID des Ortes
-      responses:
-        '200':
-          description: Detaildaten des Ortes
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExploreDetailResponse'
-        '404':
-          description: Ort nicht gefunden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
   /explore:
     get:
       summary: Orte auflisten
@@ -7341,6 +7121,128 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           description: Nicht autorisiert (fehlender oder ungültiger Token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/osm-search:
+    get:
+      summary: OSM-Orte durchsuchen (für das Anlegen)
+      description: >
+        Durchsucht OpenStreetMap nach Orten über Nominatim.
+        Dieser Endpunkt wird verwendet, um neue Orte zu finden,
+        die noch nicht in der Datenbank sind.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Suchbegriff
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 10
+          description: Maximale Anzahl der Ergebnisse
+      responses:
+        '200':
+          description: Suchergebnisse aus OSM
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        osmId:
+                          type: integer
+                          description: OSM-ID des Ortes
+                        osmType:
+                          type: string
+                          enum: [N, W, R]
+                          description: OSM-Typ (Node, Way, Relation)
+                        name:
+                          type: string
+                          description: Anzeigename aus OSM
+                        lat:
+                          type: number
+                          format: float
+                          description: Breitengrad
+                        lon:
+                          type: number
+                          format: float
+                          description: Längengrad
+        '400':
+          description: Fehlender Suchbegriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /explore/preview-category:
+    post:
+      summary: Kategorie-Vorschau für OSM-Ort
+      description: >
+        Gibt die Kategorie zurück, die die API einem OSM-Ort zuweisen wird,
+        ohne diesen anzulegen. Nützlich für die Vorschau im Client vor dem
+        Erstellen eines neuen Ortes.
+      tags: [Explore]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExploreCreateRequest'
+      responses:
+        '200':
+          description: Kategorie-Vorschau
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      category:
+                        type: string
+                        enum: [gastronomy, leisure]
+                        description: Voraussichtliche Kategorie
+                      cuisine:
+                        type: string
+                        nullable: true
+                        description: Cuisine-Typ (falls vorhanden)
+                      name:
+                        type: string
+                        nullable: true
+                        description: Name des Ortes aus OSM
+        '400':
+          description: Ungültige OSM-ID oder OSM-Typ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

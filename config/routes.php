@@ -73,18 +73,12 @@ return function (App $app): void {
         });
     });
 
-    // Explore — public read-only routes (no auth required, sensitive data stripped for anonymous users)
-    $app->group('/public/explore', function (RouteCollectorProxy $group) {
-        $group->get('/search', [ExploreController::class, 'search']);
-        $group->get('/random', [ExploreController::class, 'random']);
-        $group->get('', [ExploreController::class, 'list']);
-        $group->get('/{id}', [ExploreController::class, 'get']);
-    })->add($container->get('auth.optional'));
-
     // Explore — authenticated routes
     $app->group('/explore', function (RouteCollectorProxy $group) use ($container) {
         $group->get('/search', [ExploreController::class, 'search']);
         $group->get('/random', [ExploreController::class, 'random']);
+        $group->post('/preview-category', [ExploreController::class, 'previewCategory']);
+        $group->get('/osm-search', [ExploreController::class, 'searchOsm']);
         $group->get('/bookmarks', [ExploreController::class, 'listBookmarks']);
         $group->get('', [ExploreController::class, 'list']);
         $group->post('', [ExploreController::class, 'create']);

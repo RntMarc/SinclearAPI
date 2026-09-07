@@ -127,6 +127,50 @@ final readonly class ExploreController
         return ResponseFactory::json(['data' => $place], 200, $response);
     }
 
+    public function previewCategory(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $request->getParsedBody();
+
+        $osmId = (int) ($body['osmId'] ?? 0);
+        $osmType = strtoupper(trim($body['osmType'] ?? ''));
+
+        if ($osmId <= 0) {
+            return ResponseFactory::json(['error' => 'invalid_osm_id'], 400, $response);
+        }
+
+        if (!in_array($osmType, ['N', 'W', 'R'], true)) {
+            return ResponseFactory::json(['error' => 'invalid_osm_type'], 400, $response);
+        }
+
+        try {
+            $result = $this->exploreService->previewCategory($osmId, $osmType);
+            return ResponseFactory::json(['data' => $result], 200, $response);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => 'preview_failed'], 400, $response);
+        }
+    }
+
+    public function searchOsm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $params = $request->getQueryParams();
+
+        $query = trim($params['q'] ?? '');
+        if ($query === '') {
+            return ResponseFactory::json(['error' => 'missing_query'], 400, $response);
+        }
+
+        $limit = min(10, max(1, (int) ($params['limit'] ?? 5)));
+
+        try {
+            $results = $this->exploreService->searchOsm($query, $limit);
+            return ResponseFactory::json(['data' => $results], 200, $response);
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => 'search_failed'], 400, $response);
+        }
+    }
+
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);
