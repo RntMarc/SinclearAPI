@@ -211,7 +211,7 @@ final readonly class ExternalDataLocationService
      */
     private function searchNominatim(string $query): array
     {
-        $cacheKey = 'nominatim_search_' . mb_strtolower($query);
+        $cacheKey = 'nominatim_search_v2_' . mb_strtolower($query);
         $cached = $this->nominatimCache->get($cacheKey);
         if ($cached !== null && is_array($cached)) {
             return $cached;
