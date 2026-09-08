@@ -14,7 +14,7 @@ final readonly class ExternalDataLocationService
 
     private const int HTTP_TIMEOUT = 10;
     private const string USER_AGENT = 'SinclearBeyondAPI/2.0 (https://sinclear.app)';
-    private const string INFRANODE_CITIES_URL = 'https://infranode.dev/api/cities';
+    private const string INFRANODE_CITIES_URL = 'https://infranode.dev/api/v1/cities';
     private const int CACHE_TTL = 86400; // 24 hours
     private const int MIN_QUERY_LENGTH = 2;
     private const int MAX_RESULTS = 20;
@@ -37,7 +37,11 @@ final readonly class ExternalDataLocationService
      * Search for weather locations by query string.
      *
      * Uses Nominatim for global geocoding. Results matching InfraNode-supported
-     * cities (via OSM relation ID mapping) get the InfraNode slug and recommended=true.
+     * cities get the InfraNode slug and recommended=true. Matching is done
+     * against the InfraNode city list itself: first by Wikidata QID
+     * (Nominatim extratags), falling back to the OSM relation ID. This keeps
+     * the slug mapping always in sync with InfraNode instead of relying on a
+     * hardcoded OSM ID list that goes stale.
      *
      * @return array{data: list<array{name: string, slug: ?string, lat: float, lon: float, recommended: bool, source: string, state: ?string, population: ?int, osm_id: ?int, osm_type: ?string}>}
      */
@@ -49,24 +53,27 @@ final readonly class ExternalDataLocationService
             return ['data' => []];
         }
 
-        // Load OSM-to-slug mapping
-        $osmToSlugMap = $this->loadOsmToSlugMapping();
+        [$qidToSlug, $osmToSlug] = $this->loadInfraNodeCityIndex();
 
-        // Search Nominatim (global coverage, returns OSM IDs)
+        // Search Nominatim (global coverage, returns OSM IDs + Wikidata tags)
         $nominatimResults = $this->searchNominatim($query);
 
         $results = [];
         foreach ($nominatimResults as $place) {
+            $qid = $place['qid'] ?? null;
             $osmId = $place['osm_id'] ?? null;
             $osmType = $place['osm_type'] ?? null;
 
-            // Check if this is a relation (type 'R') that matches an InfraNode city
             $slug = null;
             $recommended = false;
             $source = 'nominatim';
 
-            if ($osmType === 'R' && $osmId !== null && isset($osmToSlugMap[$osmId])) {
-                $slug = $osmToSlugMap[$osmId];
+            if ($qid !== null && isset($qidToSlug[$qid])) {
+                $slug = $qidToSlug[$qid];
+                $recommended = true;
+                $source = 'infranode';
+            } elseif ($osmType === 'R' && $osmId !== null && isset($osmToSlug[$osmId])) {
+                $slug = $osmToSlug[$osmId];
                 $recommended = true;
                 $source = 'infranode';
             }
@@ -92,20 +99,26 @@ final readonly class ExternalDataLocationService
     }
 
     /**
-     * Load OSM relation ID to InfraNode slug mapping.
+     * Build slug lookup indexes from the InfraNode city list:
+     * Wikidata QID => slug and OSM relation ID => slug.
      *
-     * @return array<int, string>
+     * @return array{0: array<string, string>, 1: array<int, string>}
      */
-    private function loadOsmToSlugMapping(): array
+    private function loadInfraNodeCityIndex(): array
     {
-        $mappingPath = __DIR__ . '/../../config/infranode_osm_mapping.php';
-        if (is_file($mappingPath)) {
-            $mapping = require $mappingPath;
-            if (is_array($mapping)) {
-                return $mapping;
+        $qidToSlug = [];
+        $osmToSlug = [];
+
+        foreach ($this->fetchInfraNodeCities() as $city) {
+            if (!empty($city['qid']) && !empty($city['slug'])) {
+                $qidToSlug[$city['qid']] = $city['slug'];
+            }
+            if (!empty($city['osm_relation']) && !empty($city['slug'])) {
+                $osmToSlug[(int) $city['osm_relation']] = $city['slug'];
             }
         }
-        return [];
+
+        return [$qidToSlug, $osmToSlug];
     }
 
     /**
@@ -194,7 +207,7 @@ final readonly class ExternalDataLocationService
     /**
      * Search Nominatim for geocoding results.
      *
-     * @return list<array{display_name: string, lat: string, lon: string, state: ?string, osm_id: ?int, osm_type: ?string}>
+     * @return list<array{display_name: string, lat: string, lon: string, state: ?string, qid: ?string, osm_id: ?int, osm_type: ?string}>
      */
     private function searchNominatim(string $query): array
     {
@@ -227,14 +240,19 @@ final readonly class ExternalDataLocationService
                 return [];
             }
 
-            // Normalize results - include OSM ID and type for mapping
+            // Normalize results - include OSM ID/type and Wikidata QID for mapping
             $normalized = [];
             foreach ($results as $item) {
+                $qid = $item['extratags']['wikidata'] ?? null;
+                if (!is_string($qid)) {
+                    $qid = null;
+                }
                 $normalized[] = [
                     'display_name' => $item['display_name'] ?? '',
                     'lat' => $item['lat'] ?? '0',
                     'lon' => $item['lon'] ?? '0',
                     'state' => $item['address']['state'] ?? null,
+                    'qid' => $qid,
                     'osm_id' => isset($item['osm_id']) ? (int) $item['osm_id'] : null,
                     'osm_type' => $item['osm_type'] ?? null,
                 ];

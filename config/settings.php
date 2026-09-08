@@ -69,7 +69,7 @@ $settings['vapid'] = [
 ];
 
 $settings['external_data'] = [
-    'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://infranode.dev/api/v1/',
+    'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://infranode.dev/api/v1',
     'open_meteo_base_url' => $_ENV['OPEN_METEO_BASE_URL'] ?? 'https://api.open-meteo.com/v1',
     'cache_ttl' => [
         'weather' => (int)($_ENV['EXTERNAL_DATA_CACHE_WEATHER'] ?? 600),

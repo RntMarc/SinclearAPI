@@ -84,6 +84,7 @@ Array von Tagesvorhersagen (nur Open-Meteo, 3 Tage):
 - **Open-Meteo**: Liefert `current`, `hourly`, `daily` (global)
 - Bei InfraNode-Treffer + Open-Meteo werden Daten gemischt (`source: mixed`)
 - Die Datenquelle ist in `meta.source` angegeben
+- Fällt InfraNode bei einem `city_slug`-Request aus, wird der Open-Meteo-Fallback nur mit reduzierter TTL (60 s) gecached, sodass InfraNode zeitnah erneut abgefragt wird
 
 ## Beispiel
 

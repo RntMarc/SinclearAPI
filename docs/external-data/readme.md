@@ -71,6 +71,12 @@ Sucht nach Orten für Wetterdaten. Kombiniert InfraNode-gestützte deutsche Stä
 - `state` — Bundesland (bei InfraNode) bzw. Staat/Region (bei Nominatim)
 - `population` — Einwohnerzahl (nur bei InfraNode)
 
+**Slug-Zuordnung:** Die Suche ordnet Nominatim-Treffer dynamisch über die
+InfraNode-Städte-Liste zu — primär über die Wikidata-QID aus `extratags`,
+zurückfallend auf die OSM-Relation-ID (`osm_relation`). Dadurch bleibt das
+Mapping automatisch im Sync mit InfraNode (keine hardcoded OSM-ID-Liste).
+Der Client hebt InfraNode-Treffer in der Ergebnisseite hervor (Stern).
+
 ### `GET /external-data/locations`
 
 Gibt alle von InfraNode unterstützten deutschen Städte zurück.

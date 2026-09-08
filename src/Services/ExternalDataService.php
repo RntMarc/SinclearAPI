@@ -15,6 +15,8 @@ final readonly class ExternalDataService
     private Client $httpClient;
 
     private const int HTTP_TIMEOUT = 10;
+    /** Short TTL for Open-Meteo fallback results cached under a slug key, so InfraNode is retried quickly after transient failures. */
+    private const int FALLBACK_CACHE_TTL = 60;
     private const string USER_AGENT = 'SinclearBeyondAPI/2.0 (https://sinclear.app)';
 
     public function __construct(
@@ -61,7 +63,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('weather', $locationKey);
         }
 
-        $this->cacheRepo->save('weather', $locationKey, $source, $data, $this->getCacheTtl('weather'));
+        $this->cacheRepo->save('weather', $locationKey, $source, $data, $this->getCacheTtl('weather', $source, $locationKey));
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -115,7 +117,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('pollen_uv', $locationKey, ['pollen' => [], 'uv_index' => null]);
         }
 
-        $this->cacheRepo->save('pollen_uv', $locationKey, $source, $data, $this->getCacheTtl('pollen_uv'));
+        $this->cacheRepo->save('pollen_uv', $locationKey, $source, $data, $this->getCacheTtl('pollen_uv', $source, $locationKey));
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -140,7 +142,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('air_quality', $locationKey);
         }
 
-        $this->cacheRepo->save('air_quality', $locationKey, $source, $data, $this->getCacheTtl('air_quality'));
+        $this->cacheRepo->save('air_quality', $locationKey, $source, $data, $this->getCacheTtl('air_quality', $source, $locationKey));
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -196,7 +198,7 @@ final readonly class ExternalDataService
         try {
             $response = $this->httpClient->request(
                 'GET',
-                $this->settings->external_data['infranode_base_url'] . '/cities/' . $citySlug . '/weather'
+                rtrim($this->settings->external_data['infranode_base_url'], '/') . '/cities/' . $citySlug . '/weather'
             );
             $body = json_decode((string) $response->getBody(), true);
 
@@ -220,7 +222,7 @@ final readonly class ExternalDataService
         try {
             $response = $this->httpClient->request(
                 'GET',
-                $this->settings->external_data['infranode_base_url'] . '/cities/' . $citySlug . '/weather-warnings'
+                rtrim($this->settings->external_data['infranode_base_url'], '/') . '/cities/' . $citySlug . '/weather-warnings'
             );
             $body = json_decode((string) $response->getBody(), true);
 
@@ -244,7 +246,7 @@ final readonly class ExternalDataService
         try {
             $response = $this->httpClient->request(
                 'GET',
-                $this->settings->external_data['infranode_base_url'] . '/cities/' . $citySlug . '/pollen-uv'
+                rtrim($this->settings->external_data['infranode_base_url'], '/') . '/cities/' . $citySlug . '/pollen-uv'
             );
             $body = json_decode((string) $response->getBody(), true);
 
@@ -268,7 +270,7 @@ final readonly class ExternalDataService
         try {
             $response = $this->httpClient->request(
                 'GET',
-                $this->settings->external_data['infranode_base_url'] . '/cities/' . $citySlug . '/air'
+                rtrim($this->settings->external_data['infranode_base_url'], '/') . '/cities/' . $citySlug . '/air'
             );
             $body = json_decode((string) $response->getBody(), true);
 
@@ -665,8 +667,15 @@ final readonly class ExternalDataService
         return null;
     }
 
-    private function getCacheTtl(string $dataType): int
+    private function getCacheTtl(string $dataType, ?string $source = null, ?string $locationKey = null): int
     {
+        // An Open-Meteo fallback must never take over a slug key for the full TTL,
+        // otherwise a transient InfraNode failure poisons the cache and the
+        // InfraNode data is not retried until the cached entry expires.
+        if ($source === 'open-meteo' && $locationKey !== null && !str_contains($locationKey, ',')) {
+            return self::FALLBACK_CACHE_TTL;
+        }
+
         return $this->settings->external_data['cache_ttl'][$dataType]
             ?? $this->settings->external_data['cache_ttl']['default'];
     }
