@@ -9,6 +9,7 @@ use Sinclear\Api\Services\Cron\Tasks\CleanupExpiredOtpTokensTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupOldDirectMessagesTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupOldLocationSharingTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupExternalDataCacheTask;
+use Sinclear\Api\Services\Cron\Tasks\CleanupStalePushSubscriptionsTask;
 use Sinclear\Api\Services\Cron\Tasks\PtRefreshStaleLegsTask;
 
 
@@ -37,6 +38,7 @@ $scheduler->register(new CleanupExpiredOtpTokensTask());
 $scheduler->register(new CleanupOldLocationSharingTask());
 $scheduler->register(new CleanupOldDirectMessagesTask());
 $scheduler->register(new CleanupExternalDataCacheTask());
+$scheduler->register(new CleanupStalePushSubscriptionsTask());
 $scheduler->register(new PtRefreshStaleLegsTask());
 
 

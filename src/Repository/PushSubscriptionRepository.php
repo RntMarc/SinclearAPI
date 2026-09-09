@@ -16,8 +16,15 @@ final readonly class PushSubscriptionRepository
         $existing = $this->findByEndpoint($data['endpoint']);
 
         if ($existing !== null) {
+            // Re-registration proves the client is alive again: refresh
+            // lastSeenAt and reset the failure tracking (heals long-offline
+            // devices before the stale sweep removes them).
             $stmt = $this->pdo->prepare(
-                'UPDATE PushSubscription SET type = ?, p256dh = ?, auth = ?, userAgent = ? WHERE id = ?'
+                'UPDATE PushSubscription
+                 SET type = ?, p256dh = ?, auth = ?, userAgent = ?,
+                     lastSeenAt = NOW(3), consecutiveFailures = 0,
+                     lastErrorAt = NULL, lastError = NULL
+                 WHERE id = ?'
             );
             $stmt->execute([
                 $data['type'],
@@ -31,8 +38,8 @@ final readonly class PushSubscriptionRepository
 
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO PushSubscription (id, userId, `type`, endpoint, p256dh, auth, userAgent, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3))'
+            'INSERT INTO PushSubscription (id, userId, `type`, endpoint, p256dh, auth, userAgent, createdAt, lastSeenAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
         );
         $stmt->execute([
             $id,
@@ -83,5 +90,25 @@ final readonly class PushSubscriptionRepository
     {
         $stmt = $this->pdo->prepare('DELETE FROM PushSubscription WHERE endpoint = ?');
         $stmt->execute([$endpoint]);
+    }
+
+    public function markSuccess(string $id): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE PushSubscription
+             SET lastSuccessAt = NOW(3), lastErrorAt = NULL, lastError = NULL, consecutiveFailures = 0
+             WHERE id = ?'
+        );
+        $stmt->execute([$id]);
+    }
+
+    public function markFailure(string $id, string $error): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE PushSubscription
+             SET consecutiveFailures = consecutiveFailures + 1, lastErrorAt = NOW(3), lastError = ?
+             WHERE id = ?'
+        );
+        $stmt->execute([mb_substr($error, 0, 255), $id]);
     }
 }

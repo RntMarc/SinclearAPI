@@ -1151,9 +1151,24 @@ final readonly class NotificationService
                 $report = $this->webPush->sendOneNotification($webPushSubscription, $payload);
 
                 if ($report->isSubscriptionExpired()) {
+                    // 404/410: endpoint no longer exists (PWA removed, browser
+                    // data cleared, permission revoked). Dead on arrival.
                     $this->pushSubRepo->deleteById($sub['id']);
+                    continue;
+                }
+
+                if ($report->isSuccess()) {
+                    $this->pushSubRepo->markSuccess($sub['id']);
+                } else {
+                    $this->pushSubRepo->markFailure($sub['id'], $report->getReason());
+                    $this->logger?->warning('Web Push delivery failed', [
+                        'userId' => $userId,
+                        'endpoint' => $sub['endpoint'],
+                        'error' => $report->getReason(),
+                    ]);
                 }
             } catch (\Throwable $e) {
+                $this->pushSubRepo->markFailure($sub['id'], $e->getMessage());
                 $this->logger?->warning('Web Push delivery failed', [
                     'userId' => $userId,
                     'endpoint' => $sub['endpoint'],
@@ -1183,14 +1198,21 @@ final readonly class NotificationService
                     'headers' => ['Content-Type' => 'application/json; charset=utf-8'],
                     'timeout' => 10,
                 ]);
+                $this->pushSubRepo->markSuccess($sub['id']);
             } catch (RequestException $e) {
                 $statusCode = $e->getResponse()?->getStatusCode();
 
-                if ($statusCode === 410) {
+                if ($statusCode === 410 || $statusCode === 404) {
+                    // RFC 8030: subscription gone (app uninstalled, distributor
+                    // dropped the topic). Dead on arrival.
                     $this->pushSubRepo->deleteById($sub['id']);
                     continue;
                 }
 
+                $this->pushSubRepo->markFailure(
+                    $sub['id'],
+                    'HTTP ' . ($statusCode ?? 'unknown') . ': ' . $e->getMessage()
+                );
                 $this->logger?->warning('UnifiedPush delivery failed', [
                     'userId' => $userId,
                     'endpoint' => $sub['endpoint'],
@@ -1198,6 +1220,7 @@ final readonly class NotificationService
                     'error' => $e->getMessage(),
                 ]);
             } catch (\Throwable $e) {
+                $this->pushSubRepo->markFailure($sub['id'], $e->getMessage());
                 $this->logger?->warning('UnifiedPush delivery failed', [
                     'userId' => $userId,
                     'endpoint' => $sub['endpoint'],
@@ -1205,25 +1228,5 @@ final readonly class NotificationService
                 ]);
             }
         }
-    }
-
-    /**
-     * Proactively removes expired push subscriptions.
-     *
-     * Currently uses reactive cleanup (on 410/404 during delivery) as the
-     * primary mechanism. This method exists for spec compliance and can be
-     * extended when a `failedAt`/`lastError` column is added to
-     * `PushSubscription` to track delivery failures without sending test
-     * notifications.
-     *
-     * @return int Number of subscriptions removed
-     */
-    public function cleanExpiredSubscriptions(): int
-    {
-        // Reactive cleanup happens in sendWebPush()/sendUnifiedPush()
-        // when a 410/404 is received. A proactive sweep would require
-        // tracking failed deliveries (e.g. failedAt column), which is not
-        // currently implemented. Return 0 to indicate no proactive action.
-        return 0;
     }
 }

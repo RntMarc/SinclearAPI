@@ -95,9 +95,16 @@ class NotificationIntegrationTest extends TestCase
                 auth text DEFAULT NULL,
                 userAgent varchar(255) DEFAULT NULL,
                 createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                lastSeenAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                lastSuccessAt datetime(3) DEFAULT NULL,
+                lastErrorAt datetime(3) DEFAULT NULL,
+                lastError varchar(255) DEFAULT NULL,
+                consecutiveFailures int NOT NULL DEFAULT 0,
                 PRIMARY KEY (id),
                 UNIQUE KEY idx_pushsub_endpoint (endpoint(255)),
-                KEY idx_pushsub_user (userId)
+                KEY idx_pushsub_user (userId),
+                KEY idx_pushsub_last_seen (lastSeenAt),
+                KEY idx_pushsub_failures (consecutiveFailures)
             )
         ");
 

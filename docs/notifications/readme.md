@@ -295,8 +295,16 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 | `auth` | text | Web Push Auth Secret (nullable) |
 | `userAgent` | varchar(255) | User-Agent des Clients (nullable) |
 | `createdAt` | datetime(3) | Erstellungszeitpunkt (UTC) |
+| `lastSeenAt` | datetime(3) | Letzte Client-Registrierung (Upsert via `POST /notifications/push-subscription`) oder Erstellung (UTC) |
+| `lastSuccessAt` | datetime(3) | Letzter erfolgreicher Push-Versand (UTC, nullable) |
+| `lastErrorAt` | datetime(3) | Letzter fehlgeschlagener Push-Versand (UTC, nullable) |
+| `lastError` | varchar(255) | Fehlerursache des letzten Fehlschlags (nullable) |
+| `consecutiveFailures` | int | Anzahl aufeinanderfolgender fehlgeschlagener Push-Versuche (Default 0) |
 
 **Unique:** `endpoint` (Duplikate verhindern)
+**Index:** `lastSeenAt` (Stale-Sweep), `consecutiveFailures` (Failure-Sweep)
+
+Ein erfolgreicher Push setzt `consecutiveFailures` auf 0 und `lastSuccessAt` auf jetzt. Ein fehlgeschlagener Versuch (alles außer 410/404) erhöht `consecutiveFailures` und setzt `lastErrorAt`/`lastError`. Eine erneute Registrierung desselben Endpoints (Upsert) setzt `lastSeenAt` auf jetzt und setzt das Failure-Tracking zurück — so heilt ein Client, der lange offline war, automatisch durch Re-Registrierung.
 
 ### Tabelle `NotificationPreference`
 
@@ -510,9 +518,17 @@ HTTP 410 vom Distributor → Subscription wird automatisch gelöscht.
 
 > Der Push-Payload entspricht dem reduzierten Benachrichtigungsobjekt aus `GET /notifications` ohne `userId` und `isRead`: `id`, `type`, `title`, `text`, `data`, `createdAt`. Er enthält keine Routen; Titel und Texte sind API-generiert.
 
-### Bereinigung abgelaufener Subscriptions
+### Bereinigung toter Subscriptions
 
-Die Bereinigung erfolgt **reaktiv** beim Push-Versand: Endpoints, die mit HTTP 410 (oder 404) antworten, werden unmittelbar nach der Fehlerantwort aus `PushSubscription` gelöscht (`sendWebPush` via `MessageSentReport::isSubscriptionExpired()`, `sendUnifiedPush` bei HTTP 410). Ein separater `cleanExpiredSubscriptions()`-Sweep ist bewusst nicht implementiert, da der reaktive Weg keinen zusätzlichen Zustand benötigt und die Abfrage leben­der Endpoints im Batch unzuverlässig wäre.
+Die Bereinigung erfolgt auf zwei Wegen:
+
+1. **Reaktiv beim Push-Versand:** Endpoints, die mit HTTP 410 oder 404 antworten, werden unmittelbar nach der Fehlerantwort aus `PushSubscription` gelöscht (`sendWebPush` via `MessageSentReport::isSubscriptionExpired()`, `sendUnifiedPush` bei HTTP 410/404). Ein gelöschtes Endpoint-Objekt (PWA entfernt, Browser-Daten gelöscht, App deinstalliert) ist endgültig tot — ein Neu-Login des Clients legt eine neue Subscription an.
+
+2. **Proaktiv per Cron-Task** `cleanup_stale_push_subscriptions` (täglich, siehe [CRON.md](../CRON.md)): löscht Subscriptions, die
+   - **10 oder mehr aufeinanderfolgende Fehlversuche** aufweisen (`consecutiveFailures >= 10` — z.B. 403, DNS-Fehler, Timeouts), **oder**
+   - **90 Tage kein Lebenszeichen** haben: `lastSeenAt` älter als 90 Tage **und** kein erfolgreicher Versand in diesem Zeitraum.
+
+   Die 90-Tage-Frist schützt Geräte, die nur vorübergehend offline sind: Ein paar Tage Offlinezeit erzeugt keine Failures (der Push-Service quittiert mit 201 und queued die Nachricht) und keine Stale-Löschung, solange der Client sich innerhalb der Frist mindestens einmal re-registriert hat (Clients re-registrieren bei App-Start/Login/Resume via `POST /notifications/push-subscription`, was als Upsert `lastSeenAt` auffrischt). Die Frist entspricht der Refresh-Token-Lebensdauer — wer länger weg war, muss sich ohnehin neu einloggen und registriert sich dabei automatisch neu. Verpasste Benachrichtigungen gehen nicht verloren: sie bleiben in `Notification` persistiert und sind via `GET /notifications` bzw. Polling abholbar.
 
 ## Integration in bestehende Controller
 

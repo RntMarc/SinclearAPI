@@ -31,6 +31,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 3 | `cleanup_direct_messages` | 24 Stunden | Löscht Chat-Nachrichten älter als 90 Tage |
 | 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
 | 5 | `cleanup_external_data_cache` | 24 Stunden | Entfernt abgelaufene Cache-Einträge (ExternalDataCache) |
+| 6 | `cleanup_stale_push_subscriptions` | 24 Stunden | Löscht tote Push-Subscriptions (10+ Fehlversuche oder 90 Tage ohne Lebenszeichen) |
 
 ## Details
 
@@ -62,6 +63,15 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Intervall:** 86400 Sekunden (24 Stunden)
 - **Aktion:** `DELETE FROM ExternalDataCache WHERE expires_at < NOW()` — entfernt alle abgelaufenen Cache-Einträge für externe Datenquellen (Wetter, Warnungen, Pollen/UV, Luftqualität).
 - **Datei:** `src/Services/Cron/Tasks/CleanupExternalDataCacheTask.php`
+
+### Stale Push Subscriptions Cleanup
+- **Task-Name:** `cleanup_stale_push_subscriptions`
+- **Intervall:** 86400 Sekunden (24 Stunden)
+- **Aktion:** Löscht tote `PushSubscription`-Einträge in Batches (LIMIT 1000):
+  1. Dauerhaft fehlgeschlagene Endpoints: `consecutiveFailures >= 10` (z.B. 403, DNS-Fehler, Timeouts — 410/404 werden bereits reaktiv beim Versand gelöscht).
+  2. Veraltete Endpoints: `lastSeenAt` älter als 90 Tage **und** kein erfolgreicher Versand (`lastSuccessAt`) in diesem Zeitraum. Die 90-Tage-Übergangsfrist schützt nur vorübergehend offline Geräte — Clients re-registrieren bei App-Start/Login/Resume (`POST /notifications/push-subscription` als Upsert) und setzen damit `lastSeenAt` und den Failure-Zähler zurück. Die Frist entspricht der Refresh-Token-Lebensdauer (90 Tage).
+- **Datei:** `src/Services/Cron/Tasks/CleanupStalePushSubscriptionsTask.php`
+- **Hintergrund:** Siehe [notifications/readme.md](./notifications/readme.md) → „Bereinigung toter Subscriptions".
 
 ## CronSchedule-Tabelle
 
