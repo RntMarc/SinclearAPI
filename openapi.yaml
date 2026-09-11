@@ -1990,6 +1990,43 @@ components:
           type: string
           format: date-time
 
+    UserWeatherLocation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Anzeigename des Ortes
+        slug:
+          type: string
+          nullable: true
+          description: InfraNode City-Slug (nullable)
+        lat:
+          type: number
+          format: double
+          description: Breitengrad
+        lon:
+          type: number
+          format: double
+          description: Längengrad
+        source:
+          type: string
+          description: Datenquelle (z.B. "nominatim", "infranode")
+        sortOrder:
+          type: integer
+          description: Sortierungsreihenfolge
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
     UserSocialInfo:
       type: object
       properties:
@@ -7043,6 +7080,245 @@ paths:
                     $ref: '#/components/schemas/UserPreferences'
         '400':
           description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/weather-locations:
+    get:
+      summary: Gespeicherte Wetter-Orte abrufen
+      description: Gibt alle gespeicherten Wetter-Orte des Benutzers sortiert nach sortOrder zurück.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Gespeicherte Wetter-Orte
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserWeatherLocation'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Wetter-Ort hinzufügen
+      description: >
+        Fügt einen neuen gespeicherten Wetter-Ort hinzu.
+        Maximal 5 Orte pro Benutzer.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                  description: Anzeigename des Ortes
+                slug:
+                  type: string
+                  nullable: true
+                  description: InfraNode City-Slug (optional)
+                lat:
+                  type: number
+                  format: double
+                  description: Breitengrad
+                lon:
+                  type: number
+                  format: double
+                  description: Längengrad
+                source:
+                  type: string
+                  maxLength: 50
+                  default: nominatim
+                  description: Datenquelle
+      responses:
+        '201':
+          description: Wetter-Ort erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserWeatherLocation'
+        '400':
+          description: Ungültige Eingabe oder Limit erreicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Alle Wetter-Orte ersetzen (Full Sync)
+      description: >
+        Ersetzt die komplette Liste der gespeicherten Wetter-Orte.
+        Nützlich für Full-Sync beim Starten auf einem neuen Gerät.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locations]
+              properties:
+                locations:
+                  type: array
+                  maxItems: 5
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name:
+                        type: string
+                        maxLength: 255
+                      slug:
+                        type: string
+                        nullable: true
+                      lat:
+                        type: number
+                        format: double
+                      lon:
+                        type: number
+                        format: double
+                      source:
+                        type: string
+                        maxLength: 50
+                        default: nominatim
+      responses:
+        '200':
+          description: Wetter-Orte aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserWeatherLocation'
+        '400':
+          description: Ungültige Eingabe oder Limit erreicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/weather-locations/{id}:
+    patch:
+      summary: Wetter-Ort aktualisieren
+      description: Aktualisiert einen einzelnen gespeicherten Wetter-Ort.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID des Wetter-Orts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                slug:
+                  type: string
+                  nullable: true
+                lat:
+                  type: number
+                  format: double
+                lon:
+                  type: number
+                  format: double
+                source:
+                  type: string
+                  maxLength: 50
+                sortOrder:
+                  type: integer
+      responses:
+        '200':
+          description: Wetter-Ort aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UserWeatherLocation'
+        '400':
+          description: Ort nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Wetter-Ort löschen
+      description: Entfernt einen gespeicherten Wetter-Ort.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID des Wetter-Orts
+      responses:
+        '204':
+          description: Wetter-Ort gelöscht
+        '400':
+          description: Ort nicht gefunden
           content:
             application/json:
               schema:

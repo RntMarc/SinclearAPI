@@ -31,6 +31,7 @@ use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
+use Sinclear\Api\Controllers\UserWeatherLocationController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
@@ -85,6 +86,7 @@ use Sinclear\Api\Repository\FeedPostVoteRepository;
 use Sinclear\Api\Repository\FeedPostCommentRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\UserPreferenceRepository;
+use Sinclear\Api\Repository\UserWeatherLocationRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
@@ -373,6 +375,10 @@ return [
 
     UserUpdateRepository::class => autowire(),
     UserPreferenceRepository::class => autowire(),
+
+    UserWeatherLocationRepository::class => autowire(),
+    UserWeatherLocationService::class => autowire(),
+    UserWeatherLocationController::class => autowire(),
 
     UserPolicy::class => autowire(),
     UserService::class => autowire(),

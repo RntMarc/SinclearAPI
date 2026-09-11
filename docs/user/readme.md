@@ -42,6 +42,18 @@ Der angemeldete Nutzer sieht seine eigenen Einstellungen.
 |---------|------|-------------|
 | `GET` | `/user/me/preferences` | Alle Benutzereinstellungen aus der `UserPreferences`-Tabelle |
 
+### Eigene Wetter-Orte (`/me/weather-locations`)
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `GET` | `/user/me/weather-locations` | Alle gespeicherten Wetter-Orte |
+| `POST` | `/user/me/weather-locations` | Neuen Wetter-Ort hinzufügen (max. 5) |
+| `PUT` | `/user/me/weather-locations` | Alle Orte ersetzen (Full Sync) |
+| `PATCH` | `/user/me/weather-locations/{id}` | Einzelnen Ort aktualisieren |
+| `DELETE` | `/user/me/weather-locations/{id}` | Ort entfernen |
+
+Details siehe [Wetter-Orte](weather-locations.md).
+
 Gibt ein flaches Objekt mit allen Preferences zurück:
 
 ```json
@@ -304,6 +316,7 @@ level-2-Daten sehen kann.
 
 - **`User`** – Basis-Profil (E-Mail, Anzeigename, Geburtstag, Bild, Discord-ID, Discord-Avatar-Hash, …)
 - **`UserPreferences`** – Zentrale Benutzereinstellungen: Sichtbarkeit (14 Felder), Sprache, Theme, Akzentfarbe, Zeitzone, Discord-Sync, Onboarding-Status
+- **`UserWeatherLocation`** – Gespeicherte Wetter-Orte pro Benutzer (max. 5, synchronisiert zwischen Geräten)
 - **`SocialInfo`** – Social-Media-Handles (7 Plattformen)
 - **`ContactInfo`** – Kontaktmöglichkeiten (Discord, Fluxer, Signal, WhatsApp, Matrix)
 - **`CloseFriend`** – Enge-Freunde-Beziehungen für Sichtbarkeit Level 2
