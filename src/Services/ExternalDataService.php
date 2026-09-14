@@ -79,11 +79,16 @@ final readonly class ExternalDataService
         $data = $this->fetchWeatherWarningsFromInfraNode($citySlug);
         $source = 'infranode';
 
-        if ($data === null) {
-            return $this->emptyResponse('weather_warnings', $locationKey, ['warnings' => []]);
+        if ($data === null && $lat !== null && $lon !== null) {
+            $data = $this->fetchWeatherWarningsFromBrightSky($lat, $lon);
+            $source = 'brightsky';
         }
 
-        $this->cacheRepo->save('weather_warnings', $locationKey, $source, $data, $this->getCacheTtl('weather_warnings'));
+        if ($data === null) {
+            return $this->emptyResponse('weather_warnings', $locationKey, ['warnings' => [], 'special_warnings' => [], 'max_level' => 0, 'count' => 0]);
+        }
+
+        $this->cacheRepo->save('weather_warnings', $locationKey, $source, $data, $this->getCacheTtl('weather_warnings', $source, $locationKey));
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -233,6 +238,32 @@ final readonly class ExternalDataService
             return $this->normalizeInfraNodeWarnings($body['data']);
         } catch (GuzzleException $e) {
             $this->logger->warning('[EXTERNAL_DATA] InfraNode weather-warnings failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private function fetchWeatherWarningsFromBrightSky(float $lat, float $lon): ?array
+    {
+        try {
+            $response = $this->httpClient->request(
+                'GET',
+                rtrim($this->settings->external_data['brightsky_base_url'], '/') . '/alerts',
+                [
+                    'query' => [
+                        'lat' => $lat,
+                        'lon' => $lon,
+                    ],
+                ]
+            );
+            $body = json_decode((string) $response->getBody(), true);
+
+            if (!is_array($body) || !isset($body['alerts'])) {
+                return null;
+            }
+
+            return $this->normalizeBrightSkyWarnings($body);
+        } catch (GuzzleException $e) {
+            $this->logger->warning('[EXTERNAL_DATA] BrightSky alerts failed: ' . $e->getMessage());
             return null;
         }
     }
@@ -409,9 +440,66 @@ final readonly class ExternalDataService
             ];
         }
 
+        $specialWarnings = [];
+        foreach ($payload['special_warnings'] ?? [] as $sw) {
+            $specialWarnings[] = [
+                'event' => $sw['event'] ?? '',
+                'level' => $sw['level'] ?? 0,
+                'headline' => $sw['headline'] ?? '',
+                'start' => $this->formatUtcTime($sw['start'] ?? null),
+                'end' => $this->formatUtcTime($sw['end'] ?? null),
+            ];
+        }
+
         return [
             'warnings' => $warnings,
+            'special_warnings' => $specialWarnings,
             'max_level' => $payload['max_level'] ?? 0,
+            'count' => $payload['count'] ?? 0,
+            '_attribution' => [
+                'text' => ($data['attribution'] ?? [])['text'] ?? '',
+                'url' => ($data['attribution'] ?? [])['license_url'] ?? '',
+            ],
+        ];
+    }
+
+    private function normalizeBrightSkyWarnings(array $body): array
+    {
+        $alerts = $body['alerts'] ?? [];
+        $warnings = [];
+        $maxLevel = 0;
+
+        $severityMap = [
+            'minor' => 1,
+            'moderate' => 2,
+            'severe' => 3,
+            'extreme' => 4,
+        ];
+
+        foreach ($alerts as $alert) {
+            $level = $severityMap[$alert['severity'] ?? ''] ?? 0;
+            if ($level > $maxLevel) {
+                $maxLevel = $level;
+            }
+
+            $warnings[] = [
+                'event' => $alert['event_de'] ?? $alert['event_en'] ?? '',
+                'level' => $level,
+                'headline' => $alert['headline_de'] ?? $alert['headline_en'] ?? '',
+                'start' => $this->formatUtcTime($alert['onset'] ?? $alert['effective'] ?? null),
+                'end' => $this->formatUtcTime($alert['expires'] ?? null),
+            ];
+        }
+
+        return [
+            'warnings' => $warnings,
+            'special_warnings' => [],
+            'max_level' => $maxLevel,
+            'count' => count($warnings),
+            '_attribution' => [
+                'text' => 'Datenbasis: Deutscher Wetterdienst via Bright Sky',
+                'url' => 'https://brightsky.dev',
+            ],
         ];
     }
 

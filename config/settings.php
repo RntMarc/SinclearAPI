@@ -78,6 +78,7 @@ $settings['vapid'] = [
 $settings['external_data'] = [
     'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://infranode.dev/api/v1',
     'open_meteo_base_url' => $_ENV['OPEN_METEO_BASE_URL'] ?? 'https://api.open-meteo.com/v1',
+    'brightsky_base_url' => $_ENV['BRIGHTSKY_BASE_URL'] ?? 'https://api.brightsky.dev',
     'cache_ttl' => [
         'weather' => (int)($_ENV['EXTERNAL_DATA_CACHE_WEATHER'] ?? 600),
         'weather_warnings' => (int)($_ENV['EXTERNAL_DATA_CACHE_WARNINGS'] ?? 300),

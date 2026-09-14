@@ -124,3 +124,127 @@ Authorization: Bearer <token>
   }
 }
 ```
+
+---
+
+# Wetterwarnungen-Endpoint
+
+`GET /api/v2/external-data/weather/warnings`
+
+Liefert aktuelle Wetterwarnungen für einen Standort. InfraNode (deutsche Städte mit Slug) oder BrightSky (global mit lat+lon). Warnungen umfassen Sturm, Regen, Schnee, Nebel, Glitzeis, Hochwasser sowie Spezialwarnungen (Hitze, UV).
+
+## Parameter
+
+| Name | In | Typ | Pflicht | Beschreibung |
+|------|----|-----|---------|--------------|
+| `city_slug` | query | string | bedingt | City-Slug (z.B. `berlin`) |
+| `lat` | query | float | bedingt | Breitengrad |
+| `lon` | query | float | bedingt | Längengrad |
+
+Mindestens `city_slug` oder `lat`+`lon` muss angegeben werden.
+
+## Antwort
+
+### `meta`
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `source` | string \| null | Datenquelle: `infranode`, `brightsky` oder `cache` |
+| `data_type` | string | Immer `weather_warnings` |
+| `city_slug` | string \| null | Übergebener City-Slug (null bei Koordinaten) |
+| `coordinates` | object \| null | `{lat,lon}` bei Koordinaten-Abfrage |
+| `available_sections` | string[] | Verfügbare Abschnitte (`warnings`, `special_warnings`) |
+| `missing_sections` | string[] | Fehlende Abschnitte |
+| `retrieved_at` | datetime | Zeitpunkt der Datenabfrage (UTC) |
+
+### `data.warnings`
+
+Array von Warnungen:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `event` | string | Warnungsereignis (z.B. "STARKREGEN", "HEAVY RAIN") |
+| `level` | int | Schweregrad (0-4: 0=keine, 1=minor, 2=moderate, 3=severe, 4=extreme) |
+| `headline` | string | Warnungstitel |
+| `start` | datetime \| null | Beginn der Warnung (UTC) |
+| `end` | datetime \| null | Ende der Warnung (UTC) |
+
+### `data.special_warnings`
+
+Array von Spezialwarnungen (Hitze, UV) - gleiche Struktur wie `warnings`:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `event` | string | Spezialwarnung (z.B. "HEAT_STRESS", "UV_WARNING") |
+| `level` | int | Schweregrad (0-4) |
+| `headline` | string | Warnungstitel |
+| `start` | datetime \| null | Beginn (UTC) |
+| `end` | datetime \| null | Ende (UTC) |
+
+### `data.max_level`
+
+| Typ | Beschreibung |
+|-----|--------------|
+| int | Maximaler Schweregrad aller Warnungen (0 = keine Warnung) |
+
+### `data.count`
+
+| Typ | Beschreibung |
+|-----|--------------|
+| int | Anzahl der Warnungen |
+
+### `data._attribution`
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `text` | string | Quellen-Angabe |
+| `url` | string | URL zur Quelle |
+
+## Quellen
+
+- **InfraNode**: Liefert Warnungen für deutsche Städte (mit `city_slug`)
+- **BrightSky**: Liefert Warnungen全球 (mit `lat`+`lon`)
+- Fällt InfraNode bei einem `city_slug`-Request aus, wird BrightSky als Fallback verwendet
+- BrightSky-Fallback nur mit reduzierter TTL (60 s) gecached, sodass InfraNode zeitnah erneut abgefragt wird
+- Die Datenquelle ist in `meta.source` angegeben
+
+## Beispiel
+
+```bash
+GET /api/v2/external-data/weather/warnings?lat=52.52&lon=13.405
+Authorization: Bearer <token>
+```
+
+### Antwort-Beispiel
+
+```json
+{
+  "data": {
+    "warnings": [
+      {
+        "event": "STARKREGEN",
+        "level": 2,
+        "headline": "Amtliche WARNUNG vor STARKREGEN",
+        "start": "2026-09-07 14:00:00",
+        "end": "2026-09-07 20:00:00"
+      }
+    ],
+    "special_warnings": [],
+    "max_level": 2,
+    "count": 1,
+    "_attribution": {
+      "text": "Datenbasis: Deutscher Wetterdienst via Bright Sky",
+      "url": "https://brightsky.dev"
+    }
+  },
+  "meta": {
+    "source": "brightsky",
+    "data_type": "weather_warnings",
+    "city_slug": null,
+    "coordinates": {"lat": 52.52, "lon": 13.405},
+    "available_sections": ["warnings", "special_warnings"],
+    "missing_sections": [],
+    "retrieved_at": "2026-09-07 14:05:00"
+  }
+}
+```

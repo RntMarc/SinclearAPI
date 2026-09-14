@@ -5085,8 +5085,25 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/ExternalDataWarning'
+            special_warnings:
+              type: array
+              description: Spezialwarnungen (Hitze, UV)
+              items:
+                $ref: '#/components/schemas/ExternalDataWarning'
             max_level:
               type: integer
+              description: Maximaler Schweregrad (0 = keine Warnung, 1-4)
+            count:
+              type: integer
+              description: Anzahl der Warnungen
+            _attribution:
+              type: object
+              description: Quellen-Angabe
+              properties:
+                text:
+                  type: string
+                url:
+                  type: string
         meta:
           $ref: '#/components/schemas/ExternalDataResponseMeta'
 
@@ -5135,7 +5152,7 @@ components:
       properties:
         source:
           type: string
-          enum: [infranode, open-meteo, mixed, cache]
+          enum: [infranode, open-meteo, brightsky, mixed, cache]
           nullable: true
           description: Datenquelle
         data_type:
@@ -5193,7 +5210,7 @@ components:
           properties:
             source:
               type: string
-              enum: [infranode, open-meteo, mixed, cache]
+              enum: [infranode, open-meteo, brightsky, mixed, cache]
               nullable: true
               description: Datenquelle
             data_type:
@@ -16482,8 +16499,9 @@ paths:
     get:
       summary: Wetterwarnungen abrufen
       description: >
-        Aktuelle Wetterwarnungen für einen Standort (InfraNode). Nur für
-        deutsche Städte verfügbar.
+        Aktuelle Wetterwarnungen für einen Standort. InfraNode (deutsche Städte
+        mit Slug), BrightSky Fallback (global mit lat+lon). Liefert Warnungen
+        mit Schweregrad (max_level 0-4) und Spezialwarnungen (Hitze, UV).
       tags: [External Data]
       security:
         - BearerAuth: []
@@ -16492,17 +16510,19 @@ paths:
           in: query
           schema:
             type: string
-          description: City-Slug (z.B. berlin)
+          description: City-Slug (z.B. berlin). Für InfraNode-gestützte Städte.
         - name: lat
           in: query
           schema:
             type: number
             format: float
+          description: Breitengrad (für BrightSky Fallback)
         - name: lon
           in: query
           schema:
             type: number
             format: float
+          description: Längengrad (für BrightSky Fallback)
       responses:
         '200':
           description: Wetterwarnungen

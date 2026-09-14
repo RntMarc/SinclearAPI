@@ -19,9 +19,9 @@ Gibt eine Übersicht aller unterstützten external-data Datentypen zurück.
     "weather_warnings": {
       "label": "Wetterwarnungen",
       "label_en": "Weather warnings",
-      "sections": ["warnings"],
-      "sources": ["infranode"],
-      "requires": "city_slug"
+      "sections": ["warnings", "special_warnings"],
+      "sources": ["infranode", "brightsky"],
+      "requires": "city_slug oder lat+lon"
     },
     "pollen_uv": {
       "label": "Pollenbelastung & UV-Index",
@@ -50,9 +50,10 @@ Gibt eine Übersicht aller unterstützten external-data Datentypen zurück.
 - **Beispiel:** `GET /external-data/weather?city_slug=berlin`
 
 ### `weather_warnings`
-- **Abschnitte:** `warnings` (Warnungen)
-- **Quellen:** Nur InfraNode (DE)
-- **Beispiel:** `GET /external-data/weather/warnings?city_slug=berlin`
+- **Abschnitte:** `warnings` (Warnungen), `special_warnings` (Spezialwarnungen: Hitze, UV)
+- **Quellen:** InfraNode (DE, mit Slug), BrightSky (global, mit lat+lon)
+- **Schweregrad:** `max_level` 0-4 (0 = keine Warnung, 1 = minor, 2 = moderate, 3 = severe, 4 = extreme)
+- **Beispiel:** `GET /external-data/weather/warnings?city_slug=berlin` oder `GET /external-data/weather/warnings?lat=52.52&lon=13.405`
 
 ### `pollen_uv`
 - **Abschnitte:** `pollen` (Pollenbelastung), `uv` (UV-Index)

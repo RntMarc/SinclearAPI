@@ -4,15 +4,15 @@ Aggregierte externe Daten (Wetter, Luftqualität, Pollenbelastung) für beliebig
 
 ## Übersicht
 
-| Endpoint | Beschreibung | InfraNode | Open-Meteo |
-|----------|-------------|-----------|------------|
-| `GET /external-data/weather` | Aktuelles Wetter | ✅ (DE) | ✅ (global) |
-| `GET /external-data/weather/warnings` | Wetterwarnungen | ✅ (DE) | ❌ |
-| `GET /external-data/pollen-uv` | Pollenbelastung + UV-Index | ✅ (DE) | ✅ (nur UV) |
-| `GET /external-data/air-quality` | Luftqualität (PM10, NO2, O3…) | ✅ (DE) | ✅ (global) |
-| `GET /external-data/types` | Verfügbare Datentypen | — | — |
-| `GET /external-data/locations/search` | Orte für Wetterdaten suchen | ✅ | ✅ (Nominatim) |
-| `GET /external-data/locations` | Alle InfraNode-Orte auflisten | ✅ | — |
+| Endpoint | Beschreibung | InfraNode | BrightSky | Open-Meteo |
+|----------|-------------|-----------|-----------|------------|
+| `GET /external-data/weather` | Aktuelles Wetter | ✅ (DE) | — | ✅ (global) |
+| `GET /external-data/weather/warnings` | Wetterwarnungen | ✅ (DE) | ✅ (global) | — |
+| `GET /external-data/pollen-uv` | Pollenbelastung + UV-Index | ✅ (DE) | — | ✅ (nur UV) |
+| `GET /external-data/air-quality` | Luftqualität (PM10, NO2, O3…) | ✅ (DE) | — | ✅ (global) |
+| `GET /external-data/types` | Verfügbare Datentypen | — | — | — |
+| `GET /external-data/locations/search` | Orte für Wetterdaten suchen | ✅ | — | ✅ (Nominatim) |
+| `GET /external-data/locations` | Alle InfraNode-Orte auflisten | ✅ | — | — |
 
 ## Authentifizierung
 
@@ -23,7 +23,7 @@ Alle Endpoints erfordern ein gültiges JWT im `Authorization: Bearer <token>` He
 Für Wetter-, Warn- und Luftqualitäts-Endpoints muss ein Standort angegeben werden:
 
 - **`city_slug`** — Deutscher City-Slug (z.B. `berlin`, `muenchen`). Muss korrekt sein; keine Validierung.
-- **`lat` + `lon`** — Koordinaten (Dezimalgrad). Für Open-Meteo Fallback.
+- **`lat` + `lon`** — Koordinaten (Dezimalgrad). Für Open-Meteo Fallback oder BrightSky (Warnungen).
 
 Mindestens eines von beiden muss angegeben werden.
 
@@ -107,7 +107,7 @@ Client → API → Cache (MySQL ExternalDataCache)?
                     ↓ (kein Treffer)
                 InfraNode (DE-Städte)?
                     ↓ (404 oder kein DE)
-                Open-Meteo (global)
+                Open-Meteo (global) / BrightSky (Warnungen)
                     ↓
                 Cache speichern → Antwort
 ```
@@ -133,6 +133,7 @@ Cache-Einträge laufen nach Ablauf automatisch ab und werden durch den Cron-Job 
 | Quelle | Nutzung | Lizenz |
 |--------|---------|--------|
 | InfraNode.dev | Deutsche Städte (Wetter, Warnungen, Pollen, UV, Luftqualität) | Open Data |
+| BrightSky.dev | Wetterwarnungen全球 (Fallback für nicht-DE Standorte) | Open Data (DWD GeoNutzV) |
 | Open-Meteo.com | Globaler Wetter- und Luftqualitäts-Fallback | Non-commercial |
 
 ## Lückenhafte Daten
@@ -147,6 +148,7 @@ Jede Antwort enthält in `meta.source` die Information, welche Quelle die Daten 
 |---------------|--------------|
 | `infranode` | Daten ausschließlich von InfraNode (deutsche Städte) |
 | `open-meteo` | Daten ausschließlich von Open-Meteo (global) |
+| `brightsky` | Daten ausschließlich von BrightSky (Warnungen全球) |
 | `mixed` | InfraNode + Open-Meteo kombiniert |
 | `cache` | Gecachte Antwort aus der Datenbank |
 
