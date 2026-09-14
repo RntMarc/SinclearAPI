@@ -58,6 +58,13 @@ $settings['pagination'] = [
     'max_limit' => 100,
 ];
 
+$settings['unsplash'] = [
+    'base_url' => $_ENV['UNSPLASH_BASE_URL'] ?? 'https://api.unsplash.com',
+    'access_key' => $_ENV['UNSPLASH_ACCESS_KEY'] ?? '',
+    'per_user_limit' => (int)($_ENV['UNSPLASH_PER_USER_LIMIT'] ?? 30),
+    'cache_ttl' => (int)($_ENV['UNSPLASH_CACHE_TTL'] ?? 21600),
+];
+
 $settings['downloads'] = [
     'base_url' => $_ENV['DOWNLOADS_BASE_URL'] ?? 'https://sinclear.de/downloads',
 ];

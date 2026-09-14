@@ -20,6 +20,7 @@ use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\StoryController;
+use Sinclear\Api\Controllers\PhotoController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -359,6 +360,12 @@ return function (App $app): void {
         $group->delete('/{id}', [StoryController::class, 'delete']);
         $group->post('/{id}/view', [StoryController::class, 'markViewed']);
         $group->get('/{id}/viewers', [StoryController::class, 'getViewers']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    // Photos — Unsplash-Fotos verlinkter Nutzer (authenticated)
+    $app->group('/photos', function (RouteCollectorProxy $group) {
+        $group->get('', [PhotoController::class, 'feed']);
+        $group->get('/user/{id}', [PhotoController::class, 'userPhotos']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Chat / Direktnachrichten (authenticated)

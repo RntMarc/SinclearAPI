@@ -16,5 +16,6 @@ final readonly class Settings
         public array $downloads = [],
         public array $vapid = [],
         public array $external_data = [],
+        public array $unsplash = [],
     ) {}
 }

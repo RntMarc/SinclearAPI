@@ -4602,6 +4602,104 @@ components:
             $ref: '#/components/schemas/StoryViewer'
           description: Liste der Nutzer, die die Story gesehen haben
 
+    PhotoPhotographer:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+          description: Name des Unsplash-Fotografen
+        username:
+          type: string
+          nullable: true
+          description: Unsplash-Nutzername des Fotografen
+        url:
+          type: string
+          nullable: true
+          description: Link zum Unsplash-Profil des Fotografen
+
+    PhotoAuthor:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID des Sinclear-Nutzers, der das Foto verlinkt hat
+        displayName:
+          type: string
+          nullable: true
+          description: Anzeigename des Nutzers
+        avatar:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Profilbild des Nutzers
+
+    Photo:
+      type: object
+      required: [id, createdAt, author]
+      properties:
+        id:
+          type: string
+          description: Unsplash-Foto-ID
+        thumb:
+          type: string
+          nullable: true
+          description: Unsplash-URL in kleiner Auflösung (für das Grid)
+        regular:
+          type: string
+          nullable: true
+          description: Unsplash-URL in mittlerer Auflösung (für die Detailansicht)
+        width:
+          type: integer
+          description: Originalbreite in Pixeln
+        height:
+          type: integer
+          description: Originalhöhe in Pixeln
+        createdAt:
+          type: string
+          description: Upload-Zeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+        photographer:
+          $ref: '#/components/schemas/PhotoPhotographer'
+        author:
+          $ref: '#/components/schemas/PhotoAuthor'
+
+    PhotoFeedResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+          description: Sichtbare Fotos, nach Upload-Zeitpunkt absteigend sortiert
+        meta:
+          type: object
+          required: [page, limit, total, totalPages]
+          properties:
+            page:
+              type: integer
+              description: Aktuelle Seite
+            limit:
+              type: integer
+              description: Einträge pro Seite
+            total:
+              type: integer
+              description: Gesamtzahl sichtbarer Fotos vor der Paginierung
+            totalPages:
+              type: integer
+              description: Gesamtzahl der Seiten
+
+    PhotoUserResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+          description: Sichtbare Fotos eines einzelnen Nutzers, neueste zuerst
+
     ChatConversation:
       type: object
       required: [id, type, createdAt, updatedAt]
@@ -16237,6 +16335,96 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /photos:
+    get:
+      summary: Foto-Feed abrufen
+      description: >
+        Gibt einen flachen, nach Upload-Zeitpunkt absteigend sortierten Feed
+        von Unsplash-Fotos zurück. Berücksichtigt werden nur Nutzer mit
+        hinterlegtem Unsplash-Handle, deren `unsplashVisibility` dem
+        anfragenden Nutzer Zugriff erlaubt (0 = nur ich, 1 = alle,
+        2 = enge Freunde). Unbekannte Handles, ein fehlender API-Key oder
+        Unsplash-Ausfälle führen dazu, dass einzelne Nutzer still
+        übersprungen werden — nie schlägt der gesamte Feed fehl.
+      tags: [Photos]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Seitennummer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+          description: Einträge pro Seite
+      responses:
+        '200':
+          description: Paginierter Foto-Feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoFeedResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /photos/user/{id}:
+    get:
+      summary: Fotos eines Nutzers abrufen
+      description: >
+        Gibt die sichtbaren Unsplash-Fotos eines einzelnen Nutzers zurück
+        (max. UNSPLASH_PER_USER_LIMIT, neueste zuerst). Die Sichtbarkeit des
+        Handles wird durchgesetzt.
+      tags: [Photos]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Nutzer-ID
+      responses:
+        '200':
+          description: Fotos des Nutzers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoUserResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Fotos sind für den anfragenden Nutzer nicht sichtbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden oder ohne Unsplash-Handle
           content:
             application/json:
               schema:

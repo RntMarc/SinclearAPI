@@ -27,6 +27,7 @@ use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\ReviewController;
 use Sinclear\Api\Controllers\StoryController;
+use Sinclear\Api\Controllers\PhotoController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
@@ -97,6 +98,7 @@ use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Repository\StoryRepository;
+use Sinclear\Api\Repository\PhotoRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
@@ -138,6 +140,7 @@ use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\ExternalDataService;
+use Sinclear\Api\Services\UnsplashService;
 use Sinclear\Api\Services\ExternalDataLocationService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
@@ -448,6 +451,10 @@ return [
     StoryRepository::class => autowire(),
     StoryPolicy::class => autowire(),
     StoryController::class => autowire(),
+
+    PhotoRepository::class => autowire(),
+    UnsplashService::class => autowire(),
+    PhotoController::class => autowire(),
 
     AppController::class => function (ContainerInterface $c): AppController {
         $settings = $c->get(Settings::class);
