@@ -29,7 +29,7 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.continuwuity.rule=(Host(`matrix.sinclear.de`))"
+      - "traefik.http.routers.continuwuity.rule=(Host(`chat.sinclear.de`))"
       - "traefik.http.routers.continuwuity.entrypoints=https"
       - "traefik.http.routers.continuwuity.tls=true"
       - "traefik.http.routers.continuwuity.tls.certresolver=limacity"
@@ -39,7 +39,7 @@ services:
       # Konfigurationsdatei laden (Env-Variablen haben Vorrang vor der TOML).
       CONTINUWUITY_CONFIG: /etc/continuwuity.toml
 
-      CONTINUWUITY_SERVER_NAME: matrix.sinclear.de
+      CONTINUWUITY_SERVER_NAME: chat.sinclear.de
       CONTINUWUITY_DATABASE_PATH: /var/lib/continuwuity
       CONTINUWUITY_ADDRESS: 0.0.0.0
       CONTINUWUITY_PORT: 8008 # Muss zum Traefik-loadbalancer-Label passen
@@ -52,7 +52,7 @@ services:
       CONTINUWUITY_ALLOW_FEDERATION: "false"
 
       # .well-known: Clients erreichen den Homeserver auf Port :443 (Traefik).
-      CONTINUWUITY_WELL_KNOWN: '{ client=https://matrix.sinclear.de,server=matrix.sinclear.de:443 }'
+      CONTINUWUITY_WELL_KNOWN: '{ client=https://chat.sinclear.de,server=chat.sinclear.de:443 }'
 
 volumes:
   sibed-db:

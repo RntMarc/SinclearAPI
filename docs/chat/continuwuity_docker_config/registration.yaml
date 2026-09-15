@@ -28,5 +28,5 @@ sender_localpart: _sinclearbeyond_bot
 namespaces:
   users:
     - exclusive: true
-      regex: '^@sb_[0-9a-z]+:matrix\.sinclear\.de$'
+      regex: '^@sb_[0-9a-z]+:chat\.sinclear\.de$'
 rate_limited: false
