@@ -32,6 +32,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
 | 5 | `cleanup_external_data_cache` | 24 Stunden | Entfernt abgelaufene Cache-Einträge (ExternalDataCache) |
 | 6 | `cleanup_stale_push_subscriptions` | 24 Stunden | Löscht tote Push-Subscriptions (10+ Fehlversuche oder 90 Tage ohne Lebenszeichen) |
+| 7 | `matrix_sync` | 5 Minuten | Synchronisiert Matrix-Accounts und Anzeigenamen über den Application Service |
 
 ## Details
 
@@ -72,6 +73,15 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
   2. Veraltete Endpoints: `lastSeenAt` älter als 90 Tage **und** kein erfolgreicher Versand (`lastSuccessAt`) in diesem Zeitraum. Die 90-Tage-Übergangsfrist schützt nur vorübergehend offline Geräte — Clients re-registrieren bei App-Start/Login/Resume (`POST /notifications/push-subscription` als Upsert) und setzen damit `lastSeenAt` und den Failure-Zähler zurück. Die Frist entspricht der Refresh-Token-Lebensdauer (90 Tage).
 - **Datei:** `src/Services/Cron/Tasks/CleanupStalePushSubscriptionsTask.php`
 - **Hintergrund:** Siehe [notifications/readme.md](./notifications/readme.md) → „Bereinigung toter Subscriptions".
+
+### Matrix Sync
+- **Task-Name:** `matrix_sync`
+- **Intervall:** 300 Sekunden (5 Minuten)
+- **Aktion:** Synchronisiert Matrix-Accounts und Anzeigenamen über den Application Service. Zwei Phasen:
+  1. **Reconciliation:** erkennt Drift (fehlende `MatrixAccount`-Zeilen, `matrixUserId IS NULL`, abweichende Anzeigenamen) und reiht die nötigen Operationen als `pending` ein (selbstheilend, Backfill für Bestandsnutzer).
+  2. **Outbox-Verarbeitung:** arbeitet fällige `MatrixSyncOperation`-Einträge ab (Batch-Limit, exponentieller Backoff bei transienten Fehlern, `failed` bei permanenten Fehlern).
+- **Datei:** `src/Services/Cron/Tasks/MatrixSyncTask.php`
+- **Hintergrund:** Siehe [chat/readme.md](./chat/readme.md) → „Matrix-Auslagerung".
 
 ## CronSchedule-Tabelle
 

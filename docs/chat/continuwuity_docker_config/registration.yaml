@@ -1,0 +1,32 @@
+# Matrix Application-Service-Registrierung für Continuwuity (Vorlage).
+#
+# WICHTIG: Dies ist eine Vorlage mit Platzhaltern. Die echten Tokens werden
+# serverseitig erzeugt (openssl rand -hex 32) und ausschließlich in der
+# PHP-`\.env` abgelegt — NIE committen. Hier nur zur Registrierung eintragen.
+#
+# Registrierung im #admins-Raum per Matrix-Client (z.B. Element):
+#
+#   !admin appservices register
+#   ```
+#   <Inhalt dieser Datei mit ersetzten Platzhaltern>
+#   ```
+#
+# Prüfen:  !admin appservices list-registered   (erwartet "sinclear-beyond")
+#
+# Die `url` MUSS auf den öffentlich erreichbaren Transaktions-Endpunkt der
+# PHP-API zeigen (siehe public/matrix/as-transactions.php + .htaccess-Rewrite
+# `^matrix/as-transactions$`). Beispiel: https://api.sinclear.de/matrix/as-transactions
+#
+# Die Tokens müssen mit MATRIX_AS_TOKEN / MATRIX_HS_TOKEN in der PHP-`.env`
+# übereinstimmen.
+
+id: sinclear-beyond
+url: "https://sinclear.de/api/v2/matrix/as-transactions"
+as_token: "MATRIX_AS_TOKEN"
+hs_token: "MATRIX_HS_TOKEN"
+sender_localpart: _sinclearbeyond_bot
+namespaces:
+  users:
+    - exclusive: true
+      regex: '^@sb_[0-9a-z]+:matrix\.sinclear\.de$'
+rate_limited: false

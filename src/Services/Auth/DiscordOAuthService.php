@@ -12,6 +12,7 @@ use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MatrixSyncService;
 
 final readonly class DiscordOAuthService
 {
@@ -26,6 +27,7 @@ final readonly class DiscordOAuthService
         private OtpTokenRepository $otpTokenRepo,
         private UserPreferenceRepository $userPreferenceRepo,
         private ImageService $imageService,
+        private MatrixSyncService $matrixSyncService,
         private LoggerInterface $logger,
     ) {
         $this->httpClient = new Client();
@@ -291,6 +293,8 @@ final readonly class DiscordOAuthService
 
         $displayName = $discordUser['username'] ?? 'User';
         $user = $repo->create($email, $displayName, $discordUser['id'], $discordUser['avatar'] ?? null);
+
+        $this->matrixSyncService->enqueueCreate($user['id']);
 
         if (!empty($discordUser['avatar'])) {
             try {

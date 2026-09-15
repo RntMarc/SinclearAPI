@@ -92,4 +92,15 @@ $settings['external_data'] = [
     ],
 ];
 
+$settings['matrix'] = [
+    'homeserver_url'   => rtrim($_ENV['MATRIX_HOMESERVER_URL'] ?? '', '/'),
+    'server_name'      => $_ENV['MATRIX_SERVER_NAME'] ?? '',
+    'as_token'         => $_ENV['MATRIX_AS_TOKEN'] ?? '',
+    'hs_token'         => $_ENV['MATRIX_HS_TOKEN'] ?? '',
+    'sender_localpart' => $_ENV['MATRIX_SENDER_LOCALPART'] ?? '_sinclearbeyond_bot',
+    'namespace_prefix' => $_ENV['MATRIX_NAMESPACE_PREFIX'] ?? 'sb_',
+    'password_key'     => $_ENV['MATRIX_PASSWORD_KEY'] ?? '',
+    'sync_batch_size'  => (int)($_ENV['MATRIX_SYNC_BATCH_SIZE'] ?? 50),
+];
+
 return $settings;

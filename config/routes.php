@@ -457,5 +457,9 @@ return function (App $app): void {
         $group->get('/external-data-cache/json', [AdminController::class, 'adminExternalDataCacheJson']);
         $group->delete('/external-data-cache/{id}', [AdminController::class, 'deleteExternalDataCacheEntry']);
         $group->delete('/external-data-cache', [AdminController::class, 'clearExternalDataCache']);
+        $group->get('/matrix', [AdminController::class, 'matrixSync']);
+        $group->get('/matrix/json', [AdminController::class, 'adminMatrixSyncJson']);
+        $group->post('/matrix/operations/{id}/retry', [AdminController::class, 'retryMatrixOperation']);
+        $group->post('/matrix/reconcile', [AdminController::class, 'reconcileMatrixSync']);
     })->add($container->get(AdminMiddleware::class));
 };

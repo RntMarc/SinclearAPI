@@ -33,6 +33,9 @@ use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\ImageService;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
+use Sinclear\Api\Services\MatrixSyncService;
+use Sinclear\Api\Repository\MatrixAccountRepository;
+use Sinclear\Api\Repository\MatrixSyncOperationRepository;
 use PDO;
 
 final readonly class AdminController
@@ -64,6 +67,9 @@ final readonly class AdminController
         private TravelChatService $travelChatService,
         private ImageService $imageService,
         private ExternalDataCacheRepository $externalDataCacheRepo,
+        private MatrixSyncService $matrixSyncService,
+        private MatrixAccountRepository $matrixAccountRepo,
+        private MatrixSyncOperationRepository $matrixOperationRepo,
         private PDO $pdo,
         private LoggerInterface $logger,
     ) {}
@@ -3003,5 +3009,62 @@ ROW;
         }
 
         return ResponseFactory::json(['message' => 'cleared', 'deleted' => $count], 200, $response);
+    }
+
+    public function matrixSync(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $stats = $this->matrixOperationRepo->countByStatus();
+
+        $contentHtml = $this->renderTemplate('matrix_sync.php', [
+            'accountCount' => $this->matrixAccountRepo->countAll(),
+            'pendingCount' => $stats['pending'],
+            'failedCount' => $stats['failed'],
+            'doneCount' => $stats['done'],
+        ]);
+        $html = $this->renderLayout('Matrix-Sync', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminMatrixSyncJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $accounts = $this->matrixAccountRepo->findAllWithUser();
+        $operations = $this->matrixOperationRepo->findActive();
+        $stats = $this->matrixOperationRepo->countByStatus();
+
+        return ResponseFactory::json([
+            'accounts' => $accounts,
+            'operations' => $operations,
+            'stats' => $stats,
+        ], 200, $response);
+    }
+
+    public function retryMatrixOperation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $id = $args['id'] ?? '';
+        if ($id === '') {
+            return ResponseFactory::json(['error' => 'id_required'], 400, $response);
+        }
+
+        if (!$this->matrixSyncService->retryOperation($id)) {
+            return ResponseFactory::json(['error' => 'not_found'], 404, $response);
+        }
+
+        return ResponseFactory::json(['message' => 'retry_scheduled'], 200, $response);
+    }
+
+    public function reconcileMatrixSync(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $this->matrixSyncService->reconcile();
+
+        return ResponseFactory::json(['message' => 'reconciled'], 200, $response);
     }
 }

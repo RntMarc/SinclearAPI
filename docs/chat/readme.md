@@ -1,306 +1,149 @@
-# Chat / Direktnachrichten
+# Chat / Direktnachrichten – Matrix-Auslagerung
 
-1:1-Direktnachrichten und Gruppenchats zwischen Nutzern. Text-only (Bilder/Standort vorbereitet, aber nicht implementiert).
+> **Status:** Phase 1 umgesetzt — Matrix-Account-Provisionierung und
+> Anzeigename-Sync über einen Application Service (Continuwuity).
+> Noch **nicht** enthalten: Räume, Nachrichten, E2EE, Avatar-Sync, Login-Flow.
+
+Die Sinclear Beyond API lagert das Messaging perspektivisch auf einen
+Matrix-Homeserver (Continuwuity, eigener Docker-Container) aus. Diese Phase legt
+das Fundament: Das PHP-Backend provisioniert automatisch — und ausschließlich
+über einen privilegierten Application Service (AS) — Matrix-Accounts für
+Sinclear-Nutzer und hält deren Anzeigenamen synchron.
+
+Der bisherige interne Chat (siehe [readme-old.md](./readme-old.md)) bleibt
+unverändert bestehen; die Matrix-Auslagerung ersetzt ihn in dieser Phase noch
+nicht.
 
 ## Architektur
 
-- **Wahrheit**: `DirectMessage`-Tabelle mit globalem monotonen `seq`-Cursor
-- **Sync über Events**: `ChatEvent`-Tabelle protokolliert jede Nachrichten-Änderung (`message_created`, `message_edited`, `message_deleted`) mit eigenem monotonen `seq`. So werden auch Bearbeitungen und Löschungen bereits zugestellter Nachrichten in Echtzeit propagiert.
-- **Realtime**: Short Polling via `GET /chat/sync?after=<eventSeq>` (adaptiv 2–3 s aktiv, 30 s idle)
-- **Push**: Web Push + UnifiedPush, unterdrückt wenn Empfänger aktiv pollt (`ChatPresence`)
-- **Kein E2EE**: Server kennt Klartext, Push darf Inhalte zeigen
-- **Aufbewahrung**: 90 Tage (Nachrichten + Events), automatisch via Cron
+```
+Sinclear-Nutzer registriert sich (Discord OAuth)
+        │
+        ▼
+DiscordOAuthService::processRegistrationCallback()
+        └─► MatrixSyncService::enqueueCreate(userId)   (Outbox: type=create)
+
+ProfileService::updateProfile() — displayName geändert
+        └─► MatrixSyncService::enqueueDisplayName(userId, name)  (Outbox: type=displayname)
+        │
+        ▼
+┌───────────────────────────────────┐
+│ MySQL                             │
+│  MatrixAccount       (Ist/Soll)   │
+│  MatrixSyncOperation (Outbox)     │
+└───────────────────────────────────┘
+        ▲
+        │  MatrixSyncTask (Cron, alle 5 Min)
+        │   – Reconciliation (Drift erkennen)
+        │   – Outbox verarbeiten (Retry/Backoff)
+        ▼
+┌────────────────────────────────────────┐
+│ MatrixClient (Guzzle)                  │
+│  POST /_matrix/client/v3/register (AS) │
+│  PUT  /_matrix/client/v3/profile/...   │
+└────────────────────────────────────────┘
+        ▼
+Continuwuity (Homeserver, Application Service)
+```
+
+**Kernprinzip:** Die Datenbank ist die Wahrheit darüber, was *gewollt* ist
+(`MatrixAccount`, `MatrixSyncOperation`) und was *bereits umgesetzt* wurde. Der
+Cron-Task ist nur der Motor, der die Differenz abarbeitet. Der Sync ist damit
+selbstheilend: bleibt der Homeserver offline, bleiben Operationen `pending` und
+werden beim nächsten Lauf erneut versucht.
 
 ## Datenmodell
 
 | Tabelle | Zweck |
 |---|---|
-| `ChatConversation` | Konversation (type: direct/group) |
-| `ChatParticipant` | Teilnehmer + `lastReadSeq` + `lastSeenAt` |
-| `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor) |
-| `ChatEvent` | Nachrichten-Events (`message_created`/`message_edited`/`message_deleted`) mit eigenem `seq` |
-| `ChatPresence` | Push-Unterdrückung (`activeUntil`) — **nicht** für Online-Anzeige gedacht |
-| `ChatTyping` | Tippindikator (ephemer, läuft nach 5 s ab) |
-| `TravelChat` | Verknüpfung von Gruppenchat mit Reise oder Event |
+| `MatrixAccount` | Eine Zeile pro Nutzer: `localpart`, `matrixUserId`, verschlüsseltes Passwort, `displayNameSynced` (zuletzt erfolgreich übernommener Name) |
+| `MatrixSyncOperation` | Outbox: eine Zeile pro Zustandsänderung mit Matrix-Bezug (`type`: `create`/`displayname`), Retry-/Backoff-Metadaten, Status (`pending`/`done`/`failed`) |
 
-### Gruppenchat (type: group)
+- `localpart` ist deterministisch: `sb_` + UUID7 **ohne Bindestriche**
+  (`sb_0192f3ab…`). Damit steht `matrixUserId` (`@sb_…:server`) schon **vor**
+  dem Register-Aufruf fest — der `create`-Schritt ist idempotent.
+- **Status-Semantik:** `pending` = noch nicht (vollständig) umgesetzt (inkl.
+  aller Retries), `done` = erfolgreich, `failed` = permanent fehlgeschlagen
+  (wird nicht mehr automatisch versucht, bleibt für Admin/Log sichtbar).
 
-Gruppenchats werden aktuell nur admin-seitig für Reisen und Events erstellt. Manuelle User-Gruppenchats sind geplant, aber nicht implementiert.
+## Sync-Logik
 
-- `ChatConversation.type = 'group'` + `ChatConversation.name = Reise-/Event-Name`
-- `ChatParticipant`-Einträge werden aus `TravelRelation`/`EventRelation` gespiegelt
-- `TravelChat`-Tabelle speichert die Zuordnung (Reise oder Event)
-- Bei Hinzufügen/Entfernen von Teilnehmern wird `ChatParticipant` automatisch synchronisiert
-- `otherUser` ist `null` bei Gruppen; `otherLastReadSeq` ist `null` bei Gruppen
-- `memberCount` enthält die Anzahl der aktiven Teilnehmer
+### Phase A — Reconciliation (Drift erkennen, selbstheilend)
+1. Für alle Nutzer ohne `MatrixAccount` (oder `matrixUserId IS NULL`) ohne
+   bereits `pending` `create`-Operation → `MatrixAccount`-Zeile anlegen
+   (Passwort generieren + verschlüsseln) und `create`-Operation einreihen.
+   Zugleich Backfill für Bestandsnutzer.
+2. Für alle aktiven Accounts mit `User.displayName <> MatrixAccount.displayNameSynced`
+   und ohne `pending` `displayname`-Operation → `displayname`-Operation einreihen.
 
-## DTO-Schemas
+### Phase B — Outbox verarbeiten (Retry/Backoff)
+- `create`: `POST /_matrix/client/v3/register` mit `m.login.application_service`.
+  Erfolg **oder** `M_USER_IN_USE` (idempotenter Retry) → `matrixUserId` setzen,
+  `done`. Danach wird der initiale `displayName` über eine neue
+  `displayname`-Operation gesetzt.
+- `displayname`: `PUT /_matrix/client/v3/profile/{mxid}/displayname` mit
+  `?user_id=` (AS-Impersonation). Erfolg → `displayNameSynced` setzen, `done`.
+- **Fehler:** transient (Netzwerk/Timeout/5xx/429/`M_UNKNOWN`/`M_LIMIT_EXCEEDED`)
+  → `attempts++`, Backoff `min(5min × 2^attempts, 60min)` + Jitter, bleibt
+  `pending`. Permanent (4xx außer `M_USER_IN_USE`) → `failed`.
+- Batch-Limit (Standard 50) pro Lauf als Laufzeitschutz.
 
-Die vollständigen Schemas leben in `openapi.yaml`. Hier die Feldreferenz als Kurzübersicht.
+## Konfiguration
 
-### ChatConversation
+`.env` (siehe `.env.example`):
 
-Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id}` (Detail) zurückgegeben. Beide Endpoints liefern **dasselbe Feldset**.
-
-**1:1-Konversation (direct):**
-
-```json
-{
-  "id": "uuid",
-  "type": "direct",
-  "name": null,
-  "otherUser": {
-    "id": "uuid",
-    "displayName": "Alice",
-    "avatar": "https://..."
-  },
-  "lastMessage": {
-    "content": "Hallo!",
-    "senderId": "uuid",
-    "createdAt": "2025-01-15 10:30:00",
-    "deleted": false
-  },
-  "unreadCount": 3,
-  "lastSeenAt": "2025-01-15 10:25:00",
-  "lastReadSeq": 42,
-  "otherLastReadSeq": 38,
-  "memberCount": null,
-  "createdAt": "2025-01-15 10:00:00",
-  "updatedAt": "2025-01-15 10:30:00"
-}
+```dotenv
+MATRIX_HOMESERVER_URL=https://matrix.example.tld
+MATRIX_SERVER_NAME=matrix.example.tld
+MATRIX_AS_TOKEN=
+MATRIX_HS_TOKEN=
+MATRIX_SENDER_LOCALPART=_sinclearbeyond_bot
+MATRIX_NAMESPACE_PREFIX=sb_
+MATRIX_PASSWORD_KEY=
+MATRIX_SYNC_BATCH_SIZE=50
 ```
 
-**Gruppenchat (group):**
+- Das einmalig generierte Matrix-Passwort (`bin2hex(random_bytes(16))`) wird mit
+  `sodium_crypto_secretbox()` unter `MATRIX_PASSWORD_KEY` (32 Byte, hex)
+  verschlüsselt abgelegt. Es wird **nicht** an Nutzer/Clients ausgeliefert und
+  hat keinen Ändern-/Reset-Flow.
+- Solange `MATRIX_HOMESERVER_URL`, `MATRIX_AS_TOKEN`, `MATRIX_SERVER_NAME` oder
+  `MATRIX_PASSWORD_KEY` fehlen, ist der Sync inaktiv (No-op) — die übrigen
+  Flows (Registrierung, Profil) bleiben unbeeinflusst.
 
-```json
-{
-  "id": "uuid",
-  "type": "group",
-  "name": "Sommerurlaub 2025",
-  "image": "data:image/jpeg;base64,...",
-  "otherUser": null,
-  "lastMessage": { "..." },
-  "unreadCount": 5,
-  "lastSeenAt": null,
-  "lastReadSeq": 42,
-  "otherLastReadSeq": null,
-  "memberCount": 4,
-  "createdAt": "2025-06-01 09:00:00",
-  "updatedAt": "2025-06-15 14:00:00"
-}
-```
+## Application Service
 
-| Feld | Typ | Beschreibung |
-|---|---|---|
-| `id` | string (uuid) | Konversations-ID |
-| `type` | string | `direct` oder `group` |
-| `name` | string\|null | Name (für Gruppen, null bei 1:1) |
-| `image` | string\|null | Icon/Avatar der Gruppenkonversation (base64-encoded Bild); null bei 1:1 und wenn nicht gesetzt |
-| `otherUser` | object\|null | Der andere Teilnehmer (`id`, `displayName`, `avatar`); null bei Gruppen |
-| `lastMessage` | object\|null | Vorschau der letzten Nachricht (null wenn keine) |
-| `unreadCount` | int | Anzahl ungelesener Nachrichten |
-| `lastSeenAt` | string\|null | Letzter Seitenaufruf des anderen Teilnehmers; null bei Gruppen |
-| `lastReadSeq` | int | Eigener Lesestand (höchster gelesener seq) |
-| `otherLastReadSeq` | int\|null | Lesestand des Gegenübers; null bei Gruppen |
-| `memberCount` | int\|null | Anzahl der Teilnehmer (nur bei Gruppen; null bei 1:1) |
-| `createdAt` | string | Erstellungszeitpunkt (UTC) |
-| `updatedAt` | string | Zeitpunkt der letzten Aktivität (UTC) |
+- **Transaktions-Endpunkt (Stub):** `public/matrix/as-transactions.php`
+  (`/matrix/as-transactions` via `.htaccess`-Rewrite). Validiert ausschließlich
+  das `hs_token` und antwortet mit `{}` — eingehende Events werden in dieser
+  Phase nicht verarbeitet.
+- **Registrierung:** im `#admins`-Raum per `!admin appservices register` mit dem
+  Registration-YAML (Vorlage: `docs/chat/continuwuity_docker_config/registration.yaml`,
+  Docker-Setup: `docs/chat/continuwuity_docker_config/`).
+- **Sicherheit:** `as_token`/`hs_token` nur in `.env`; exklusiver Namensraum
+  `sb_` stellt sicher, dass nur der AS diese Accounts anlegt (öffentliche
+  Registrierung gesperrt).
 
-### DirectMessage
+## Sicherheit
 
-```json
-{
-  "id": "uuid",
-  "seq": 42,
-  "conversationId": "uuid",
-  "senderId": "uuid",
-  "sender": {
-    "id": "uuid",
-    "displayName": "Alice",
-    "avatar": "https://..."
-  },
-  "type": "text",
-  "content": "Hallo!",
-  "payload": null,
-  "clientId": "client-123",
-  "editedAt": null,
-  "deleted": false,
-  "createdAt": "2025-01-15 10:30:00"
-}
-```
-
-- `content`: Leerstring wenn `deleted == true`
-- `payload`: null wenn `deleted == true` oder `type == text`
-- `sender`: Engeschachteltes Objekt mit Absender-Details (aus User-Tabelle)
-
-### ChatEvent
-
-```json
-{
-  "seq": 100,
-  "conversationId": "uuid",
-  "actorId": "uuid",
-  "type": "message_created",
-  "messageId": "uuid",
-  "message": { ... }
-}
-```
-
-- `message`: `DirectMessage`-Objekt (aktueller Zustand) oder null
-- `type`: `message_created` | `message_edited` | `message_deleted`
-
-### ChatSyncResponse
-
-Antwort von `GET /chat/sync`:
-
-```json
-{
-  "data": {
-    "events": [
-      {
-        "seq": 100,
-        "conversationId": "uuid",
-        "actorId": "uuid",
-        "type": "message_created",
-        "messageId": "uuid",
-        "message": { ... }
-      }
-    ],
-    "conversations": [
-      {
-        "conversationId": "uuid",
-        "unreadCount": 3,
-        "lastSeenAt": "2025-01-15 10:25:00",
-        "otherLastReadSeq": 42
-      }
-    ],
-    "typing": {
-      "uuid-conversation-id": ["uuid-user-1"]
-    }
-  },
-  "meta": {
-    "seq": 100,
-    "hasMore": false
-  }
-}
-```
-
-- `events`: Alle Nachrichten-Events mit `seq > after` (neu/bearbeitet/gelöscht)
-- `conversations`: **Voll-Liste** aller Konversationen (bis 100), nicht nur Delta
-- `typing`: Map von Konversations-ID → Array tippender User-IDs
-- `meta.seq`: Höchster gesehener Event-seq (für nächsten Sync als `after`-Parameter verwenden)
-- `meta.hasMore`: true wenn `limit` erreicht wurde → weiter pollen
-
-## REST-API
-
-| Methode | Pfad | Zweck |
-|---|---|---|
-| GET | `/chat/sync?after=<eventSeq>&limit=` | **Optimierte Sync-Route:** Nachrichten-Events + Unread + Tippzustände |
-| GET | `/chat/conversations` | Konversationsliste (letzte Nachricht, Unread, lastSeenAt) |
-| POST | `/chat/conversations` | 1:1-Konversation öffnen (idempotent: get-or-create) → 200 (bestehend) oder 201 (neu) |
-| GET | `/chat/conversations/{id}` | Konversation + Teilnehmer (lastReadSeq, otherLastReadSeq) |
-| GET | `/chat/conversations/{id}/messages?before=<seq>&limit=50` | History (Cursor `before`) |
-| POST | `/chat/conversations/{id}/messages` | Senden (`{clientId, type, content, payload?}`) |
-| PATCH | `/chat/messages/{id}` | Bearbeiten (nur eigener, 10 Min-Fenster) |
-| DELETE | `/chat/messages/{id}` | Löschen für alle (Platzhalter "Nachricht gelöscht") |
-| POST | `/chat/conversations/{id}/read` | Lesestand setzen (`{seq}`) |
-| POST | `/chat/conversations/{id}/typing` | Tippindikator (`{typing: bool}`) |
-
-### Admin: Travel-Gruppenchats
-
-| Methode | Pfad | Zweck |
-|---|---|---|
-| POST | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise erstellen (idempotent) |
-| DELETE | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise löschen |
-| PATCH | `/admin/travel/trips/{id}/chat` | Gruppenchat-Icon für Reise setzen/entfernen |
-| POST | `/admin/travel/events/{id}/chat` | Gruppenchat für Event erstellen (idempotent) |
-| DELETE | `/admin/travel/events/{id}/chat` | Gruppenchat für Event löschen |
-| PATCH | `/admin/travel/events/{id}/chat` | Gruppenchat-Icon für Event setzen/entfernen |
-
-**Verhalten:**
-- Bei Erstellung wird `ChatConversation` mit `type=group` + Name = Reise-/Event-Name angelegt
-- `TravelChat`-Eintrag verknüpft den Chat mit Reise oder Event
-- `ChatParticipant` wird aus den aktuellen Reise-/Event-Teilnehmern gespiegelt (via `TravelRelation`/`EventRelation`)
-- Idempotent: GET oder POST gibt den bestehenden Chat zurück
-- Bei Löschung werden `TravelChat`, `ChatConversation` und assoziierte `ChatParticipant`/`DirectMessage`/`ChatEvent` gelöscht (FK-Cascade)
-- Automatischer Sync: `AdminController` ruft `syncTripMembers`/`syncEventMembers` bei Hinzufügen/Entfernen von Teilnehmern auf
-
-## Sync-Flow
-
-1. Client merkt sich höchsten **Event**-`seq`-Wert
-2. Pollt `GET /chat/sync?after=<letzterEventSeq>` alle 2–3 s (aktiv) oder bis 30 s (idle)
-3. Erhält:
-   - `events`: `message_created` (neue Nachricht hinzufügen), `message_edited` (Inhalt/`editedAt` ersetzen), `message_deleted` (als gelöscht markieren)
-   - `conversations`: **Voll-Liste** aller Konversationen mit `unreadCount`, `lastSeenAt`, `otherLastReadSeq`
-   - `typing`: Tippzustände
-4. Presence wird bei jedem Sync aktualisiert (`activeUntil = now + 5 s`)
-5. Push wird nur gesendet wenn Empfänger NICHT aktiv pollt
-
-**Hinweis:** `conversations` ist keine Delta-Antwort. Der Server liefert bei jedem Sync-Aufruf den kompletten Stand aller Konversationen (bis `limit=100`). Der Client kann die Liste direkt verwenden, ohne本地en Cache zu mergen.
-
-## Online-Anzeige / Presence
-
-- `ChatPresence.activeUntil` ist **server-intern** für Push-Unterdrückung. Das Feld istClients **nicht** verfügbar.
-- Das einzige verfügbare Feld für „war der andere online?" ist `lastSeenAt` (aus `ChatParticipant`). Es zeigt den Zeitpunkt des letzten Seitenaufrufs des anderen Teilnehmers.
-- Ein `online`-Feld wird **nicht** Exposed. Clients können `lastSeenAt` verwenden, um z.B. „zuletzt online vor 5 Minuten" anzuzeigen.
-- `ChatPresence` könnte in Zukunft für eine heartbeat-basierte Online-Anzeige erweitert werden (z.B. `isActive: true` wenn `activeUntil > now`), ist aber aktuell nicht vorgesehen.
-
-## Lesestatus (Read Receipts)
-
-- Pro Teilnehmer wird `lastReadSeq` geführt. Der Sender sieht „gelesen", sobald `otherLastReadSeq >= msg.seq`.
-- Der Sender erhält den Lesestatus über:
-  - `conversations[].otherLastReadSeq` im Sync (Voll-Liste)
-  - `ChatConversation.otherLastReadSeq` in der Konversationsliste
-  - `ChatConversation.otherLastReadSeq` in Detail-Endpoints (`getConversation`, `openConversation`)
-- Der Client markiert eigene Nachrichten mit `seq <= otherLastReadSeq` als gelesen.
-- `POST /chat/conversations/{id}/read` setzt den eigenen Lesestand; das `seq` wird serverseitig auf das Maximum der Konversation begrenzt (Clamp).
-
-## Idempotenz
-
-- `POST …/messages` mit `clientId`: **UNIQUE-Constraint** `(senderId, clientId)` + serverseitiger Lookup innerhalb derselben Konversation verhindern Duplikate bei Retry (auch unter parallelen Requests). Ein wiederverwendetes `clientId` in einer anderen Konversation wird als neuer Sendeversuch behandelt.
-
-## Nachrichten-Aktionen
-
-- **Bearbeiten**: Nur eigener Sender, innerhalb 10 Minuten. Setzt `editedAt` und erzeugt `message_edited`-Event.
-- **Löschen für alle**: Nur Sender. `deletedAt` gesetzt, `content`/`payload` geleert. Empfänger sieht Platzhalter. Erzeugt `message_deleted`-Event.
-- **Gelesen**: `lastReadSeq` pro Teilnehmer. Sender sieht "gelesen" wenn `empfänger.lastReadSeq >= msg.seq`.
-
-## Notifications
-
-- Typ `direct_message` in `NotificationService::CONTENT_TEMPLATES`
-- **Body**: `"{Absender}: {Vorschau}"` (Vorschau auf 160 Zeichen gekürzt) — Push zeigt damit den Nachrichteninhalt
-- **Bündelung**: Eine Notification pro Konversation (`dedupeKey = "chat:<conversationId>"`)
-- Coalesced Upsert: Existierende ungelesene Notification wird aktualisiert statt neu anzulegen
-- Denylist-Präferenz: `direct_message` mit `customData.userIds` (wie `story_post`)
-- **Push-Unterdrückung**: Ein aktiver Empfänger (pollt) erhält weiterhin den In-App-Listeneintrag, aber keinen Push
-
-## Moderation
-
-Chat-Nachrichten haben aktuell **keinen** `ModerationObjectType`. Die `VALID_OBJECT_TYPES` in `ModerationRequestService` enthalten:
-
-```
-user, forum_post, recipe, explore_place, recipe_review, forum_comment,
-explore_comment, feedback_suggestion, feedback_comment, travel_trip,
-travel_event, travel_accommodation, travel_ticket, subscription,
-calendar_event, story
-```
-
-`chat_message` fehlt. Laut AGENTS.md muss jeder User-Content einen Report-Flag haben. **TODO:** `chat_message` zu `VALID_OBJECT_TYPES` hinzufügen und `resolveOwner` für Chat-Nachrichten implementieren. Der Report-Button für Chat kann ggf. auf die nächste Iteration verschoben werden.
+- `MATRIX_AS_TOKEN`/`MATRIX_HS_TOKEN` ausschließlich in `.env` (durch
+  `.htaccess`/`FilesMatch` geschützt), nie im Git.
+- Generiertes Passwort verschlüsselt (`sodium_crypto_secretbox`).
+- AS-Endpunkt validiert `hs_token` strikt (`hash_equals`).
 
 ## Cron
 
-- `CleanupOldDirectMessagesTask`: Löscht Nachrichten **und Events** älter als 90 Tage (gebatcht, LIMIT 1000)
-- Räumt verwaiste Konversationen, abgelaufene Presence-Einträge und Tippindikatoren auf
-- Intervall: 24 Stunden
+- `matrix_sync` (300 s): `MatrixSyncTask` → `MatrixSyncService::reconcile()` +
+  `processDueOperations()`. Siehe [../CRON.md](../CRON.md).
 
-## Rate-Limits (per Nutzer)
+## Admin-Dashboard
 
-- 20 Nachrichten/Minute pro Nutzer
-- 30/Minute für `…/typing`
-- Polling nicht drosseln
-- Antwort bei Überschreitung: `429 rate_limit_exceeded`
+`/api/v2/admin/matrix` — Übersicht über `MatrixAccount`-Zeilen, offene/felhlgeschlagene
+`MatrixSyncOperation`-Einträge, Aktion „Neu versuchen" (setzt `failed`→`pending`,
+`nextAttemptAt=NULL`) und „Alle reconciliieren".
 
-## Gültige `type`-Werte (aktuell)
+## Bewusst NICHT enthalten (spätere Schritte)
 
-- `text` (einziger implementierter Typ)
-- `image`, `location` vorbereitet aber nicht implementiert
+Räume/Kontakte, Nachrichten, E2EE, eingehende Events, Avatar-Sync, Passwort-
+Anzeige/-Änderung/-Reset, Account-Deaktivierung/-Löschung, Flutter-Integration,
+Push/Notification-Integration (kein neuer Notification-Typ).

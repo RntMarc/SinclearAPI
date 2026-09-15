@@ -20,3 +20,7 @@ app_version.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local temp dev stuff
+/docs/chat/continuwuity_docs_from-git
+/docs/chat/database_dump_2026-09-15_20-00

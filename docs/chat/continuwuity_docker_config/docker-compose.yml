@@ -1,0 +1,62 @@
+# Continuwuity (Matrix-Homeserver) — Docker-Compose für Sinclear Beyond
+#
+# Ablage auf dem Server: /home/marc/docker/sinclear-beyond-chat/
+#   ├── docker-compose.yml
+#   ├── continuwuity.toml
+#   ├── continuwuity-resolv.conf
+#   └── registration.yaml   (Appservice-Registrierung, siehe unten)
+#
+# Start:  docker compose up -d
+# Logs:   docker compose logs -f continuwuity
+#
+# Wichtig: Der Application Service (sinclear-beyond) wird NICHT hier, sondern
+# im #admins-Raum per `!admin appservices register` mit dem Inhalt von
+# registration.yaml registriert. Siehe docs/chat/readme.md.
+
+services:
+  sinclear-beyond-chat:
+    image: "forgejo.ellis.link/continuwuation/continuwuity:latest"
+    container_name: sinclear-beyond-chat
+    restart: unless-stopped
+    command: /sbin/conduwuit
+    volumes:
+      - sibed-db:/var/lib/continuwuity
+      # Eigene DNS-Resolver statt Docker-DNS (verhindert Federation-Timeouts)
+      - /home/marc/docker/sinclear-beyond-chat/continuwuity-resolv.conf:/etc/resolv.conf:ro
+      # Vollständige Server-Konfiguration (allow_registration/federation=false)
+      - /home/marc/docker/sinclear-beyond-chat/continuwuity.toml:/etc/continuwuity.toml:ro
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.continuwuity.rule=(Host(`matrix.sinclear.de`))"
+      - "traefik.http.routers.continuwuity.entrypoints=https"
+      - "traefik.http.routers.continuwuity.tls=true"
+      - "traefik.http.routers.continuwuity.tls.certresolver=limacity"
+      - "traefik.http.routers.continuwuity.service=continuwuity"
+      - "traefik.http.services.continuwuity.loadbalancer.server.port=8008"
+    environment:
+      # Konfigurationsdatei laden (Env-Variablen haben Vorrang vor der TOML).
+      CONTINUWUITY_CONFIG: /etc/continuwuity.toml
+
+      CONTINUWUITY_SERVER_NAME: matrix.sinclear.de
+      CONTINUWUITY_DATABASE_PATH: /var/lib/continuwuity
+      CONTINUWUITY_ADDRESS: 0.0.0.0
+      CONTINUWUITY_PORT: 8008 # Muss zum Traefik-loadbalancer-Label passen
+
+      # Registrierung und Föderation sperren. Der Application Service legt
+      # Accounts über den exklusiven Namensraum "sb_" an und umgeht die Sperre
+      # gezielt. Der erste Admin-Account wird über den einmaligen
+      # Registrierungs-Token aus dem Container-Log angelegt.
+      CONTINUWUITY_ALLOW_REGISTRATION: "false"
+      CONTINUWUITY_ALLOW_FEDERATION: "false"
+
+      # .well-known: Clients erreichen den Homeserver auf Port :443 (Traefik).
+      CONTINUWUITY_WELL_KNOWN: '{ client=https://matrix.sinclear.de,server=matrix.sinclear.de:443 }'
+
+volumes:
+  sibed-db:
+
+networks:
+  proxy:
+    external: true

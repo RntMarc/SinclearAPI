@@ -145,6 +145,10 @@ use Sinclear\Api\Services\ExternalDataLocationService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MatrixClient;
+use Sinclear\Api\Services\MatrixSyncService;
+use Sinclear\Api\Repository\MatrixAccountRepository;
+use Sinclear\Api\Repository\MatrixSyncOperationRepository;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
@@ -335,6 +339,13 @@ return [
     NominatimCache::class => autowire(),
 
     ClientInterface::class => fn(): ClientInterface => new Client(['timeout' => 15]),
+
+    \GuzzleHttp\ClientInterface::class => fn(): \GuzzleHttp\ClientInterface => new Client(['timeout' => 15]),
+
+    MatrixAccountRepository::class => autowire(),
+    MatrixSyncOperationRepository::class => autowire(),
+    MatrixClient::class => autowire(),
+    MatrixSyncService::class => autowire(),
 
     TravelTripRepository::class => autowire(),
     TravelEventRepository::class => autowire(),

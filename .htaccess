@@ -12,6 +12,9 @@
     # damit DAV-OPTIONS-Requests an dav.php gehen)
     RewriteRule ^dav($|/) public/dav.php [L]
 
+    # Matrix Application-Service-Transaktions-Endpunkt (Stub)
+    RewriteRule ^matrix/as-transactions$ public/matrix/as-transactions.php [L]
+
     # RFC 6764 Discovery (CalDAV/CardDAV)
     RewriteRule ^\.well-known/(caldav|carddav)/?$ public/dav.php [L]
 
@@ -30,6 +33,7 @@
     RewriteRule ^bin/ - [F,L]
     RewriteRule ^config/ - [F,L]
     RewriteRule ^database/ - [F,L]
+    RewriteRule ^deploy/ - [F,L]
     RewriteRule ^events/ - [F,L]
     RewriteRule ^src/ - [F,L]
     RewriteRule ^vendor/ - [F,L]

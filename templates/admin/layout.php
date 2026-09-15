@@ -183,6 +183,7 @@
             <a href="/api/v2/admin/moderation-requests" class="nav-link" data-path="/api/v2/admin/moderation-requests">Moderations-Anfragen</a>
             <a href="/api/v2/admin/notifications" class="nav-link" data-path="/api/v2/admin/notifications">Benachrichtigungen</a>
             <a href="/api/v2/admin/external-data-cache" class="nav-link" data-path="/api/v2/admin/external-data-cache">Externe Daten</a>
+            <a href="/api/v2/admin/matrix" class="nav-link" data-path="/api/v2/admin/matrix">Matrix-Sync</a>
         </nav>
         <div class="user-info">
             <div>{{userEmail}}</div>

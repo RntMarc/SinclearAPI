@@ -87,6 +87,13 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Live-Vorschau der Benachrichtigung
 - Push-Zustellung an alle registrierten Geräte des Empfängers (Web Push + UnifiedPush)
 
+### Matrix-Sync (`/matrix`) – **voll implementiert**
+- Übersicht über `MatrixAccount`-Zeilen (Nutzer, Matrix-User-ID, `displayNameSynced` vs. aktueller Name)
+- Liste der offenen/fehlgeschlagenen `MatrixSyncOperation`-Einträge (`type`, Status, Versuche, `nextAttemptAt`, `lastError`)
+- Aktion „Neu versuchen" pro Operation (setzt `failed` → `pending`, `nextAttemptAt = NULL`, `attempts = 0`)
+- Aktion „Alle reconciliieren" (stößt Phase A der Reconciliation manuell an)
+- Hintergrund: [../chat/readme.md](../chat/readme.md)
+
 ## API-Endpoints
 
 | Methode | Pfad | Beschreibung |
@@ -130,6 +137,10 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/notifications` | Benachrichtigungs-Testseite (geschützt) |
 | GET | `/admin/notifications/json` | Entitäten als JSON für Dropdowns (geschützt) |
 | POST | `/admin/notifications/send` | Test-Benachrichtigung senden (geschützt) |
+| GET | `/admin/matrix` | Matrix-Sync-Übersicht (geschützt) |
+| GET | `/admin/matrix/json` | Matrix-Accounts + Operationen als JSON (geschützt) |
+| POST | `/admin/matrix/operations/{id}/retry` | Operation für erneuten Versuch zurücksetzen (geschützt) |
+| POST | `/admin/matrix/reconcile` | Reconciliation manuell anstoßen (geschützt) |
 
 ## Responsive Layout
 

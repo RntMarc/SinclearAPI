@@ -16,6 +16,7 @@ use Sinclear\Api\Repository\UserUpdateRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
+use Sinclear\Api\Services\MatrixSyncService;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
@@ -67,6 +68,7 @@ final readonly class ProfileService
         private LoggerInterface $logger,
         private Settings $settings,
         private ImageService $imageService,
+        private MatrixSyncService $matrixSyncService,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -185,6 +187,10 @@ final readonly class ProfileService
             $this->logger->debug('ProfileService: userUpdates applied successfully');
         } else {
             $this->logger->debug('ProfileService: no userUpdates to apply');
+        }
+
+        if (isset($userUpdates['displayName'])) {
+            $this->matrixSyncService->enqueueDisplayName($user->id, $userUpdates['displayName']);
         }
 
         if (!empty($contactUpdates)) {
