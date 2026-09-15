@@ -2,6 +2,7 @@
 
 namespace Sinclear\Api\Tests\Unit;
 
+use GuzzleHttp\ClientInterface as GuzzleClientInterface;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\TestCase;
@@ -10,6 +11,8 @@ use Psr\Log\NullLogger;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
+use Sinclear\Api\Repository\MatrixAccountRepository;
+use Sinclear\Api\Repository\MatrixSyncOperationRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
 use Sinclear\Api\Repository\UserRepository;
@@ -18,6 +21,8 @@ use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MatrixClient;
+use Sinclear\Api\Services\MatrixSyncService;
 use Slim\Psr7\Response;
 use Symfony\Component\Mailer\MailerInterface;
 
@@ -68,12 +73,21 @@ final class AuthControllerTest extends TestCase
         $logger = new NullLogger();
         $imageService = new ImageService($logger);
 
+        $matrixSyncService = new MatrixSyncService(
+            new MatrixAccountRepository($this->pdo),
+            new MatrixSyncOperationRepository($this->pdo),
+            new MatrixClient($this->createMock(GuzzleClientInterface::class), $settings),
+            $settings,
+            $logger,
+        );
+
         $discordService = new DiscordOAuthService(
             $settings,
             $this->pdo,
             $this->otpTokenRepo,
             $userPrefRepo,
             $imageService,
+            $matrixSyncService,
             $logger,
         );
 
