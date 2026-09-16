@@ -179,9 +179,11 @@ class DirectMessagePublishWiringTest extends TestCase
         $messageRepo = new DirectMessageRepository($this->db);
         $userRepo = new UserRepository($this->db);
         $notificationService = new NotificationService(
-            db: $this->db,
-            pushSubscriptionRepo: new \Sinclear\Api\Repository\PushSubscriptionRepository($this->db),
-            preferenceRepo: new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db),
+            notificationRepo: new \Sinclear\Api\Repository\NotificationRepository($this->db),
+            pushSubRepo: new \Sinclear\Api\Repository\PushSubscriptionRepository($this->db),
+            preferenceService: new \Sinclear\Api\Services\NotificationPreferenceService(
+                new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db)
+            ),
             logger: new \Psr\Log\NullLogger(),
         );
         $rateLimiter = new RateLimiter();
@@ -247,9 +249,11 @@ class DirectMessagePublishWiringTest extends TestCase
             messageRepo: new DirectMessageRepository($this->db),
             userRepo: new UserRepository($this->db),
             notificationService: new NotificationService(
-                db: $this->db,
-                pushSubscriptionRepo: new \Sinclear\Api\Repository\PushSubscriptionRepository($this->db),
-                preferenceRepo: new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db),
+                notificationRepo: new \Sinclear\Api\Repository\NotificationRepository($this->db),
+                pushSubRepo: new \Sinclear\Api\Repository\PushSubscriptionRepository($this->db),
+                preferenceService: new \Sinclear\Api\Services\NotificationPreferenceService(
+                    new \Sinclear\Api\Repository\NotificationPreferenceRepository($this->db)
+                ),
                 logger: new \Psr\Log\NullLogger(),
             ),
             rateLimiter: new RateLimiter(),

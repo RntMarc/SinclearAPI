@@ -6,7 +6,7 @@ use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\UserRepository;
-use Sinclear\Api\Services\Centrifugo\CentrifugoClient;
+use Sinclear\Api\Services\Centrifugo\CentrifugoClientInterface;
 use Sinclear\Api\Services\Centrifugo\ChatEventPublisher;
 
 final readonly class DirectMessageService
@@ -27,7 +27,7 @@ final readonly class DirectMessageService
         private UserRepository $userRepo,
         private NotificationService $notificationService,
         private RateLimiter $rateLimiter,
-        private CentrifugoClient $centrifugoClient,
+        private CentrifugoClientInterface $centrifugoClient,
         private ChatEventPublisher $eventPublisher,
     ) {}
 

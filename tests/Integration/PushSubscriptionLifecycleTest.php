@@ -33,8 +33,15 @@ class PushSubscriptionLifecycleTest extends TestCase
         );
         $this->db->exec("SET time_zone = '+00:00'");
 
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS DirectMessage");
+        $this->db->exec("DROP TABLE IF EXISTS ChatParticipant");
+        $this->db->exec("DROP TABLE IF EXISTS ChatConversation");
+        $this->db->exec("DROP TABLE IF EXISTS Notification");
+        $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS User");
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
 
         $this->db->exec("
             CREATE TABLE User (
@@ -76,8 +83,15 @@ class PushSubscriptionLifecycleTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS DirectMessage");
+        $this->db->exec("DROP TABLE IF EXISTS ChatParticipant");
+        $this->db->exec("DROP TABLE IF EXISTS ChatConversation");
+        $this->db->exec("DROP TABLE IF EXISTS Notification");
+        $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS User");
+        $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
 
     private function insert(string $endpoint): string
@@ -146,8 +160,8 @@ class PushSubscriptionLifecycleTest extends TestCase
         $this->assertSame(0, (int) $row['consecutiveFailures']);
         $this->assertNull($row['lastError']);
         $this->assertNull($row['lastErrorAt']);
-        // lastSeenAt is fresh again (same day)
-        $this->assertGreaterThan(date('Y-m-d') . ' 00:00:00', $row['lastSeenAt']);
+        // lastSeenAt is fresh again (same UTC day, DB stores UTC)
+        $this->assertGreaterThan(gmdate('Y-m-d') . ' 00:00:00', $row['lastSeenAt']);
     }
 
     public function testMarkSuccessResetsFailures(): void

@@ -133,7 +133,7 @@ class CentrifugoProxyTest extends TestCase
     {
         $this->createConversationWithParticipants('conv-1', ['user-1', 'user-2']);
 
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody(['user' => 'user-1', 'channel' => 'chat:conv-1']);
         $response = new Response();
 
@@ -148,7 +148,7 @@ class CentrifugoProxyTest extends TestCase
     {
         $this->createConversationWithParticipants('conv-1', ['user-1', 'user-2']);
 
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody(['user' => 'user-3', 'channel' => 'chat:conv-1']);
         $response = new Response();
 
@@ -159,7 +159,7 @@ class CentrifugoProxyTest extends TestCase
 
     public function testSubscribeReturns400ForInvalidChannel(): void
     {
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody(['user' => 'user-1', 'channel' => 'invalid-channel']);
         $response = new Response();
 
@@ -172,7 +172,7 @@ class CentrifugoProxyTest extends TestCase
     {
         $this->createConversationWithParticipants('conv-1', ['user-1']);
 
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody(['channel' => 'chat:conv-1']);
         $response = new Response();
 
@@ -183,7 +183,7 @@ class CentrifugoProxyTest extends TestCase
 
     public function testSubscribeReturns400ForEmptyBody(): void
     {
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody(null);
         $response = new Response();
 
@@ -198,7 +198,7 @@ class CentrifugoProxyTest extends TestCase
     {
         $this->createConversationWithParticipants('conv-1', ['user-1', 'user-2']);
 
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody([
                 'user' => 'user-1',
                 'channel' => 'chat:conv-1',
@@ -217,7 +217,7 @@ class CentrifugoProxyTest extends TestCase
     {
         $this->createConversationWithParticipants('conv-1', ['user-1']);
 
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody([
                 'user' => 'user-1',
                 'channel' => 'chat:conv-1',
@@ -236,7 +236,7 @@ class CentrifugoProxyTest extends TestCase
     {
         $this->createConversationWithParticipants('conv-1', ['user-1']);
 
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody([
                 'user' => 'user-3',
                 'channel' => 'chat:conv-1',
@@ -251,7 +251,7 @@ class CentrifugoProxyTest extends TestCase
 
     public function testPublishReturns400ForInvalidChannel(): void
     {
-        $request = ServerRequestFactory::create()
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
             ->withParsedBody([
                 'user' => 'user-1',
                 'channel' => 'bad:channel',
