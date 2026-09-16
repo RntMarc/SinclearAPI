@@ -12,9 +12,13 @@ class FakeCentrifugoClient implements CentrifugoClientInterface
     public string $unsubscribedChannel = '';
     public string $unsubscribedUserId = '';
     public string $disconnectedUserId = '';
+    public ?\Throwable $publishException = null;
 
     public function publish(string $channel, array $data): void
     {
+        if ($this->publishException !== null) {
+            throw $this->publishException;
+        }
         $this->publishedChannel = $channel;
         $this->publishedData = $data;
     }

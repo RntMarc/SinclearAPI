@@ -62,7 +62,7 @@ Client ──WS publish (typing)──► Centrifugo ──Publish-Proxy──�
 2. **`CentrifugoTokenService.php`**
    - Handgebauter HS256-JWT (analog `TokenService::generateToken`, aber `hash_hmac('sha256')`)
    - `generateConnectionToken(string $userId): string` – liest Secret/TTL/Issuer/Audience aus Settings
-   - `parseToken(string $token): array` – für Tests/Validierung
+   - `parseToken(string $token): ?object` – für Tests/Validierung (liefertstdClass-Payload oder null)
 
 3. **`ChatEventPublisher.php`**
    - Baut Event-Payloads und published via `CentrifugoClient`

@@ -72,6 +72,35 @@ class ChatEventPublisherTest extends TestCase
         $this->assertSame('user-1', $this->fakeClient->publishedData['userId']);
     }
 
+    public function testPublishMessageCreatedToleratesClientException(): void
+    {
+        $this->fakeClient->publishException = new \RuntimeException('Centrifugo unavailable');
+
+        $message = $this->createFormattedMessage('conv-err');
+
+        // Must not throw
+        $this->publisher->publishMessageCreated($message);
+        $this->assertTrue(true);
+    }
+
+    public function testPublishMessageDeletedToleratesClientException(): void
+    {
+        $this->fakeClient->publishException = new \RuntimeException('Connection refused');
+
+        // Must not throw
+        $this->publisher->publishMessageDeleted('conv-err', 'msg-err', 1);
+        $this->assertTrue(true);
+    }
+
+    public function testPublishReadToleratesClientException(): void
+    {
+        $this->fakeClient->publishException = new \RuntimeException('Timeout');
+
+        // Must not throw
+        $this->publisher->publishRead('conv-err', 1, 1, 'user-1');
+        $this->assertTrue(true);
+    }
+
     private function createFormattedMessage(string $conversationId): array
     {
         return [
