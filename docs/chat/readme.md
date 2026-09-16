@@ -64,7 +64,7 @@ Response:
 | `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor) |
 | `TravelChat` | Verknüpfung von Gruppenchat mit Reise oder Event |
 
-*Entfernt (nicht mehr benötigt): `ChatEvent`, `ChatPresence`, `ChatTyping`*
+*Entfernt (nicht mehr benötigt): `ChatEvent`, `ChatPresence`, `ChatTyping` – plus Legacy-Tabellen `ChatMessages`, `ChatRooms`, `ChatRoomMembers`, `ChatReadReceipt`, `DirectChat`, `UserPresence`, `SseEvent` (per Migration `20260916120000_drop_chat_realtime_tables.sql` gelöscht)*
 
 ### Gruppenchat (type: group)
 
@@ -359,7 +359,7 @@ calendar_event, story
 - `CleanupOldDirectMessagesTask`: Löscht Nachrichten älter als 90 Tage (gebatcht, LIMIT 1000)
 - Räumt verwaiste Konversationen auf
 - Intervall: 24 Stunden
-- *Entfernt: ChatEvent, ChatPresence, ChatTyping Cleanup (Tabellen werden in Schritt 2C gelöscht)*
+- *Entfernt: ChatEvent, ChatPresence, ChatTyping Cleanup (Tabellen per Migration `20260916120000_drop_chat_realtime_tables.sql` gelöscht)*
 
 ## Rate-Limits (per Nutzer)
 

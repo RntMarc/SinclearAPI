@@ -56,7 +56,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Task-Name:** `cleanup_direct_messages`
 - **Intervall:** 86400 Sekunden (24 Stunden)
 - **Aktion:** Löscht `DirectMessage`-Einträge älter als 90 Tage in Batches (LIMIT 1000, um lange Locks zu vermeiden). Räumt verwaiste `ChatConversation`-Einträge (keine Nachrichten, älter als 1 Tag) auf.
-- **Hinweis:** `ChatEvent`, `ChatPresence` und `ChatTyping` werden nicht mehr bereinigt (Tabellen werden entfernt).
+- **Hinweis:** `ChatEvent`, `ChatPresence` und `ChatTyping` wurden entfernt (Migration `20260916120000_drop_chat_realtime_tables.sql`).
 - **Datei:** `src/Services/Cron/Tasks/CleanupOldDirectMessagesTask.php`
 
 ### External Data Cache Cleanup
