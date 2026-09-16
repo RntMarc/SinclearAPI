@@ -38,10 +38,7 @@ use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
-use Sinclear\Api\Repository\ChatEventRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
-use Sinclear\Api\Repository\ChatPresenceRepository;
-use Sinclear\Api\Repository\ChatTypingRepository;
 use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\LocationSharingSessionRepository;
 use Sinclear\Api\Repository\LocationSharingRecipientRepository;
@@ -145,6 +142,9 @@ use Sinclear\Api\Services\ExternalDataLocationService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\Centrifugo\CentrifugoClient;
+use Sinclear\Api\Services\Centrifugo\CentrifugoTokenService;
+use Sinclear\Api\Services\Centrifugo\ChatEventPublisher;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
@@ -283,10 +283,7 @@ return [
 
     ChatConversationRepository::class => autowire(),
     ChatParticipantRepository::class => autowire(),
-    ChatEventRepository::class => autowire(),
     DirectMessageRepository::class => autowire(),
-    ChatPresenceRepository::class => autowire(),
-    ChatTypingRepository::class => autowire(),
     DirectMessagePolicy::class => autowire(),
     DirectMessageService::class => autowire(),
     ChatController::class => autowire(),
@@ -330,6 +327,35 @@ return [
     },
 
     \Sinclear\Api\Controllers\NotificationController::class => autowire(),
+
+    CentrifugoClient::class => function (ContainerInterface $c): CentrifugoClient {
+        $settings = $c->get(Settings::class);
+        return new CentrifugoClient(
+            apiKey: $settings->centrifugo['api_key'],
+            apiUrl: $settings->centrifugo['api_url'],
+            timeout: $settings->centrifugo['timeout'],
+            enabled: $settings->centrifugo['enabled'],
+            logger: $c->get(\Psr\Log\LoggerInterface::class),
+            httpClient: new Client(['timeout' => $settings->centrifugo['timeout']]),
+        );
+    },
+
+    CentrifugoTokenService::class => function (ContainerInterface $c): CentrifugoTokenService {
+        $settings = $c->get(Settings::class);
+        return new CentrifugoTokenService(
+            hmacSecret: $settings->centrifugo['hmac_secret'],
+            tokenTtl: $settings->centrifugo['token_ttl'],
+            issuer: $settings->centrifugo['issuer'],
+            audience: $settings->centrifugo['audience'],
+        );
+    },
+
+    ChatEventPublisher::class => function (ContainerInterface $c): ChatEventPublisher {
+        return new ChatEventPublisher(
+            client: $c->get(CentrifugoClient::class),
+            logger: $c->get(\Psr\Log\LoggerInterface::class),
+        );
+    },
 
     NominatimRateLimiter::class => autowire(),
     NominatimCache::class => autowire(),

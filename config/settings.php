@@ -65,6 +65,19 @@ $settings['unsplash'] = [
     'cache_ttl' => (int)($_ENV['UNSPLASH_CACHE_TTL'] ?? 21600),
 ];
 
+$settings['centrifugo'] = [
+    'api_url' => $_ENV['CENTRIFUGO_API_URL'] ?? '',
+    'api_key' => $_ENV['CENTRIFUGO_API_KEY'] ?? '',
+    'hmac_secret' => $_ENV['CENTRIFUGO_HMAC_SECRET'] ?? '',
+    'token_ttl' => (int)($_ENV['CENTRIFUGO_TOKEN_TTL'] ?? 900),
+    'ws_url' => $_ENV['CENTRIFUGO_WS_URL'] ?? '',
+    'timeout' => (int)($_ENV['CENTRIFUGO_TIMEOUT'] ?? 2),
+    'enabled' => filter_var($_ENV['CENTRIFUGO_ENABLED'] ?? false, FILTER_VALIDATE_BOOLEAN),
+    'log_level' => $_ENV['CENTRIFUGO_LOG_LEVEL'] ?? 'error',
+    'issuer' => $_ENV['CENTRIFUGO_ISSUER'] ?? 'sinclear-api',
+    'audience' => $_ENV['CENTRIFUGO_AUDIENCE'] ?? 'centrifugo',
+];
+
 $settings['downloads'] = [
     'base_url' => $_ENV['DOWNLOADS_BASE_URL'] ?? 'https://sinclear.de/downloads',
 ];
