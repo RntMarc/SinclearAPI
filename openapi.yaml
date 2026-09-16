@@ -4913,83 +4913,6 @@ components:
         data:
           $ref: '#/components/schemas/DirectMessage'
 
-    ChatEvent:
-      type: object
-      required: [seq, conversationId, actorId, type]
-      properties:
-        seq:
-          type: integer
-          format: int64
-          description: Globaler monotoner Event-Sync-Cursor
-        conversationId:
-          type: string
-          format: uuid
-        actorId:
-          type: string
-          format: uuid
-          description: Nutzer, der das Event ausgelöst hat
-        type:
-          type: string
-          enum: [message_created, message_edited, message_deleted]
-          description: Art der Nachrichten-Änderung
-        messageId:
-          type: string
-          format: uuid
-          nullable: true
-        message:
-          $ref: '#/components/schemas/DirectMessage'
-          nullable: true
-          description: Aktueller Zustand der betroffenen Nachricht (bei message_created/-edited/-deleted)
-
-    ChatSyncResponse:
-      type: object
-      required: [data, meta]
-      properties:
-        data:
-          type: object
-          properties:
-            events:
-              type: array
-              items:
-                $ref: '#/components/schemas/ChatEvent'
-              description: Nachrichten-Änderungen seit dem letzten Sync (neu/bearbeitet/gelöscht)
-            conversations:
-              type: array
-              items:
-                type: object
-                properties:
-                  conversationId:
-                    type: string
-                    format: uuid
-                  unreadCount:
-                    type: integer
-                  lastSeenAt:
-                    type: string
-                    format: date-time
-                    nullable: true
-                  otherLastReadSeq:
-                    type: integer
-                    format: int64
-              description: Aktualisierte Konversations-Zusammenfassungen (inkl. Lesestatus des Gegenübers)
-            typing:
-              type: object
-              additionalProperties:
-                type: array
-                items:
-                  type: string
-                  format: uuid
-              description: Tippzustände pro Konversation (conversationId → User-IDs)
-        meta:
-          type: object
-          properties:
-            seq:
-              type: integer
-              format: int64
-              description: Höchster gesehener Event-seq (für nächsten Sync)
-            hasMore:
-              type: boolean
-              description: Gibt es weitere Daten
-
     ChatOpenRequest:
       type: object
       required: [userId]
@@ -5041,14 +4964,6 @@ components:
           format: int64
           description: Höchster gelesener seq-Wert
 
-    ChatTypingRequest:
-      type: object
-      required: [typing]
-      properties:
-        typing:
-          type: boolean
-          description: True = tippt, False = nicht mehr tippend
-
     CentrifugoTokenResponse:
       type: object
       required: [data]
@@ -5068,11 +4983,15 @@ components:
             expiresAt:
               type: string
               format: date-time
-              description: Ablaufzeitpunkt des Tokens (UTC)
+              description: Ablaufzeitpunkt des Tokens (UTC), Format `YYYY-MM-DD HH:MM:SS`
 
     CentrifugoSubscribeRequest:
       type: object
       required: [user, channel]
+      description: >
+        Von Centrifugo gesendeter Subscribe-Request. Enthält weitere Felder
+        (client, transport, etc.), die vom Controller ignoriert werden.
+      additionalProperties: true
       properties:
         user:
           type: string
@@ -5092,6 +5011,10 @@ components:
     CentrifugoPublishRequest:
       type: object
       required: [user, channel, data]
+      description: >
+        Von Centrifugo gesendeter Publish-Request. Enthält weitere Felder
+        (client, transport, etc.), die vom Controller ignoriert werden.
+      additionalProperties: true
       properties:
         user:
           type: string
@@ -5101,7 +5024,7 @@ components:
           description: Channel-Name (z.B. "chat:<conversationId>")
         data:
           type: object
-          description: Event-Daten (z.B. { typing: true })
+          description: 'Event-Daten (z.B. { typing: true })'
 
     CentrifugoPublishResponse:
       type: object
@@ -6337,7 +6260,33 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ChatSyncResponse'
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      events:
+                        type: array
+                        items: {}
+                        description: Immer leer (deprecated)
+                      conversations:
+                        type: array
+                        items: {}
+                        description: Immer leer (deprecated)
+                      typing:
+                        type: object
+                        description: Immer leer (deprecated)
+                  meta:
+                    type: object
+                    properties:
+                      seq:
+                        type: integer
+                        format: int64
+                        description: Immer 0 (deprecated)
+                      hasMore:
+                        type: boolean
+                        description: Immer false (deprecated)
         '401':
           description: Nicht autorisiert
           content:
@@ -6742,12 +6691,6 @@ paths:
             type: string
             format: uuid
           description: Konversations-ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChatTypingRequest'
       responses:
         '410':
           description: Typing moved to Centrifugo publish proxy
