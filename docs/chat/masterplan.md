@@ -247,12 +247,12 @@ Datenbanktabellen dürfen verändert werden. Datenverlust ist akzeptiert und ste
 
 ## Hinweise für Schritt 3 (Deploy Centrifugo)
 
-- Domain: `chat.sinclear.de` (TLS via Caddy/nginx)
+- Domain: `chat.sinclear.de` (TLS durch Traefik Proxy) <-- Prüfen, ob Traefik Config des Homeservers angepasst werden muss, Tests sind hilfreich zur Feststellung ob es schon funktioniert 
 - WebSocket: `wss://chat.sinclear.de/connection/websocket`
 - SSE Fallback: `https://chat.sinclear.de/connection/uni_sse` / `/connection/http_stream`
-- `allowed_origins`: `https://app.sinclear.de`, `https://*.sinclear.de` (Web-Client)
-- Centrifugo `config.json` exakt wie in `docs/chat/centrifugo.md` dokumentiert
-- Secrets: `CENTRIFUGO_API_KEY`, `CENTRIFUGO_HMAC_SECRET`, `CENTRIFUGO_PROXY_KEY` (für `X-Centrifugo-Proxy-Key`)
+- `allowed_origins`: `*` (* sollte nur vorübergehend sein und muss später geändert werden, um bestimmte Angriffsszenarien abzuwehren!)
+- Centrifugo `config.json` exakt wie in `docs/chat/centrifugo.md` dokumentiert <-- Nutzer erinnern, dass das noch nicht durchgeführt wurde und die momentane deployte config von Centrifugo nicht unbedingt dem hier genannten Config-Code entspricht!
+- Secrets: `CENTRIFUGO_API_KEY`, `CENTRIFUGO_HMAC_SECRET`, `CENTRIFUGO_PROXY_KEY` (für `X-Centrifugo-Proxy-Key`) <-- Nutzer hat Frage: Woher kommt CENTRIFUGO_PROXY_KEY? Also wo kann ich diesen ablesen und speichern? Einfach random generieren und in config eingtragen wie die anderen Keys?
 
 ---
 
