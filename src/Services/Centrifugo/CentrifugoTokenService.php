@@ -31,6 +31,11 @@ final readonly class CentrifugoTokenService
         return $this->encodeJwt($payload);
     }
 
+    public function getTokenTtl(): int
+    {
+        return $this->tokenTtl;
+    }
+
     /**
      * Decode and verify a Centrifugo connection token.
      *

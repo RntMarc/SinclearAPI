@@ -9,6 +9,7 @@ use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
+use Sinclear\Api\Services\Centrifugo\CentrifugoClient;
 
 final readonly class TravelChatService
 {
@@ -20,6 +21,7 @@ final readonly class TravelChatService
         private EventRelationRepository $eventRelationRepo,
         private ChatConversationRepository $conversationRepo,
         private ChatParticipantRepository $participantRepo,
+        private CentrifugoClient $centrifugoClient,
     ) {}
 
     /**
@@ -129,6 +131,7 @@ final readonly class TravelChatService
     /**
      * Reconcile ChatParticipant rows with the given list of participants.
      * Adds new participants, removes stale ones.
+     * Removed participants are unsubscribed from the Centrifugo channel.
      */
     private function reconcileParticipants(string $conversationId, array $participants, string $userIdKey): void
     {
@@ -143,11 +146,13 @@ final readonly class TravelChatService
             $this->participantRepo->add($conversationId, $userId);
         }
 
-        // Remove stale participants
+        // Remove stale participants and unsubscribe from Centrifugo
         $existing = $this->participantRepo->findByConversation($conversationId);
         foreach ($existing as $existingParticipant) {
             if (!in_array($existingParticipant['userId'], $currentIds, true)) {
                 $this->participantRepo->remove($conversationId, $existingParticipant['userId']);
+                // Unsubscribe removed participant from Centrifugo channel
+                $this->centrifugoClient->unsubscribe("chat:{$conversationId}", $existingParticipant['userId']);
             }
         }
     }

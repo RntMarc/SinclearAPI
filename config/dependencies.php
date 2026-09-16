@@ -14,6 +14,7 @@ use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
+use Sinclear\Api\Controllers\CentrifugoProxyController;
 use Sinclear\Api\Controllers\ChatController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
@@ -36,6 +37,7 @@ use Sinclear\Api\Controllers\UserWeatherLocationController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
+use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
@@ -286,7 +288,23 @@ return [
     DirectMessageRepository::class => autowire(),
     DirectMessagePolicy::class => autowire(),
     DirectMessageService::class => autowire(),
-    ChatController::class => autowire(),
+    ChatController::class => function (ContainerInterface $c): ChatController {
+        $settings = $c->get(Settings::class);
+        return new ChatController(
+            service: $c->get(DirectMessageService::class),
+            policy: $c->get(DirectMessagePolicy::class),
+            tokenService: $c->get(CentrifugoTokenService::class),
+            centrifugoWsUrl: $settings->centrifugo['ws_url'],
+        );
+    },
+
+    CentrifugoProxyController::class => autowire(),
+    CentrifugoProxyMiddleware::class => function (ContainerInterface $c): CentrifugoProxyMiddleware {
+        $settings = $c->get(Settings::class);
+        return new CentrifugoProxyMiddleware(
+            proxyKey: $settings->centrifugo['proxy_key'],
+        );
+    },
 
     \Minishlink\WebPush\WebPush::class => function (ContainerInterface $c): \Minishlink\WebPush\WebPush {
         $settings = $c->get(Settings::class);
@@ -338,6 +356,10 @@ return [
             logger: $c->get(\Psr\Log\LoggerInterface::class),
             httpClient: new Client(['timeout' => $settings->centrifugo['timeout']]),
         );
+    },
+
+    \Sinclear\Api\Services\Centrifugo\CentrifugoClientInterface::class => function (ContainerInterface $c): \Sinclear\Api\Services\Centrifugo\CentrifugoClientInterface {
+        return $c->get(CentrifugoClient::class);
     },
 
     CentrifugoTokenService::class => function (ContainerInterface $c): CentrifugoTokenService {

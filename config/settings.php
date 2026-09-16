@@ -76,6 +76,7 @@ $settings['centrifugo'] = [
     'log_level' => $_ENV['CENTRIFUGO_LOG_LEVEL'] ?? 'error',
     'issuer' => $_ENV['CENTRIFUGO_ISSUER'] ?? 'sinclear-api',
     'audience' => $_ENV['CENTRIFUGO_AUDIENCE'] ?? 'centrifugo',
+    'proxy_key' => $_ENV['CENTRIFUGO_PROXY_KEY'] ?? '',
 ];
 
 $settings['downloads'] = [

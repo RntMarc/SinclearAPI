@@ -5,6 +5,7 @@ use Sinclear\Api\Controllers\AdminController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
+use Sinclear\Api\Controllers\CentrifugoProxyController;
 use Sinclear\Api\Controllers\ChatController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
@@ -30,6 +31,7 @@ use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
+use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Middleware\McpApiKeyMiddleware;
 use Slim\App;
@@ -373,6 +375,9 @@ return function (App $app): void {
         // Sync endpoint (static route MUST come before parameterized routes)
         $group->get('/sync', [ChatController::class, 'sync']);
 
+        // Centrifugo connection token (SDK refresh endpoint)
+        $group->get('/centrifugo/token', [ChatController::class, 'getCentrifugoToken']);
+
         // Message routes (static route MUST come before /{id})
         $group->patch('/messages/{id}', [ChatController::class, 'editMessage']);
         $group->delete('/messages/{id}', [ChatController::class, 'deleteMessage']);
@@ -386,6 +391,14 @@ return function (App $app): void {
         $group->post('/conversations/{id}/read', [ChatController::class, 'markRead']);
         $group->post('/conversations/{id}/typing', [ChatController::class, 'setTyping']);
     })->add($container->get(AuthenticationMiddleware::class));
+
+    // Centrifugo proxy endpoints (no JWT — secured via shared secret header)
+    $app->group('/centrifugo', function (RouteCollectorProxy $group) {
+        $group->post('/subscribe', [CentrifugoProxyController::class, 'subscribe']);
+        $group->post('/publish', [CentrifugoProxyController::class, 'publish']);
+    })
+        ->add($container->get(CentrifugoProxyMiddleware::class))
+        ->add($container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class));
 
     // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);

@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
 final readonly class ChatEventPublisher
 {
     public function __construct(
-        private CentrifugoClient $client,
+        private CentrifugoClientInterface $client,
         private LoggerInterface $logger,
     ) {}
 

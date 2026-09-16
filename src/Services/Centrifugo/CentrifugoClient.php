@@ -12,7 +12,7 @@ use Psr\Log\LoggerInterface;
  * All methods are fire-and-forget: errors are logged but never thrown.
  * When CENTRIFUGO_ENABLED=false, all methods are no-ops.
  */
-final readonly class CentrifugoClient
+final readonly class CentrifugoClient implements CentrifugoClientInterface
 {
     public function __construct(
         private string $apiKey,

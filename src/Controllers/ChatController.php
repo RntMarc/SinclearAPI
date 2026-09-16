@@ -7,6 +7,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\DirectMessagePolicy;
+use Sinclear\Api\Services\Centrifugo\CentrifugoTokenService;
 use Sinclear\Api\Services\DirectMessageService;
 
 final readonly class ChatController
@@ -29,6 +30,8 @@ final readonly class ChatController
     public function __construct(
         private DirectMessageService $service,
         private DirectMessagePolicy $policy,
+        private CentrifugoTokenService $tokenService,
+        private string $centrifugoWsUrl,
     ) {}
 
     public function listConversations(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -42,6 +45,26 @@ final readonly class ChatController
         $result = $this->service->listConversations($user->id, $page, $limit);
 
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
+    }
+
+    /**
+     * Get Centrifugo connection token for the authenticated user.
+     * Used by SDK getToken callback and token refresh.
+     */
+    public function getCentrifugoToken(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        $token = $this->tokenService->generateConnectionToken($user->id);
+        $expiresAt = time() + $this->tokenService->getTokenTtl();
+
+        return ResponseFactory::json([
+            'data' => [
+                'token' => $token,
+                'url' => $this->centrifugoWsUrl,
+                'expiresAt' => date('Y-m-d H:i:s', $expiresAt),
+            ],
+        ], 200, $response);
     }
 
     public function openConversation(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -174,34 +197,37 @@ final readonly class ChatController
         return ResponseFactory::noContent($response);
     }
 
-    public function setTyping(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
-    {
-        $user = $this->requireUser($request);
-        $conversationId = $args['id'];
-        $body = $request->getParsedBody();
-
-        if (!$this->policy->canAccess($user, $conversationId)) {
-            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
-        }
-
-        $typing = (bool) ($body['typing'] ?? false);
-
-        $this->service->setTyping($user->id, $conversationId, $typing);
-
-        return ResponseFactory::noContent($response);
-    }
-
+    /**
+     * @deprecated Soft Cut – antwortet leer, keine Presence-Touch. Wird entfernt.
+     */
     public function sync(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $user = $this->requireUser($request);
-        $params = $request->getQueryParams();
+        $this->requireUser($request);
 
-        $afterSeq = max(0, (int) ($params['after'] ?? 0));
-        $limit = min(500, max(1, (int) ($params['limit'] ?? 200)));
+        return ResponseFactory::json([
+            'data' => [
+                'events' => [],
+                'conversations' => [],
+                'typing' => (object) [],
+            ],
+            'meta' => [
+                'seq' => 0,
+                'hasMore' => false,
+            ],
+        ], 200, $response);
+    }
 
-        $result = $this->service->sync($user->id, $afterSeq, $limit);
+    /**
+     * @deprecated Typing läuft via Centrifugo Publish-Proxy. Gibt 410 Gone zurück.
+     */
+    public function setTyping(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
 
-        return ResponseFactory::json($result, 200, $response);
+        return ResponseFactory::json([
+            'error' => 'gone',
+            'message' => 'Typing moved to Centrifugo publish proxy. Use POST /centrifugo/publish instead.',
+        ], 410, $response);
     }
 
     private function errorResponse(string $message, ResponseInterface $response): ResponseInterface

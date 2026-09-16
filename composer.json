@@ -23,5 +23,10 @@
         "psr-4": {
             "Sinclear\\Api\\": "src/"
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Sinclear\\Api\\Tests\\": "tests/"
+        }
     }
 }

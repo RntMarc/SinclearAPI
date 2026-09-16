@@ -3,23 +3,19 @@
 namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\ChatConversationRepository;
-use Sinclear\Api\Repository\ChatEventRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
-use Sinclear\Api\Repository\ChatPresenceRepository;
-use Sinclear\Api\Repository\ChatTypingRepository;
 use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Services\Centrifugo\CentrifugoClient;
+use Sinclear\Api\Services\Centrifugo\ChatEventPublisher;
 
 final readonly class DirectMessageService
 {
     private const int MAX_CONTENT_LENGTH = 2000;
     private const int EDIT_WINDOW_SECONDS = 600; // 10 minutes
     private const int MESSAGES_PER_PAGE = 50;
-    private const int SYNC_LIMIT = 200;
     private const int SEND_RATE_LIMIT = 20;       // Nachrichten pro Minute
     private const int SEND_RATE_WINDOW = 60;
-    private const int TYPING_RATE_LIMIT = 30;     // Tippindikatoren pro Minute
-    private const int TYPING_RATE_WINDOW = 60;
     private const int NOTIFICATION_PREVIEW_LENGTH = 160;
 
     private const array VALID_TYPES = ['text'];
@@ -28,12 +24,11 @@ final readonly class DirectMessageService
         private ChatConversationRepository $conversationRepo,
         private ChatParticipantRepository $participantRepo,
         private DirectMessageRepository $messageRepo,
-        private ChatPresenceRepository $presenceRepo,
-        private ChatTypingRepository $typingRepo,
-        private ChatEventRepository $eventRepo,
         private UserRepository $userRepo,
         private NotificationService $notificationService,
         private RateLimiter $rateLimiter,
+        private CentrifugoClient $centrifugoClient,
+        private ChatEventPublisher $eventPublisher,
     ) {}
 
     /**
@@ -237,10 +232,12 @@ final readonly class DirectMessageService
         }
 
         $this->conversationRepo->updateTimestamp($conversationId);
-        $this->eventRepo->create($conversationId, $userId, 'message_created', $result['id']);
 
         $message = $this->messageRepo->findById($result['id']);
         $formatted = $this->formatMessage($message);
+
+        // Publish event to Centrifugo
+        $this->eventPublisher->publishMessageCreated($formatted);
 
         // Send notification to other participants
         $this->notifyParticipants($userId, $conversationId, $formatted);
@@ -282,10 +279,14 @@ final readonly class DirectMessageService
         }
 
         $this->messageRepo->updateContent($messageId, $newContent);
-        $this->eventRepo->create($message['conversationId'], $userId, 'message_edited', $messageId);
 
         $updated = $this->messageRepo->findById($messageId);
-        return $this->formatMessage($updated);
+        $formatted = $this->formatMessage($updated);
+
+        // Publish event to Centrifugo
+        $this->eventPublisher->publishMessageEdited($formatted);
+
+        return $formatted;
     }
 
     /**
@@ -307,7 +308,14 @@ final readonly class DirectMessageService
         }
 
         $this->messageRepo->markDeleted($messageId, $userId);
-        $this->eventRepo->create($message['conversationId'], $userId, 'message_deleted', $messageId);
+
+        // Publish event to Centrifugo (need seq from the deleted message)
+        $deletedMessage = $this->messageRepo->findById($messageId);
+        $this->eventPublisher->publishMessageDeleted(
+            $message['conversationId'],
+            $messageId,
+            (int) $deletedMessage['seq'],
+        );
     }
 
     /**
@@ -318,81 +326,39 @@ final readonly class DirectMessageService
         $maxSeq = $this->messageRepo->getMaxSeq($conversationId);
         $seq = min(max($seq, 0), $maxSeq);
         $this->participantRepo->updateLastReadSeq($conversationId, $userId, $seq);
-    }
 
-    /**
-     * Set typing indicator.
-     */
-    public function setTyping(string $userId, string $conversationId, bool $typing): void
-    {
-        if (!$this->rateLimiter->isAllowed('chat_typing:' . $userId, self::TYPING_RATE_LIMIT, self::TYPING_RATE_WINDOW)) {
-            throw new \RuntimeException('rate_limit_exceeded');
-        }
-
-        if ($typing) {
-            $this->typingRepo->touch($conversationId, $userId);
-        } else {
-            $this->typingRepo->clear($conversationId, $userId);
-        }
+        // Publish read event to Centrifugo
+        $this->eventPublisher->publishRead($conversationId, $seq, $seq, $userId);
     }
 
     /**
      * Sync endpoint: get all new data since a seq cursor.
-     * Returns new/changed messages (as events), read status, and typing states.
+     *
+     * @deprecated Soft Cut – wird entfernt. Clients nutzen Centrifugo für Echtzeit.
      */
-    public function sync(string $userId, int $afterSeq = 0, int $limit = self::SYNC_LIMIT): array
+    public function sync(string $userId, int $afterSeq = 0, int $limit = 200): array
     {
-        // Touch presence (push suppression)
-        $this->presenceRepo->touchActiveUntil($userId);
-
-        $limit = min(500, max(1, $limit));
-
-        // Get new/changed messages (events) across all conversations
-        $events = $this->eventRepo->findNewForUser($userId, $afterSeq, $limit);
-
-        // Get typing states
-        $typingMap = $this->typingRepo->findTypingForUser($userId);
-
-        // Get conversations with updated read status
-        $conversations = $this->conversationRepo->listForUser($userId, 100, 0);
-
-        $conversationUpdates = array_map(function (array $conv) {
-            $isGroup = $conv['type'] === 'group';
-            return [
-                'conversationId' => $conv['id'],
-                'unreadCount' => (int) $conv['unreadCount'],
-                'lastSeenAt' => !$isGroup && $conv['lastSeenAt'] !== null ? self::stripFractionalSeconds($conv['lastSeenAt']) : null,
-                'otherLastReadSeq' => !$isGroup && $conv['otherLastReadSeq'] !== null ? (int) $conv['otherLastReadSeq'] : null,
-            ];
-        }, $conversations);
-
-        $newMaxSeq = $afterSeq;
-        $formattedEvents = array_map(function (array $row) use (&$newMaxSeq) {
-            $eventSeq = (int) $row['eventSeq'];
-            if ($eventSeq > $newMaxSeq) {
-                $newMaxSeq = $eventSeq;
-            }
-            return [
-                'seq' => $eventSeq,
-                'conversationId' => $row['conversationId'],
-                'actorId' => $row['actorId'],
-                'type' => $row['type'],
-                'messageId' => $row['messageId'],
-                'message' => $row['messageId'] !== null ? $this->formatMessage($row) : null,
-            ];
-        }, $events);
-
         return [
             'data' => [
-                'events' => $formattedEvents,
-                'conversations' => $conversationUpdates,
-                'typing' => $typingMap,
+                'events' => [],
+                'conversations' => [],
+                'typing' => (object) [],
             ],
             'meta' => [
-                'seq' => $newMaxSeq,
-                'hasMore' => count($events) === $limit,
+                'seq' => $afterSeq,
+                'hasMore' => false,
             ],
         ];
+    }
+
+    /**
+     * Set typing indicator.
+     *
+     * @deprecated Typing läuft via Centrifugo Publish-Proxy.
+     */
+    public function setTyping(string $userId, string $conversationId, bool $typing): void
+    {
+        // No-op: Typing is now handled via Centrifugo publish proxy
     }
 
     private function formatConversation(array $conversation, string $userId): array
@@ -475,14 +441,18 @@ final readonly class DirectMessageService
         $senderName = $sender['displayName'] ?? 'Jemand';
         $body = $this->buildNotificationBody($senderName, $formattedMessage['content'] ?? '');
 
+        // Check Centrifugo presence for push suppression
+        $channel = "chat:{$conversationId}";
+        $presence = $this->centrifugoClient->presence($channel);
+        $onlineUserIds = array_keys($presence);
+
         foreach ($participants as $participant) {
             if ($participant['userId'] === $senderId) {
                 continue;
             }
 
-            // Push suppression: skip only the push if recipient is actively polling,
-            // but still create the (coalesced) in-app notification list entry.
-            $suppressPush = $this->presenceRepo->isActive($participant['userId']);
+            // Push suppression: skip push if recipient is connected to Centrifugo channel
+            $suppressPush = in_array($participant['userId'], $onlineUserIds, true);
 
             $this->notificationService->create(
                 userId: $participant['userId'],
