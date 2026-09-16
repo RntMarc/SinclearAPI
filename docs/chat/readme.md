@@ -12,6 +12,8 @@ Centrifugo ──Subscribe-Proxy──► POST /api/v2/centrifugo/subscribe (PHP
 Client ──WS publish (typing)──► Centrifugo ──Publish-Proxy──► PHP (validiert) ──► Broadcast
 ```
 
+Die API ist die Source of Truth. Centrifugo ist Transport, Recovery und Presence – kein Persistenz-Backend.
+
 ### Kern-Entscheidungen
 
 | Thema | Entscheidung | Begründung |
@@ -21,6 +23,8 @@ Client ──WS publish (typing)──► Centrifugo ──Publish-Proxy──�
 | **Push-Suppression** | Conversation-Presence | `presence(chat:<convId>)` prüft, ob Empfänger den Chat *gerade offen* hat (vs. bisher: App-weit aktiv) |
 | **PHP-Client** | Eigene schlanke Implementierung | Guzzle ^7.9 bereits im Projekt; keine neue Dependency; Shared Hosting bleibt ausreichend |
 | **Hosting Clients** | Direkt an `chat.sinclear.de` (WS/SSE) | PHP-Server hält **nie** lange Verbindungen |
+
+Siehe auch: [Centrifugo Server Deploy-Handbuch](./centrifugo.md)
 
 ## Channel-Modell
 
@@ -35,7 +39,7 @@ Client ──WS publish (typing)──► Centrifugo ──Publish-Proxy──�
 ### Connection-JWT (HS256)
 
 - **Secret**: `CENTRIFUGO_HMAC_SECRET` (eigenes Secret, nicht RSA)
-- **Claims**: `sub` (userId als String), `exp` (TTL aus `CENTRIFUGO_TOKEN_TTL`), `iat`, `iss: "sinclear-api"`, `aud: "centrifugo"`
+- **Claims**: `sub` (userId als String), `exp` (TTL aus `CENTRIFUGO_TOKEN_TTL`, Standard 900s), `iat`, `iss: "sinclear-api"`, `aud: "centrifugo"`
 - **Client refresht Token** via SDK `getToken` Callback → `GET /chat/centrifugo/token`
 - **Server-seitig**: `client.token.audience: "centrifugo"`, `client.token.issuer: "sinclear-api"` konfiguriert
 
@@ -45,24 +49,28 @@ Client ──WS publish (typing)──► Centrifugo ──Publish-Proxy──�
 GET /api/v2/chat/centrifugo/token
 Authorization: Bearer <JWT>
 
-Response:
+Response 200:
 {
   "data": {
     "token": "<centrifugo-connection-jwt>",
     "url": "wss://chat.sinclear.de/connection/websocket",
-    "expiresAt": "2025-01-15 10:15:00"
+    "expiresAt": "2026-01-15 10:15:00"
   }
 }
 ```
+
+`expiresAt` im Format `YYYY-MM-DD HH:MM:SS` (UTC). Clients nutzen dieses Endpoint als SDK `getToken` Callback für Token-Refresh.
 
 ## Datenmodell
 
 | Tabelle | Zweck |
 |---|---|
-| `ChatConversation` | Konversation (type: direct/group) |
-| `ChatParticipant` | Teilnehmer + `lastReadSeq` + `lastSeenAt` |
-| `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor) |
+| `ChatConversation` | Konversation (type: direct/group), `name` (optional), `image` (optional, base64) |
+| `ChatParticipant` | Teilnehmer + `lastReadSeq` (DEFAULT 0) + `lastSeenAt` (NULL) |
+| `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor), `clientId` (Idempotenz), `senderId`, `type`, `content`, `payload`, `editedAt`, `deletedAt` |
 | `TravelChat` | Verknüpfung von Gruppenchat mit Reise oder Event |
+
+**PK von `ChatParticipant`:** `(conversationId, userId)`
 
 *Entfernt (nicht mehr benötigt): `ChatEvent`, `ChatPresence`, `ChatTyping` – plus Legacy-Tabellen `ChatMessages`, `ChatRooms`, `ChatRoomMembers`, `ChatReadReceipt`, `DirectChat`, `UserPresence`, `SseEvent` (per Migration `20260916120000_drop_chat_realtime_tables.sql` gelöscht)*
 
@@ -93,6 +101,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "id": "uuid",
   "type": "direct",
   "name": null,
+  "image": null,
   "otherUser": {
     "id": "uuid",
     "displayName": "Alice",
@@ -101,16 +110,16 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "lastMessage": {
     "content": "Hallo!",
     "senderId": "uuid",
-    "createdAt": "2025-01-15 10:30:00",
+    "createdAt": "2026-01-15 10:30:00",
     "deleted": false
   },
   "unreadCount": 3,
-  "lastSeenAt": "2025-01-15 10:25:00",
+  "lastSeenAt": "2026-01-15 10:25:00",
   "lastReadSeq": 42,
   "otherLastReadSeq": 38,
   "memberCount": null,
-  "createdAt": "2025-01-15 10:00:00",
-  "updatedAt": "2025-01-15 10:30:00"
+  "createdAt": "2026-01-15 10:00:00",
+  "updatedAt": "2026-01-15 10:30:00"
 }
 ```
 
@@ -120,7 +129,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 {
   "id": "uuid",
   "type": "group",
-  "name": "Sommerurlaub 2025",
+  "name": "Sommerurlaub 2026",
   "image": "data:image/jpeg;base64,...",
   "otherUser": null,
   "lastMessage": { "..." },
@@ -129,8 +138,8 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "lastReadSeq": 42,
   "otherLastReadSeq": null,
   "memberCount": 4,
-  "createdAt": "2025-06-01 09:00:00",
-  "updatedAt": "2025-06-15 14:00:00"
+  "createdAt": "2026-06-01 09:00:00",
+  "updatedAt": "2026-06-15 14:00:00"
 }
 ```
 
@@ -142,7 +151,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | `image` | string\|null | Icon/Avatar der Gruppenkonversation (base64-encoded Bild); null bei 1:1 und wenn nicht gesetzt |
 | `otherUser` | object\|null | Der andere Teilnehmer (`id`, `displayName`, `avatar`); null bei Gruppen |
 | `lastMessage` | object\|null | Vorschau der letzten Nachricht (null wenn keine) |
-| `unreadCount` | int | Anzahl ungelesener Nachrichten |
+| `unreadCount` | int | Anzahl ungelesener Nachrichten (`seq > lastReadSeq`) |
 | `lastSeenAt` | string\|null | Letzter Seitenaufruf des anderen Teilnehmers; null bei Gruppen |
 | `lastReadSeq` | int | Eigener Lesestand (höchster gelesener seq) |
 | `otherLastReadSeq` | int\|null | Lesestand des Gegenübers; null bei Gruppen |
@@ -169,7 +178,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "clientId": "client-123",
   "editedAt": null,
   "deleted": false,
-  "createdAt": "2025-01-15 10:30:00"
+  "createdAt": "2026-01-15 10:30:00"
 }
 ```
 
@@ -179,13 +188,15 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 ## REST-API
 
+### Authentifizierte Endpoints (`AuthenticationMiddleware`)
+
 | Methode | Pfad | Zweck |
 |---|---|---|
 | **GET** | **`/chat/centrifugo/token`** | **NEU:** Centrifugo Connection-Token (SDK `getToken` Callback) |
 | GET | `/chat/conversations` | Konversationsliste (letzte Nachricht, Unread, lastSeenAt) |
 | POST | `/chat/conversations` | 1:1-Konversation öffnen (idempotent: get-or-create) → 200 (bestehend) oder 201 (neu) |
 | GET | `/chat/conversations/{id}` | Konversation + Teilnehmer (lastReadSeq, otherLastReadSeq) |
-| GET | `/chat/conversations/{id}/messages?before=<seq>&limit=50` | History (Cursor `before`) |
+| GET | `/chat/conversations/{id}/messages?before=<seq>&limit=50` | History (Cursor `before`, max 100) |
 | POST | `/chat/conversations/{id}/messages` | Senden (`{clientId, type, content, payload?}`) |
 | PATCH | `/chat/messages/{id}` | Bearbeiten (nur eigener, 10 Min-Fenster) |
 | DELETE | `/chat/messages/{id}` | Löschen für alle (Platzhalter "Nachricht gelöscht") |
@@ -193,14 +204,14 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | ~~POST~~ | ~~`/chat/conversations/{id}/typing`~~ | ~~Tippindikator~~ → **410 Gone** (Typing via Centrifugo Publish-Proxy) |
 | ~~GET~~ | ~~`/chat/sync`~~ | ~~Optimierte Sync-Route~~ → **Deprecated**, antwortet leer |
 
-### Interne Proxy-Endpoints (von Centrifugo aufgerufen)
+### Interne Proxy-Endpoints (von Centrifugo aufgerufen, kein JWT)
 
 | Methode | Pfad | Security | Zweck |
 |---|---|---|---|
 | POST | `/centrifugo/subscribe` | `X-Centrifugo-Proxy-Key` + HTTPS | Subscribe-Validierung (ChatParticipant) |
 | POST | `/centrifugo/publish` | `X-Centrifugo-Proxy-Key` + HTTPS | Typing-Validierung (Participant + Rate-Limit) |
 
-**Security:** Kein JWT – gesichert via Shared Secret (`CENTRIFUGO_PROXY_KEY`) in `X-Centrifugo-Proxy-Key` Header (Centrifugo sendet via `http.static_headers`).
+**Security:** Kein JWT – gesichert via Shared Secret (`CENTRIFUGO_PROXY_KEY`) in `X-Centrifugo-Proxy-Key` Header (Centrifugo sendet via `http.static_headers`). Doppelte HTTPS-Prüfung: `CentrifugoProxyMiddleware` (prüft `HTTPS`/`X-Forwarded-Proto`) + `RequireHttpsMiddleware` (identische Prüfung).
 
 ### Admin: Travel-Gruppenchats
 
@@ -220,7 +231,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 - Idempotent: GET oder POST gibt den bestehenden Chat zurück
 - Bei Löschung werden `TravelChat`, `ChatConversation` und assoziierte `ChatParticipant`/`DirectMessage` gelöscht (FK-Cascade)
 - Automatischer Sync: `AdminController` ruft `syncTripMembers`/`syncEventMembers` bei Hinzufügen/Entfernen von Teilnehmern auf
-- **Entfernte Teilnehmer werden automatisch vom Centrifugo-Channel abgemeldet**
+- **Entfernte Teilnehmer werden automatisch vom Centrifugo-Channel abgemeldet** (`CentrifugoClient->unsubscribe`)
 
 ## Message-Flow
 
@@ -228,9 +239,9 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 ```
 1. Client sendet POST /chat/conversations/{id}/messages
-2. PHP-API: Validierung (Content, Rate-Limit, Idempotenz via clientId)
+2. PHP-API: Validierung (Content, Rate-Limit 20/min, Idempotenz via clientId)
 3. PHP-API: Persistenz in DirectMessage (seq wird automatisch zugewiesen)
-4. PHP-API: CentrifugoServer-API publish → chat:{conversationId}
+4. PHP-API: CentrifugoServer-API publish → chat:{conversationId} (message_created-Event)
 5. PHP-API: Presence-Check → Empfänger im Channel? → suppressPush
 6. PHP-API: Notification erstellen (in-App immer, Push nur wenn nicht online)
 7. PHP-API: Response an Sender mit finalem Message-Objekt
@@ -260,13 +271,73 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 **Rate-Limit:** 30 Typing-Events pro Minute pro Nutzer (Key: `chat_typing:{userId}`).
 
+**Validierung:** Nur `typing: bool` wird akzeptiert (sanitized). Anderes `data` wird ignoriert.
+
+**Channel-Validierung:** `parseConversationId` prüft Kanal gegen Regex `^chat:([A-Za-z0-9_-]+)$` → `400 invalid_channel` bei Nichteinhaltung.
+
+## Echtzeit-Events
+
+Clients empfangen folgende Events über den Centrifugo-Channel `chat:<conversationId>`:
+
+### `message_created`
+
+Neue Nachricht. Enthält das vollständige `DirectMessage`-Objekt (gleiches Schema wie REST-Response).
+
+```json
+{
+  "type": "message_created",
+  "message": {
+    "id": "uuid", "seq": 42, "conversationId": "uuid",
+    "senderId": "uuid", "sender": {"id": "...", "displayName": "...", "avatar": "..."},
+    "type": "text", "content": "Hallo!", "payload": null,
+    "clientId": "...", "editedAt": null, "deleted": false, "createdAt": "2026-..."
+  }
+}
+```
+
+### `message_edited`
+
+Nachricht wurde bearbeitet. Enthält das aktualisierte `DirectMessage`-Objekt.
+
+```json
+{
+  "type": "message_edited",
+  "message": { "... DirectMessage ..." }
+}
+```
+
+### `message_deleted`
+
+Nachricht wurde gelöscht.
+
+```json
+{
+  "type": "message_deleted",
+  "messageId": "uuid",
+  "seq": 42
+}
+```
+
+### `read`
+
+Lesestand-Update eines Teilnehmers.
+
+```json
+{
+  "type": "read",
+  "seq": 42,
+  "lastReadSeq": 42,
+  "userId": "uuid"
+}
+```
+
 ## Presence / Recovery / History
 
 ### Presence (Push-Suppression)
 
 - `CentrifugoClient->presence("chat:<convId>")` prüft, ob Empfänger den Chat *gerade offen* hat
 - Empfänger im Channel → `suppressPush=true` (kein Push, aber In-App-Notification)
-- Bei Centrifugo-Fehler → `suppressPush=false` (Fallback: Push senden)
+- Bei Centrifugo-Fehler → `presence()` gibt `[]` zurück → `suppressPush=false` (Fallback: Push senden)
 - **Keine Personal-Channels** nötig
 
 ### Recovery
@@ -278,6 +349,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 - REST-Endpoint `GET /chat/conversations/{id}/messages?before=<seq>&limit=50` für historische Nachrichten
 - Cursor-basierte Pagination (nach `seq`)
+- `lastSeenAt` wird bei jedem Abruf von Nachrichten aktualisiert
 
 ## Push-Unterdrückung (neue Semantik)
 
@@ -288,6 +360,12 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | `ChatPresence`-Tabelle | Centrifugo Presence API |
 
 **Begründung:** Conversation-Presence ist präziser – ein Nutzer kann die App im Hintergrund haben, aber den Chat nicht offen. In diesem Fall soll ein Push gesendet werden.
+
+**Vollständiger Flow:**
+1. `presence("chat:<convId>")` gibt assoziatives Array `{userId => {...}}` zurück
+2. `array_keys($presence)` ergibt die Online-User-IDs
+3. Für jeden Nicht-Sender-Teilnehmer: `suppressPush = in_array(userId, onlineUserIds)`
+4. `NotificationService->create(..., suppressPush)` erstellt In-App-Record immer, sendet Push nur wenn `suppressPush=false`
 
 ## Soft-Cut: `/chat/sync`
 
@@ -311,35 +389,56 @@ Der Endpoint `GET /chat/sync` bleibt vorerst registriert, antwortet aber leer:
 
 ## Graceful Degradation
 
-- **CENTRIFUGO_ENABLED=false** → Alle Centrifugo-Calls sind No-ops (Local-Dev)
+- **CENTRIFUGO_ENABLED=false** → Alle Centrifugo-Calls sind No-ops (keine Fehler, kein Publish, `presence()` gibt `[]` zurück)
 - **Fehler:** Niemals fatal – nur loggen, Chat funktioniert via REST weiter
 - **Timeout:** `CENTRIFUGO_TIMEOUT` (~2s) für alle Server-API-Calls
 - **Fallback bei Presence-Fehler:** Push senden (sicherer als nicht senden)
+- **CentrifugoClient** fängt `GuzzleException` ab, loggt Warning, gibt `[]` zurück
+- **ChatEventPublisher** fängt `\Throwable` ab, loggt Warning, wirft nie
 
 ## Lesestatus (Read Receipts)
 
 - Pro Teilnehmer wird `lastReadSeq` geführt. Der Sender sieht „gelesen", sobald `otherLastReadSeq >= msg.seq`.
-- `POST /chat/conversations/{id}/read` setzt den eigenen Lesestand; das `seq` wird serverseitig auf das Maximum der Konversation begrenzt (Clamp).
-- Read-Event wird via Centrifugo an andere Clients gepublished.
+- `POST /chat/conversations/{id}/read` setzt den eigenen Lesestand; das `seq` wird serverseitig auf das Maximum der Konversation begrenzt (`GREATEST(lastReadSeq, newSeq)`).
+- Read-Event wird via Centrifugo an andere Clients gepublished (`read`-Event mit `seq`, `lastReadSeq`, `userId`).
 
 ## Idempotenz
 
 - `POST …/messages` mit `clientId`: **UNIQUE-Constraint** `(senderId, clientId)` + serverseitiger Lookup innerhalb derselben Konversation verhindern Duplikate bei Retry (auch unter parallelen Requests). Ein wiederverwendetes `clientId` in einer anderen Konversation wird als neuer Sendeversuch behandelt.
+- **Concurrent-Duplikate:** Bei PDO-Exception `23000` (Unique-Verletzung) wird das existierende Objekt zurückgegeben.
 
 ## Nachrichten-Aktionen
 
-- **Bearbeiten**: Nur eigener Sender, innerhalb 10 Minuten. Setzt `editedAt` und published `message_edited`-Event via Centrifugo.
-- **Löschen für alle**: Nur Sender. `deletedAt` gesetzt, `content`/`payload` geleert. Empfänger sieht Platzhalter. Published `message_deleted`-Event via Centrifugo.
+- **Bearbeiten**: Nur eigener Sender, innerhalb 10 Minuten (`EDIT_WINDOW_SECONDS = 600`). Setzt `editedAt` und published `message_edited`-Event via Centrifugo.
+- **Löschen für alle**: Nur Sender. `deletedAt` gesetzt, `content`/`payload` geleert. Empfänger sieht Platzhalter. Published `message_deleted`-Event via Centrifugo. Idempotent (bereits gelöschte Nachricht → kein Fehler).
 - **Gelesen**: `lastReadSeq` pro Teilnehmer. Sender sieht "gelesen" wenn `empfänger.lastReadSeq >= msg.seq`. Published `read`-Event via Centrifugo.
+
+## Validierung und Limits
+
+| Regel | Detail |
+|---|---|
+| Content | Nicht-leer, max. 2000 Zeichen (`MAX_CONTENT_LENGTH`) |
+| Type | Nur `text` erlaubt (`VALID_TYPES = ['text']`) |
+| Payload | Bei `type: text` abgelehnt (`invalid_payload`) |
+| Rate-Limit Senden | 20 Nachrichten/Minute pro Nutzer (Key: `chat_send:{userId}`) |
+| Rate-Limit Typing | 30 Events/Minute pro Nutzer (Key: `chat_typing:{userId}`) |
+| Edit-Fenster | 10 Minuten nach `createdAt` (UTC) |
+| Delete | Kein Zeitfenster, idempotent |
+| Idempotenz | `clientId` → UNIQUE `(senderId, clientId)` |
+| read `seq` | Clamped auf `min(max(seq, 0), maxSeq)` |
+
+**Antwort bei Überschreitung:** `429 rate_limit_exceeded`
 
 ## Notifications
 
 - Typ `direct_message` in `NotificationService::CONTENT_TEMPLATES`
-- **Body**: `"{Absender}: {Vorschau}"` (Vorschau auf 160 Zeichen gekürzt) — Push zeigt damit den Nachrichteninhalt
+- **Titel**: `Neue Nachricht` (API-generiert)
+- **Body**: `"{Absender}: {Vorschau}"` (Vorschau auf 160 Zeichen gekürzt; bei leerem Content: `"{Absender} hat dir eine Nachricht geschickt."`)
 - **Bündelung**: Eine Notification pro Konversation (`dedupeKey = "chat:<conversationId>"`)
 - Coalesced Upsert: Existierende ungelesene Notification wird aktualisiert statt neu anzulegen
 - Denylist-Präferenz: `direct_message` mit `customData.userIds` (wie `story_post`)
 - **Push-Unterdrückung**: Empfänger im Centrifugo-Channel → kein Push (aber In-App-Listeneintrag)
+- **Gruppenchats**: Alle Nicht-Sender-Teilnehmer erhalten eine Notification (kein Unterschied zu 1:1)
 
 ## Moderation
 
@@ -357,21 +456,34 @@ calendar_event, story
 ## Cron
 
 - `CleanupOldDirectMessagesTask`: Löscht Nachrichten älter als 90 Tage (gebatcht, LIMIT 1000)
-- Räumt verwaiste Konversationen auf
+- Räumt verwaiste Konversationen auf (keine Nachrichten, älter als 1 Tag)
 - Intervall: 24 Stunden
 - *Entfernt: ChatEvent, ChatPresence, ChatTyping Cleanup (Tabellen per Migration `20260916120000_drop_chat_realtime_tables.sql` gelöscht)*
 
-## Rate-Limits (per Nutzer)
+## Gruppenchat-Synchronisation
 
-- 20 Nachrichten/Minute pro Nutzer
-- 30/Minute für Typing via Centrifugo Publish-Proxy
-- Polling nicht drosseln (WebSocket ersetzt Polling)
-- Antwort bei Überschreitung: `429 rate_limit_exceeded`
+Bei Reisen und Events wird `ChatParticipant` automatisch mit den aktuellen Mitgliedern synchronisiert:
 
-## Gültige `type`-Werte (aktuell)
+1. **Reise:** `syncTripMembers` liest `TravelRelation`, spiegelt nach `ChatParticipant`
+2. **Event:** `syncEventMembers` liest `EventRelation`, spiegelt nach `ChatParticipant`
+3. **Entfernte Teilnehmer** werden aus `ChatParticipant` gelöscht **und** vom Centrifugo-Channel abgemeldet (`CentrifugoClient->unsubscribe("chat:<convId>", userId)`)
 
-- `text` (einziger implementierter Typ)
-- `image`, `location` vorbereitet aber nicht implementiert
+*Hinweis: Centrifugo hat keinen Unsubscribe-Hook – die API muss aktiv abmelden.*
+
+## Migration (Datenbank)
+
+Die Migration `20260916120000_drop_chat_realtime_tables.sql` löscht:
+
+**Realtime-Tabellen (durch Centrifugo ersetzt):**
+- `ChatEvent`, `ChatTyping`, `ChatPresence`
+
+**Legacy-Tabellen (nicht mehr im Code referenziert):**
+- `ChatRoomMembers`, `ChatRooms`, `ChatMessages`, `ChatReadReceipt`, `DirectChat`, `UserPresence`, `SseEvent`
+
+**Legacy DB-Event:**
+- `cleanup_messages`
+
+*Keine neuen Tabellen nötig. Unread-Counts laufen über `DirectMessage.seq` + `ChatParticipant.lastReadSeq`.*
 
 ## Env-Vars
 
@@ -404,4 +516,4 @@ calendar_event, story
 - **Paket:** `centrifuge` 0.20.1 (pub.dev)
 - **Token-Refresh:** via `getToken` Callback → `GET /chat/centrifugo/token`
 - **Subscription:** `Subscription` auf `chat:<conversationId>`
-- **Typing:** Client-seitigem Publish mit `{ typing: bool }`
+- **Typing:** Client-seitiges Publish mit `{ typing: bool }`

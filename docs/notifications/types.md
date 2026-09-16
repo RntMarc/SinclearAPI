@@ -20,7 +20,7 @@ Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihr
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `direct_message` | Neue Nachricht in einer 1:1-Konversation | Der andere Teilnehmer (nicht der Sender). Der In-App-Listeneintrag wird immer erstellt; der **Push** wird nur gesendet, wenn der Empfänger den Chat **nicht geöffnet** hat (Centrifugo Presence: `presence(chat:<convId>)`). Bündelung: Eine Notification pro Konversation (`dedupeKey = "chat:<conversationId>"`), nicht pro Nachricht. | `sender` (User, Absender), `conversation` (ChatConversation), `message` (DirectMessage) | `Neue Nachricht` | Dynamisch: `{Absender}: {Vorschau der Nachricht}` (Vorschau auf 160 Zeichen gekürzt) |
+| `direct_message` | Neue Nachricht in einer Konversation (1:1 oder Gruppe) | Alle anderen Teilnehmer (nicht der Sender). Der In-App-Listeneintrag wird immer erstellt; der **Push** wird nur gesendet, wenn der Empfänger den Chat **nicht geöffnet** hat (Centrifugo Presence: `presence(chat:<convId>)`). Bündelung: Eine Notification pro Konversation (`dedupeKey = "chat:<conversationId>"`), nicht pro Nachricht. | `sender` (User, Absender), `conversation` (ChatConversation), `message` (DirectMessage) | `Neue Nachricht` | Dynamisch: `{Absender}: {Vorschau der Nachricht}` (Vorschau auf 160 Zeichen gekürzt) |
 
 ## Reise: Nutzer hinzugefügt
 

@@ -336,7 +336,7 @@ Die Forum-Typen werden automatisch in `ForumService` getriggert: ein Top-Level-K
 
 Der Story-Typ wird automatisch in `StoryController::create()` getriggert: eine neue Story erzeugt `story_post` für alle übrigen Nutzer (kein Self-Trigger).
 
-Der Chat-Typ wird automatisch in `DirectMessageService::sendMessage()` getriggert: eine neue Nachricht erzeugt `direct_message` für alle anderen Teilnehmer der Konversation (kein Self-Trigger). Push wird nur gesendet wenn `ChatPresence.activeUntil` des Empfängers in der Vergangenheit liegt. Bündelung via `dedupeKey = "chat:<conversationId>"`.
+Der Chat-Typ wird automatisch in `DirectMessageService::sendMessage()` getriggert: eine neue Nachricht erzeugt `direct_message` für alle anderen Teilnehmer der Konversation – sowohl bei 1:1- als auch bei Gruppenchats (kein Self-Trigger). Push wird nur gesendet wenn der Empfänger den Chat **nicht geöffnet** hat (Centrifugo Presence: `presence(chat:<convId>)`). Bündelung via `dedupeKey = "chat:<conversationId>"`.
 
 ### `forum_reply`
 
@@ -443,9 +443,9 @@ Benachrichtigt darüber, dass eine neue Story veröffentlicht wurde. Empfänger 
 
 ### `direct_message`
 
-Benachrichtigt darüber, dass eine neue Direktnachricht in einer 1:1-Konversation eingegangen ist. **Bündelung:** Es wird maximal eine Notification pro Konversation erstellt (`dedupeKey = "chat:<conversationId>"`). Bei weiteren Nachrichten in derselben Konversation wird die bestehende, ungelesene Notification aktualisiert (Titel/Text/Data), statt eine neue anzulegen. **Body:** `"{Absender}: {Vorschau}"` (Vorschau auf 160 Zeichen gekürzt) — dadurch zeigt der Push den Nachrichteninhalt.
+Benachrichtigt darüber, dass eine neue Direktnachricht eingegangen ist – sowohl in 1:1-Konversationen als auch in Gruppenchats. **Bündelung:** Es wird maximal eine Notification pro Konversation erstellt (`dedupeKey = "chat:<conversationId>"`). Bei weiteren Nachrichten in derselben Konversation wird die bestehende, ungelesene Notification aktualisiert (Titel/Text/Data), statt eine neue anzulegen. **Body:** `"{Absender}: {Vorschau}"` (Vorschau auf 160 Zeichen gekürzt) — dadurch zeigt der Push den Nachrichteninhalt.
 
-**Push-Unterdrückung:** Der In-App-Listeneintrag wird immer erstellt. Eine **Push-Benachrichtigung** (Web/Unified) wird nur gesendet, wenn `ChatPresence.activeUntil` des Empfängers in der Vergangenheit liegt (er nicht aktiv pollt).
+**Push-Unterdrückung:** Der In-App-Listeneintrag wird immer erstellt. Eine **Push-Benachrichtigung** (Web/Unified) wird nur gesendet, wenn der Empfänger den Chat **nicht geöffnet** hat (Centrifugo Presence: `presence(chat:<convId>)`). Fallback bei Centrifugo-Fehler: Push wird gesendet (sicherer als nicht senden).
 
 | Relation | Objekt | Pflicht | Bedeutung |
 |----------|--------|---------|-----------|
