@@ -144,23 +144,38 @@ class DirectMessagePublishWiringTest extends TestCase
 
         $this->db->exec("
             CREATE TABLE NotificationPreference (
+                id varchar(191) NOT NULL,
                 userId varchar(191) NOT NULL,
                 type varchar(64) NOT NULL,
-                state enum('enabled','disabled','custom') NOT NULL DEFAULT 'enabled',
-                customData json DEFAULT NULL,
-                PRIMARY KEY (userId, type)
+                state varchar(16) NOT NULL DEFAULT 'enabled',
+                data json DEFAULT NULL,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                updatedAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                UNIQUE KEY idx_notifpref_user_type (userId, type)
             )
         ");
 
         $this->db->exec("
             CREATE TABLE PushSubscription (
-                id varchar(191) NOT NULL PRIMARY KEY,
+                id varchar(191) NOT NULL,
                 userId varchar(191) NOT NULL,
-                endpoint varchar(500) NOT NULL,
-                p256dh varchar(255) NOT NULL,
-                auth varchar(255) NOT NULL,
+                type varchar(20) NOT NULL,
+                endpoint text NOT NULL,
+                p256dh text DEFAULT NULL,
+                auth text DEFAULT NULL,
+                userAgent varchar(255) DEFAULT NULL,
                 createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-                KEY idx_push_user (userId),
+                lastSeenAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                lastSuccessAt datetime(3) DEFAULT NULL,
+                lastErrorAt datetime(3) DEFAULT NULL,
+                lastError varchar(255) DEFAULT NULL,
+                consecutiveFailures int NOT NULL DEFAULT 0,
+                PRIMARY KEY (id),
+                UNIQUE KEY idx_pushsub_endpoint (endpoint(255)),
+                KEY idx_pushsub_user (userId),
+                KEY idx_pushsub_last_seen (lastSeenAt),
+                KEY idx_pushsub_failures (consecutiveFailures),
                 CONSTRAINT fk_push_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
             )
         ");
@@ -240,6 +255,7 @@ class DirectMessagePublishWiringTest extends TestCase
             timeout: 1,
             enabled: false,
             logger: new \Psr\Log\NullLogger(),
+            httpClient: new \GuzzleHttp\Client(),
         );
         $noopPublisher = new ChatEventPublisher(client: $noopClient, logger: new \Psr\Log\NullLogger());
 
