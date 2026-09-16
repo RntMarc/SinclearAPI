@@ -29,6 +29,7 @@ docker run -d \
   "engine": "memory",
   "api_key": "<CENTRIFUGO_API_KEY>",
   "allowed_origins": [
+    "https://sinclear.de",
     "https://app.sinclear.de",
     "https://*.sinclear.de"
   ],
@@ -87,7 +88,22 @@ docker run -d \
 
 ## Reverse Proxy
 
-### Caddy
+### Traefik (Primär – Homeserver)
+
+Traefik handhabt WebSocket-Upgrade automatisch. Keine spezielle WS-Konfiguration nötig.
+
+```yaml
+# docker-compose Labels für centrifugo:8000
+- "traefik.enable=true"
+- "traefik.http.routers.centrifugo.rule=Host(`chat.sinclear.de`)"
+- "traefik.http.routers.centrifugo.entrypoints=websecure"
+- "traefik.http.routers.centrifugo.tls.certresolver=letsencrypt"
+- "traefik.http.services.centrifugo.loadbalancer.server.port=8000"
+```
+
+*Alternative:* Caddy/nginx (Beispiele siehe unten).
+
+### Caddy (Alternative)
 
 ```
 chat.sinclear.de {
@@ -135,6 +151,8 @@ server {
 
 **Wichtig:** `CENTRIFUGO_API_KEY` und `CENTRIFUGO_PROXY_KEY` können identisch sein, müssen aber nicht. Für maximale Sicherheit sollten sie unterschiedlich sein.
 
+**Generierung:** Alle drei Secrets mit `openssl rand -hex 32` erzeugen. Einmal in `.env` (API-Server), einmal in `config.json` (Centrifugo-Host) eintragen.
+
 ## Engine
 
 - **Memory** (Single-Node): Ausreichend für ~10 gleichzeitige Nutzer
@@ -149,15 +167,20 @@ server {
 
 ## Checklist vor Deploy
 
-- [ ] `CENTRIFUGO_API_KEY` generiert und in `.env` + `config.json` eingetragen
-- [ ] `CENTRIFUGO_HMAC_SECRET` generiert und in `.env` + `config.json` eingetragen
-- [ ] `CENTRIFUGO_PROXY_KEY` generiert und in `.env` + `config.json` eingetragen
+- [ ] `CENTRIFUGO_API_KEY` generiert (`openssl rand -hex 32`) und in `.env` + `config.json` eingetragen
+- [ ] `CENTRIFUGO_HMAC_SECRET` generiert (`openssl rand -hex 32`) und in `.env` + `config.json` eingetragen
+- [ ] `CENTRIFUGO_PROXY_KEY` generiert (`openssl rand -hex 32`) und in `.env` + `config.json` eingetragen
+- [ ] Alle drei Secrets sind **unterschiedlich**
 - [ ] `CENTRIFUGO_WS_URL` in `.env` auf `wss://chat.sinclear.de/connection/websocket` gesetzt
 - [ ] `CENTRIFUGO_API_URL` in `.env` auf `https://chat.sinclear.de/api` gesetzt
-- [ ] Reverse Proxy konfiguriert (TLS, WebSocket-Upgrade)
-- [ ] CORS `allowed_origins` korrekt (`https://app.sinclear.de`)
+- [ ] Bestehende `config.json` auf Centrifugo-Host mit Doku-Version oben überschreiben (nicht manuell anpassen!)
+- [ ] Traefik-Labels/Router konfiguriert (`chat.sinclear.de` → `:8000`, TLS via Let's Encrypt)
+- [ ] `allowed_origins`: `["https://sinclear.de", "https://app.sinclear.de", "https://*.sinclear.de"]` (kein `*`!)
 - [ ] Proxy-Endpoints erreichbar (`POST /api/v2/centrifugo/subscribe`, `POST /api/v2/centrifugo/publish`)
 - [ ] `CENTRIFUGO_ENABLED=true` in `.env` auf API-Server gesetzt
+- [ ] Test: `GET https://chat.sinclear.de/api/info` → 200
 - [ ] Test: Client verbindet via WebSocket und erhält Token
 - [ ] Test: Nachricht wird via REST gesendet und via WebSocket empfangen
 - [ ] Test: Typing-Event wird via WebSocket gesendet und validiert
+- [ ] Test: PWA (`https://sinclear.de`) kann WebSocket-Verbindung aufbauen
+- [ ] Test: Android-App kann WebSocket-Verbindung aufbauen (ohne Origin-Header)

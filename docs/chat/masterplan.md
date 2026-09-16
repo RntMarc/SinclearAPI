@@ -1,7 +1,7 @@
 # Masterplan: Chat-Umstellung auf Centrifugo v6
 
-**Status:** Planung (Schritt 1 abgeschlossen) – bereit für Umsetzung (Schritt 2)  
-**Branch:** `centrifugo-chat` (neu, basierend auf `main`)  
+**Status:** Schritt 2 abgeschlossen (Commits `2a–2f` auf `main`) – Schritt 3 (Deploy Centrifugo) in Durchführung  
+**Branch:** `main`  
 **Konkurrierender Branch `the-real-chat` (Matrix/Continuwuity):** Verworfen, kein Merge
 
 ---
@@ -245,18 +245,64 @@ Datenbanktabellen dürfen verändert werden. Datenverlust ist akzeptiert und ste
 
 ---
 
-## Hinweise für Schritt 3 (Deploy Centrifugo)
+## Schritt 3 – Deploy Centrifugo (in Durchführung)
 
-- Domain: `chat.sinclear.de` (TLS durch Traefik Proxy) <-- Prüfen, ob Traefik Config des Homeservers angepasst werden muss, Tests sind hilfreich zur Feststellung ob es schon funktioniert 
-- WebSocket: `wss://chat.sinclear.de/connection/websocket`
-- SSE Fallback: `https://chat.sinclear.de/connection/uni_sse` / `/connection/http_stream`
-- `allowed_origins`: `*` (* sollte nur vorübergehend sein und muss später geändert werden, um bestimmte Angriffsszenarien abzuwehren!)
-- Centrifugo `config.json` exakt wie in `docs/chat/centrifugo.md` dokumentiert <-- Nutzer erinnern, dass das noch nicht durchgeführt wurde und die momentane deployte config von Centrifugo nicht unbedingt dem hier genannten Config-Code entspricht!
-- Secrets: `CENTRIFUGO_API_KEY`, `CENTRIFUGO_HMAC_SECRET`, `CENTRIFUGO_PROXY_KEY` (für `X-Centrifugo-Proxy-Key`) <-- Nutzer hat Frage: Woher kommt CENTRIFUGO_PROXY_KEY? Also wo kann ich diesen ablesen und speichern? Einfach random generieren und in config eingtragen wie die anderen Keys?
+### Infrastruktur
+- **Domain:** `chat.sinclear.de` (TLS via Traefik auf Homeserver)
+- **WebSocket:** `wss://chat.sinclear.de/connection/websocket`
+- **SSE Fallback:** `https://chat.sinclear.de/connection/uni_sse` / `/connection/http_stream`
+- **Engine:** Memory (Single-Node, ~10 Nutzer, kein Redis nötig)
+
+### Traefik (Homeserver)
+```yaml
+# docker-compose Labels für centrifugo:8000
+- "traefik.enable=true"
+- "traefik.http.routers.centrifugo.rule=Host(`chat.sinclear.de`)"
+- "traefik.http.routers.centrifugo.entrypoints=websecure"
+- "traefik.http.routers.centrifugo.tls.certresolver=letsencrypt"
+- "traefik.http.services.centrifugo.loadbalancer.server.port=8000"
+```
+Traefik handhabt WebSocket-Upgrade automatisch. Timeouts ggf. erhöhen.
+
+### Secrets
+Drei unabhängige Secrets per `openssl rand -hex 32` erzeugen:
+- `CENTRIFUGO_API_KEY` → `.env` (API-Server) + `config.json` (`api_key` + `http_api.key`)
+- `CENTRIFUGO_HMAC_SECRET` → `.env` (API-Server) + `config.json` (`client.token_hmac_secret_key`)
+- `CENTRIFUGO_PROXY_KEY` → `.env` (API-Server) + `config.json` (`http_api.static_headers.X-Centrifugo-Proxy-Key`)
+
+**Wichtig:** Alle drei Secrets müssen unterschiedlich sein (unterschiedliche Vertrauensrichtungen, getrennt rotierbar).
+
+### `allowed_origins`
+Produktiv (direkt restriktiv, kein `*`-Zwischenschritt):
+```json
+"allowed_origins": ["https://sinclear.de", "https://app.sinclear.de", "https://*.sinclear.de"]
+```
+- `https://sinclear.de` = PWA (braucht Origin-Header)
+- Android-App (`de.sinclear.beyond`) braucht keinen Eintrag (kein browserbasierter Origin)
+
+### `config.json` – exakt wie in `docs/chat/centrifugo.md`
+**Vor Deploy prüfen:** Bestehende `config.json` auf Centrifugo-Host verwerfen und exakt mit Doku-Version überschreiben (Namespace `chat` mit allen Optionen, `client.token_issuer/audience`, `proxy.subscribe/publish_endpoint`, `engine: memory`).
+
+### Deploy-Sequenz
+1. Secrets generieren → `.env` (API) + `config.json` (Centrifugo)
+2. `config.json` auf Centrifugo-Host deployen (Doku-Version)
+3. Traefik-Labels/Router konfigurieren → `chat.sinclear.de` → `:8000`
+4. `CENTRIFUGO_WS_URL` + `CENTRIFUGO_API_URL` in `.env` setzen
+5. Zuerst `CENTRIFUGO_ENABLED=false` lassen
+6. Tests durchführen (s. Testprotokoll)
+7. `CENTRIFUGO_ENABLED=true` setzen + `update.sh` Deploy
+
+### Testprotokoll
+1. `GET https://chat.sinclear.de/api/info` → 200 (TLS + Routing ok)
+2. `GET /api/v2/chat/centrifugo/token` (JWT) → `{token, url, expiresAt}`
+3. `POST /api/v2/centrifugo/subscribe` ohne/avec falschem Key → 403; mit Key + Teilnehmer → `{result:{}}`
+4. PWA (`https://sinclear.de`): WS-Connect + `chat:<id>`-Subscribe → REST-`POST …/messages` kommt als `message_created` an
+5. Android-Debug-App: gleicher Flow ohne Origin-Probleme
+6. Negativ: Centrifugo gestoppt → REST-Chat funktioniert weiter (Graceful Degradation)
 
 ---
 
-## Offene Punkte / Nachbereitung (nach Schritt 2)
+## Offene Punkte / Nachbereitung (nach Schritt 3)
 
 - [ ] Client-Agent implementiert Flutter-Integration (centrifuge-dart 0.20.1, Token-Refresh via `getToken`, Subscription auf `chat:<id>`, Typing via Client-seitigem Publish)
 - [ ] End-to-End Test: Message senden → REST Response + Centrifugo Event empfangen
@@ -265,4 +311,4 @@ Datenbanktabellen dürfen verändert werden. Datenverlust ist akzeptiert und ste
 
 ---
 
-*Dieser Masterplan ist die verbindliche Entscheidungsgrundlage für Schritt 2. Änderungen nur nach Rücksprache.*
+*Dieser Masterplan ist die verbindliche Entscheidungsgrundlage. Änderungen nur nach Rücksprache.*
