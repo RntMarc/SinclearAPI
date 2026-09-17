@@ -21,51 +21,72 @@ docker run -d \
 
 ## config.json
 
+Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Version und vom Format her komplett falsch.
+
 ```json
 {
-  "log_level": "warning",
-  "log_file": "/var/log/centrifugo/centrifugo.log",
-  "admin": false,
-  "engine": "memory",
-  "api_key": "<CENTRIFUGO_API_KEY>",
-  "allowed_origins": [
-    "https://sinclear.de",
-    "https://app.sinclear.de",
-    "https://*.sinclear.de"
-  ],
-  "namespaces": [
-    {
-      "name": "chat",
-      "subscribe_proxy_enabled": true,
-      "publish_proxy_enabled": true,
-      "presence": true,
-      "join_leave": true,
-      "force_push_join_leave": true,
-      "force_recovery": true,
-      "force_positioning": true,
-      "history_size": 100,
-      "history_ttl": "600s",
-      "channel_regex": "^[A-Za-z0-9_-]+$",
-      "publication_data_format": "json"
-    }
-  ],
-  "http_api": {
+  "log": {
+    "level": "warning",
+    "file": "/var/log/centrifugo/centrifugo.log"
+  },
+  "admin": {
+    "enabled": true,
+    "password": "xxxx",
+    "secret": "xxxx"
+  },
+  "engine": {
+    "type": "memory"
+  },
+  "http_server": {
     "address": "0.0.0.0",
-    "port": 8000,
-    "key": "<CENTRIFUGO_API_KEY>",
-    "static_headers": {
-      "X-Centrifugo-Proxy-Key": "<CENTRIFUGO_PROXY_KEY>"
-    }
+    "port": 8000
+  },
+  "http_api": {
+    "key": "xxxx"
   },
   "client": {
+    "allowed_origins": [
+      "https://sinclear.de",
+      "https://*.sinclear.de"
+    ],
     "concurrency": 8,
-    "token_issuer": "sinclear-api",
-    "token_audience": "centrifugo",
-    "token_hmac_secret_key": "<CENTRIFUGO_HMAC_SECRET>"
+    "token": {
+      "hmac_secret_key": "xxxx",
+      "issuer": "sinclear-api",
+      "audience": "centrifugo"
+    }
   },
-  "proxy": {
-    "subscribe_endpoint": "https://api.sinclear.de/api/v2/centrifugo/subscribe",
-    "publish_endpoint": "https://api.sinclear.de/api/v2/centrifugo/publish"
+  "channel": {
+    "namespaces": [
+      {
+        "name": "chat",
+        "subscribe_proxy_enabled": true,
+        "publish_proxy_enabled": true,
+        "presence": true,
+        "join_leave": true,
+        "force_push_join_leave": true,
+        "force_recovery": true,
+        "force_positioning": true,
+        "history_size": 100,
+        "history_ttl": "600s",
+        "channel_regex": "^[A-Za-z0-9_-]+$",
+        "publication_data_format": "json"
+      }
+    ],
+    "proxy": {
+      "subscribe": {
+        "endpoint": "https://api.sinclear.de/api/v2/centrifugo/subscribe",
+        "http": {
+          "static_headers": { "X-Centrifugo-Proxy-Key": "xxxx" }
+        }
+      },
+      "publish": {
+        "endpoint": "https://api.sinclear.de/api/v2/centrifugo/publish",
+        "http": {
+          "static_headers": { "X-Centrifugo-Proxy-Key": "xxxx" }
+        }
+      }
+    }
   }
 }
 ```
