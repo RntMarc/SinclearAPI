@@ -75,13 +75,13 @@ Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Ver
     ],
     "proxy": {
       "subscribe": {
-        "endpoint": "https://api.sinclear.de/api/v2/centrifugo/subscribe",
+        "endpoint": "https://sinclear.de/api/v2/centrifugo/subscribe",
         "http": {
           "static_headers": { "X-Centrifugo-Proxy-Key": "xxxx" }
         }
       },
       "publish": {
-        "endpoint": "https://api.sinclear.de/api/v2/centrifugo/publish",
+        "endpoint": "https://sinclear.de/api/v2/centrifugo/publish",
         "http": {
           "static_headers": { "X-Centrifugo-Proxy-Key": "xxxx" }
         }

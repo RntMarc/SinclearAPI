@@ -175,7 +175,7 @@ Datenbanktabellen dürfen verändert werden. Datenverlust ist akzeptiert und ste
     - Domain: `chat.sinclear.de`
     - `config.json` Beispiel mit exakten Namespace-Optionen (siehe Tabelle oben)
     - `http_api.key`, `client.token.hmac_secret_key`, `client.token.audience`, `client.token.issuer`
-    - Proxy-Endpoints: `subscribe` → `https://api.sinclear.de/api/v2/centrifugo/subscribe`, `publish` → `.../publish`
+    - Proxy-Endpoints: `subscribe` → `https://sinclear.de/api/v2/centrifugo/subscribe`, `publish` → `.../publish`
     - Docker: `centrifugo/centrifugo:v6`
     - Reverse Proxy (Caddy/nginx): TLS, WebSocket-Upgrade, CORS `allowed_origins`
     - Engine: Memory (Single-Node, ~10 Nutzer) – Redis optional für HA
