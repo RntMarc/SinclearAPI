@@ -88,7 +88,13 @@ final readonly class CentrifugoProxyController
             'typing' => !empty($payload['typing']),
         ];
 
-        return ResponseFactory::json(['result' => ['data' => $sanitized]], 200, $response);
+        // Typing is ephemeral: keep it out of channel history/recovery.
+        return ResponseFactory::json([
+            'result' => [
+                'data' => $sanitized,
+                'skip_history' => true,
+            ],
+        ], 200, $response);
     }
 
     private function parseConversationId(string $channel): ?string

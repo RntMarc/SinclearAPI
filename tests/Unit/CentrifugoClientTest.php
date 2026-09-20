@@ -44,11 +44,35 @@ class CentrifugoClientTest extends TestCase
         $this->assertCount(0, $mock);
     }
 
-    public function testPresenceReturnsData(): void
+    public function testPresenceReturnsUserKeyedData(): void
+    {
+        // Centrifugo keys presence by client ID; client normalizes to user IDs.
+        $presenceData = [
+            'client-abc' => ['client' => 'client-abc', 'user' => 'user-1'],
+            'client-def' => ['client' => 'client-def', 'user' => 'user-2'],
+        ];
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => ['presence' => $presenceData]])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->presence('chat:conv-1');
+
+        $this->assertCount(2, $result);
+        $this->assertArrayHasKey('user-1', $result);
+        $this->assertArrayHasKey('user-2', $result);
+        $this->assertSame('user-1', $result['user-1']['user']);
+        $this->assertSame('client-abc', $result['user-1']['client']);
+    }
+
+    public function testPresenceDeduplicatesMultipleClientsPerUser(): void
     {
         $presenceData = [
-            'user-1' => ['client' => 'abc', 'user' => 'user-1'],
-            'user-2' => ['client' => 'def', 'user' => 'user-2'],
+            'client-1' => ['client' => 'client-1', 'user' => 'user-1'],
+            'client-2' => ['client' => 'client-2', 'user' => 'user-1'],
+            'client-3' => ['client' => 'client-3', 'user' => 'user-2'],
         ];
         $mock = new MockHandler([
             new Response(200, [], json_encode(['result' => ['presence' => $presenceData]])),
@@ -194,6 +218,59 @@ class CentrifugoClientTest extends TestCase
         // CentrifugoClient sends to /publish endpoint with channel and data
         $this->assertSame('chat:conv-1', $body['channel'] ?? null);
         $this->assertSame($data, $body['data'] ?? null);
+        $this->assertArrayNotHasKey('skip_history', $body);
+    }
+
+    public function testPublishWithSkipHistory(): void
+    {
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => []])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $centrifugoClient->publish('chat:conv-1', ['type' => 'read'], skipHistory: true);
+
+        $request = $mock->getLastRequest();
+        $body = json_decode((string) $request->getBody(), true);
+
+        $this->assertTrue($body['skip_history'] ?? false);
+    }
+
+    public function testApiErrorFieldIsLoggedAndEmptyResultReturned(): void
+    {
+        $logger = new class extends \Psr\Log\AbstractLogger {
+            public array $records = [];
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = [$level, (string) $message, $context];
+            }
+        };
+
+        $mock = new MockHandler([
+            new Response(200, [], json_encode([
+                'error' => ['code' => 102, 'message' => 'unknown channel'],
+            ])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = new \Sinclear\Api\Services\Centrifugo\CentrifugoClient(
+            apiKey: 'test-api-key',
+            apiUrl: 'http://localhost:8000/api',
+            timeout: 2,
+            enabled: true,
+            logger: $logger,
+            httpClient: $client,
+        );
+
+        $result = $centrifugoClient->presence('chat:conv-1');
+
+        $this->assertSame([], $result);
+        $this->assertCount(1, $logger->records);
+        $this->assertSame('unknown channel', $logger->records[0][2]['message']);
+        $this->assertSame(102, $logger->records[0][2]['code']);
     }
 
     private function createClient(Client $httpClient, bool $enabled = true): \Sinclear\Api\Services\Centrifugo\CentrifugoClient

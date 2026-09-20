@@ -211,7 +211,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | POST | `/centrifugo/subscribe` | `X-Centrifugo-Proxy-Key` + HTTPS | Subscribe-Validierung (ChatParticipant) |
 | POST | `/centrifugo/publish` | `X-Centrifugo-Proxy-Key` + HTTPS | Typing-Validierung (Participant + Rate-Limit) |
 
-**Security:** Kein JWT – gesichert via Shared Secret (`CENTRIFUGO_PROXY_KEY`) in `X-Centrifugo-Proxy-Key` Header (Centrifugo sendet via `http.static_headers`). Doppelte HTTPS-Prüfung: `CentrifugoProxyMiddleware` (prüft `HTTPS`/`X-Forwarded-Proto`) + `RequireHttpsMiddleware` (identische Prüfung).
+**Security:** Kein JWT – gesichert via Shared Secret (`CENTRIFUGO_PROXY_KEY`) in `X-Centrifugo-Proxy-Key` Header (Centrifugo sendet via `http.static_headers`). HTTPS erzwungen durch vorgeschaltetes `RequireHttpsMiddleware`; die Shared-Secret-Prüfung liegt in `CentrifugoProxyMiddleware`.
 
 ### Admin: Travel-Gruppenchats
 
@@ -273,6 +273,8 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 **Validierung:** Nur `typing: bool` wird akzeptiert (sanitized). Anderes `data` wird ignoriert.
 
+**History:** Die Proxy-Antwort setzt `skip_history: true` – Typing-Events sind ephemer und werden nicht in der Channel-History gespeichert (kein Replay als „verpasste“ Nachricht bei Recovery).
+
 **Channel-Validierung:** `parseConversationId` prüft Kanal gegen Regex `^chat:([A-Za-z0-9_-]+)$` → `400 invalid_channel` bei Nichteinhaltung.
 
 ## Echtzeit-Events
@@ -320,7 +322,7 @@ Nachricht wurde gelöscht.
 
 ### `read`
 
-Lesestand-Update eines Teilnehmers.
+Lesestand-Update eines Teilnehmers. Wird mit `skip_history: true` publiziert (ephemer, kein Replay bei Recovery).
 
 ```json
 {
@@ -335,7 +337,9 @@ Lesestand-Update eines Teilnehmers.
 
 ### Presence (Push-Suppression)
 
-- `CentrifugoClient->presence("chat:<convId>")` prüft, ob Empfänger den Chat *gerade offen* hat
+- Centrifugo liefert Presence **nach Client-ID** verschlüsselt: `{"<clientId>": {"client": "<clientId>", "user": "<userId>"}}`.
+- `CentrifugoClient::presence("chat:<convId>")` **normalisiert** das auf User-IDs (dedupliziert, mehrere Verbindungen eines Nutzers → ein Eintrag): `{"<userId>": {"client": "...", "user": "<userId>"}}`.
+- `array_keys($presence)` ergibt damit die online User-IDs → Vergleich gegen `ChatParticipant.userId` funktioniert.
 - Empfänger im Channel → `suppressPush=true` (kein Push, aber In-App-Notification)
 - Bei Centrifugo-Fehler → `presence()` gibt `[]` zurück → `suppressPush=false` (Fallback: Push senden)
 - **Keine Personal-Channels** nötig
@@ -442,16 +446,13 @@ Der Endpoint `GET /chat/sync` bleibt vorerst registriert, antwortet aber leer:
 
 ## Moderation
 
-Chat-Nachrichten haben aktuell **keinen** `ModerationObjectType`. Die `VALID_OBJECT_TYPES` in `ModerationRequestService` enthalten:
+Chat-Nachrichten haben aktuell **keinen** `ModerationObjectType`. Das `ModerationRequest.objectType`-ENUM enthält (produktiv, verifiziert):
 
 ```
-user, forum_post, recipe, explore_place, recipe_review, forum_comment,
-explore_comment, feedback_suggestion, feedback_comment, travel_trip,
-travel_event, travel_accommodation, travel_ticket, subscription,
-calendar_event, story
+user, forum_post, recipe, explore_place
 ```
 
-`chat_message` fehlt. Laut AGENTS.md muss jeder User-Content einen Report-Flag haben. **TODO:** `chat_message` zu `VALID_OBJECT_TYPES` hinzufügen und `resolveOwner` für Chat-Nachrichten implementieren. Der Report-Button für Chat kann ggf. auf die nächste Iteration verschoben werden.
+`chat_message` fehlt. Laut AGENTS.md muss jeder User-Content einen Report-Flag haben. **TODO:** `chat_message` zum ENUM + `VALID_OBJECT_TYPES` hinzufügen und `resolveOwner` für Chat-Nachrichten implementieren. Der Report-Button für Chat kann ggf. auf die nächste Iteration verschoben werden.
 
 ## Cron
 
@@ -496,7 +497,6 @@ Die Migration `20260916120000_drop_chat_realtime_tables.sql` löscht:
 | `CENTRIFUGO_WS_URL` | WebSocket-URL für Clients | – |
 | `CENTRIFUGO_TIMEOUT` | Timeout für Server-API-Calls (Sekunden) | 2 |
 | `CENTRIFUGO_ENABLED` | Aktivieren/Deaktivieren | false |
-| `CENTRIFUGO_LOG_LEVEL` | Log-Level (error/warning) | error |
 | `CENTRIFUGO_ISSUER` | JWT-Issuer | sinclear-api |
 | `CENTRIFUGO_AUDIENCE` | JWT-Audience | centrifugo |
 | `CENTRIFUGO_PROXY_KEY` | Shared Secret für Proxy-Endpoints | – |

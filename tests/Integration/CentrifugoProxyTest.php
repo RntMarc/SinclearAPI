@@ -211,6 +211,7 @@ class CentrifugoProxyTest extends TestCase
         $this->assertSame(200, $result->getStatusCode());
         $body = json_decode((string) $result->getBody(), true);
         $this->assertSame(['typing' => true], $body['result']['data']);
+        $this->assertTrue($body['result']['skip_history']);
     }
 
     public function testPublishSanitizesPayloadToTypingOnly(): void

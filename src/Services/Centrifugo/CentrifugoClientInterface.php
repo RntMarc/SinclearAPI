@@ -11,11 +11,17 @@ interface CentrifugoClientInterface
 {
     /**
      * Publish data to a Centrifugo channel.
+     *
+     * @param bool $skipHistory Skip adding the publication to the channel history
+     *                          (used for ephemeral events like typing/read)
      */
-    public function publish(string $channel, array $data): void;
+    public function publish(string $channel, array $data, bool $skipHistory = false): void;
 
     /**
      * Get presence information for a channel.
+     *
+     * Centrifugo keys presence by client ID; this normalizes it to unique
+     * user IDs so callers can match against `ChatParticipant.userId`.
      *
      * @return array<string, array{client: string, user: string}> User-ID → info
      */

@@ -1,6 +1,6 @@
 # Masterplan: Chat-Umstellung auf Centrifugo v6
 
-**Status:** Schritt 2 abgeschlossen (Commits `2a–2f` auf `main`) – Schritt 3 (Deploy Centrifugo) in Durchführung  
+**Status:** Schritt 2 abgeschlossen (Commits `2a–2f` auf `main`) – Schritt 3 (Deploy Centrifugo) abgeschlossen (Commits `efea506`, `89efdcd`); API-seitige Nachbesserungen (Presence-Normalisierung, `skip_history`, Fehler-Logging, Cleanup) umgesetzt  
 **Branch:** `main`  
 **Konkurrierender Branch `the-real-chat` (Matrix/Continuwuity):** Verworfen, kein Merge
 

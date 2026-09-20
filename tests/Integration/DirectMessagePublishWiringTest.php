@@ -305,7 +305,8 @@ class DirectMessagePublishWiringTest extends TestCase
 
     public function testPresencePushSuppressionWhenOnline(): void
     {
-        // Simulate receiver being online in Centrifugo channel
+        // FakeCentrifugoClient::presence returns already-normalized (user-keyed)
+        // data. Presence normalization itself is covered by CentrifugoClientTest.
         $this->fakeClient->presenceResult = [
             'recv-1' => ['client' => 'abc', 'user' => 'recv-1'],
         ];
@@ -316,6 +317,13 @@ class DirectMessagePublishWiringTest extends TestCase
 
         // Message published successfully
         $this->assertSame('message_created', $this->fakeClient->publishedData['type']);
+
+        // In-app notification is created for the recipient even when online
+        $stmt = $this->db->prepare("SELECT body FROM Notification WHERE userId = 'recv-1' AND type = 'direct_message'");
+        $stmt->execute();
+        $body = $stmt->fetchColumn();
+        $this->assertIsString($body);
+        $this->assertStringContainsString('Alice', $body);
     }
 
     public function testPresenceFallbackWhenCentrifugoFails(): void

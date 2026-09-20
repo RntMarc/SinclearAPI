@@ -18,12 +18,9 @@ class CentrifugoProxyMiddlewareTest extends TestCase
         $this->middleware = new CentrifugoProxyMiddleware(proxyKey: self::PROXY_KEY);
     }
 
-    public function testValidKeyAndHttpsPassesThrough(): void
+    public function testValidKeyPassesThrough(): void
     {
-        $request = $this->createRequest(
-            proxyKey: self::PROXY_KEY,
-            https: true,
-        );
+        $request = $this->createRequest(proxyKey: self::PROXY_KEY);
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects($this->once())
@@ -37,10 +34,7 @@ class CentrifugoProxyMiddlewareTest extends TestCase
 
     public function testMissingKeyReturns403(): void
     {
-        $request = $this->createRequest(
-            proxyKey: '',
-            https: true,
-        );
+        $request = $this->createRequest(proxyKey: '');
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects($this->never())->method('handle');
@@ -54,10 +48,7 @@ class CentrifugoProxyMiddlewareTest extends TestCase
 
     public function testWrongKeyReturns403(): void
     {
-        $request = $this->createRequest(
-            proxyKey: 'wrong-key',
-            https: true,
-        );
+        $request = $this->createRequest(proxyKey: 'wrong-key');
 
         $handler = $this->createMock(RequestHandlerInterface::class);
         $handler->expects($this->never())->method('handle');
@@ -67,73 +58,9 @@ class CentrifugoProxyMiddlewareTest extends TestCase
         $this->assertSame(403, $response->getStatusCode());
     }
 
-    public function testNonHttpsReturns403(): void
+    private function createRequest(string $proxyKey): ServerRequestInterface
     {
-        $request = $this->createRequest(
-            proxyKey: self::PROXY_KEY,
-            https: false,
-        );
-
-        $handler = $this->createMock(RequestHandlerInterface::class);
-        $handler->expects($this->never())->method('handle');
-
-        $response = $this->middleware->process($request, $handler);
-
-        $this->assertSame(403, $response->getStatusCode());
-        $body = json_decode((string) $response->getBody(), true);
-        $this->assertSame('ssl_required', $body['error']);
-    }
-
-    public function testHttpsViaForwardedProtoPassesThrough(): void
-    {
-        $request = $this->createRequest(
-            proxyKey: self::PROXY_KEY,
-            https: false,
-            forwardedProto: 'https',
-        );
-
-        $handler = $this->createMock(RequestHandlerInterface::class);
-        $handler->expects($this->once())
-            ->method('handle')
-            ->willReturn($this->createResponse(200));
-
-        $response = $this->middleware->process($request, $handler);
-
-        $this->assertSame(200, $response->getStatusCode());
-    }
-
-    public function testMissingKeyAndNonHttpsReturnsSslErrorFirst(): void
-    {
-        $request = $this->createRequest(
-            proxyKey: '',
-            https: false,
-        );
-
-        $handler = $this->createMock(RequestHandlerInterface::class);
-        $handler->expects($this->never())->method('handle');
-
-        $response = $this->middleware->process($request, $handler);
-
-        // SSL check happens first
-        $this->assertSame(403, $response->getStatusCode());
-        $body = json_decode((string) $response->getBody(), true);
-        $this->assertSame('ssl_required', $body['error']);
-    }
-
-    private function createRequest(
-        string $proxyKey,
-        bool $https,
-        string $forwardedProto = '',
-    ): ServerRequestInterface {
-        $serverParams = [
-            'HTTPS' => $https ? 'on' : '',
-        ];
-        if ($forwardedProto !== '') {
-            $serverParams['HTTP_X_FORWARDED_PROTO'] = $forwardedProto;
-        }
-
         $request = $this->createMock(ServerRequestInterface::class);
-        $request->method('getServerParams')->willReturn($serverParams);
         $request->method('getHeaderLine')
             ->willReturnCallback(function (string $name) use ($proxyKey) {
                 return $name === 'X-Centrifugo-Proxy-Key' ? $proxyKey : '';

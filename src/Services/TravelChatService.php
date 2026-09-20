@@ -9,7 +9,7 @@ use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
-use Sinclear\Api\Services\Centrifugo\CentrifugoClient;
+use Sinclear\Api\Services\Centrifugo\CentrifugoClientInterface;
 
 final readonly class TravelChatService
 {
@@ -21,7 +21,7 @@ final readonly class TravelChatService
         private EventRelationRepository $eventRelationRepo,
         private ChatConversationRepository $conversationRepo,
         private ChatParticipantRepository $participantRepo,
-        private CentrifugoClient $centrifugoClient,
+        private CentrifugoClientInterface $centrifugoClient,
     ) {}
 
     /**

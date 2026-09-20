@@ -348,12 +348,20 @@ return [
 
     CentrifugoClient::class => function (ContainerInterface $c): CentrifugoClient {
         $settings = $c->get(Settings::class);
+        $logger = $c->get(\Psr\Log\LoggerInterface::class);
+
+        $enabled = $settings->centrifugo['enabled'];
+        if ($enabled && ($settings->centrifugo['api_url'] === '' || $settings->centrifugo['api_key'] === '')) {
+            $logger->warning('[CENTRIFUGO] enabled but api_url/api_key missing – disabling');
+            $enabled = false;
+        }
+
         return new CentrifugoClient(
             apiKey: $settings->centrifugo['api_key'],
             apiUrl: $settings->centrifugo['api_url'],
             timeout: $settings->centrifugo['timeout'],
-            enabled: $settings->centrifugo['enabled'],
-            logger: $c->get(\Psr\Log\LoggerInterface::class),
+            enabled: $enabled,
+            logger: $logger,
             httpClient: new Client(['timeout' => $settings->centrifugo['timeout']]),
         );
     },

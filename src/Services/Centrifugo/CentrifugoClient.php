@@ -26,24 +26,34 @@ final readonly class CentrifugoClient implements CentrifugoClientInterface
     /**
      * Publish data to a Centrifugo channel.
      */
-    public function publish(string $channel, array $data): void
+    public function publish(string $channel, array $data, bool $skipHistory = false): void
     {
         if (!$this->enabled) {
             return;
         }
 
-        $this->request('publish', [
+        $body = [
             'channel' => $channel,
             'data' => $data,
-        ]);
+        ];
+        if ($skipHistory) {
+            $body['skip_history'] = true;
+        }
+
+        $this->request('publish', $body);
     }
 
     /**
-     * Get presence info for a channel (connected clients).
+     * Get presence info for a channel, normalized to unique user IDs.
      *
-     * Returns the presence data on success, empty array on failure.
+     * Centrifugo returns presence keyed by client ID:
+     *   {"<clientId>": {"client": "<clientId>", "user": "<userId>"}}
+     * We key by user ID (deduped across multiple connections of one user),
+     * so callers can compare directly against `ChatParticipant.userId`.
      *
-     * @return array<string, mixed>
+     * Returns the normalized presence on success, empty array on failure.
+     *
+     * @return array<string, array{client: string, user: string}>
      */
     public function presence(string $channel): array
     {
@@ -55,7 +65,27 @@ final readonly class CentrifugoClient implements CentrifugoClientInterface
             'channel' => $channel,
         ]);
 
-        return $result['presence'] ?? [];
+        $presence = $result['presence'] ?? [];
+        if (!is_array($presence)) {
+            return [];
+        }
+
+        $byUser = [];
+        foreach ($presence as $clientId => $info) {
+            if (!is_array($info)) {
+                continue;
+            }
+            $userId = (string) ($info['user'] ?? '');
+            if ($userId === '' || isset($byUser[$userId])) {
+                continue;
+            }
+            $byUser[$userId] = [
+                'client' => (string) ($info['client'] ?? $clientId),
+                'user' => $userId,
+            ];
+        }
+
+        return $byUser;
     }
 
     /**
@@ -114,6 +144,16 @@ final readonly class CentrifugoClient implements CentrifugoClientInterface
                 $this->logger->warning('[CENTRIFUGO] Invalid response from {method}', [
                     'method' => $method,
                     'status' => $response->getStatusCode(),
+                ]);
+                return [];
+            }
+
+            // Centrifugo returns HTTP 200 even on API errors; the error is in the body.
+            if (isset($result['error'])) {
+                $this->logger->warning('[CENTRIFUGO] {method} error {code}: {message}', [
+                    'method' => $method,
+                    'code' => $result['error']['code'] ?? 0,
+                    'message' => $result['error']['message'] ?? '',
                 ]);
                 return [];
             }

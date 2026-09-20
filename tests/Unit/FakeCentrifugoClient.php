@@ -8,19 +8,21 @@ class FakeCentrifugoClient implements CentrifugoClientInterface
 {
     public string $publishedChannel = '';
     public array $publishedData = [];
+    public bool $publishedSkipHistory = false;
     public array $presenceResult = [];
     public string $unsubscribedChannel = '';
     public string $unsubscribedUserId = '';
     public string $disconnectedUserId = '';
     public ?\Throwable $publishException = null;
 
-    public function publish(string $channel, array $data): void
+    public function publish(string $channel, array $data, bool $skipHistory = false): void
     {
         if ($this->publishException !== null) {
             throw $this->publishException;
         }
         $this->publishedChannel = $channel;
         $this->publishedData = $data;
+        $this->publishedSkipHistory = $skipHistory;
     }
 
     public function presence(string $channel): array

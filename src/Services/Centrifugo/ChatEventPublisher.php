@@ -57,6 +57,9 @@ final readonly class ChatEventPublisher
 
     /**
      * Publish a read-receipt event.
+     *
+     * Read receipts are ephemeral and must not land in channel history
+     * (otherwise they are replayed as missed events on recovery).
      */
     public function publishRead(string $conversationId, int $seq, int $lastReadSeq, string $userId): void
     {
@@ -65,13 +68,13 @@ final readonly class ChatEventPublisher
             'seq' => $seq,
             'lastReadSeq' => $lastReadSeq,
             'userId' => $userId,
-        ]);
+        ], skipHistory: true);
     }
 
-    private function publish(string $conversationId, array $data): void
+    private function publish(string $conversationId, array $data, bool $skipHistory = false): void
     {
         try {
-            $this->client->publish("chat:{$conversationId}", $data);
+            $this->client->publish("chat:{$conversationId}", $data, $skipHistory);
         } catch (\Throwable $e) {
             // Should never happen (CentrifugoClient catches internally),
             // but defensive log if a different exception slips through.

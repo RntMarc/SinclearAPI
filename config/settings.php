@@ -73,7 +73,6 @@ $settings['centrifugo'] = [
     'ws_url' => $_ENV['CENTRIFUGO_WS_URL'] ?? '',
     'timeout' => (int)($_ENV['CENTRIFUGO_TIMEOUT'] ?? 2),
     'enabled' => filter_var($_ENV['CENTRIFUGO_ENABLED'] ?? false, FILTER_VALIDATE_BOOLEAN),
-    'log_level' => $_ENV['CENTRIFUGO_LOG_LEVEL'] ?? 'error',
     'issuer' => $_ENV['CENTRIFUGO_ISSUER'] ?? 'sinclear-api',
     'audience' => $_ENV['CENTRIFUGO_AUDIENCE'] ?? 'centrifugo',
     'proxy_key' => $_ENV['CENTRIFUGO_PROXY_KEY'] ?? '',

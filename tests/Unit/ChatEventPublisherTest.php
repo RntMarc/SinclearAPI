@@ -72,6 +72,20 @@ class ChatEventPublisherTest extends TestCase
         $this->assertSame('user-1', $this->fakeClient->publishedData['userId']);
     }
 
+    public function testPublishReadSkipsHistory(): void
+    {
+        $this->publisher->publishRead('conv-4', 10, 10, 'user-1');
+
+        $this->assertTrue($this->fakeClient->publishedSkipHistory);
+    }
+
+    public function testPublishMessageCreatedDoesNotSkipHistory(): void
+    {
+        $this->publisher->publishMessageCreated($this->createFormattedMessage('conv-1'));
+
+        $this->assertFalse($this->fakeClient->publishedSkipHistory);
+    }
+
     public function testPublishMessageCreatedToleratesClientException(): void
     {
         $this->fakeClient->publishException = new \RuntimeException('Centrifugo unavailable');

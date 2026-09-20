@@ -5032,7 +5032,7 @@ components:
       properties:
         result:
           type: object
-          required: [data]
+          required: [data, skip_history]
           properties:
             data:
               type: object
@@ -5041,6 +5041,11 @@ components:
                 typing:
                   type: boolean
                   description: Tippindikator
+            skip_history:
+              type: boolean
+              description: >
+                Immer `true` – Typing-Events sind ephemer und werden nicht in
+                der Channel-History gespeichert (kein Replay bei Recovery).
 
     ExternalDataWeatherResponse:
       type: object

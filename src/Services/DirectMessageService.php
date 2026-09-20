@@ -331,36 +331,6 @@ final readonly class DirectMessageService
         $this->eventPublisher->publishRead($conversationId, $seq, $seq, $userId);
     }
 
-    /**
-     * Sync endpoint: get all new data since a seq cursor.
-     *
-     * @deprecated Soft Cut – wird entfernt. Clients nutzen Centrifugo für Echtzeit.
-     */
-    public function sync(string $userId, int $afterSeq = 0, int $limit = 200): array
-    {
-        return [
-            'data' => [
-                'events' => [],
-                'conversations' => [],
-                'typing' => (object) [],
-            ],
-            'meta' => [
-                'seq' => $afterSeq,
-                'hasMore' => false,
-            ],
-        ];
-    }
-
-    /**
-     * Set typing indicator.
-     *
-     * @deprecated Typing läuft via Centrifugo Publish-Proxy.
-     */
-    public function setTyping(string $userId, string $conversationId, bool $typing): void
-    {
-        // No-op: Typing is now handled via Centrifugo publish proxy
-    }
-
     private function formatConversation(array $conversation, string $userId): array
     {
         $participant = $this->participantRepo->find($conversation['id'], $userId);
