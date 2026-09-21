@@ -48,6 +48,7 @@ class CentrifugoProxyTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS DirectMessage");
         $this->db->exec("DROP TABLE IF EXISTS ChatParticipant");
         $this->db->exec("DROP TABLE IF EXISTS ChatConversation");
+        $this->db->exec("DROP TABLE IF EXISTS UserActivity");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
 

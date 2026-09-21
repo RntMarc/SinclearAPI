@@ -56,6 +56,7 @@ class ModerationRequestStoryTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS ModerationRequest");
         $this->db->exec("DROP TABLE IF EXISTS StoryView");
         $this->db->exec("DROP TABLE IF EXISTS Story");
+        $this->db->exec("DROP TABLE IF EXISTS UserActivity");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
 
@@ -137,6 +138,7 @@ class ModerationRequestStoryTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS ModerationRequest");
         $this->db->exec("DROP TABLE IF EXISTS StoryView");
         $this->db->exec("DROP TABLE IF EXISTS Story");
+        $this->db->exec("DROP TABLE IF EXISTS UserActivity");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }

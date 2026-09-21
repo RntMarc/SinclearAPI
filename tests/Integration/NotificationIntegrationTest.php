@@ -50,6 +50,7 @@ class NotificationIntegrationTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
         $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
+        $this->db->exec("DROP TABLE IF EXISTS UserActivity");
         $this->db->exec("DROP TABLE IF EXISTS User");
 
         $this->db->exec("
@@ -147,6 +148,7 @@ class NotificationIntegrationTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
         $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
+        $this->db->exec("DROP TABLE IF EXISTS UserActivity");
         $this->db->exec("DROP TABLE IF EXISTS User");
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }

@@ -32,6 +32,7 @@ class NotificationPreferenceServiceTest extends TestCase
 
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
         $this->db->exec('DROP TABLE IF EXISTS NotificationPreference');
+        $this->db->exec('DROP TABLE IF EXISTS UserActivity');
         $this->db->exec('DROP TABLE IF EXISTS User');
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
 
@@ -64,6 +65,7 @@ class NotificationPreferenceServiceTest extends TestCase
     {
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
         $this->db->exec('DROP TABLE IF EXISTS NotificationPreference');
+        $this->db->exec('DROP TABLE IF EXISTS UserActivity');
         $this->db->exec('DROP TABLE IF EXISTS User');
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
     }

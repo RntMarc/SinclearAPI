@@ -40,7 +40,7 @@ class CalendarFeedServiceTest extends TestCase
         foreach ([
             'CalendarEventParticipant', 'CalendarEvent', 'CloseFriend', 'UserPreferences',
             'EventRelation', 'TravelRelation', 'TravelEvent', 'TravelTrip',
-            'PtParticipant', 'PtLeg', 'PtJourney', 'User',
+            'PtParticipant', 'PtLeg', 'PtJourney', 'UserActivity', 'User',
         ] as $table) {
             $this->db->exec("DROP TABLE IF EXISTS {$table}");
         }
@@ -232,7 +232,7 @@ class CalendarFeedServiceTest extends TestCase
         foreach ([
             'CalendarEventParticipant', 'CalendarEvent', 'CloseFriend', 'UserPreferences',
             'EventRelation', 'TravelRelation', 'TravelEvent', 'TravelTrip',
-            'PtParticipant', 'PtLeg', 'PtJourney', 'User',
+            'PtParticipant', 'PtLeg', 'PtJourney', 'UserActivity', 'User',
         ] as $table) {
             $this->db->exec("DROP TABLE IF EXISTS {$table}");
         }

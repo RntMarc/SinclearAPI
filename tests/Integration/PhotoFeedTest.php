@@ -52,7 +52,7 @@ class PhotoFeedTest extends TestCase
         $this->db->exec("SET time_zone = '+00:00'");
 
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['CloseFriend', 'UserPreferences', 'SocialInfo', 'ExternalDataCache', 'User'] as $table) {
+        foreach (['CloseFriend', 'UserPreferences', 'SocialInfo', 'ExternalDataCache', 'UserActivity', 'User'] as $table) {
             $this->db->exec("DROP TABLE IF EXISTS {$table}");
         }
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -172,7 +172,7 @@ class PhotoFeedTest extends TestCase
     protected function tearDown(): void
     {
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['CloseFriend', 'UserPreferences', 'SocialInfo', 'ExternalDataCache', 'User'] as $table) {
+        foreach (['CloseFriend', 'UserPreferences', 'SocialInfo', 'ExternalDataCache', 'UserActivity', 'User'] as $table) {
             $this->db->exec("DROP TABLE IF EXISTS {$table}");
         }
         $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');

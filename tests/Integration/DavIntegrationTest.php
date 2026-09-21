@@ -59,7 +59,7 @@ class DavIntegrationTest extends TestCase
             'DavToken', 'CalendarEventParticipant', 'CalendarEvent',
             'EventRelation', 'TravelRelation', 'TravelEvent', 'TravelTrip',
             'PtParticipant', 'PtLeg', 'PtJourney',
-            'CloseFriend', 'UserPreferences', 'User',
+            'CloseFriend', 'UserPreferences', 'UserActivity', 'User',
         ] as $table) {
             $this->db->exec("DROP TABLE IF EXISTS `$table`");
         }

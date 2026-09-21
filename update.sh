@@ -107,6 +107,7 @@ SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o L
 
     # PHPUnit-Tests ausführen
     echo '---TEST_START---'
+    php bin/reset-test-db.php 2>&1
     vendor/bin/phpunit --colors=never 2>&1
     TEST_EXIT=\$?
     echo \"---TEST_EXIT:\$TEST_EXIT---\"
