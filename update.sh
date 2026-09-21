@@ -51,7 +51,8 @@ print_header
 
 # 1️⃣  Schritt 1: SSH-Verbindung testen (mit LogLevel=QUIET, um Willkommensnachricht zu unterdrücken)
 print_step "1/5: Verbinde mit Server ($SERVER)..."
-if ! ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o LogLevel=QUIET "$SERVER" "echo SSH_OK" >/dev/null 2>&1; then
+# Kein BatchMode: Ein passwortgeschützter Key soll nach der Passphrase fragen dürfen.
+if ! ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o LogLevel=QUIET -o ConnectTimeout=15 "$SERVER" "echo SSH_OK" >/dev/null; then
     handle_error "SSH-Verbindung fehlgeschlagen! Überprüfe Server, Benutzer und SSH-Key."
 fi
 print_success "SSH-Verbindung erfolgreich"
@@ -61,8 +62,13 @@ print_step "2/5: Prüfe Branch (main) und starte git pull..."
 print_step "3/5: Führe composer install (mit Dev-Dependencies) aus..."
 print_step "4/5: Führe PHPUnit-Tests aus..."
 print_step "5/5: Führe composer install --no-dev aus (Bereinigung)..."
+print_info "Hinweis: Ist der SSH-Key auf dem Server passwortgeschützt, wirst du hier nach der Passphrase gefragt."
 
-SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o LogLevel=QUIET "$SERVER" "
+# TTY erzwingen (-t), damit Passphrase-Abfragen (z. B. beim 'git pull' auf dem Server)
+# im Terminal sichtbar sind und das Skript auf die Eingabe wartet. Die Ausgabe wird
+# gleichzeitig live angezeigt und in eine Logdatei geschrieben, um sie danach auszuwerten.
+DEPLOY_LOG=$(mktemp)
+ssh -t -i "$SSH_KEY" -o StrictHostKeyChecking=no -o LogLevel=QUIET "$SERVER" "
     # Wechsle in das Verzeichnis
     cd $TARGET_DIR || { echo 'ERROR: Verzeichniswechsel fehlgeschlagen'; exit 1; }
 
@@ -71,7 +77,7 @@ SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o L
     CURRENT_BRANCH=\$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
     if [ \"\$CURRENT_BRANCH\" != \"main\" ]; then
         echo \"WARN: Aktueller Branch ist '\$CURRENT_BRANCH' – Wechsle zu main...\"
-        git checkout main 2>&1
+        git -c color.ui=never checkout main 2>&1
         if [ \$? -ne 0 ]; then
             echo 'ERROR: Branch-Wechsel zu main fehlgeschlagen'
             exit 1
@@ -79,9 +85,9 @@ SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o L
     fi
     echo '---BRANCH_OK---'
 
-    # git pull
+    # git pull (GIT_TERMINAL_PROMPT=1 stellt sicher, dass nach der Passphrase gefragt werden darf)
     echo '---GIT_START---'
-    git pull origin main 2>&1
+    GIT_TERMINAL_PROMPT=1 git -c color.ui=never pull origin main 2>&1
     GIT_EXIT=\$?
     echo '---GIT_END---'
     if [ \$GIT_EXIT -ne 0 ]; then
@@ -96,8 +102,8 @@ SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o L
 
     # composer install mit Dev-Dependencies (für Tests)
     echo '---COMPOSER_START---'
-    composer dump-autoload
-    composer install --no-interaction --prefer-dist --optimize-autoloader 2>&1
+    composer dump-autoload --no-ansi
+    composer install --no-interaction --no-ansi --prefer-dist --optimize-autoloader 2>&1
     COMPOSER_EXIT=\$?
     echo '---COMPOSER_END---'
     if [ \$COMPOSER_EXIT -ne 0 ]; then
@@ -115,7 +121,7 @@ SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o L
 
     # Bereinigung: ohne Dev-Dependencies installieren
     echo '---CLEAN_START---'
-    composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader 2>&1
+    composer install --no-dev --no-interaction --no-ansi --prefer-dist --optimize-autoloader 2>&1
     CLEAN_EXIT=\$?
     echo '---CLEAN_END---'
     if [ \$CLEAN_EXIT -ne 0 ]; then
@@ -124,9 +130,12 @@ SSH_OUTPUT=$(ssh -i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=no -o L
     fi
 
     exit \$TEST_EXIT
-" 2>&1)
+" 2>&1 | tee "$DEPLOY_LOG"
 
-SSH_EXIT=$?
+# Exit-Code des SSH-Prozesses (nicht der von tee) übernehmen
+SSH_EXIT=${PIPESTATUS[0]}
+SSH_OUTPUT=$(cat "$DEPLOY_LOG")
+rm -f "$DEPLOY_LOG"
 
 # 🔍 Verarbeite den Output
 IN_GIT=0
@@ -139,6 +148,9 @@ HAS_ERRORS=0
 TEST_EXIT_CODE=""
 
 while IFS= read -r line; do
+    # Durch das erzwungene TTY (-t) enden Zeilen auf \r\n – Windows-Zeilenende entfernen
+    line="${line%$'\r'}"
+
     # Schritt-Trenner
     if [[ "$line" == "---BRANCH_CHECK---" ]]; then
         IN_BRANCH=1
