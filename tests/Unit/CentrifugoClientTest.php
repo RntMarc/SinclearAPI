@@ -238,6 +238,159 @@ class CentrifugoClientTest extends TestCase
         $this->assertTrue($body['skip_history'] ?? false);
     }
 
+    // ── getUserPresence ────────────────────────────────────
+
+    public function testGetUserPresenceReturnsOnlineWhenPresent(): void
+    {
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => ['presence' => [
+                'client-abc' => [
+                    'client' => 'client-abc',
+                    'user' => 'user-1',
+                    'info' => ['lastJoin' => '2026-09-21T10:00:00Z', 'lastLeave' => null],
+                ],
+            ]]])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->getUserPresence('user-1');
+
+        $this->assertTrue($result['online']);
+        $this->assertSame('2026-09-21T10:00:00Z', $result['lastJoin']);
+        $this->assertNull($result['lastLeave']);
+    }
+
+    public function testGetUserPresenceReturnsOfflineWhenEmpty(): void
+    {
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => ['presence' => []]])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->getUserPresence('user-1');
+
+        $this->assertFalse($result['online']);
+        $this->assertNull($result['lastJoin']);
+        $this->assertNull($result['lastLeave']);
+    }
+
+    public function testGetUserPresenceReturnsOfflineWhenDisabled(): void
+    {
+        $mock = new MockHandler([]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client, enabled: false);
+        $result = $centrifugoClient->getUserPresence('user-1');
+
+        $this->assertFalse($result['online']);
+        $this->assertCount(0, $mock);
+    }
+
+    public function testGetUserPresenceReturnsOfflineOnFailure(): void
+    {
+        $mock = new MockHandler([
+            new Response(500, [], 'Internal Server Error'),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->getUserPresence('user-1');
+
+        $this->assertFalse($result['online']);
+    }
+
+    public function testGetUserPresenceOfflineWhenNoInfoField(): void
+    {
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => ['presence' => [
+                'client-abc' => ['client' => 'client-abc', 'user' => 'user-1'],
+            ]]])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->getUserPresence('user-1');
+
+        $this->assertTrue($result['online']);
+        $this->assertNull($result['lastJoin']);
+        $this->assertNull($result['lastLeave']);
+    }
+
+    public function testGetUserPresenceSendsCorrectChannel(): void
+    {
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => ['presence' => []]])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $centrifugoClient->getUserPresence('user-42');
+
+        $request = $mock->getLastRequest();
+        $body = json_decode((string) $request->getBody(), true);
+        $this->assertSame('user:user-42', $body['channel']);
+    }
+
+    // ── getBulkUserPresence ────────────────────────────────
+
+    public function testGetBulkUserPresenceReturnsPerUserResults(): void
+    {
+        $mock = new MockHandler([
+            new Response(200, [], json_encode(['result' => ['presence' => [
+                'client-1' => [
+                    'client' => 'client-1',
+                    'user' => 'user-1',
+                    'info' => ['lastJoin' => '2026-09-21T10:00:00Z', 'lastLeave' => null],
+                ],
+            ]]])),
+            new Response(200, [], json_encode(['result' => ['presence' => []]])),
+        ]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->getBulkUserPresence(['user-1', 'user-2']);
+
+        $this->assertCount(2, $result);
+        $this->assertTrue($result['user-1']['online']);
+        $this->assertFalse($result['user-2']['online']);
+    }
+
+    public function testGetBulkUserPresenceReturnsOfflineWhenDisabled(): void
+    {
+        $mock = new MockHandler([]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client, enabled: false);
+        $result = $centrifugoClient->getBulkUserPresence(['user-1', 'user-2']);
+
+        $this->assertCount(2, $result);
+        $this->assertFalse($result['user-1']['online']);
+        $this->assertFalse($result['user-2']['online']);
+        $this->assertCount(0, $mock);
+    }
+
+    public function testGetBulkUserPresenceEmptyArray(): void
+    {
+        $mock = new MockHandler([]);
+        $handlerStack = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handlerStack]);
+
+        $centrifugoClient = $this->createClient($client);
+        $result = $centrifugoClient->getBulkUserPresence([]);
+
+        $this->assertSame([], $result);
+    }
+
     public function testApiErrorFieldIsLoggedAndEmptyResultReturned(): void
     {
         $logger = new class extends \Psr\Log\AbstractLogger {

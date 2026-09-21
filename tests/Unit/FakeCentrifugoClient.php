@@ -10,6 +10,8 @@ class FakeCentrifugoClient implements CentrifugoClientInterface
     public array $publishedData = [];
     public bool $publishedSkipHistory = false;
     public array $presenceResult = [];
+    public array $userPresenceResult = ['online' => false, 'lastJoin' => null, 'lastLeave' => null];
+    public array $bulkUserPresenceResult = [];
     public string $unsubscribedChannel = '';
     public string $unsubscribedUserId = '';
     public string $disconnectedUserId = '';
@@ -28,6 +30,23 @@ class FakeCentrifugoClient implements CentrifugoClientInterface
     public function presence(string $channel): array
     {
         return $this->presenceResult;
+    }
+
+    public function getUserPresence(string $userId): array
+    {
+        return $this->userPresenceResult;
+    }
+
+    public function getBulkUserPresence(array $userIds): array
+    {
+        if ($this->bulkUserPresenceResult !== []) {
+            return $this->bulkUserPresenceResult;
+        }
+        $results = [];
+        foreach ($userIds as $userId) {
+            $results[$userId] = $this->userPresenceResult;
+        }
+        return $results;
     }
 
     public function unsubscribe(string $channel, string $userId): void
