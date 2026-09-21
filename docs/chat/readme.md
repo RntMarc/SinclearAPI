@@ -28,11 +28,10 @@ Siehe auch: [Centrifugo Server Deploy-Handbuch](./centrifugo.md)
 
 ## Channel-Modell
 
-| Channel | Namespace | Optionen (Centrifugo `config.json`) |
-|---|---|---|
-| `chat:<conversationId>` | `chat` | `subscribe_proxy_enabled: true`, `publish_proxy_enabled: true`, `presence: true`, `join_leave: true`, `force_push_join_leave: true`, `force_recovery: true`, `force_positioning: true`, `history_size: 100`, `history_ttl: "600s"`, `channel_regex: "^[A-Za-z0-9_-]+$"`, `publication_data_format: "json"` |
-
-*Keine Personal-Channels nötig (Entscheidung: Conversation-Presence).*
+| Channel | Namespace | Zweck | Optionen (Centrifugo `config.json`) |
+|---|---|---|---|
+| `chat:<conversationId>` | `chat` | Chat-Echtzeit + Presence pro Konversation | `subscribe_proxy_enabled: true`, `publish_proxy_enabled: true`, `presence: true`, `join_leave: true`, `force_push_join_leave: true`, `force_recovery: true`, `force_positioning: true`, `history_size: 100`, `history_ttl: "600s"`, `channel_regex: "^[A-Za-z0-9_-]+$"`, `publication_data_format: "json"` |
+| `user:<userId>` | `user` | Nutzer-Präsenz (nur Chat-Clients) | `subscribe_proxy_enabled: true`, `presence: true`, `join_leave: true`, `force_push_join_leave: true`, `channel_regex: "^[A-Za-z0-9_-]+$"`, `publication_data_format: "json"` |
 
 ## Authentifizierung
 
@@ -192,7 +191,9 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| **GET** | **`/chat/centrifugo/token`** | **NEU:** Centrifugo Connection-Token (SDK `getToken` Callback) |
+| **GET** | **`/chat/centrifugo/token`** | Centrifugo Connection-Token (SDK `getToken` Callback) |
+| **GET** | **`/chat/presence`** | Nutzer-Präsenz abfragen (Bulk: `?userIds[]=...`) |
+| **GET** | **`/chat/presence/{userId}`** | Einzelnen Nutzer-Status abfragen |
 | GET | `/chat/conversations` | Konversationsliste (letzte Nachricht, Unread, lastSeenAt) |
 | POST | `/chat/conversations` | 1:1-Konversation öffnen (idempotent: get-or-create) → 200 (bestehend) oder 201 (neu) |
 | GET | `/chat/conversations/{id}` | Konversation + Teilnehmer (lastReadSeq, otherLastReadSeq) |
@@ -201,8 +202,6 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | PATCH | `/chat/messages/{id}` | Bearbeiten (nur eigener, 10 Min-Fenster) |
 | DELETE | `/chat/messages/{id}` | Löschen für alle (Platzhalter "Nachricht gelöscht") |
 | POST | `/chat/conversations/{id}/read` | Lesestand setzen (`{seq}`) |
-| ~~POST~~ | ~~`/chat/conversations/{id}/typing`~~ | ~~Tippindikator~~ → **410 Gone** (Typing via Centrifugo Publish-Proxy) |
-| ~~GET~~ | ~~`/chat/sync`~~ | ~~Optimierte Sync-Route~~ → **Deprecated**, antwortet leer |
 
 ### Interne Proxy-Endpoints (von Centrifugo aufgerufen, kein JWT)
 
@@ -370,26 +369,6 @@ Lesestand-Update eines Teilnehmers. Wird mit `skip_history: true` publiziert (ep
 2. `array_keys($presence)` ergibt die Online-User-IDs
 3. Für jeden Nicht-Sender-Teilnehmer: `suppressPush = in_array(userId, onlineUserIds)`
 4. `NotificationService->create(..., suppressPush)` erstellt In-App-Record immer, sendet Push nur wenn `suppressPush=false`
-
-## Soft-Cut: `/chat/sync`
-
-Der Endpoint `GET /chat/sync` bleibt vorerst registriert, antwortet aber leer:
-
-```json
-{
-  "data": {
-    "events": [],
-    "conversations": [],
-    "typing": {}
-  },
-  "meta": {
-    "seq": 0,
-    "hasMore": false
-  }
-}
-```
-
-**Grund:** Alte Clients laufen friedlich weiter bis Client-Update. Keine Presence-Touch.
 
 ## Graceful Degradation
 

@@ -71,6 +71,15 @@ Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Ver
         "history_ttl": "600s",
         "channel_regex": "^[A-Za-z0-9_-]+$",
         "publication_data_format": "json"
+      },
+      {
+        "name": "user",
+        "subscribe_proxy_enabled": true,
+        "presence": true,
+        "join_leave": true,
+        "force_push_join_leave": true,
+        "channel_regex": "^[A-Za-z0-9_-]+$",
+        "publication_data_format": "json"
       }
     ],
     "proxy": {
@@ -96,13 +105,15 @@ Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Ver
 | Feld | Beschreibung |
 |---|---|
 | `engine: "memory"` | Single-Node, ~10 Nutzer, kein Redis nötig |
-| `subscribe_proxy_enabled` | Centrifugo ruft PHP-API für Subscribe-Validierung auf |
-| `publish_proxy_enabled` | Centrifugo ruft PHP-API für Publish-Validierung auf (Typing) |
-| `presence` | Ermöglicht Presence-Abfragen via Server-API |
-| `force_recovery` | Clients erhalten verpasste Nachrichten bei Reconnect |
-| `force_positioning` | Position-Tracking für zuverlässige Zustellung |
-| `history_size: 100` | Letzte 100 Nachrichten pro Channel im Speicher |
-| `history_ttl: "600s"` | History wird nach 10 Minuten geleert |
+| `chat.subscribe_proxy_enabled` | Centrifugo ruft PHP-API für Subscribe-Validierung auf |
+| `chat.publish_proxy_enabled` | Centrifugo ruft PHP-API für Publish-Validierung auf (Typing) |
+| `chat.presence` | Ermöglicht Presence-Abfragen via Server-API |
+| `chat.force_recovery` | Clients erhalten verpasste Nachrichten bei Reconnect |
+| `chat.force_positioning` | Position-Tracking für zuverlässige Zustellung |
+| `chat.history_size: 100` | Letzte 100 Nachrichten pro Channel im Speicher |
+| `chat.history_ttl: "600s"` | History wird nach 10 Minuten geleert |
+| `user.subscribe_proxy_enabled` | Centrifugo ruft PHP-API für User-Presence-Subscribe auf |
+| `user.presence` | Ermöglicht Presence-Abfragen für User-Presence-Channels |
 | `http_api.key` | API-Key für Server-API (Publish, Presence, etc.) |
 | `client.token_hmac_secret_key` | Secret für Connection-JWT-Validierung |
 | `http_api.static_headers` | Wird bei jedem Proxy-Request an PHP-API gesendet |

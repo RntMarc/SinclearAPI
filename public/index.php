@@ -14,6 +14,7 @@ $app->addBodyParsingMiddleware();
 $app->add($container->get(\Sinclear\Api\Middleware\SecurityHeadersMiddleware::class));
 $app->add($container->get(\Sinclear\Api\Middleware\CorsMiddleware::class));
 $app->add($container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class));
+$app->add($container->get(\Sinclear\Api\Middleware\UserActivityMiddleware::class));
 
 $errorMiddleware = $app->addErrorMiddleware(
     displayErrorDetails: ($_ENV['APP_DEBUG'] ?? false),

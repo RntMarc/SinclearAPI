@@ -25,9 +25,13 @@ final readonly class CentrifugoProxyController
     ) {}
 
     /**
-     * Centrifugo subscribe proxy: validates that the user is a participant of the channel.
+     * Centrifugo subscribe proxy: validates channel access.
      *
-     * Request:  { "user": "<userId>", "channel": "chat:<conversationId>" }
+     * Supports two channel types:
+     * - `chat:<conversationId>`: validates ChatParticipant membership
+     * - `user:<userId>`: validates user owns the channel (userId matches authenticated user)
+     *
+     * Request:  { "user": "<userId>", "channel": "chat:<conversationId>" | "user:<userId>" }
      * Response: { "result": {} } on success, 403 on failure
      */
     public function subscribe(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -40,12 +44,26 @@ final readonly class CentrifugoProxyController
         $userId = $data['user'] ?? '';
         $channel = $data['channel'] ?? '';
 
+        if ($userId === '') {
+            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        }
+
+        // User presence channel: user:<userId> — only the user themselves can subscribe
+        $userChannelId = $this->parseUserChannel($channel);
+        if ($userChannelId !== null) {
+            if ($userId !== $userChannelId) {
+                return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+            }
+            return ResponseFactory::json(['result' => (object) []], 200, $response);
+        }
+
+        // Chat channel: chat:<conversationId> — validate ChatParticipant membership
         $conversationId = $this->parseConversationId($channel);
         if ($conversationId === null) {
             return ResponseFactory::json(['error' => 'invalid_channel'], 400, $response);
         }
 
-        if ($userId === '' || !$this->participantRepo->isParticipant($conversationId, $userId)) {
+        if (!$this->participantRepo->isParticipant($conversationId, $userId)) {
             return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
         }
 
@@ -100,6 +118,14 @@ final readonly class CentrifugoProxyController
     private function parseConversationId(string $channel): ?string
     {
         if (!preg_match('/^chat:([A-Za-z0-9_-]+)$/', $channel, $m)) {
+            return null;
+        }
+        return $m[1];
+    }
+
+    private function parseUserChannel(string $channel): ?string
+    {
+        if (!preg_match('/^user:([A-Za-z0-9_-]+)$/', $channel, $m)) {
             return null;
         }
         return $m[1];

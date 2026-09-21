@@ -89,6 +89,53 @@ final readonly class CentrifugoClient implements CentrifugoClientInterface
     }
 
     /**
+     * Get user presence for the user:<userId> channel.
+     *
+     * Returns normalized presence with online status and timestamps.
+     * On Centrifugo failure or disabled: online=false, timestamps=null.
+     */
+    public function getUserPresence(string $userId): array
+    {
+        if (!$this->enabled) {
+            return ['online' => false, 'lastJoin' => null, 'lastLeave' => null];
+        }
+
+        $result = $this->request('presence', [
+            'channel' => "user:{$userId}",
+        ]);
+
+        $presence = $result['presence'] ?? [];
+        if (!is_array($presence) || $presence === []) {
+            return ['online' => false, 'lastJoin' => null, 'lastLeave' => null];
+        }
+
+        $firstClient = reset($presence);
+        if (!is_array($firstClient)) {
+            return ['online' => false, 'lastJoin' => null, 'lastLeave' => null];
+        }
+
+        return [
+            'online' => true,
+            'lastJoin' => isset($firstClient['info']) && is_array($firstClient['info'])
+                ? ($firstClient['info']['lastJoin'] ?? null) : null,
+            'lastLeave' => isset($firstClient['info']) && is_array($firstClient['info'])
+                ? ($firstClient['info']['lastLeave'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * Get user presence for multiple users in bulk.
+     */
+    public function getBulkUserPresence(array $userIds): array
+    {
+        $results = [];
+        foreach ($userIds as $userId) {
+            $results[$userId] = $this->getUserPresence($userId);
+        }
+        return $results;
+    }
+
+    /**
      * Unsubscribe a user from a channel.
      */
     public function unsubscribe(string $channel, string $userId): void

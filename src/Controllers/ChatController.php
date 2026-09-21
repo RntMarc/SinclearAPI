@@ -197,39 +197,6 @@ final readonly class ChatController
         return ResponseFactory::noContent($response);
     }
 
-    /**
-     * @deprecated Soft Cut – antwortet leer, keine Presence-Touch. Wird entfernt.
-     */
-    public function sync(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
-    {
-        $this->requireUser($request);
-
-        return ResponseFactory::json([
-            'data' => [
-                'events' => [],
-                'conversations' => [],
-                'typing' => (object) [],
-            ],
-            'meta' => [
-                'seq' => 0,
-                'hasMore' => false,
-            ],
-        ], 200, $response);
-    }
-
-    /**
-     * @deprecated Typing läuft via Centrifugo Publish-Proxy. Gibt 410 Gone zurück.
-     */
-    public function setTyping(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
-    {
-        $this->requireUser($request);
-
-        return ResponseFactory::json([
-            'error' => 'gone',
-            'message' => 'Typing moved to Centrifugo publish proxy. Use POST /centrifugo/publish instead.',
-        ], 410, $response);
-    }
-
     private function errorResponse(string $message, ResponseInterface $response): ResponseInterface
     {
         $mapped = self::ERROR_MAP[$message] ?? null;

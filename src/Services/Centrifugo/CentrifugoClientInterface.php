@@ -28,6 +28,24 @@ interface CentrifugoClientInterface
     public function presence(string $channel): array;
 
     /**
+     * Get user presence for the user:presence channel.
+     *
+     * Checks if a user is currently connected via their personal user:<userId> channel.
+     * Returns normalized presence with online status and timestamps.
+     *
+     * @return array{online: bool, lastJoin: ?string, lastLeave: ?string}
+     */
+    public function getUserPresence(string $userId): array;
+
+    /**
+     * Get user presence for multiple users in bulk.
+     *
+     * @param list<string> $userIds
+     * @return array<string, array{online: bool, lastJoin: ?string, lastLeave: ?string}> User-ID → presence info
+     */
+    public function getBulkUserPresence(array $userIds): array;
+
+    /**
      * Remove a user from a channel's presence.
      */
     public function unsubscribe(string $channel, string $userId): void;

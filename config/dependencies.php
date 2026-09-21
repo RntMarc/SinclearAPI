@@ -34,6 +34,7 @@ use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Controllers\UserWeatherLocationController;
+use Sinclear\Api\Controllers\UserActivityController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
@@ -55,10 +56,12 @@ use Sinclear\Api\Repository\ContactInfoUpdateRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\SocialInfoUpdateRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
+use Sinclear\Api\Repository\UserActivityRepository;
 use Sinclear\Api\Repository\UserUpdateRepository;
 use Sinclear\Api\Security\Policy\UserPolicy;
 use Sinclear\Api\Services\UserService;
 use Sinclear\Api\Services\UserPreferenceService;
+use Sinclear\Api\Services\UserActivityService;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
@@ -66,6 +69,7 @@ use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
 use Sinclear\Api\Middleware\McpApiKeyMiddleware;
+use Sinclear\Api\Middleware\UserActivityMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
 use Sinclear\Api\Repository\OtpTokenRepository;
 use Sinclear\Api\Repository\RefreshTokenRepository;
@@ -498,6 +502,11 @@ return [
     AdminMiddleware::class => create(),
 
     AdminController::class => autowire(),
+
+    UserActivityRepository::class => autowire(),
+    UserActivityService::class => autowire(),
+    UserActivityMiddleware::class => autowire(),
+    UserActivityController::class => autowire(),
 
     SubscriptionRepository::class => autowire(),
     SubscriptionService::class => autowire(),

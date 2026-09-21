@@ -6233,65 +6233,114 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /chat/sync:
+  /chat/presence:
     get:
-      summary: Chat-Sync (deprecated – antwortet leer)
+      summary: Nutzer-Präsenz abfragen (Bulk)
       description: >
-        **Deprecated:** Dieser Endpoint wird in Kürze entfernt. Er antwortet
-        mit leerem JSON (events: [], conversations: [], typing: {}).
-        Clients sollen Centrifugo für Echtzeit-Daten nutzen.
-      deprecated: true
+        Fragt den Online-Status mehrerer Nutzer über den Centrifugo
+        User-Presence-Channel (`user:<userId>`) ab. Kombiniert Echtzeit-Präsenz
+        mit `lastActiveAt` aus der UserActivity-Tabelle als Fallback.
+        Maximal 50 Nutzer pro Request.
       tags: [Chat]
       security:
         - BearerAuth: []
       parameters:
-        - name: after
+        - name: userIds
           in: query
+          required: true
           schema:
-            type: integer
-            format: int64
-            default: 0
-          description: (ignoriert)
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 200
-            maximum: 500
-          description: (ignoriert)
+            type: array
+            items:
+              type: string
+              format: uuid
+            minItems: 1
+            maxItems: 50
+          description: Liste der Nutzer-IDs (max. 50)
       responses:
         '200':
-          description: Leere Antwort (deprecated)
+          description: Präsenz-Informationen
           content:
             application/json:
               schema:
                 type: object
-                required: [data, meta]
+                properties:
+                  data:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        online:
+                          type: boolean
+                        lastJoin:
+                          type: string
+                          nullable: true
+                        lastLeave:
+                          type: string
+                          nullable: true
+                        lastSeen:
+                          type: string
+                          nullable: true
+                          description: Letzte bekannte Aktivität (nur wenn offline)
+        '400':
+          description: Ungültiger Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /chat/presence/{userId}:
+    get:
+      summary: Einzelnen Nutzer-Präsenz abfragen
+      description: >
+        Fragt den Online-Status eines einzelnen Nutzers über den Centrifugo
+        User-Presence-Channel (`user:<userId>`) ab. Kombiniert Echtzeit-Präsenz
+        mit `lastActiveAt` aus der UserActivity-Tabelle als Fallback.
+      tags: [Chat]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Nutzer-ID
+      responses:
+        '200':
+          description: Präsenz-Informationen
+          content:
+            application/json:
+              schema:
+                type: object
                 properties:
                   data:
                     type: object
                     properties:
-                      events:
-                        type: array
-                        items: {}
-                        description: Immer leer (deprecated)
-                      conversations:
-                        type: array
-                        items: {}
-                        description: Immer leer (deprecated)
-                      typing:
-                        type: object
-                        description: Immer leer (deprecated)
-                  meta:
-                    type: object
-                    properties:
-                      seq:
-                        type: integer
-                        format: int64
-                        description: Immer 0 (deprecated)
-                      hasMore:
+                      online:
                         type: boolean
-                        description: Immer false (deprecated)
+                      lastJoin:
+                        type: string
+                        nullable: true
+                      lastLeave:
+                        type: string
+                        nullable: true
+                      lastSeen:
+                        type: string
+                        nullable: true
+                        description: Letzte bekannte Aktivität (nur wenn offline)
+        '400':
+          description: Ungültige Nutzer-ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Nicht autorisiert
           content:
@@ -6678,44 +6727,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /chat/conversations/{id}/typing:
-    post:
-      summary: Tippindikator (deprecated – 410 Gone)
-      description: >
-        **Deprecated:** Typing läuft jetzt via Centrifugo Publish-Proxy.
-        Dieser Endpoint gibt immer 410 Gone zurück.
-      deprecated: true
-      tags: [Chat]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: Konversations-ID
-      responses:
-        '410':
-          description: Typing moved to Centrifugo publish proxy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: gone
-                  message:
-                    type: string
-                    example: Typing moved to Centrifugo publish proxy. Use POST /centrifugo/publish instead.
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
   /centrifugo/subscribe:
     post:
@@ -6949,6 +6960,61 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/activity:
+    get:
+      summary: Nutzer-Aktivität abfragen (Bulk)
+      description: >
+        Fragt die letzte bekannte Aktivität mehrerer Nutzer ab. Gibt für jeden
+        Nutzer den Zeitstempel und den Endpunkt der letzten API-Anfrage zurück.
+        Dient als Fallback für Presence-Abfragen wenn Centrifugo offline ist.
+        Maximal 50 Nutzer pro Request.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+            minItems: 1
+            maxItems: 50
+          description: Liste der Nutzer-IDs (max. 50)
+      responses:
+        '200':
+          description: Aktivitäts-Informationen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        lastActiveAt:
+                          type: string
+                          format: date-time
+                        lastActiveEndpoint:
+                          type: string
+                          nullable: true
+        '400':
+          description: Ungültiger Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

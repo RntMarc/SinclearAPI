@@ -19,6 +19,7 @@ Authorization: Bearer <access_token>
 | Methode | Pfad | Beschreibung |
 |---------|------|-------------|
 | `GET` | `/user` | Liste aller Benutzer (gefiltert nach Sichtbarkeit) |
+| `GET` | `/users/activity` | Nutzer-Aktivität abfragen (Bulk: `?ids[]=...`) |
 
 Gibt ein Array aller Benutzer zurück. Jeder Eintrag enthält die Basis-Profildaten,
 gefiltert nach den Sichtbarkeitseinstellungen des jeweiligen Benutzers

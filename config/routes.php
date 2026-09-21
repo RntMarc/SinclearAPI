@@ -7,6 +7,7 @@ use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
 use Sinclear\Api\Controllers\CentrifugoProxyController;
 use Sinclear\Api\Controllers\ChatController;
+use Sinclear\Api\Controllers\PresenceController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
 use Sinclear\Api\Controllers\PlaceSubmissionController;
@@ -26,6 +27,7 @@ use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
+use Sinclear\Api\Controllers\UserActivityController;
 use Sinclear\Api\Controllers\UserWeatherLocationController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
@@ -131,6 +133,7 @@ return function (App $app): void {
         $group->post('/me/dav-tokens', [DavTokenController::class, 'createToken']);
         $group->get('/me/dav-tokens', [DavTokenController::class, 'listTokens']);
         $group->delete('/me/dav-tokens/{id}', [DavTokenController::class, 'deleteToken']);
+        $group->get('/activity', [UserActivityController::class, 'getBulk']);
         $group->get('/{userId}', [UserController::class, 'get']);
         $group->get('/{userId}/base', [UserController::class, 'getBase']);
         $group->get('/{userId}/social', [UserController::class, 'getSocial']);
@@ -372,11 +375,12 @@ return function (App $app): void {
 
     // Chat / Direktnachrichten (authenticated)
     $app->group('/chat', function (RouteCollectorProxy $group) {
-        // Sync endpoint (static route MUST come before parameterized routes)
-        $group->get('/sync', [ChatController::class, 'sync']);
-
         // Centrifugo connection token (SDK refresh endpoint)
         $group->get('/centrifugo/token', [ChatController::class, 'getCentrifugoToken']);
+
+        // Presence endpoints (bulk MUST come before parameterized routes)
+        $group->get('/presence', [PresenceController::class, 'getBulk']);
+        $group->get('/presence/{userId}', [PresenceController::class, 'getUser']);
 
         // Message routes (static route MUST come before /{id})
         $group->patch('/messages/{id}', [ChatController::class, 'editMessage']);
@@ -389,7 +393,6 @@ return function (App $app): void {
         $group->get('/conversations/{id}/messages', [ChatController::class, 'listMessages']);
         $group->post('/conversations/{id}/messages', [ChatController::class, 'sendMessage']);
         $group->post('/conversations/{id}/read', [ChatController::class, 'markRead']);
-        $group->post('/conversations/{id}/typing', [ChatController::class, 'setTyping']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Centrifugo proxy endpoints (no JWT — secured via shared secret header)
