@@ -431,10 +431,12 @@ ROW;
             $data['endDate'] = trim((string) $body['endDate']);
         }
         if (array_key_exists('startTime', $body)) {
-            $data['startTime'] = trim((string) $body['startTime']);
+            $raw = $body['startTime'];
+            $data['startTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
         }
         if (array_key_exists('endTime', $body)) {
-            $data['endTime'] = trim((string) $body['endTime']);
+            $raw = $body['endTime'];
+            $data['endTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
         }
         if (isset($body['hastickets'])) {
             $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
@@ -598,10 +600,12 @@ ROW;
             $data['endDate'] = trim((string) $body['endDate']);
         }
         if (array_key_exists('startTime', $body)) {
-            $data['startTime'] = trim((string) $body['startTime']);
+            $raw = $body['startTime'];
+            $data['startTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
         }
         if (array_key_exists('endTime', $body)) {
-            $data['endTime'] = trim((string) $body['endTime']);
+            $raw = $body['endTime'];
+            $data['endTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
         }
         $stringFields = ['ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address'];
         foreach ($stringFields as $field) {

@@ -141,7 +141,7 @@ Nur die zu ändernden Felder mitsenden:
 }
 ```
 
-Bei ganztägigen Events (`allDay: true`) werden `startTime`/`endTime` weggelassen.
+Bei ganztägigen Events (`allDay: true`) werden `startTime`/`endTime` weggelassen. Beim Umschalten eines bestehenden getakteten Events auf ganztägig müssen `startTime`/`endTime` explizit auf `null` (oder `""`) gesetzt werden, damit die gespeicherten Uhrzeiten geleert werden.
 
 ### `POST /calendar/{id}/participants` – Request
 

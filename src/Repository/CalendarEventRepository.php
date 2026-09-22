@@ -50,7 +50,7 @@ final readonly class CalendarEventRepository
                 if (in_array($field, ['startDate', 'endDate'], true)) {
                     $value = $this->formatDate($value);
                 } elseif (in_array($field, ['startTime', 'endTime'], true)) {
-                    $value = $this->formatTime($value);
+                    $value = ($value === null || $value === '') ? null : $this->formatTime($value);
                 }
                 $params[] = $value;
             }

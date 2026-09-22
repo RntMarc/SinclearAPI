@@ -161,18 +161,29 @@ final readonly class CalendarEventController
             $data['endDate'] = $endDate;
         }
         if ($hasStartTime) {
-            $startTime = trim((string) $body['startTime']);
-            if ($startTime !== '' && !$this->assertValidTime($startTime)) {
-                return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+            $rawStartTime = $body['startTime'];
+            if ($rawStartTime === null || $rawStartTime === '') {
+                // Leert die Uhrzeit (Umschalten auf ganztägig).
+                $data['startTime'] = null;
+            } else {
+                $startTime = trim((string) $rawStartTime);
+                if (!$this->assertValidTime($startTime)) {
+                    return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+                }
+                $data['startTime'] = $startTime;
             }
-            $data['startTime'] = $startTime;
         }
         if ($hasEndTime) {
-            $endTime = trim((string) $body['endTime']);
-            if ($endTime !== '' && !$this->assertValidTime($endTime)) {
-                return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+            $rawEndTime = $body['endTime'];
+            if ($rawEndTime === null || $rawEndTime === '') {
+                $data['endTime'] = null;
+            } else {
+                $endTime = trim((string) $rawEndTime);
+                if (!$this->assertValidTime($endTime)) {
+                    return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+                }
+                $data['endTime'] = $endTime;
             }
-            $data['endTime'] = $endTime;
         }
 
         if (isset($body['visibility'])) {
