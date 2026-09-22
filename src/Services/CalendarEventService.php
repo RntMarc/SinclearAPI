@@ -194,10 +194,10 @@ final readonly class CalendarEventService
         if (isset($event['endDate'])) {
             $event['endDate'] = $this->formatDate($event['endDate']);
         }
-        if (isset($event['startTime']) && $event['startTime'] !== null) {
+        if (isset($event['startTime'])) {
             $event['startTime'] = $this->formatTime($event['startTime']);
         }
-        if (isset($event['endTime']) && $event['endTime'] !== null) {
+        if (isset($event['endTime'])) {
             $event['endTime'] = $this->formatTime($event['endTime']);
         }
         // For all-day events, omit time fields (they are NULL in DB)

@@ -82,8 +82,11 @@ class CalendarFeedServiceTest extends TestCase
                 creatorId varchar(191) NOT NULL,
                 title varchar(255) NOT NULL,
                 description text DEFAULT NULL,
-                startTime datetime(3) NOT NULL,
-                endTime datetime(3) NOT NULL,
+                startDate date NOT NULL,
+                endDate date NOT NULL,
+                startTime time DEFAULT NULL,
+                endTime time DEFAULT NULL,
+                allDay tinyint NOT NULL DEFAULT 0,
                 visibility tinyint NOT NULL DEFAULT 0,
                 createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                 updatedAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
@@ -102,8 +105,11 @@ class CalendarFeedServiceTest extends TestCase
                 id varchar(191) NOT NULL PRIMARY KEY,
                 name varchar(255) DEFAULT NULL,
                 description text DEFAULT NULL,
-                start datetime(3) DEFAULT NULL,
-                end datetime(3) DEFAULT NULL,
+                startDate date NOT NULL,
+                endDate date NOT NULL,
+                startTime time DEFAULT NULL,
+                endTime time DEFAULT NULL,
+                allDay tinyint NOT NULL DEFAULT 1,
                 hastickets varchar(255) DEFAULT NULL,
                 ticket text DEFAULT NULL,
                 ticketUrl text DEFAULT NULL,
@@ -124,8 +130,11 @@ class CalendarFeedServiceTest extends TestCase
                 trip varchar(191) DEFAULT NULL,
                 name varchar(255) DEFAULT NULL,
                 description text DEFAULT NULL,
-                start datetime(3) DEFAULT NULL,
-                end datetime(3) DEFAULT NULL,
+                startDate date NOT NULL,
+                endDate date NOT NULL,
+                startTime time DEFAULT NULL,
+                endTime time DEFAULT NULL,
+                allDay tinyint NOT NULL DEFAULT 0,
                 hastickets varchar(255) DEFAULT NULL,
                 ticket text DEFAULT NULL,
                 ticketUrl text DEFAULT NULL,
@@ -239,12 +248,12 @@ class CalendarFeedServiceTest extends TestCase
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 1");
     }
 
-    private function insertCalendarEvent(string $id, string $creatorId, string $start, string $end, int $visibility): void
+    private function insertCalendarEvent(string $id, string $creatorId, string $startDate, string $endDate, int $visibility, string $startTime = '10:00:00', string $endTime = '12:00:00', int $allDay = 0): void
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, startTime, endTime, visibility) VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO CalendarEvent (id, creatorId, title, startDate, endDate, startTime, endTime, allDay, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$id, $creatorId, 'Event ' . $id, $start, $end, $visibility]);
+        $stmt->execute([$id, $creatorId, 'Event ' . $id, $startDate, $endDate, $startTime, $endTime, $allDay, $visibility]);
     }
 
     private function itemIds(array $items, string $type): array
@@ -257,14 +266,14 @@ class CalendarFeedServiceTest extends TestCase
 
     public function testCalendarEventsRespectVisibility(): void
     {
-        $this->insertCalendarEvent('ev-1', 'user-1', '2026-03-10 10:00:00', '2026-03-10 12:00:00', 0);
-        $this->insertCalendarEvent('ev-2', 'user-2', '2026-03-11 10:00:00', '2026-03-11 12:00:00', 1);
-        $this->insertCalendarEvent('ev-3', 'user-2', '2026-03-12 10:00:00', '2026-03-12 12:00:00', 0);
-        $this->insertCalendarEvent('ev-4', 'user-4', '2026-03-13 10:00:00', '2026-03-13 12:00:00', 2);
-        $this->insertCalendarEvent('ev-5', 'user-3', '2026-03-14 10:00:00', '2026-03-14 12:00:00', 2);
-        $this->insertCalendarEvent('ev-6', 'user-2', '2025-03-11 10:00:00', '2025-03-11 12:00:00', 1);
+        $this->insertCalendarEvent('ev-1', 'user-1', '2026-03-10', '2026-03-10', 0);
+        $this->insertCalendarEvent('ev-2', 'user-2', '2026-03-11', '2026-03-11', 1);
+        $this->insertCalendarEvent('ev-3', 'user-2', '2026-03-12', '2026-03-12', 0);
+        $this->insertCalendarEvent('ev-4', 'user-4', '2026-03-13', '2026-03-13', 2);
+        $this->insertCalendarEvent('ev-5', 'user-3', '2026-03-14', '2026-03-14', 2);
+        $this->insertCalendarEvent('ev-6', 'user-2', '2025-03-11', '2025-03-11', 1);
 
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
         $ids = $this->itemIds($feed['data'], 'calendar_event');
         $this->assertContains('ev-1', $ids);
@@ -277,19 +286,19 @@ class CalendarFeedServiceTest extends TestCase
 
     public function testTripsAndTravelEventsRespectParticipation(): void
     {
-        $this->db->exec("INSERT INTO TravelTrip (id, name, start, end) VALUES ('trip-1', 'Berlin Trip', '2026-07-01 00:00:00', '2026-07-05 23:59:59')");
-        $this->db->exec("INSERT INTO TravelTrip (id, name, start, end) VALUES ('trip-2', 'Köln Trip', '2026-07-10 00:00:00', '2026-07-12 23:59:59')");
+        $this->db->exec("INSERT INTO TravelTrip (id, name, startDate, endDate) VALUES ('trip-1', 'Berlin Trip', '2026-07-01', '2026-07-05')");
+        $this->db->exec("INSERT INTO TravelTrip (id, name, startDate, endDate) VALUES ('trip-2', 'Köln Trip', '2026-07-10', '2026-07-12')");
         $this->db->exec("INSERT INTO TravelRelation (ID, userid, tripid) VALUES ('rel-1', 'user-1', 'trip-1')");
         $this->db->exec("INSERT INTO TravelRelation (ID, userid, tripid) VALUES ('rel-2', 'user-2', 'trip-2')");
 
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, start, end) VALUES ('event-1', 'trip-1', 'Museum', '2026-07-02 09:00:00', '2026-07-02 11:00:00')");
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, start, end) VALUES ('event-2', NULL, 'Konzert', '2026-08-01 20:00:00', '2026-08-01 23:00:00')");
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, start, end) VALUES ('event-3', NULL, 'Theater', '2026-08-02 20:00:00', '2026-08-02 23:00:00')");
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, start, end) VALUES ('event-4', 'trip-2', 'Dom', '2026-07-11 10:00:00', '2026-07-11 12:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-1', 'trip-1', 'Museum', '2026-07-02', '2026-07-02', '09:00:00', '11:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-2', NULL, 'Konzert', '2026-08-01', '2026-08-01', '20:00:00', '23:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-3', NULL, 'Theater', '2026-08-02', '2026-08-02', '20:00:00', '23:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-4', 'trip-2', 'Dom', '2026-07-11', '2026-07-11', '10:00:00', '12:00:00')");
         $this->db->exec("INSERT INTO EventRelation (id, eventId, userId) VALUES ('er-1', 'event-2', 'user-1')");
         $this->db->exec("INSERT INTO EventRelation (id, eventId, userId) VALUES ('er-2', 'event-3', 'user-2')");
 
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
         $tripIds = $this->itemIds($feed['data'], 'trip');
         $this->assertSame(['trip-1'], $tripIds);
@@ -307,7 +316,7 @@ class CalendarFeedServiceTest extends TestCase
 
     public function testBirthdaysRespectVisibilityAndRecurrence(): void
     {
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
         $birthdays = array_values(array_filter($feed['data'], fn(array $i) => $i['type'] === 'birthday'));
         $titles = array_column($birthdays, 'title');
@@ -317,14 +326,14 @@ class CalendarFeedServiceTest extends TestCase
         $this->assertNotContains('Geburtstag: Dave', $titles);
 
         $bob = array_values(array_filter($birthdays, fn(array $i) => $i['title'] === 'Geburtstag: Bob'))[0];
-        $this->assertSame('2026-05-12 00:00:00', $bob['startTime']);
-        $this->assertSame('2026-05-12 23:59:59', $bob['endTime']);
+        $this->assertSame('2026-05-12', $bob['startDate']);
+        $this->assertSame('2026-05-12', $bob['endDate']);
         $this->assertTrue($bob['allDay']);
     }
 
     public function testBirthdayLeapYearOccurrence(): void
     {
-        $feed = $this->service->buildFeed('user-1', '2024-01-01 00:00:00', '2024-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $feed = $this->service->buildFeed('user-1', '2024-01-01', '2024-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
         $birthdays = array_values(array_filter($feed['data'], fn(array $i) => $i['type'] === 'birthday'));
         $titles = array_column($birthdays, 'title');
@@ -341,7 +350,7 @@ class CalendarFeedServiceTest extends TestCase
         $this->db->exec("INSERT INTO PtLeg (id, journeyId, legIndex, mode, lineName, plannedDeparture, plannedArrival, cancelled) VALUES ('leg-1', 'journey-1', 0, 'bus', 'LINIE 10', '2026-09-01 08:00:00', '2026-09-01 08:30:00', 0)");
         $this->db->exec("INSERT INTO PtLeg (id, journeyId, legIndex, mode, lineName, plannedDeparture, plannedArrival, cancelled) VALUES ('leg-2', 'journey-1', 1, 'train', 'S1', '2026-09-01 08:40:00', '2026-09-01 09:30:00', 0)");
 
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
         $journeyIds = $this->itemIds($feed['data'], 'pt_journey');
         $this->assertSame(['journey-1'], $journeyIds);
@@ -353,11 +362,11 @@ class CalendarFeedServiceTest extends TestCase
 
     public function testTypeFilter(): void
     {
-        $this->insertCalendarEvent('ev-1', 'user-1', '2026-03-10 10:00:00', '2026-03-10 12:00:00', 0);
-        $this->db->exec("INSERT INTO TravelTrip (id, name, start, end) VALUES ('trip-1', 'Berlin Trip', '2026-07-01 00:00:00', '2026-07-05 23:59:59')");
+        $this->insertCalendarEvent('ev-1', 'user-1', '2026-03-10', '2026-03-10', 0);
+        $this->db->exec("INSERT INTO TravelTrip (id, name, startDate, endDate) VALUES ('trip-1', 'Berlin Trip', '2026-07-01', '2026-07-05')");
         $this->db->exec("INSERT INTO TravelRelation (ID, userid, tripid) VALUES ('rel-1', 'user-1', 'trip-1')");
 
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', ['trip']);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', ['trip']);
 
         $this->assertCount(1, $feed['data']);
         $this->assertSame('trip', $feed['data'][0]['type']);
@@ -366,17 +375,17 @@ class CalendarFeedServiceTest extends TestCase
 
     public function testItemsAreSortedByStartTime(): void
     {
-        $this->insertCalendarEvent('ev-late', 'user-1', '2026-06-01 10:00:00', '2026-06-01 12:00:00', 0);
-        $this->insertCalendarEvent('ev-early', 'user-1', '2026-02-01 10:00:00', '2026-02-01 12:00:00', 0);
-        $this->db->exec("INSERT INTO TravelTrip (id, name, start, end) VALUES ('trip-mid', 'Berlin Trip', '2026-04-01 00:00:00', '2026-04-05 23:59:59')");
+        $this->insertCalendarEvent('ev-late', 'user-1', '2026-06-01', '2026-06-01', 0);
+        $this->insertCalendarEvent('ev-early', 'user-1', '2026-02-01', '2026-02-01', 0);
+        $this->db->exec("INSERT INTO TravelTrip (id, name, startDate, endDate) VALUES ('trip-mid', 'Berlin Trip', '2026-04-01', '2026-04-05')");
         $this->db->exec("INSERT INTO TravelRelation (ID, userid, tripid) VALUES ('rel-1', 'user-1', 'trip-mid')");
 
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
-        $startTimes = array_column($feed['data'], 'startTime');
-        $sorted = $startTimes;
+        $startDates = array_column($feed['data'], 'startDate');
+        $sorted = $startDates;
         sort($sorted);
-        $this->assertSame($sorted, $startTimes);
+        $this->assertSame($sorted, $startDates);
 
         $insertedIds = array_values(array_map(
             fn(array $item) => $item['id'],
@@ -391,30 +400,32 @@ class CalendarFeedServiceTest extends TestCase
     public function testTruncationIsReported(): void
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, startTime, endTime, visibility) VALUES (?, ?, ?, ?, ?, ?)'
+            'INSERT INTO CalendarEvent (id, creatorId, title, startDate, endDate, startTime, endTime, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
         for ($i = 1; $i <= 501; $i++) {
             $stmt->execute([
                 'ev-' . $i,
                 'user-1',
                 'Event ' . $i,
-                '2026-03-10 10:00:00',
-                '2026-03-10 12:00:00',
+                '2026-03-10',
+                '2026-03-10',
+                '10:00:00',
+                '12:00:00',
                 0,
             ]);
         }
 
-        $feed = $this->service->buildFeed('user-1', '2026-01-01 00:00:00', '2026-12-31 23:59:59', ['calendar_event']);
+        $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', ['calendar_event']);
 
         $this->assertTrue($feed['meta']['truncated']);
         $this->assertCount(500, $feed['data']);
     }
 
-    public function testInvalidDatetimeThrows(): void
+    public function testInvalidDateThrows(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Invalid datetime');
+        $this->expectExceptionMessage('Invalid date');
 
-        $this->service->buildFeed('user-1', '2026-13-01 00:00:00', '2026-12-31 23:59:59', CalendarFeedService::SUPPORTED_TYPES);
+        $this->service->buildFeed('user-1', '2026-13-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
     }
 }

@@ -123,13 +123,16 @@ class DavIntegrationTest extends TestCase
                 creatorId varchar(191) NOT NULL,
                 title varchar(255) NOT NULL,
                 description text DEFAULT NULL,
-                startTime datetime NOT NULL,
-                endTime datetime NOT NULL,
+                startDate date NOT NULL,
+                endDate date NOT NULL,
+                startTime time DEFAULT NULL,
+                endTime time DEFAULT NULL,
+                allDay tinyint(1) NOT NULL DEFAULT 0,
                 visibility tinyint(1) NOT NULL DEFAULT 0,
                 createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                 updatedAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                 KEY idx_calendar_creator (creatorId),
-                KEY idx_calendar_time (startTime, endTime)
+                KEY idx_calendar_time (startDate, endDate)
             )
         ");
 
@@ -160,8 +163,11 @@ class DavIntegrationTest extends TestCase
                 id varchar(191) NOT NULL PRIMARY KEY,
                 name varchar(255) DEFAULT NULL,
                 description text DEFAULT NULL,
-                start datetime(3) DEFAULT NULL,
-                end datetime(3) DEFAULT NULL,
+                startDate date NOT NULL,
+                endDate date NOT NULL,
+                startTime time DEFAULT NULL,
+                endTime time DEFAULT NULL,
+                allDay tinyint NOT NULL DEFAULT 1,
                 hastickets varchar(255) DEFAULT NULL,
                 ticket text DEFAULT NULL,
                 ticketUrl text DEFAULT NULL,
@@ -184,8 +190,11 @@ class DavIntegrationTest extends TestCase
                 trip varchar(191) DEFAULT NULL,
                 name varchar(255) DEFAULT NULL,
                 description text DEFAULT NULL,
-                start datetime(3) DEFAULT NULL,
-                end datetime(3) DEFAULT NULL,
+                startDate date NOT NULL,
+                endDate date NOT NULL,
+                startTime time DEFAULT NULL,
+                endTime time DEFAULT NULL,
+                allDay tinyint NOT NULL DEFAULT 0,
                 hastickets varchar(255) DEFAULT NULL,
                 ticket text DEFAULT NULL,
                 ticketUrl text DEFAULT NULL,
@@ -277,14 +286,14 @@ class DavIntegrationTest extends TestCase
             ->execute(['pref-bob', $this->bobId, 0, 1]);
 
         $events = [
-            ['event-alice-private', $this->aliceId, 'Alice privat', 'start', '2026-07-01 08:00:00', '2026-07-01 09:00:00', 0],
-            ['event-alice-public', $this->aliceId, 'Alice public', 'treffen', '2026-07-01 10:00:00', '2026-07-01 11:00:00', 1],
-            ['event-bob-public', $this->bobId, 'Bob public', 'party', '2026-07-01 12:00:00', '2026-07-01 13:00:00', 1],
-            ['event-bob-private', $this->bobId, 'Bob privat', 'geheim', '2026-07-01 14:00:00', '2026-07-01 15:00:00', 0],
-            ['event-bob-shared', $this->bobId, 'Bob shared', 'mit alice', '2026-07-01 16:00:00', '2026-07-01 17:00:00', 0],
+            ['event-alice-private', $this->aliceId, 'Alice privat', 'start', '2026-07-01', '2026-07-01', '08:00:00', '09:00:00', 0],
+            ['event-alice-public', $this->aliceId, 'Alice public', 'treffen', '2026-07-01', '2026-07-01', '10:00:00', '11:00:00', 1],
+            ['event-bob-public', $this->bobId, 'Bob public', 'party', '2026-07-01', '2026-07-01', '12:00:00', '13:00:00', 1],
+            ['event-bob-private', $this->bobId, 'Bob privat', 'geheim', '2026-07-01', '2026-07-01', '14:00:00', '15:00:00', 0],
+            ['event-bob-shared', $this->bobId, 'Bob shared', 'mit alice', '2026-07-01', '2026-07-01', '16:00:00', '17:00:00', 0],
         ];
         $insertEvent = $this->db->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, description, startTime, endTime, visibility, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
+            'INSERT INTO CalendarEvent (id, creatorId, title, description, startDate, endDate, startTime, endTime, visibility, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
         );
         foreach ($events as $event) {
             $insertEvent->execute($event);

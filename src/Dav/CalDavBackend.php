@@ -98,8 +98,8 @@ final class CalDavBackend extends AbstractBackend
 
         [$userId, $types] = $resolved;
 
-        $start = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-1 year')->format('Y-m-d H:i:s');
-        $end = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('+2 years')->format('Y-m-d H:i:s');
+        $start = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-1 year')->format('Y-m-d');
+        $end = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('+2 years')->format('Y-m-d');
 
         $feed = $this->feedService->buildFeed($userId, $start, $end, $types);
 
@@ -127,8 +127,8 @@ final class CalDavBackend extends AbstractBackend
 
         $objectId = str_ends_with($objectUri, '.ics') ? substr($objectUri, 0, -4) : $objectUri;
 
-        $start = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-1 year')->format('Y-m-d H:i:s');
-        $end = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('+2 years')->format('Y-m-d H:i:s');
+        $start = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-1 year')->format('Y-m-d');
+        $end = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('+2 years')->format('Y-m-d');
 
         $feed = $this->feedService->buildFeed($userId, $start, $end, $types);
 

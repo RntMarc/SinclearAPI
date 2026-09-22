@@ -321,19 +321,6 @@ final readonly class CalendarFeedService
         return false;
     }
 
-    /**
-     * @param list<string> $fields
-     */
-    private function normalizeDatetimes(array $row, array $fields): array
-    {
-        foreach ($fields as $field) {
-            if (array_key_exists($field, $row)) {
-                $row[$field] = $this->formatUtc($row[$field]);
-            }
-        }
-        return $row;
-    }
-
     private function formatJourney(array $journey): array
     {
         return [

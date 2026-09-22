@@ -28,8 +28,11 @@ class DavFactoriesTest extends TestCase
             'creatorId' => 'user-1',
             'title' => 'Team, Meeting',
             'description' => "Zeile 1\nZeile 2; mit Sonderzeichen",
-            'startTime' => '2026-07-01 10:00:00',
-            'endTime' => '2026-07-01 11:00:00',
+            'allDay' => false,
+            'startDate' => '2026-07-01',
+            'endDate' => '2026-07-01',
+            'startTime' => '10:00:00',
+            'endTime' => '11:00:00',
             'visibility' => 0,
             'createdAt' => '2026-06-26 10:00:00',
             'updatedAt' => '2026-06-27 10:00:00',
@@ -63,8 +66,11 @@ class DavFactoriesTest extends TestCase
             'id' => 'event-1',
             'creatorId' => 'user-1',
             'title' => 'T',
-            'startTime' => '2026-07-01 10:00:00',
-            'endTime' => '2026-07-01 11:00:00',
+            'allDay' => false,
+            'startDate' => '2026-07-01',
+            'endDate' => '2026-07-01',
+            'startTime' => '10:00:00',
+            'endTime' => '11:00:00',
             'createdAt' => '2026-06-26 10:00:00',
             'updatedAt' => '2026-06-27 10:00:00',
         ];
@@ -139,16 +145,21 @@ class DavFactoriesTest extends TestCase
             'type' => 'calendar_event',
             'id' => 'evt-1',
             'title' => 'Meeting',
-            'startTime' => '2026-07-01 10:00:00',
-            'endTime' => '2026-07-01 11:00:00',
             'allDay' => false,
+            'startDate' => '2026-07-01',
+            'endDate' => '2026-07-01',
+            'startTime' => '10:00:00',
+            'endTime' => '11:00:00',
             'detail' => [
                 'id' => 'evt-1',
                 'creatorId' => 'user-1',
                 'title' => 'Meeting',
                 'description' => 'Beschreibung',
-                'startTime' => '2026-07-01 10:00:00',
-                'endTime' => '2026-07-01 11:00:00',
+                'allDay' => false,
+                'startDate' => '2026-07-01',
+                'endDate' => '2026-07-01',
+                'startTime' => '10:00:00',
+                'endTime' => '11:00:00',
                 'visibility' => 1,
                 'createdAt' => '2026-06-26 10:00:00',
                 'updatedAt' => '2026-06-27 10:00:00',
@@ -161,6 +172,8 @@ class DavFactoriesTest extends TestCase
 
         $vcal = Reader::read($object['calendardata']);
         self::assertSame('evt-1@sinclear.de', (string) $vcal->VEVENT->UID);
+        self::assertSame('20260701T100000Z', (string) $vcal->VEVENT->DTSTART);
+        self::assertSame('20260701T110000Z', (string) $vcal->VEVENT->DTEND);
         self::assertSame('Meeting', (string) $vcal->VEVENT->SUMMARY);
         self::assertSame('PUBLIC', (string) $vcal->VEVENT->CLASS);
         self::assertStringContainsString('Beschreibung', (string) $vcal->VEVENT->DESCRIPTION);
@@ -172,15 +185,20 @@ class DavFactoriesTest extends TestCase
             'type' => 'travel_event',
             'id' => 'te-1',
             'title' => 'Konzert',
-            'startTime' => '2026-08-15 18:00:00',
-            'endTime' => '2026-08-15 22:00:00',
             'allDay' => false,
+            'startDate' => '2026-08-15',
+            'endDate' => '2026-08-15',
+            'startTime' => '18:00:00',
+            'endTime' => '22:00:00',
             'detail' => [
                 'id' => 'te-1',
                 'name' => 'Konzert',
                 'description' => 'Rockkonzert',
-                'start' => '2026-08-15 18:00:00',
-                'end' => '2026-08-15 22:00:00',
+                'allDay' => false,
+                'startDate' => '2026-08-15',
+                'endDate' => '2026-08-15',
+                'startTime' => '18:00:00',
+                'endTime' => '22:00:00',
                 'participants' => [
                     ['id' => 'user-1', 'displayName' => 'Max'],
                 ],
@@ -191,6 +209,8 @@ class DavFactoriesTest extends TestCase
         $vcal = Reader::read($object['calendardata']);
         self::assertSame('te-1@sinclear.de', (string) $vcal->VEVENT->UID);
         self::assertSame('Konzert', (string) $vcal->VEVENT->SUMMARY);
+        self::assertSame('20260815T180000Z', (string) $vcal->VEVENT->DTSTART);
+        self::assertSame('20260815T220000Z', (string) $vcal->VEVENT->DTEND);
         self::assertSame('mailto:user-1@sinclear.de', (string) $vcal->VEVENT->ATTENDEE);
     }
 
@@ -200,15 +220,16 @@ class DavFactoriesTest extends TestCase
             'type' => 'trip',
             'id' => 'trip-1',
             'title' => 'Italien-Reise',
-            'startTime' => '2026-09-01 00:00:00',
-            'endTime' => '2026-09-14 23:59:59',
             'allDay' => true,
+            'startDate' => '2026-09-01',
+            'endDate' => '2026-09-14',
             'detail' => [
                 'id' => 'trip-1',
                 'name' => 'Italien-Reise',
                 'description' => 'Sommerurlaub',
-                'start' => '2026-09-01 00:00:00',
-                'end' => '2026-09-14 23:59:59',
+                'allDay' => true,
+                'startDate' => '2026-09-01',
+                'endDate' => '2026-09-14',
             ],
         ];
 
@@ -228,9 +249,11 @@ class DavFactoriesTest extends TestCase
             'type' => 'pt_journey',
             'id' => 'pt-1',
             'title' => 'Berlin → München',
-            'startTime' => '2026-07-10 08:00:00',
-            'endTime' => '2026-07-10 12:30:00',
             'allDay' => false,
+            'startDate' => '2026-07-10',
+            'endDate' => '2026-07-10',
+            'startTime' => '08:00:00',
+            'endTime' => '12:30:00',
             'detail' => [
                 'id' => 'pt-1',
                 'fromStationName' => 'Berlin Hbf',
@@ -272,9 +295,9 @@ class DavFactoriesTest extends TestCase
             'type' => 'birthday',
             'id' => 'bd-2026-05-04-user-1',
             'title' => 'Geburtstag: Max',
-            'startTime' => '2026-05-04 00:00:00',
-            'endTime' => '2026-05-04 23:59:59',
             'allDay' => true,
+            'startDate' => '2026-05-04',
+            'endDate' => '2026-05-04',
             'detail' => [
                 'userId' => 'user-1',
                 'displayName' => 'Max',

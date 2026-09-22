@@ -1020,8 +1020,13 @@ ROW;
             foreach ($tripEvents as $e) {
                 $eId = htmlspecialchars($e['ID']);
                 $eName = htmlspecialchars($e['name']);
-                $eStart = date('d.m.Y H:i', strtotime($e['start']));
-                $eEnd = date('d.m.Y H:i', strtotime($e['end']));
+                if (!empty($e['allDay'])) {
+                    $eStart = date('d.m.Y', strtotime($e['startDate']));
+                    $eEnd = date('d.m.Y', strtotime($e['endDate']));
+                } else {
+                    $eStart = date('d.m.Y H:i', strtotime($e['startDate'] . ' ' . $e['startTime']));
+                    $eEnd = date('d.m.Y H:i', strtotime($e['endDate'] . ' ' . $e['endTime']));
+                }
                 $tripEventRows .= <<<ROW
                 <tr>
                     <td><a href="/api/v2/admin/travel/events/{$eId}" style="color:#5865F2;text-decoration:none;">{$eName}</a></td>
@@ -1056,8 +1061,13 @@ ROW;
 
         $tripName = htmlspecialchars($trip['name']);
         $tripDesc = htmlspecialchars($trip['description'] ?? '');
-        $tripStart = date('d.m.Y H:i', strtotime($trip['start']));
-        $tripEnd = date('d.m.Y H:i', strtotime($trip['end']));
+        if (!empty($trip['allDay'])) {
+            $tripStart = date('d.m.Y', strtotime($trip['startDate']));
+            $tripEnd = date('d.m.Y', strtotime($trip['endDate']));
+        } else {
+            $tripStart = date('d.m.Y H:i', strtotime($trip['startDate'] . ' ' . $trip['startTime']));
+            $tripEnd = date('d.m.Y H:i', strtotime($trip['endDate'] . ' ' . $trip['endTime']));
+        }
 
         // Forum linking
         $forumId = $trip['forumId'] ?? null;
@@ -1403,8 +1413,13 @@ ROW;
 
         $eventName = htmlspecialchars($event['name']);
         $eventDesc = htmlspecialchars($event['description'] ?? '');
-        $eventStart = date('d.m.Y H:i', strtotime($event['start']));
-        $eventEnd = date('d.m.Y H:i', strtotime($event['end']));
+        if (!empty($event['allDay'])) {
+            $eventStart = date('d.m.Y', strtotime($event['startDate']));
+            $eventEnd = date('d.m.Y', strtotime($event['endDate']));
+        } else {
+            $eventStart = date('d.m.Y H:i', strtotime($event['startDate'] . ' ' . $event['startTime']));
+            $eventEnd = date('d.m.Y H:i', strtotime($event['endDate'] . ' ' . $event['endTime']));
+        }
         $eventTrip = $event['trip'] ?? null;
         if ($eventTrip !== null) {
             $trip = $this->tripRepo->findById($eventTrip);
@@ -1435,8 +1450,11 @@ ROW;
             'name' => $event['name'],
             'description' => $event['description'] ?? '',
             'trip' => $event['trip'] ?? '',
-            'start' => $event['start'],
-            'end' => $event['end'],
+            'allDay' => !empty($event['allDay']),
+            'startDate' => $event['startDate'],
+            'endDate' => $event['endDate'],
+            'startTime' => $event['startTime'] ?? '',
+            'endTime' => $event['endTime'] ?? '',
             'hastickets' => $event['hastickets'] ?? '0',
             'ticket' => $event['ticket'] ?? '',
             'ticketUrl' => $event['ticketUrl'] ?? '',
@@ -2892,8 +2910,11 @@ ROW;
         $fieldLabels = [
             'name' => 'Name',
             'description' => 'Beschreibung',
-            'start' => 'Startdatum',
-            'end' => 'Enddatum',
+            'startDate' => 'Startdatum',
+            'endDate' => 'Enddatum',
+            'startTime' => 'Startzeit',
+            'endTime' => 'Endzeit',
+            'allDay' => 'Ganztägig',
             'hastickets' => 'Ticket-Status',
             'ticket' => 'Ticket-Informationen',
             'ticketUrl' => 'Ticket-URL',
@@ -2923,8 +2944,11 @@ ROW;
         $fieldLabels = [
             'name' => 'Name',
             'description' => 'Beschreibung',
-            'start' => 'Startdatum',
-            'end' => 'Enddatum',
+            'startDate' => 'Startdatum',
+            'endDate' => 'Enddatum',
+            'startTime' => 'Startzeit',
+            'endTime' => 'Endzeit',
+            'allDay' => 'Ganztägig',
             'hastickets' => 'Ticket-Status',
             'ticket' => 'Ticket-Informationen',
             'ticketUrl' => 'Ticket-URL',
