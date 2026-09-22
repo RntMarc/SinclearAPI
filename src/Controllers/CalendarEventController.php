@@ -15,6 +15,8 @@ final readonly class CalendarEventController
         'Event not found' => ['event_not_found', 404],
         'Forbidden' => ['forbidden', 403],
         'Invalid datetime' => ['invalid_datetime', 400],
+        'Invalid date' => ['invalid_date', 400],
+        'Invalid time' => ['invalid_time', 400],
     ];
 
     public function __construct(
@@ -28,6 +30,10 @@ final readonly class CalendarEventController
         $body = $request->getParsedBody();
 
         $title = trim((string) ($body['title'] ?? ''));
+        $description = !empty($body['description']) ? trim((string) $body['description']) : null;
+        $allDay = !empty($body['allDay']) ? (bool) $body['allDay'] : false;
+        $startDate = trim((string) ($body['startDate'] ?? ''));
+        $endDate = trim((string) ($body['endDate'] ?? ''));
         $startTime = trim((string) ($body['startTime'] ?? ''));
         $endTime = trim((string) ($body['endTime'] ?? ''));
         $visibility = isset($body['visibility']) ? (int) $body['visibility'] : 0;
@@ -38,22 +44,54 @@ final readonly class CalendarEventController
         if ($title === '') {
             return ResponseFactory::json(['error' => 'title_required'], 400, $response);
         }
-        if ($startTime === '' || $endTime === '') {
-            return ResponseFactory::json(['error' => 'time_required'], 400, $response);
-        }
         if ($visibility < 0 || $visibility > 2) {
             return ResponseFactory::json(['error' => 'invalid_visibility'], 400, $response);
         }
-        if ($startTime >= $endTime) {
-            return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+
+        if ($allDay) {
+            if ($startDate === '' || $endDate === '') {
+                return ResponseFactory::json(['error' => 'date_required'], 400, $response);
+            }
+            // Validate date format YYYY-MM-DD
+            if (!$this->assertValidDate($startDate) || !$this->assertValidDate($endDate)) {
+                return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+            }
+            // Inclusive end: startDate <= endDate (single-day event allowed)
+            if ($startDate > $endDate) {
+                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+            }
+            // allDay events must not have time fields
+            if ($startTime !== '' || $endTime !== '') {
+                return ResponseFactory::json(['error' => 'time_forbidden'], 400, $response);
+            }
+        } else {
+            // Timed events: all four fields required (date + time)
+            if ($startDate === '' || $endDate === '' || $startTime === '' || $endTime === '') {
+                return ResponseFactory::json(['error' => 'time_required'], 400, $response);
+            }
+            if (!$this->assertValidDate($startDate) || !$this->assertValidDate($endDate)) {
+                return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+            }
+            if (!$this->assertValidTime($startTime) || !$this->assertValidTime($endTime)) {
+                return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+            }
+            // Combined moment: end must be strictly after start
+            $startMoment = $startDate . ' ' . $startTime;
+            $endMoment = $endDate . ' ' . $endTime;
+            if ($startMoment >= $endMoment) {
+                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+            }
         }
 
         try {
             $event = $this->calendarService->create($user->id, [
                 'title' => $title,
-                'description' => !empty($body['description']) ? trim((string) $body['description']) : null,
-                'startTime' => $startTime,
-                'endTime' => $endTime,
+                'description' => $description,
+                'allDay' => $allDay,
+                'startDate' => $startDate,
+                'endDate' => $endDate,
+                'startTime' => $allDay ? null : $startTime,
+                'endTime' => $allDay ? null : $endTime,
                 'visibility' => $visibility,
                 'participants' => $participants,
             ]);
@@ -62,6 +100,18 @@ final readonly class CalendarEventController
         }
 
         return ResponseFactory::json(['data' => $event], 201, $response);
+    }
+
+    private function assertValidDate(string $value): bool
+    {
+        $dt = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        return $dt !== false && $dt->format('Y-m-d') === $value;
+    }
+
+    private function assertValidTime(string $value): bool
+    {
+        $dt = \DateTimeImmutable::createFromFormat('!H:i:s', $value);
+        return $dt !== false && $dt->format('H:i:s') === $value;
     }
 
     public function update(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -85,12 +135,44 @@ final readonly class CalendarEventController
                 : null;
         }
 
-        if (isset($body['startTime'])) {
-            $data['startTime'] = trim((string) $body['startTime']);
+        // allDay flag handling
+        $hasAllDay = array_key_exists('allDay', $body);
+        if ($hasAllDay) {
+            $data['allDay'] = (bool) $body['allDay'];
         }
 
-        if (isset($body['endTime'])) {
-            $data['endTime'] = trim((string) $body['endTime']);
+        $hasStartDate = array_key_exists('startDate', $body);
+        $hasEndDate = array_key_exists('endDate', $body);
+        $hasStartTime = array_key_exists('startTime', $body);
+        $hasEndTime = array_key_exists('endTime', $body);
+
+        if ($hasStartDate) {
+            $startDate = trim((string) $body['startDate']);
+            if ($startDate !== '' && !$this->assertValidDate($startDate)) {
+                return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+            }
+            $data['startDate'] = $startDate;
+        }
+        if ($hasEndDate) {
+            $endDate = trim((string) $body['endDate']);
+            if ($endDate !== '' && !$this->assertValidDate($endDate)) {
+                return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+            }
+            $data['endDate'] = $endDate;
+        }
+        if ($hasStartTime) {
+            $startTime = trim((string) $body['startTime']);
+            if ($startTime !== '' && !$this->assertValidTime($startTime)) {
+                return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+            }
+            $data['startTime'] = $startTime;
+        }
+        if ($hasEndTime) {
+            $endTime = trim((string) $body['endTime']);
+            if ($endTime !== '' && !$this->assertValidTime($endTime)) {
+                return ResponseFactory::json(['error' => 'invalid_time'], 400, $response);
+            }
+            $data['endTime'] = $endTime;
         }
 
         if (isset($body['visibility'])) {
@@ -99,10 +181,6 @@ final readonly class CalendarEventController
                 return ResponseFactory::json(['error' => 'invalid_visibility'], 400, $response);
             }
             $data['visibility'] = $visibility;
-        }
-
-        if (isset($data['startTime']) && isset($data['endTime']) && $data['startTime'] >= $data['endTime']) {
-            return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
         }
 
         if ($data === []) {
@@ -152,20 +230,27 @@ final readonly class CalendarEventController
         $end = !empty($params['end']) ? $params['end'] : null;
         $range = !empty($params['range']) ? $params['range'] : null;
 
+        if ($start !== null && !$this->assertValidDate($start)) {
+            return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+        }
+        if ($end !== null && !$this->assertValidDate($end)) {
+            return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+        }
+
         if ($start === null && $end === null && $range !== null) {
             $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
 
             if ($range === 'week') {
                 $dayOfWeek = (int) $now->format('N');
-                $monday = $now->modify('-' . ($dayOfWeek - 1) . ' days')->setTime(0, 0, 0);
-                $sunday = $monday->modify('+6 days')->setTime(23, 59, 59);
-                $start = $monday->format('Y-m-d H:i:s');
-                $end = $sunday->format('Y-m-d H:i:s');
+                $monday = $now->modify('-' . ($dayOfWeek - 1) . ' days');
+                $sunday = $monday->modify('+6 days');
+                $start = $monday->format('Y-m-d');
+                $end = $sunday->format('Y-m-d');
             } elseif ($range === 'month') {
-                $firstDay = $now->modify('first day of this month')->setTime(0, 0, 0);
-                $lastDay = $now->modify('last day of this month')->setTime(23, 59, 59);
-                $start = $firstDay->format('Y-m-d H:i:s');
-                $end = $lastDay->format('Y-m-d H:i:s');
+                $firstDay = $now->modify('first day of this month');
+                $lastDay = $now->modify('last day of this month');
+                $start = $firstDay->format('Y-m-d');
+                $end = $lastDay->format('Y-m-d');
             }
         }
 
@@ -181,10 +266,17 @@ final readonly class CalendarEventController
         $start = !empty($params['start']) ? $params['start'] : null;
         $end = !empty($params['end']) ? $params['end'] : null;
 
+        if ($start !== null && !$this->assertValidDate($start)) {
+            return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+        }
+        if ($end !== null && !$this->assertValidDate($end)) {
+            return ResponseFactory::json(['error' => 'invalid_date'], 400, $response);
+        }
+
         if ($start === null && $end === null) {
             $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-            $start = $now->modify('first day of this month')->setTime(0, 0, 0)->format('Y-m-d H:i:s');
-            $end = $now->modify('last day of this month')->setTime(23, 59, 59)->format('Y-m-d H:i:s');
+            $start = $now->modify('first day of this month')->format('Y-m-d');
+            $end = $now->modify('last day of this month')->format('Y-m-d');
         } elseif ($start === null || $end === null) {
             return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
         }

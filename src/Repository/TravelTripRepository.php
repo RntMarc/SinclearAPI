@@ -22,7 +22,7 @@ final readonly class TravelTripRepository
     /** @return list<array<string, mixed>> */
     public function findAll(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM TravelTrip ORDER BY start DESC');
+        $stmt = $this->pdo->query('SELECT * FROM TravelTrip ORDER BY startDate DESC, startTime DESC');
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -72,15 +72,18 @@ final readonly class TravelTripRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelTrip (id, name, description, start, end, hastickets, ticket, ticketUrl, forumId)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelTrip (id, name, description, startDate, endDate, startTime, endTime, allDay, hastickets, ticket, ticketUrl, forumId)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
             $data['name'],
             $data['description'] ?? null,
-            $data['start'],
-            $data['end'],
+            $data['startDate'],
+            $data['endDate'],
+            $data['startTime'] ?? null,
+            $data['endTime'] ?? null,
+            $data['allDay'] ?? 1,
             $data['hastickets'] ?? '0',
             $data['ticket'] ?? null,
             $data['ticketUrl'] ?? null,
@@ -94,9 +97,9 @@ final readonly class TravelTripRepository
         $sets = [];
         $values = [];
 
-        foreach (['name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'forumId'] as $field) {
+        foreach (['name', 'description', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'hastickets', 'ticket', 'ticketUrl', 'forumId'] as $field) {
             if (array_key_exists($field, $data)) {
-                $sets[] = "$field = ?";
+                $sets[] = "`$field` = ?";
                 $values[] = $data[$field];
             }
         }
@@ -127,7 +130,7 @@ final readonly class TravelTripRepository
 
     /**
      * Alle Reisen des Nutzers (über TravelRelation), die den Zeitraum
-     * überlappen.
+     * überlappen (inklusiver Datumsbereich: endDate >= :start AND startDate <= :end).
      *
      * @return list<array<string, mixed>>
      */
@@ -138,9 +141,9 @@ final readonly class TravelTripRepository
              FROM TravelTrip t
              JOIN TravelRelation r ON r.tripid = t.id
              WHERE r.userid = ?
-               AND COALESCE(t.end, t.start) > ?
-               AND COALESCE(t.start, t.end) < ?
-             ORDER BY t.start ASC
+               AND t.endDate >= ?
+               AND t.startDate <= ?
+             ORDER BY t.startDate ASC, t.startTime ASC
              LIMIT ?'
         );
         $stmt->execute([$userId, $start, $end, $limit]);

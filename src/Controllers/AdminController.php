@@ -244,8 +244,14 @@ ROW;
             $id = htmlspecialchars($t['id']);
             $name = htmlspecialchars($t['name']);
             $desc = htmlspecialchars($t['description'] ?? '');
-            $start = date('d.m.Y', strtotime($t['start']));
-            $end = date('d.m.Y', strtotime($t['end']));
+            $allDay = !empty($t['allDay']);
+            if ($allDay) {
+                $start = date('d.m.Y', strtotime($t['startDate']));
+                $end = date('d.m.Y', strtotime($t['endDate']));
+            } else {
+                $start = date('d.m.Y H:i', strtotime($t['startDate'] . ' ' . $t['startTime']));
+                $end = date('d.m.Y H:i', strtotime($t['endDate'] . ' ' . $t['endTime']));
+            }
             $hastickets = $t['hastickets'] === '1' ? 'Ja' : 'Nein';
             $tripRows .= <<<ROW
             <tr>
@@ -255,7 +261,7 @@ ROW;
                 <td>{$start} – {$end}</td>
                 <td>{$hastickets}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['start']}', '{$t['end']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['startDate']}', '{$t['endDate']}', '{$t['startTime']}', '{$t['endTime']}', '{$t['allDay']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`)">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteTrip('{$id}', '{$name}')">Löschen</button>
                 </td>
             </tr>
@@ -271,8 +277,14 @@ ROW;
             $eTripName = $eTripId !== '' && isset($tripById[$eTripId])
                 ? htmlspecialchars($tripById[$eTripId])
                 : '–';
-            $eStart = date('d.m.Y H:i', strtotime($e['start']));
-            $eEnd = date('d.m.Y H:i', strtotime($e['end']));
+            $eAllDay = !empty($e['allDay']);
+            if ($eAllDay) {
+                $eStart = date('d.m.Y', strtotime($e['startDate']));
+                $eEnd = date('d.m.Y', strtotime($e['endDate']));
+            } else {
+                $eStart = date('d.m.Y H:i', strtotime($e['startDate'] . ' ' . $e['startTime']));
+                $eEnd = date('d.m.Y H:i', strtotime($e['endDate'] . ' ' . $e['endTime']));
+            }
             $eventRows .= <<<ROW
             <tr>
                 <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$eId}">{$eId}</td>
@@ -303,8 +315,11 @@ ROW;
                 'name' => $e['name'] ?? '',
                 'description' => $e['description'] ?? '',
                 'trip' => $e['trip'] ?? '',
-                'start' => $e['start'] ?? '',
-                'end' => $e['end'] ?? '',
+                'startDate' => $e['startDate'] ?? '',
+                'endDate' => $e['endDate'] ?? '',
+                'startTime' => $e['startTime'] ?? '',
+                'endTime' => $e['endTime'] ?? '',
+                'allDay' => !empty($e['allDay']),
                 'hastickets' => $e['hastickets'] ?? '0',
                 'ticket' => $e['ticket'] ?? '',
                 'ticketUrl' => $e['ticketUrl'] ?? '',
@@ -341,18 +356,37 @@ ROW;
             return ResponseFactory::json(['error' => 'name_required'], 400, $response);
         }
 
-        $start = trim((string) ($body['start'] ?? ''));
-        $end = trim((string) ($body['end'] ?? ''));
-        if ($start === '' || $end === '') {
-            return ResponseFactory::json(['error' => 'start_and_end_required'], 400, $response);
+        $allDay = !empty($body['allDay']) ? (bool) $body['allDay'] : true; // trips default all-day
+        $startDate = trim((string) ($body['startDate'] ?? ''));
+        $endDate = trim((string) ($body['endDate'] ?? ''));
+        $startTime = trim((string) ($body['startTime'] ?? ''));
+        $endTime = trim((string) ($body['endTime'] ?? ''));
+
+        if ($allDay) {
+            if ($startDate === '' || $endDate === '') {
+                return ResponseFactory::json(['error' => 'date_required'], 400, $response);
+            }
+            if ($startDate > $endDate) {
+                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+            }
+        } else {
+            if ($startDate === '' || $endDate === '' || $startTime === '' || $endTime === '') {
+                return ResponseFactory::json(['error' => 'time_required'], 400, $response);
+            }
+            if ($startDate . ' ' . $startTime >= $endDate . ' ' . $endTime) {
+                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+            }
         }
 
         $id = $this->tripRepo->create([
             'name' => $name,
             'description' => isset($body['description']) && is_string($body['description'])
                 ? trim($body['description']) : null,
-            'start' => $start,
-            'end' => $end,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'startTime' => $allDay ? null : $startTime,
+            'endTime' => $allDay ? null : $endTime,
+            'allDay' => $allDay ? 1 : 0,
             'hastickets' => !empty($body['hastickets']) ? '1' : '0',
             'ticket' => isset($body['ticket']) && is_string($body['ticket'])
                 ? trim($body['ticket']) : null,
@@ -387,11 +421,20 @@ ROW;
             $data['description'] = is_string($body['description'])
                 ? trim($body['description']) : null;
         }
-        if (isset($body['start'])) {
-            $data['start'] = trim((string) $body['start']);
+        if (array_key_exists('allDay', $body)) {
+            $data['allDay'] = (bool) $body['allDay'] ? 1 : 0;
         }
-        if (isset($body['end'])) {
-            $data['end'] = trim((string) $body['end']);
+        if (array_key_exists('startDate', $body)) {
+            $data['startDate'] = trim((string) $body['startDate']);
+        }
+        if (array_key_exists('endDate', $body)) {
+            $data['endDate'] = trim((string) $body['endDate']);
+        }
+        if (array_key_exists('startTime', $body)) {
+            $data['startTime'] = trim((string) $body['startTime']);
+        }
+        if (array_key_exists('endTime', $body)) {
+            $data['endTime'] = trim((string) $body['endTime']);
         }
         if (isset($body['hastickets'])) {
             $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
@@ -446,10 +489,26 @@ ROW;
             return ResponseFactory::json(['error' => 'name_required'], 400, $response);
         }
 
-        $start = trim((string) ($body['start'] ?? ''));
-        $end = trim((string) ($body['end'] ?? ''));
-        if ($start === '' || $end === '') {
-            return ResponseFactory::json(['error' => 'start_and_end_required'], 400, $response);
+        $allDay = !empty($body['allDay']) ? (bool) $body['allDay'] : false;
+        $startDate = trim((string) ($body['startDate'] ?? ''));
+        $endDate = trim((string) ($body['endDate'] ?? ''));
+        $startTime = trim((string) ($body['startTime'] ?? ''));
+        $endTime = trim((string) ($body['endTime'] ?? ''));
+
+        if ($allDay) {
+            if ($startDate === '' || $endDate === '') {
+                return ResponseFactory::json(['error' => 'date_required'], 400, $response);
+            }
+            if ($startDate > $endDate) {
+                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+            }
+        } else {
+            if ($startDate === '' || $endDate === '' || $startTime === '' || $endTime === '') {
+                return ResponseFactory::json(['error' => 'time_required'], 400, $response);
+            }
+            if ($startDate . ' ' . $startTime >= $endDate . ' ' . $endTime) {
+                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
+            }
         }
 
         $tripId = isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
@@ -470,8 +529,11 @@ ROW;
             'name' => $name,
             'description' => isset($body['description']) && is_string($body['description'])
                 ? trim($body['description']) : null,
-            'start' => $start,
-            'end' => $end,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'startTime' => $allDay ? null : $startTime,
+            'endTime' => $allDay ? null : $endTime,
+            'allDay' => $allDay ? 1 : 0,
             'hastickets' => !empty($body['hastickets']) ? '1' : '0',
             'ticket' => isset($body['ticket']) && is_string($body['ticket'])
                 ? trim($body['ticket']) : null,
@@ -526,7 +588,22 @@ ROW;
             $data['description'] = is_string($body['description'])
                 ? trim($body['description']) : null;
         }
-        $stringFields = ['start', 'end', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address'];
+        if (array_key_exists('allDay', $body)) {
+            $data['allDay'] = (bool) $body['allDay'] ? 1 : 0;
+        }
+        if (array_key_exists('startDate', $body)) {
+            $data['startDate'] = trim((string) $body['startDate']);
+        }
+        if (array_key_exists('endDate', $body)) {
+            $data['endDate'] = trim((string) $body['endDate']);
+        }
+        if (array_key_exists('startTime', $body)) {
+            $data['startTime'] = trim((string) $body['startTime']);
+        }
+        if (array_key_exists('endTime', $body)) {
+            $data['endTime'] = trim((string) $body['endTime']);
+        }
+        $stringFields = ['ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address'];
         foreach ($stringFields as $field) {
             if (isset($body[$field])) {
                 $data[$field] = is_string($body[$field])

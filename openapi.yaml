@@ -996,12 +996,40 @@ components:
           nullable: true
         start:
           type: string
-          format: date-time
-          description: Reisebeginn (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          format: date
+          deprecated: true
+          description: 'Deprecated: use startDate. Reisebeginn (UTC), Format `YYYY-MM-DD`'
         end:
           type: string
-          format: date-time
-          description: Reiseende (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          format: date
+          deprecated: true
+          description: 'Deprecated: use endDate. Reiseende (UTC), Format `YYYY-MM-DD`'
+        allDay:
+          type: boolean
+          default: true
+          description: Ob die Reise ganztägig ist
+        startDate:
+          type: string
+          format: date
+          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          example: '2026-07-01'
+        endDate:
+          type: string
+          format: date
+          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          example: '2026-07-05'
+        startTime:
+          type: string
+          format: time
+          nullable: true
+          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '10:00:00'
+        endTime:
+          type: string
+          format: time
+          nullable: true
+          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '18:00:00'
         hastickets:
           type: string
           enum: ['0', '1']
@@ -1078,12 +1106,40 @@ components:
           nullable: true
         start:
           type: string
-          format: date-time
-          description: Event-Beginn (UTC)
+          format: date
+          deprecated: true
+          description: 'Deprecated: use startDate. Event-Beginn (UTC), Format `YYYY-MM-DD`'
         end:
           type: string
-          format: date-time
-          description: Event-Ende (UTC)
+          format: date
+          deprecated: true
+          description: 'Deprecated: use endDate. Event-Ende (UTC), Format `YYYY-MM-DD`'
+        allDay:
+          type: boolean
+          default: false
+          description: Ob das Event ganztägig ist
+        startDate:
+          type: string
+          format: date
+          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          example: '2026-07-10'
+        endDate:
+          type: string
+          format: date
+          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          example: '2026-07-10'
+        startTime:
+          type: string
+          format: time
+          nullable: true
+          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '14:00:00'
+        endTime:
+          type: string
+          format: time
+          nullable: true
+          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '18:00:00'
         hastickets:
           type: string
           enum: ['0', '1']
@@ -1613,14 +1669,32 @@ components:
         description:
           type: string
           nullable: true
+        allDay:
+          type: boolean
+          description: Ob das Event ganztägig ist
+          example: false
+        startDate:
+          type: string
+          format: date
+          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          example: '2026-07-01'
+        endDate:
+          type: string
+          format: date
+          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          example: '2026-07-01'
         startTime:
           type: string
-          format: date-time
-          description: Startzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          format: time
+          nullable: true
+          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '10:00:00'
         endTime:
           type: string
-          format: date-time
-          description: Endzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          format: time
+          nullable: true
+          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '11:00:00'
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1659,7 +1733,7 @@ components:
 
     CalendarEventCreateRequest:
       type: object
-      required: [title, startTime, endTime]
+      required: [title, allDay, startDate, endDate]
       properties:
         title:
           type: string
@@ -1667,16 +1741,32 @@ components:
         description:
           type: string
           nullable: true
+        allDay:
+          type: boolean
+          default: false
+          description: Ob das Event ganztägig ist
+        startDate:
+          type: string
+          format: date
+          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          example: '2026-07-01'
+        endDate:
+          type: string
+          format: date
+          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          example: '2026-07-01'
         startTime:
           type: string
-          format: date-time
-          description: Startzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
-          example: '2026-07-01 10:00:00'
+          format: time
+          nullable: true
+          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '10:00:00'
         endTime:
           type: string
-          format: date-time
-          description: Endzeit (UTC), Format `YYYY-MM-DD HH:MM:SS`
-          example: '2026-07-01 11:00:00'
+          format: time
+          nullable: true
+          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          example: '11:00:00'
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1686,7 +1776,7 @@ components:
           items:
             type: string
             format: uuid
-          description: Optionale Liste von Nutzer-IDs, die als Teilnehmer hinzugefügt werden
+            description: Optionale Liste von Nutzer-IDs, die als Teilnehmer hinzugefügt werden
 
     CalendarEventUpdateRequest:
       type: object
@@ -1696,14 +1786,27 @@ components:
         description:
           type: string
           nullable: true
+        allDay:
+          type: boolean
+          description: Ob das Event ganztägig ist
+        startDate:
+          type: string
+          format: date
+          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+        endDate:
+          type: string
+          format: date
+          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
         startTime:
           type: string
-          format: date-time
-          description: Startzeit (UTC)
+          format: time
+          nullable: true
+          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
         endTime:
           type: string
-          format: date-time
-          description: Endzeit (UTC)
+          format: time
+          nullable: true
+          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1733,7 +1836,7 @@ components:
 
     CalendarFeedItem:
       type: object
-      required: [type, id, title, startTime, endTime, allDay, detail]
+      required: [type, id, title, startDate, endDate, allDay, detail]
       properties:
         type:
           type: string
@@ -1746,19 +1849,27 @@ components:
           type: string
           nullable: true
           description: Anzeige-Titel (bei Geburtstagen servergeneriert)
-        startTime:
-          type: string
-          format: date-time
-          nullable: true
-          description: Beginn (UTC), Format `YYYY-MM-DD HH:MM:SS`
-        endTime:
-          type: string
-          format: date-time
-          nullable: true
-          description: Ende (UTC), Format `YYYY-MM-DD HH:MM:SS`
         allDay:
           type: boolean
-          description: Ganzttägiger Eintrag (Reisen, Geburtstage)
+          description: Ganzttägiger Eintrag
+        startDate:
+          type: string
+          format: date
+          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+        endDate:
+          type: string
+          format: date
+          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+        startTime:
+          type: string
+          format: time
+          nullable: true
+          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+        endTime:
+          type: string
+          format: time
+          nullable: true
+          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
         detail:
           type: object
           description: >
@@ -1774,12 +1885,12 @@ components:
       properties:
         start:
           type: string
-          format: date-time
-          description: Beginn des abgefragten Zeitraums (UTC)
+          format: date
+          description: Beginn des abgefragten Zeitraums (UTC), Format `YYYY-MM-DD`
         end:
           type: string
-          format: date-time
-          description: Ende des abgefragten Zeitraums (UTC)
+          format: date
+          description: Ende des abgefragten Zeitraums (UTC), Format `YYYY-MM-DD` (inklusiv)
         types:
           type: array
           items:
@@ -8888,19 +8999,19 @@ paths:
           required: false
           schema:
             type: string
-            format: date-time
+            format: date
           description: >
-            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Events deren
-            `endTime` nach diesem Zeitpunkt liegen werden zurückgegeben.
+            Start-Datum (UTC), Format `YYYY-MM-DD`. Events deren `endDate`
+            nach oder an diesem Tag liegen werden zurückgegeben.
         - name: end
           in: query
           required: false
           schema:
             type: string
-            format: date-time
+            format: date
           description: >
-            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Events deren
-            `startTime` vor diesem Zeitpunkt liegen werden zurückgegeben.
+            End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv). Events deren
+            `startDate` vor oder an diesem Tag liegen werden zurückgegeben.
         - name: range
           in: query
           required: false
@@ -8979,21 +9090,21 @@ paths:
           required: false
           schema:
             type: string
-            format: date-time
+            format: date
           description: >
-            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Nur Termine,
-            die diesen Zeitpunkt überlappen, werden zurückgegeben. Muss
+            Start-Datum (UTC), Format `YYYY-MM-DD`. Nur Termine, die diesen
+            oder spätere Tage überlappen, werden zurückgegeben. Muss
             zusammen mit `end` gesetzt werden.
         - name: end
           in: query
           required: false
           schema:
             type: string
-            format: date-time
+            format: date
           description: >
-            UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Nur Termine,
-            die diesen Zeitpunkt überlappen, werden zurückgegeben. Muss
-            zusammen mit `start` gesetzt werden.
+            End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv). Nur Termine,
+            die diesen oder frühere Tage überlappen, werden zurückgegeben.
+            Muss zusammen mit `start` gesetzt werden.
         - name: types
           in: query
           required: false

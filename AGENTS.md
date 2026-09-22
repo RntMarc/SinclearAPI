@@ -85,15 +85,20 @@ Auf dem lokalen Entwicklungs-System wird NICHT gegen eine Datenbank getestet (ke
 The API operates exclusively in UTC. This is a hard requirement that all implementations MUST follow:
 
 ### Format
-- **Input (von Clients):** `YYYY-MM-DD HH:MM:SS` (24h-Format, keine Millisekunden, keine Zeitzonenindikatoren)
-- **Output (an Clients):** `YYYY-MM-DD HH:MM:SS` (identisches Format, bestätigt UTC)
-- **Keine** ISO 8601-Erweiterungen wie `T`, `Z`, `+00:00`, `.000Z` oder Millisekunden/Mikrosekunden
+- **Input (von Clients):** 
+  - **Datum (Date):** `YYYY-MM-DD` (ohne Uhrzeit, für ganztägige Events und Datumsbereiche)
+  - **Uhrzeit (Time):** `HH:MM:SS` (24h-Format, ohne Millisekunden, UTC)
+  - **Kombination:** Ein UTC-Zeitpunkt ergibt sich aus `startDate` + `startTime` bzw. `endDate` + `endTime`
+  - **Ganztägige Events:** Werden durch das Flag `allDay: true` gekennzeichnet. Bei `allDay: true` werden nur `startDate`/`endDate` (Datum, inklusives Ende) verwendet; `startTime`/`endTime` sind nicht gesetzt.
+- **Output (an Clients):** Identisches Format wie Input. Ganztägige Events liefern nur `startDate`/`endDate` (Format `YYYY-MM-DD`), getaktete Events liefern `startDate`/`endDate` + `startTime`/`endTime`.
+- **Keine** ISO 8601-Erweiterungen wie `T`, `Z`, `+00:00`, `.000Z` oder Millisekunden/Mikrosekunden.
 
 ### Verantwortlichkeiten
-- **API:** Speichert und liefert ausschließlich UTC-Zeitstempel im Format `YYYY-MM-DD HH:MM:SS`. Keine Zeitzonen-Konvertierung im API-Code.
-- **Clients:** Sind verantwortlich für die Umrechnung von UTC in die lokale Zeitzone des Nutzers (Anzeige) und für die Umrechnung lokaler Zeit in UTC vor dem Senden an die API.
+- **API:** Speichert und liefert ausschließlich UTC-Zeitstempel. Ganztägige Events speichert die API als Datum (`startDate`/`endDate` inklusiv) plus optional Uhrzeit. Keine Zeitzonen-Konvertierung im API-Code.
+- **Clients:** Sind verantwortlich für die Umrechnung von UTC in die lokale Zeitzone des Nutzers (Anzeige) und für die Umrechnung lokaler Zeit in UTC vor dem Senden an die API. Bei ganztägigen Events (`allDay: true`) erfolgt keine Zeitzonen-Konvertierung – das Datum wird 1:1 angezeigt.
 
 ### Begründung
 - Vermeidet Inkonsistenzen durch mehrfache Zeitzonen-Konvertierung
 - Hält die API einfach und deterministisch
 - Verschiebt die Zeitzonen-Logik dorthin, wo sie hingehört: auf das Client-Gerät des Nutzers
+- Ganztägige Events sind zeitzonenunabhängig (ziviler Tag)

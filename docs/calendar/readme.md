@@ -11,13 +11,20 @@ Zusätzlich bietet `GET /calendar/all` einen kombinierten Feed, der neben den
 Kalender-Events auch Reise-Events, Reisen, Geburtstage und ÖPNV-Fahrten
 ausgibt (siehe [Kombinierter Kalender-Feed](#kombinierter-kalender-feed)).
 
-> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben (DateTime) werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben. Das Format ist `YYYY-MM-DD HH:MM:SS` (24h, ohne Millisekunden, ohne Zeitzonenindikatoren). Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben.
+> 
+> - **Datum (Date):** Format `YYYY-MM-DD` (z. B. `2026-07-01`), repräsentiert ein Kalenderdatum in UTC.
+> - **Uhrzeit (Time):** Format `HH:MM:SS` (z. B. `10:00:00`), repräsentiert eine Uhrzeit in UTC.
+> - **Kombination:** Ein Zeitpunkt in UTC ergibt sich aus der Kombination `startDate` + `startTime` (bzw. `endDate` + `endTime`).
+> - **Ganztägige Events:** Werden durch das Flag `allDay: true` gekennzeichnet. Bei ganztägigen Events werden nur `startDate` und `endDate` (inklusiv) verwendet, die Felder `startTime`/`endTime` sind nicht gesetzt.
+> 
+> Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
 
 ## Datenbank-Tabellen
 
 | Tabelle | Beschreibung |
 |---------|-------------|
-| `CalendarEvent` | Kalender-Einträge (Titel, Beschreibung, Zeitraum, Sichtbarkeit) |
+| `CalendarEvent` | Kalender-Einträge (Titel, Beschreibung, Start/End-Datum, Start/End-Uhrzeit, All-Day-Flag, Sichtbarkeit) |
 | `CalendarEventParticipant` | Verknüpfung von Nutzern mit Kalender-Einträgen |
 
 ## Sichtbarkeit (Visibility)
@@ -64,14 +71,14 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 |-----------|-----|-------------|
 | `page` | int (default 1) | Seitenzahl |
 | `limit` | int (default 20, max 100) | Einträge pro Seite |
-| `start` | `YYYY-MM-DD HH:MM:SS` | Manueller Start der Zeitspanne in UTC (z. B. `2026-06-01 00:00:00`) |
-| `end` | `YYYY-MM-DD HH:MM:SS` | Manuelles Ende der Zeitspanne in UTC |
+| `start` | `YYYY-MM-DD` | Manueller Start der Zeitspanne in UTC (z. B. `2026-06-01`). Events deren `endDate` nach oder an diesem Tag liegen werden zurückgegeben. |
+| `end` | `YYYY-MM-DD` | Manuelles Ende der Zeitspanne in UTC (inklusiv). Events deren `startDate` vor oder an diesem Tag liegen werden zurückgegeben. |
 | `range` | `week` oder `month` | Vordefinierter Bereich (aktuelle Woche / aktueller Monat). Wird ignoriert wenn `start` + `end` gesetzt sind |
 
 **Beispiele:**
 ```
 GET /calendar?page=1&limit=20
-GET /calendar?start=2026-06-01 00:00:00&end=2026-06-30 23:59:59
+GET /calendar?start=2026-06-01&end=2026-06-30
 GET /calendar?range=week
 GET /calendar?range=month&page=1&limit=50
 ```
@@ -87,8 +94,11 @@ Ein Kalender-Event wird immer mit Teilnehmern ausgeliefert:
     "creatorId": "uuid-des-erstellers",
     "title": "Team Meeting",
     "description": "Wöchentliches Sync",
-    "startTime": "2026-07-01 10:00:00",
-    "endTime": "2026-07-01 11:00:00",
+    "allDay": false,
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-01",
+    "startTime": "10:00:00",
+    "endTime": "11:00:00",
     "visibility": 1,
     "participants": [
       { "id": "uuid", "displayName": "Max", "image": null }
@@ -105,14 +115,17 @@ Ein Kalender-Event wird immer mit Teilnehmern ausgeliefert:
 {
   "title": "Team Meeting",
   "description": "Wöchentliches Sync",
-  "startTime": "2026-07-01 10:00:00",
-  "endTime": "2026-07-01 11:00:00",
+  "allDay": false,
+  "startDate": "2026-07-01",
+  "endDate": "2026-07-01",
+  "startTime": "10:00:00",
+  "endTime": "11:00:00",
   "visibility": 1,
   "participants": ["user-uuid-1", "user-uuid-2"]
 }
 ```
 
-`participants` ist optional.
+`participants` ist optional. Bei ganztägigen Events (`allDay: true`) werden `startTime`/`endTime` weggelassen.
 
 ### `PUT /calendar/{id}` – Request (partielles Update)
 
@@ -121,9 +134,14 @@ Nur die zu ändernden Felder mitsenden:
 ```json
 {
   "title": "Geändertes Meeting",
-  "startTime": "2026-07-01 14:00:00"
+  "startDate": "2026-07-01",
+  "endDate": "2026-07-01",
+  "startTime": "14:00:00",
+  "endTime": "15:00:00"
 }
 ```
+
+Bei ganztägigen Events (`allDay: true`) werden `startTime`/`endTime` weggelassen.
 
 ### `POST /calendar/{id}/participants` – Request
 
@@ -153,8 +171,8 @@ gefiltert; pro Quelle werden maximal 500 Einträge zurückgegeben.
 
 | Parameter | Typ | Beschreibung |
 |-----------|-----|-------------|
-| `start` | `YYYY-MM-DD HH:MM:SS` | Beginn des Zeitraums in UTC. Muss zusammen mit `end` gesetzt werden. |
-| `end` | `YYYY-MM-DD HH:MM:SS` | Ende des Zeitraums in UTC. Muss zusammen mit `start` gesetzt werden. |
+| `start` | `YYYY-MM-DD` | Beginn des Zeitraums in UTC. Muss zusammen mit `end` gesetzt werden. |
+| `end` | `YYYY-MM-DD` | Ende des Zeitraums in UTC (inklusiv). Muss zusammen mit `start` gesetzt werden. |
 | `types` | string | Komma-separierte Liste der gewünschten Typen (`calendar_event`, `travel_event`, `trip`, `birthday`, `pt_journey`). Standard: alle Typen. |
 
 Ohne `start`/`end` wird der aktuelle Monat verwendet. Wird nur einer der
@@ -165,9 +183,9 @@ mit `400 invalid_type`.
 **Beispiele:**
 ```
 GET /calendar/all
-GET /calendar/all?start=2026-06-01 00:00:00&end=2026-06-30 23:59:59
+GET /calendar/all?start=2026-06-01&end=2026-06-30
 GET /calendar/all?types=calendar_event,trip
-GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:59
+GET /calendar/all?types=birthday&start=2026-01-01&end=2026-12-31
 ```
 
 ### Enthaltene Typen und Zugriffsregeln
@@ -189,8 +207,10 @@ GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:
       "type": "calendar_event",
       "id": "uuid-des-events",
       "title": "Team Meeting",
-      "startTime": "2026-07-01 10:00:00",
-      "endTime": "2026-07-01 11:00:00",
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-01",
+      "startTime": "10:00:00",
+      "endTime": "11:00:00",
       "allDay": false,
       "detail": { }
     },
@@ -198,8 +218,8 @@ GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:
       "type": "trip",
       "id": "uuid-der-reise",
       "title": "Berlin Trip",
-      "startTime": "2026-07-03 00:00:00",
-      "endTime": "2026-07-06 23:59:59",
+      "startDate": "2026-07-03",
+      "endDate": "2026-07-06",
       "allDay": true,
       "detail": { }
     },
@@ -207,8 +227,8 @@ GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:
       "type": "birthday",
       "id": "2026-05-12-uuid-des-nutzers",
       "title": "Geburtstag: Max",
-      "startTime": "2026-05-12 00:00:00",
-      "endTime": "2026-05-12 23:59:59",
+      "startDate": "2026-05-12",
+      "endDate": "2026-05-12",
       "allDay": true,
       "detail": {
         "userId": "uuid-des-nutzers",
@@ -220,8 +240,8 @@ GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:
     }
   ],
   "meta": {
-    "start": "2026-06-01 00:00:00",
-    "end": "2026-06-30 23:59:59",
+    "start": "2026-06-01",
+    "end": "2026-06-30",
     "types": ["calendar_event", "travel_event", "trip", "birthday", "pt_journey"],
     "count": 3,
     "truncated": false
@@ -236,9 +256,11 @@ GET /calendar/all?types=birthday&start=2026-01-01 00:00:00&end=2026-12-31 23:59:
 | `type` | string | `calendar_event`, `travel_event`, `trip`, `birthday` oder `pt_journey` |
 | `id` | string | ID des zugrunde liegenden Datensatzes (bei Geburtstagen: `Vorkommensdatum + Nutzer-ID`) |
 | `title` | string\|null | Anzeige-Titel (bei Geburtstagen servergeneriert: `Geburtstag: <displayName>`) |
-| `startTime` | string\|null | Beginn in UTC |
-| `endTime` | string\|null | Ende in UTC |
-| `allDay` | bool | `true` bei Reisen und Geburtstagen |
+| `allDay` | bool | `true` bei ganztägigen Einträgen (Reisen, Geburtstage, optional bei Kalender-Events) |
+| `startDate` | string | Start-Datum (UTC), Format `YYYY-MM-DD` |
+| `endDate` | string | End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv) |
+| `startTime` | string\|null | Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei `!allDay`) |
+| `endTime` | string\|null | End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei `!allDay`) |
 | `detail` | object | Typspezifisches Objekt: `calendar_event` → CalendarEvent, `travel_event` → TravelEvent inkl. `participants`, `trip` → Trip-Datensatz, `birthday` → Nutzer-Kurzinfo inkl. `occurrenceDate`, `pt_journey` → Fahrten-Zusammenfassung inkl. `legs` |
 
 **Geburtstags-Logik:** Gespeichert ist das Geburtsdatum (`YYYY-MM-DD`). Für
@@ -264,14 +286,17 @@ CREATE TABLE IF NOT EXISTS `CalendarEvent` (
   `creatorId`  varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title`      varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `startTime`  datetime NOT NULL,
-  `endTime`    datetime NOT NULL,
+  `startDate`  date NOT NULL,
+  `endDate`    date NOT NULL,
+  `startTime`  time DEFAULT NULL,
+  `endTime`    time DEFAULT NULL,
+  `allDay`     tinyint(1) NOT NULL DEFAULT 0,
   `visibility` tinyint(1) NOT NULL DEFAULT 0,
   `createdAt`  datetime(3) NOT NULL,
   `updatedAt`  datetime(3) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_calendar_creator` (`creatorId`),
-  KEY `idx_calendar_time` (`startTime`, `endTime`)
+  KEY `idx_calendar_time` (`startDate`, `endDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `CalendarEventParticipant` (

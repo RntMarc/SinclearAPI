@@ -112,13 +112,13 @@ Die Daten stammen aus demselben Service wie `GET /calendar/all`
 | ICS-Eigenschaft | Quelle |
 |-----------------|--------|
 | `UID` | `{feedItemId}@sinclear.de` |
-| `DTSTART` / `DTEND` | `startTime` / `endTime` (UTC, Format `…Z`) |
-| `DTSTAMP` | `updatedAt` bzw. aktueller Zeitpunkt |
+| `DTSTART` / `DTEND` | Bei ganztägigen Events (`allDay: true`): `VALUE=DATE`, `startDate` / `endDate + 1 Tag` (exklusiv, UTC). Bei getakteten Events: `startDate` + `startTime` / `endDate` + `endTime` als UTC DateTime mit `Z`-Suffix. |
+| `DTSTAMP` | `updatedAt` bzw. `createdAt` bzw. `startDate` (stabil, für ETag-Stabilität) |
 | `SUMMARY` / `DESCRIPTION` | `title` / `description` (bzw. Leg-Details bei ÖPNV) |
 | `CLASS` | `visibility`: 0 → `PRIVATE`, 1 → `PUBLIC`, 2 → `CONFIDENTIAL` (nur calendar_event) |
 | `ORGANIZER` / `ATTENDEE` | `mailto:{userId}@sinclear.de` (keine echten E-Mail-Adressen) |
 | `RRULE` | `FREQ=YEARLY` (nur Geburtstage) |
-| `TRANSP` | `TRANSPARENT` (Reisen, Geburtstage – nicht als „besetzt" markieren) |
+| `TRANSP` | `TRANSPARENT` (ganztägige Events: Reisen, Geburtstage, ganztägige Kalender-Events) |
 
 ### Kalender-URLs
 

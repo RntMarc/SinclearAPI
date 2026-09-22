@@ -9,13 +9,16 @@ use DateTimeZone;
 use Sabre\VObject\Component\VCalendar;
 
 /**
- * Erzeugt iCalendar-Daten (RFC 5545) aus Kalender-Events der Datenbank
- * sowie aus Feed-Items (CalendarFeedService).
- *
- * Alle Zeitangaben werden ausschliesslich in UTC serialisiert (Format mit
- * "Z"-Suffix), passend zur UTC-only-Konvention der API. Clients sind fuer
- * die Umrechnung in lokale Zeiten verantwortlich.
- */
+     * Erzeugt iCalendar-Daten (RFC 5545) aus Kalender-Events der Datenbank
+     * sowie aus Feed-Items (CalendarFeedService).
+     *
+     * Alle Zeitangaben werden ausschliesslich in UTC serialisiert (Format mit
+     * "Z"-Suffix), passend zur UTC-only-Konvention der API. Clients sind fuer
+     * die Umrechnung in lokale Zeiten verantwortlich.
+     *
+     * Ganztägige Events (allDay=true) werden als VALUE=DATE serialisiert mit
+     * exklusivem DTEND (End-Tag + 1 Tag). Getaktete Events als DATE-TIME (Z).
+     */
 final readonly class IcsFactory
 {
     private const string PRODID = '-//Sinclear Beyond//CalDAV Server//DE';
@@ -28,14 +31,26 @@ final readonly class IcsFactory
     {
         $vcal = $this->createCalendar();
 
+        $allDay = (bool) ($event['allDay'] ?? 0);
+        $dtStamp = $event['updatedAt'] ?? $event['createdAt'];
+
         $properties = [
             'UID' => $event['id'] . self::UID_DOMAIN,
-            'DTSTAMP' => new DateTimeImmutable($event['updatedAt'] ?? $event['createdAt'], new DateTimeZone('UTC')),
-            'DTSTART' => new DateTimeImmutable($event['startTime'], new DateTimeZone('UTC')),
-            'DTEND' => new DateTimeImmutable($event['endTime'], new DateTimeZone('UTC')),
+            'DTSTAMP' => new DateTimeImmutable($dtStamp, new DateTimeZone('UTC')),
             'SUMMARY' => (string) $event['title'],
             'CLASS' => $this->classFromVisibility((int) ($event['visibility'] ?? 0)),
         ];
+
+        if ($allDay) {
+            $startDt = new DateTimeImmutable($event['startDate'], new DateTimeZone('UTC'));
+            $endDt = (new DateTimeImmutable($event['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
+            $properties['DTSTART'] = $startDt;
+            $properties['DTEND'] = $endDt;
+            $properties['TRANSP'] = 'TRANSPARENT';
+        } else {
+            $properties['DTSTART'] = new DateTimeImmutable($event['startDate'] . ' ' . $event['startTime'], new DateTimeZone('UTC'));
+            $properties['DTEND'] = new DateTimeImmutable($event['endDate'] . ' ' . $event['endTime'], new DateTimeZone('UTC'));
+        }
 
         if (!empty($event['description'])) {
             $properties['DESCRIPTION'] = (string) $event['description'];
@@ -82,7 +97,7 @@ final readonly class IcsFactory
      * Konvertiert ein Feed-Item (CalendarFeedService) in ein CalDAV-
      * CalendarObject-Array. Dispatcht je nach type auf die passende Methode.
      *
-     * @param array<string, mixed> $item Feed-Item mit type, id, title, startTime, endTime, allDay, detail
+     * @param array<string, mixed> $item Feed-Item mit type, id, title, startDate, endDate, startTime, endTime, allDay, detail
      * @return array<string, mixed> CalDAV calendar-object array
      */
     public function feedItemToCalendarObject(array $item): array
@@ -96,7 +111,7 @@ final readonly class IcsFactory
             default => $this->calendarEventFromFeed($item),
         };
 
-        $lastModified = $item['detail']['updatedAt'] ?? $item['detail']['createdAt'] ?? $item['startTime'];
+        $lastModified = $item['detail']['updatedAt'] ?? $item['detail']['createdAt'] ?? $item['startDate'];
 
         return [
             'uri' => $item['id'] . '.ics',
@@ -110,7 +125,6 @@ final readonly class IcsFactory
 
     /**
      * Liefert eine eindeutige UID fuer ein Feed-Item.
-     * Feed-IDs sind bereits typ-prefixiert (z.B. "trip-{uuid}").
      */
     public function feedItemUid(array $item): string
     {
@@ -125,17 +139,26 @@ final readonly class IcsFactory
         $vcal = $this->createCalendar();
         $detail = $item['detail'];
 
+        $allDay = (bool) ($item['allDay'] ?? 0);
+        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'];
+
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => new DateTimeImmutable(
-                $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startTime'],
-                new DateTimeZone('UTC'),
-            ),
-            'DTSTART' => new DateTimeImmutable($item['startTime'], new DateTimeZone('UTC')),
-            'DTEND' => new DateTimeImmutable($item['endTime'], new DateTimeZone('UTC')),
+            'DTSTAMP' => new DateTimeImmutable($dtStamp, new DateTimeZone('UTC')),
             'SUMMARY' => (string) $item['title'],
             'CLASS' => $this->classFromVisibility((int) ($detail['visibility'] ?? 0)),
         ];
+
+        if ($allDay) {
+            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
+            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
+            $properties['DTSTART'] = $startDt;
+            $properties['DTEND'] = $endDt;
+            $properties['TRANSP'] = 'TRANSPARENT';
+        } else {
+            $properties['DTSTART'] = new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC'));
+            $properties['DTEND'] = new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC'));
+        }
 
         if (!empty($detail['description'])) {
             $properties['DESCRIPTION'] = (string) $detail['description'];
@@ -163,13 +186,25 @@ final readonly class IcsFactory
         $vcal = $this->createCalendar();
         $detail = $item['detail'];
 
+        $allDay = (bool) ($item['allDay'] ?? 0);
+        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'];
+
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => new DateTimeImmutable('now', new DateTimeZone('UTC')),
-            'DTSTART' => new DateTimeImmutable($item['startTime'], new DateTimeZone('UTC')),
-            'DTEND' => new DateTimeImmutable($item['endTime'], new DateTimeZone('UTC')),
+            'DTSTAMP' => new DateTimeImmutable($dtStamp, new DateTimeZone('UTC')),
             'SUMMARY' => (string) $item['title'],
         ];
+
+        if ($allDay) {
+            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
+            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
+            $properties['DTSTART'] = $startDt;
+            $properties['DTEND'] = $endDt;
+            $properties['TRANSP'] = 'TRANSPARENT';
+        } else {
+            $properties['DTSTART'] = new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC'));
+            $properties['DTEND'] = new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC'));
+        }
 
         if (!empty($detail['description'])) {
             $properties['DESCRIPTION'] = (string) $detail['description'];
@@ -195,24 +230,36 @@ final readonly class IcsFactory
         $vcal = $this->createCalendar();
         $detail = $item['detail'];
 
-        $startDt = new DateTimeImmutable(substr($item['startTime'], 0, 10), new DateTimeZone('UTC'));
-        $endDt = new DateTimeImmutable(substr($item['endTime'], 0, 10), new DateTimeZone('UTC'));
-        $endDt = $endDt->modify('+1 day');
+        $allDay = (bool) ($item['allDay'] ?? 1);
+        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'];
 
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            'DTSTAMP' => new DateTimeImmutable($dtStamp, new DateTimeZone('UTC')),
             'SUMMARY' => (string) $item['title'],
-            'TRANSP' => 'TRANSPARENT',
         ];
+
+        if ($allDay) {
+            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
+            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
+            $properties['DTSTART'] = $startDt;
+            $properties['DTEND'] = $endDt;
+            $properties['TRANSP'] = 'TRANSPARENT';
+        } else {
+            $properties['DTSTART'] = new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC'));
+            $properties['DTEND'] = new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC'));
+        }
 
         if (!empty($detail['description'])) {
             $properties['DESCRIPTION'] = (string) $detail['description'];
         }
 
         $vevent = $vcal->add('VEVENT', $properties);
-        $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
-        $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
+
+        if ($allDay) {
+            $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
+            $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
+        }
 
         return $vcal->serialize();
     }
@@ -225,9 +272,9 @@ final readonly class IcsFactory
 
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => new DateTimeImmutable('now', new DateTimeZone('UTC')),
-            'DTSTART' => new DateTimeImmutable($item['startTime'], new DateTimeZone('UTC')),
-            'DTEND' => new DateTimeImmutable($item['endTime'], new DateTimeZone('UTC')),
+            'DTSTAMP' => $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'],
+            'DTSTART' => new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC')),
+            'DTEND' => new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC')),
             'SUMMARY' => (string) $item['title'],
         ];
 
@@ -247,13 +294,13 @@ final readonly class IcsFactory
         $vcal = $this->createCalendar();
         $detail = $item['detail'];
 
-        $dateStr = $detail['occurrenceDate'] ?? substr($item['startTime'], 0, 10);
+        $dateStr = $detail['occurrenceDate'] ?? $item['startDate'];
         $startDt = new DateTimeImmutable($dateStr, new DateTimeZone('UTC'));
         $endDt = $startDt->modify('+1 day');
 
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            'DTSTAMP' => $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'],
             'SUMMARY' => (string) $item['title'],
             'TRANSP' => 'TRANSPARENT',
             'RRULE' => 'FREQ=YEARLY',

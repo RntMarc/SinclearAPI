@@ -14,14 +14,14 @@ final readonly class TravelEventRepository
     /** @return list<array<string, mixed>> */
     public function findAll(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM TravelEvent ORDER BY start DESC');
+        $stmt = $this->pdo->query('SELECT * FROM TravelEvent ORDER BY startDate DESC, startTime DESC');
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function findByTrip(string $tripId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM TravelEvent WHERE trip = ? ORDER BY start ASC'
+            'SELECT * FROM TravelEvent WHERE trip = ? ORDER BY startDate ASC, startTime ASC'
         );
         $stmt->execute([$tripId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -49,6 +49,7 @@ final readonly class TravelEventRepository
      * Alle Events, die für den Nutzer sichtbar sind und den Zeitraum
      * überlappen. Standalone-Events über EventRelation, Reise-Events
      * über die TravelRelation der zugehörigen Reise.
+     * Inklusiver Datumsbereich: endDate >= :start AND startDate <= :end
      *
      * @return list<array<string, mixed>>
      */
@@ -63,9 +64,9 @@ final readonly class TravelEventRepository
                  (e.trip IS NULL AND er.userId IS NOT NULL)
                  OR (e.trip IS NOT NULL AND tr.userid IS NOT NULL)
              )
-               AND COALESCE(e.end, e.start) > ?
-               AND COALESCE(e.start, e.end) < ?
-             ORDER BY e.start ASC
+               AND e.endDate >= ?
+               AND e.startDate <= ?
+             ORDER BY e.startDate ASC, e.startTime ASC
              LIMIT ?'
         );
         $stmt->execute([$userId, $userId, $start, $end, $limit]);
@@ -111,7 +112,7 @@ final readonly class TravelEventRepository
              FROM TravelEvent e
              JOIN EventRelation r ON r.eventId = e.ID
              WHERE e.trip IS NULL AND r.userId = ?
-             ORDER BY e.start DESC
+             ORDER BY e.startDate DESC, e.startTime DESC
              LIMIT ? OFFSET ?'
         );
         $dataStmt->execute([...$params, $limit, $offset]);
@@ -181,16 +182,19 @@ final readonly class TravelEventRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelEvent (ID, trip, name, description, start, end, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID, citySlug)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelEvent (ID, trip, name, description, startDate, endDate, startTime, endTime, allDay, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID, citySlug)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
             $data['trip'] ?? null,
             $data['name'],
             $data['description'] ?? null,
-            $data['start'],
-            $data['end'],
+            $data['startDate'],
+            $data['endDate'],
+            $data['startTime'] ?? null,
+            $data['endTime'] ?? null,
+            $data['allDay'] ?? 0,
             $data['hastickets'] ?? '0',
             $data['ticket'] ?? null,
             $data['ticketUrl'] ?? null,
@@ -211,7 +215,7 @@ final readonly class TravelEventRepository
         $sets = [];
         $values = [];
 
-        foreach (['trip', 'name', 'description', 'start', 'end', 'hastickets', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address', 'latitude', 'longitude', 'OSMID', 'citySlug'] as $field) {
+        foreach (['trip', 'name', 'description', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'hastickets', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address', 'latitude', 'longitude', 'OSMID', 'citySlug'] as $field) {
             if (array_key_exists($field, $data)) {
                 $sets[] = "`$field` = ?";
                 $values[] = $data[$field];

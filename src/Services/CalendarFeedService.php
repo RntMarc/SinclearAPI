@@ -35,8 +35,8 @@ final readonly class CalendarFeedService
      */
     public function buildFeed(string $userId, string $start, string $end, array $types): array
     {
-        $this->assertValidDatetime($start);
-        $this->assertValidDatetime($end);
+        $this->assertValidDate($start);
+        $this->assertValidDate($end);
 
         $items = [];
         $truncated = false;
@@ -54,8 +54,17 @@ final readonly class CalendarFeedService
             $truncated = $truncated || $result['truncated'];
         }
 
-        usort($items, fn(array $a, array $b): int => [$a['startTime'], $a['endTime'], $a['type'], $a['id']]
-            <=> [$b['startTime'], $b['endTime'], $b['type'], $b['id']]);
+        usort($items, fn(array $a, array $b): int => [
+            $a['startDate'],
+            $a['startTime'] ?? '',
+            $a['type'],
+            $a['id'],
+        ] <=> [
+            $b['startDate'],
+            $b['startTime'] ?? '',
+            $b['type'],
+            $b['id'],
+        ]);
 
         return [
             'data' => $items,
@@ -81,15 +90,20 @@ final readonly class CalendarFeedService
 
         $items = [];
         foreach ($result['data'] as $event) {
-            $items[] = [
+            $item = [
                 'type' => 'calendar_event',
                 'id' => $event['id'],
                 'title' => $event['title'] ?? null,
-                'startTime' => $event['startTime'],
-                'endTime' => $event['endTime'],
-                'allDay' => false,
+                'startDate' => $event['startDate'],
+                'endDate' => $event['endDate'],
+                'allDay' => (bool) ($event['allDay'] ?? 0),
                 'detail' => $event,
             ];
+            if (empty($event['allDay'])) {
+                $item['startTime'] = $event['startTime'];
+                $item['endTime'] = $event['endTime'];
+            }
+            $items[] = $item;
         }
 
         return [
@@ -121,18 +135,24 @@ final readonly class CalendarFeedService
 
         $items = [];
         foreach ($events as $event) {
-            $detail = $this->normalizeDatetimes($event, ['start', 'end']);
+            $detail = $event; // dates/times already in new format
             $detail['participants'] = $participantsByEvent[$event['ID']] ?? [];
 
-            $items[] = [
+            $allDay = (bool) ($detail['allDay'] ?? 0);
+            $item = [
                 'type' => 'travel_event',
                 'id' => $event['ID'],
                 'title' => $event['name'] ?? null,
-                'startTime' => $detail['start'] ?? $detail['end'],
-                'endTime' => $detail['end'] ?? $detail['start'],
-                'allDay' => false,
+                'startDate' => $detail['startDate'],
+                'endDate' => $detail['endDate'],
+                'allDay' => $allDay,
                 'detail' => $detail,
             ];
+            if (!$allDay) {
+                $item['startTime'] = $detail['startTime'] ?? $detail['endTime'];
+                $item['endTime'] = $detail['endTime'] ?? $detail['startTime'];
+            }
+            $items[] = $item;
         }
 
         return ['items' => $items, 'truncated' => $truncated];
@@ -152,17 +172,21 @@ final readonly class CalendarFeedService
 
         $items = [];
         foreach ($trips as $trip) {
-            $detail = $this->normalizeDatetimes($trip, ['start', 'end']);
-
-            $items[] = [
+            $allDay = (bool) ($trip['allDay'] ?? 1);
+            $item = [
                 'type' => 'trip',
                 'id' => $trip['id'],
                 'title' => $trip['name'] ?? null,
-                'startTime' => $detail['start'] ?? $detail['end'],
-                'endTime' => $detail['end'] ?? $detail['start'],
-                'allDay' => true,
-                'detail' => $detail,
+                'startDate' => $trip['startDate'],
+                'endDate' => $trip['endDate'],
+                'allDay' => $allDay,
+                'detail' => $trip,
             ];
+            if (!$allDay) {
+                $item['startTime'] = $trip['startTime'] ?? $trip['endTime'];
+                $item['endTime'] = $trip['endTime'] ?? $trip['startTime'];
+            }
+            $items[] = $item;
         }
 
         return ['items' => $items, 'truncated' => $truncated];
@@ -170,9 +194,6 @@ final readonly class CalendarFeedService
 
     private function birthdays(string $userId, string $start, string $end): array
     {
-        $startDate = substr($start, 0, 10);
-        $endDate = substr($end, 0, 10);
-
         $items = [];
         $truncated = false;
 
@@ -187,8 +208,8 @@ final readonly class CalendarFeedService
                 continue;
             }
 
-            $year = (int) substr($startDate, 0, 4);
-            $lastYear = (int) substr($endDate, 0, 4);
+            $year = (int) substr($start, 0, 4);
+            $lastYear = (int) substr($end, 0, 4);
 
             for (; $year <= $lastYear; $year++) {
                 $occurrence = sprintf('%04d-%s', $year, $monthDay);
@@ -196,7 +217,7 @@ final readonly class CalendarFeedService
                 if ($occurrenceDate === false || $occurrenceDate->format('m-d') !== $monthDay) {
                     continue;
                 }
-                if ($occurrence < $startDate || $occurrence > $endDate) {
+                if ($occurrence < $start || $occurrence > $end) {
                     continue;
                 }
                 if (count($items) >= self::MAX_ITEMS_PER_SOURCE) {
@@ -208,8 +229,8 @@ final readonly class CalendarFeedService
                     'type' => 'birthday',
                     'id' => $occurrence . '-' . $candidate['id'],
                     'title' => 'Geburtstag: ' . $candidate['displayName'],
-                    'startTime' => $occurrence . ' 00:00:00',
-                    'endTime' => $occurrence . ' 23:59:59',
+                    'startDate' => $occurrence,
+                    'endDate' => $occurrence,
                     'allDay' => true,
                     'detail' => [
                         'userId' => $candidate['id'],
@@ -227,10 +248,14 @@ final readonly class CalendarFeedService
 
     private function ptJourneys(string $userId, string $start, string $end): array
     {
+        // PtJourney uses datetime columns; expand date bounds to half-open datetime window
+        $startDt = $start . ' 00:00:00';
+        $endDt = (new DateTimeImmutable($end . ' 00:00:00', new DateTimeZone('UTC')))->modify('+1 day')->format('Y-m-d H:i:s');
+
         $journeys = $this->ptJourneyRepo->findByParticipantInRange(
             $userId,
-            $start,
-            $end,
+            $startDt,
+            $endDt,
             self::MAX_ITEMS_PER_SOURCE + 1,
         );
 
@@ -247,15 +272,27 @@ final readonly class CalendarFeedService
             $detail = $this->formatJourney($journey);
             $detail['legs'] = $legsByJourney[$journey['id']] ?? [];
 
-            $items[] = [
+            $departure = $detail['departureTime'] ?? $detail['arrivalTime'];
+            $arrival = $detail['arrivalTime'] ?? $detail['departureTime'];
+
+            // Split datetime into date + time
+            $depDate = $departure ? substr($departure, 0, 10) : $start;
+            $arrDate = $arrival ? substr($arrival, 0, 10) : $end;
+            $depTime = $departure ? substr($departure, 11, 8) : '00:00:00';
+            $arrTime = $arrival ? substr($arrival, 11, 8) : '00:00:00';
+
+            $item = [
                 'type' => 'pt_journey',
                 'id' => $journey['id'],
                 'title' => trim(($journey['fromStationName'] ?? '') . ' → ' . ($journey['toStationName'] ?? '')),
-                'startTime' => $detail['departureTime'] ?? $detail['arrivalTime'],
-                'endTime' => $detail['arrivalTime'] ?? $detail['departureTime'],
+                'startDate' => $depDate,
+                'endDate' => $arrDate,
+                'startTime' => $depTime,
+                'endTime' => $arrTime,
                 'allDay' => false,
                 'detail' => $detail,
             ];
+            $items[] = $item;
         }
 
         return ['items' => $items, 'truncated' => $truncated];
@@ -357,11 +394,11 @@ final readonly class CalendarFeedService
         }
     }
 
-    private function assertValidDatetime(string $value): void
+    private function assertValidDate(string $value): void
     {
-        $dt = DateTimeImmutable::createFromFormat('!Y-m-d H:i:s', $value);
-        if ($dt === false || $dt->format('Y-m-d H:i:s') !== $value) {
-            throw new RuntimeException('Invalid datetime');
+        $dt = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if ($dt === false || $dt->format('Y-m-d') !== $value) {
+            throw new RuntimeException('Invalid date');
         }
     }
 }

@@ -42,14 +42,44 @@ final readonly class CalendarEventService
             throw new \RuntimeException('Forbidden');
         }
 
+        // Merge incoming data with existing to validate cross-field constraints
+        $merged = array_merge($event, $data);
+        $this->validateDateTimeConsistency($merged);
+
         $this->eventRepo->update($id, $data);
 
         $event = $this->eventRepo->findById($id);
         $event = $this->enrich($event);
 
-        $participantIds = $this->eventRepo->findParticipantIdsByEvent($id);
-
         return $event;
+    }
+
+    private function validateDateTimeConsistency(array $event): void
+    {
+        $allDay = (bool) ($event['allDay'] ?? 0);
+
+        if ($allDay) {
+            // All-day: dates required, times must be empty
+            if (empty($event['startDate']) || empty($event['endDate'])) {
+                throw new \RuntimeException('Invalid date');
+            }
+            if ($event['startDate'] > $event['endDate']) {
+                throw new \RuntimeException('Invalid time range');
+            }
+            if (!empty($event['startTime']) || !empty($event['endTime'])) {
+                throw new \RuntimeException('Invalid time');
+            }
+        } else {
+            // Timed: all four fields required
+            if (empty($event['startDate']) || empty($event['endDate']) || empty($event['startTime']) || empty($event['endTime'])) {
+                throw new \RuntimeException('Invalid datetime');
+            }
+            $startMoment = $event['startDate'] . ' ' . $event['startTime'];
+            $endMoment = $event['endDate'] . ' ' . $event['endTime'];
+            if ($startMoment >= $endMoment) {
+                throw new \RuntimeException('Invalid time range');
+            }
+        }
     }
 
     public function delete(string $id, string $userId): void
@@ -157,7 +187,25 @@ final readonly class CalendarEventService
 
     private function enrich(array $event): array
     {
-        foreach (['startTime', 'endTime', 'createdAt', 'updatedAt'] as $field) {
+        // Normalize date/time fields for response
+        if (isset($event['startDate'])) {
+            $event['startDate'] = $this->formatDate($event['startDate']);
+        }
+        if (isset($event['endDate'])) {
+            $event['endDate'] = $this->formatDate($event['endDate']);
+        }
+        if (isset($event['startTime']) && $event['startTime'] !== null) {
+            $event['startTime'] = $this->formatTime($event['startTime']);
+        }
+        if (isset($event['endTime']) && $event['endTime'] !== null) {
+            $event['endTime'] = $this->formatTime($event['endTime']);
+        }
+        // For all-day events, omit time fields (they are NULL in DB)
+        if (($event['allDay'] ?? 0) === 1) {
+            unset($event['startTime'], $event['endTime']);
+        }
+
+        foreach (['createdAt', 'updatedAt'] as $field) {
             if (isset($event[$field])) {
                 $event[$field] = (new DateTimeImmutable($event[$field], new DateTimeZone('UTC')))
                     ->format('Y-m-d H:i:s');
@@ -166,5 +214,15 @@ final readonly class CalendarEventService
 
         $event['participants'] = $this->eventRepo->findParticipantsByEvent($event['id']);
         return $event;
+    }
+
+    private function formatDate(string $value): string
+    {
+        return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->format('Y-m-d');
+    }
+
+    private function formatTime(string $value): string
+    {
+        return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->format('H:i:s');
     }
 }

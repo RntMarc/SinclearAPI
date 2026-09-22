@@ -19,16 +19,19 @@ final readonly class CalendarEventRepository
         $id = Uuid::uuid7()->toString();
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, description, startTime, endTime, visibility, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
+            'INSERT INTO CalendarEvent (id, creatorId, title, description, startDate, endDate, startTime, endTime, allDay, visibility, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
         );
         $stmt->execute([
             $id,
             $creatorId,
             $data['title'],
             $data['description'] ?? null,
-            $this->formatDatetime($data['startTime']),
-            $this->formatDatetime($data['endTime']),
+            $this->formatDate($data['startDate']),
+            $this->formatDate($data['endDate']),
+            $data['startTime'] ?? null,
+            $data['endTime'] ?? null,
+            $data['allDay'] ?? 0,
             $data['visibility'] ?? 0,
         ]);
 
@@ -40,12 +43,14 @@ final readonly class CalendarEventRepository
         $fields = [];
         $params = [];
 
-        foreach (['title', 'description', 'startTime', 'endTime', 'visibility'] as $field) {
+        foreach (['title', 'description', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'visibility'] as $field) {
             if (array_key_exists($field, $data)) {
                 $fields[] = "`$field` = ?";
                 $value = $data[$field];
-                if (in_array($field, ['startTime', 'endTime'], true)) {
-                    $value = $this->formatDatetime($value);
+                if (in_array($field, ['startDate', 'endDate'], true)) {
+                    $value = $this->formatDate($value);
+                } elseif (in_array($field, ['startTime', 'endTime'], true)) {
+                    $value = $this->formatTime($value);
                 }
                 $params[] = $value;
             }
@@ -102,12 +107,12 @@ final readonly class CalendarEventRepository
 
         $timeConditions = [];
         if ($start !== null) {
-            $timeConditions[] = 'e.endTime > ?';
-            $params[] = $this->formatDatetime($start);
+            $timeConditions[] = 'e.endDate >= ?';
+            $params[] = $this->formatDate($start);
         }
         if ($end !== null) {
-            $timeConditions[] = 'e.startTime < ?';
-            $params[] = $this->formatDatetime($end);
+            $timeConditions[] = 'e.startDate <= ?';
+            $params[] = $this->formatDate($end);
         }
 
         $where = '(' . $visibilityWhere . ')';
@@ -126,7 +131,7 @@ final readonly class CalendarEventRepository
             "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
              FROM CalendarEvent e
              LEFT JOIN User u ON u.id = e.creatorId
-             WHERE $where ORDER BY e.startTime ASC LIMIT ? OFFSET ?"
+             WHERE $where ORDER BY e.startDate ASC, e.startTime ASC LIMIT ? OFFSET ?"
         );
         $dataStmt->execute([...$params, $limit, $offset]);
         $events = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -144,7 +149,7 @@ final readonly class CalendarEventRepository
 
     /**
      * Liefert alle fuer den Nutzer sichtbaren Events ohne Pagination
-     * (fuer CalDAV), optional auf einen Zeitraum begrenzt.
+     * (fuer CalDAV), optional auf einen Zeitraum begrenzt (YYYY-MM-DD).
      *
      * @return list<array<string, mixed>>
      */
@@ -153,19 +158,19 @@ final readonly class CalendarEventRepository
         [$where, $params] = $this->visibilityWhere($userId);
 
         if ($start !== null) {
-            $where .= ' AND e.endTime > ?';
-            $params[] = $this->formatDatetime($start);
+            $where .= ' AND e.endDate >= ?';
+            $params[] = $this->formatDate($start);
         }
         if ($end !== null) {
-            $where .= ' AND e.startTime < ?';
-            $params[] = $this->formatDatetime($end);
+            $where .= ' AND e.startDate <= ?';
+            $params[] = $this->formatDate($end);
         }
 
         $stmt = $this->pdo->prepare(
             "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
              FROM CalendarEvent e
              LEFT JOIN User u ON u.id = e.creatorId
-             WHERE $where ORDER BY e.startTime ASC"
+             WHERE $where ORDER BY e.startDate ASC, e.startTime ASC"
         );
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -302,13 +307,23 @@ final readonly class CalendarEventRepository
         return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
-    private function formatDatetime(string $value): string
+    private function formatDate(string $value): string
     {
         try {
             return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
-                ->format('Y-m-d H:i:s');
+                ->format('Y-m-d');
         } catch (\Exception $e) {
-            throw new RuntimeException('Invalid datetime');
+            throw new RuntimeException('Invalid date');
+        }
+    }
+
+    private function formatTime(string $value): string
+    {
+        try {
+            return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
+                ->format('H:i:s');
+        } catch (\Exception $e) {
+            throw new RuntimeException('Invalid time');
         }
     }
 }

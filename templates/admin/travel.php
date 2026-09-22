@@ -64,14 +64,32 @@
             <label for="newTripDescription">Beschreibung</label>
             <textarea id="newTripDescription" name="description" placeholder="Reisebeschreibung"></textarea>
         </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="newTripAllDay" checked onchange="toggleTripAllDay()">
+                Ganztägig
+            </label>
+        </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="newTripStart">Start * (UTC)</label>
-                <input type="text" id="newTripStart" name="start" placeholder="2025-07-01 10:00:00" required>
+                <label for="newTripStartDate">Start-Datum *</label>
+                <input type="date" id="newTripStartDate" name="startDate" required>
             </div>
             <div class="form-group">
-                <label for="newTripEnd">Ende * (UTC)</label>
-                <input type="text" id="newTripEnd" name="end" placeholder="2025-07-15 18:00:00" required>
+                <label for="newTripEndDate">End-Datum *</label>
+                <input type="date" id="newTripEndDate" name="endDate" required>
+            </div>
+        </div>
+        <div id="newTripTimeFields" style="display:none;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newTripStartTime">Start-Uhrzeit (UTC)</label>
+                    <input type="time" id="newTripStartTime" name="startTime" placeholder="10:00">
+                </div>
+                <div class="form-group">
+                    <label for="newTripEndTime">End-Uhrzeit (UTC)</label>
+                    <input type="time" id="newTripEndTime" name="endTime" placeholder="18:00">
+                </div>
             </div>
         </div>
         <div class="form-group">
@@ -112,14 +130,32 @@
             <label for="editTripDescription">Beschreibung</label>
             <textarea id="editTripDescription" name="description"></textarea>
         </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="editTripAllDay" onchange="toggleEditTripAllDay()">
+                Ganztägig
+            </label>
+        </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="editTripStart">Start * (UTC)</label>
-                <input type="text" id="editTripStart" name="start" required>
+                <label for="editTripStartDate">Start-Datum *</label>
+                <input type="date" id="editTripStartDate" name="startDate" required>
             </div>
             <div class="form-group">
-                <label for="editTripEnd">Ende * (UTC)</label>
-                <input type="text" id="editTripEnd" name="end" required>
+                <label for="editTripEndDate">End-Datum *</label>
+                <input type="date" id="editTripEndDate" name="endDate" required>
+            </div>
+        </div>
+        <div id="editTripTimeFields" style="display:none;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editTripStartTime">Start-Uhrzeit (UTC)</label>
+                    <input type="time" id="editTripStartTime" name="startTime" placeholder="10:00">
+                </div>
+                <div class="form-group">
+                    <label for="editTripEndTime">End-Uhrzeit (UTC)</label>
+                    <input type="time" id="editTripEndTime" name="endTime" placeholder="18:00">
+                </div>
             </div>
         </div>
         <div class="form-group">
@@ -165,14 +201,32 @@
                 {{tripOptions}}
             </select>
         </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="newEventAllDay" onchange="toggleEventAllDay()">
+                Ganztägig
+            </label>
+        </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="newEventStart">Start * (UTC)</label>
-                <input type="text" id="newEventStart" name="start" placeholder="2025-07-10 14:00:00" required>
+                <label for="newEventStartDate">Start-Datum *</label>
+                <input type="date" id="newEventStartDate" name="startDate" required>
             </div>
             <div class="form-group">
-                <label for="newEventEnd">Ende * (UTC)</label>
-                <input type="text" id="newEventEnd" name="end" placeholder="2025-07-10 18:00:00" required>
+                <label for="newEventEndDate">End-Datum *</label>
+                <input type="date" id="newEventEndDate" name="endDate" required>
+            </div>
+        </div>
+        <div id="newEventTimeFields" style="display:none;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newEventStartTime">Start-Uhrzeit (UTC)</label>
+                    <input type="time" id="newEventStartTime" name="startTime" placeholder="14:00">
+                </div>
+                <div class="form-group">
+                    <label for="newEventEndTime">End-Uhrzeit (UTC)</label>
+                    <input type="time" id="newEventEndTime" name="endTime" placeholder="18:00">
+                </div>
             </div>
         </div>
         <div class="form-group">
@@ -259,14 +313,32 @@
                 {{tripOptions}}
             </select>
         </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="editEventAllDay" onchange="toggleEditEventAllDay()">
+                Ganztägig
+            </label>
+        </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="editEventStart">Start * (UTC)</label>
-                <input type="text" id="editEventStart" name="start" required>
+                <label for="editEventStartDate">Start-Datum *</label>
+                <input type="date" id="editEventStartDate" name="startDate" required>
             </div>
             <div class="form-group">
-                <label for="editEventEnd">Ende * (UTC)</label>
-                <input type="text" id="editEventEnd" name="end" required>
+                <label for="editEventEndDate">End-Datum *</label>
+                <input type="date" id="editEventEndDate" name="endDate" required>
+            </div>
+        </div>
+        <div id="editEventTimeFields" style="display:none;">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editEventStartTime">Start-Uhrzeit (UTC)</label>
+                    <input type="time" id="editEventStartTime" name="startTime" placeholder="14:00">
+                </div>
+                <div class="form-group">
+                    <label for="editEventEndTime">End-Uhrzeit (UTC)</label>
+                    <input type="time" id="editEventEndTime" name="endTime" placeholder="18:00">
+                </div>
             </div>
         </div>
         <div class="form-group">
@@ -384,6 +456,24 @@
             document.getElementById('editTripHastickets').checked ? 'block' : 'none';
     }
 
+    // All-Day toggles
+    function toggleTripAllDay() {
+        const allDay = document.getElementById('newTripAllDay').checked;
+        document.getElementById('newTripTimeFields').style.display = allDay ? 'none' : 'block';
+        if (allDay) {
+            document.getElementById('newTripStartTime').value = '';
+            document.getElementById('newTripEndTime').value = '';
+        }
+    }
+    function toggleEditTripAllDay() {
+        const allDay = document.getElementById('editTripAllDay').checked;
+        document.getElementById('editTripTimeFields').style.display = allDay ? 'none' : 'block';
+        if (allDay) {
+            document.getElementById('editTripStartTime').value = '';
+            document.getElementById('editTripEndTime').value = '';
+        }
+    }
+
     // Event utilities
     function showCreateEventForm() {
         hideCreateTripForm(); hideEditTripForm(); hideEditEventForm();
@@ -413,6 +503,24 @@
     function toggleEditEventTickets() {
         document.getElementById('editEventTicketFields').style.display =
             document.getElementById('editEventHastickets').checked ? 'block' : 'none';
+    }
+
+    // Event All-Day toggles
+    function toggleEventAllDay() {
+        const allDay = document.getElementById('newEventAllDay').checked;
+        document.getElementById('newEventTimeFields').style.display = allDay ? 'none' : 'block';
+        if (allDay) {
+            document.getElementById('newEventStartTime').value = '';
+            document.getElementById('newEventEndTime').value = '';
+        }
+    }
+    function toggleEditEventAllDay() {
+        const allDay = document.getElementById('editEventAllDay').checked;
+        document.getElementById('editEventTimeFields').style.display = allDay ? 'none' : 'block';
+        if (allDay) {
+            document.getElementById('editEventStartTime').value = '';
+            document.getElementById('editEventEndTime').value = '';
+        }
     }
 
     // Image handling
@@ -539,17 +647,22 @@
     async function submitCreateTrip(event) {
         event.preventDefault();
         const form = document.getElementById('newTripForm');
+        const allDay = document.getElementById('newTripAllDay').checked;
         const data = {
             name: form.name.value.trim(),
             description: form.description.value.trim() || null,
-            start: form.start.value.trim(),
-            end: form.end.value.trim(),
+            allDay: allDay,
+            startDate: form.startDate.value.trim(),
+            endDate: form.endDate.value.trim(),
+            startTime: allDay ? '' : form.startTime.value.trim(),
+            endTime: allDay ? '' : form.endTime.value.trim(),
             hastickets: document.getElementById('newTripHastickets').checked ? '1' : '0',
             ticket: document.getElementById('newTripTicket').value.trim() || null,
             ticketUrl: document.getElementById('newTripTicketUrl').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
-        if (!data.start || !data.end) { showToast('Start und Ende sind erforderlich.', 'error'); return; }
+        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
+        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Reisen sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/trips', {
@@ -571,8 +684,12 @@
         document.getElementById('editEventName').value = d.name;
         document.getElementById('editEventDescription').value = d.description;
         document.getElementById('editEventTrip').value = d.trip || '';
-        document.getElementById('editEventStart').value = d.start;
-        document.getElementById('editEventEnd').value = d.end;
+        document.getElementById('editEventAllDay').checked = d.allDay;
+        document.getElementById('editEventStartDate').value = d.startDate;
+        document.getElementById('editEventEndDate').value = d.endDate;
+        document.getElementById('editEventStartTime').value = d.startTime || '';
+        document.getElementById('editEventEndTime').value = d.endTime || '';
+        document.getElementById('editEventTimeFields').style.display = d.allDay ? 'none' : 'block';
         const hasTickets = d.hastickets === '1';
         document.getElementById('editEventHastickets').checked = hasTickets;
         document.getElementById('editEventTicketFields').style.display = hasTickets ? 'block' : 'none';
@@ -600,12 +717,16 @@
         return value.startsWith('/9j/') || value.startsWith('iVBOR') || value.startsWith('UklGR');
     }
 
-    function editTrip(id, name, description, start, end, hastickets, ticket, ticketUrl) {
+    function editTrip(id, name, description, startDate, endDate, startTime, endTime, allDay, hastickets, ticket, ticketUrl) {
         document.getElementById('editTripId').value = id;
         document.getElementById('editTripName').value = name;
         document.getElementById('editTripDescription').value = description;
-        document.getElementById('editTripStart').value = start;
-        document.getElementById('editTripEnd').value = end;
+        document.getElementById('editTripAllDay').checked = allDay;
+        document.getElementById('editTripStartDate').value = startDate;
+        document.getElementById('editTripEndDate').value = endDate;
+        document.getElementById('editTripStartTime').value = startTime || '';
+        document.getElementById('editTripEndTime').value = endTime || '';
+        document.getElementById('editTripTimeFields').style.display = allDay ? 'none' : 'block';
         const hasTickets = hastickets === '1';
         document.getElementById('editTripHastickets').checked = hasTickets;
         document.getElementById('editTripTicketFields').style.display = hasTickets ? 'block' : 'none';
@@ -618,16 +739,22 @@
         event.preventDefault();
         const form = document.getElementById('editTripFormEl');
         const id = document.getElementById('editTripId').value;
+        const allDay = document.getElementById('editTripAllDay').checked;
         const data = {
             name: form.name.value.trim(),
             description: form.description.value.trim() || null,
-            start: form.start.value.trim(),
-            end: form.end.value.trim(),
+            allDay: allDay,
+            startDate: form.startDate.value.trim(),
+            endDate: form.endDate.value.trim(),
+            startTime: allDay ? '' : form.startTime.value.trim(),
+            endTime: allDay ? '' : form.endTime.value.trim(),
             hastickets: document.getElementById('editTripHastickets').checked ? '1' : '0',
             ticket: document.getElementById('editTripTicket').value.trim() || null,
             ticketUrl: document.getElementById('editTripTicketUrl').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
+        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
+        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Reisen sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/trips/' + id, {
@@ -660,12 +787,16 @@
         event.preventDefault();
         const form = document.getElementById('newEventForm');
         const imageData = document.getElementById('newEventImage').value;
+        const allDay = document.getElementById('newEventAllDay').checked;
         const data = {
             name: form.name.value.trim(),
             description: form.description.value.trim() || null,
             trip: form.trip.value || null,
-            start: form.start.value.trim(),
-            end: form.end.value.trim(),
+            allDay: allDay,
+            startDate: form.startDate.value.trim(),
+            endDate: form.endDate.value.trim(),
+            startTime: allDay ? '' : form.startTime.value.trim(),
+            endTime: allDay ? '' : form.endTime.value.trim(),
             hastickets: document.getElementById('newEventHastickets').checked ? '1' : '0',
             ticket: document.getElementById('newEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('newEventTicketUrl').value.trim() || null,
@@ -679,7 +810,8 @@
             citySlug: document.getElementById('newEventCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
-        if (!data.start || !data.end) { showToast('Start und Ende sind erforderlich.', 'error'); return; }
+        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
+        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Events sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/events', {
@@ -699,12 +831,16 @@
         const form = document.getElementById('editEventFormEl');
         const id = document.getElementById('editEventId').value;
         const imageData = document.getElementById('editEventImage').value;
+        const allDay = document.getElementById('editEventAllDay').checked;
         const data = {
             name: form.name.value.trim(),
             description: form.description.value.trim() || null,
             trip: form.trip.value || null,
-            start: form.start.value.trim(),
-            end: form.end.value.trim(),
+            allDay: allDay,
+            startDate: form.startDate.value.trim(),
+            endDate: form.endDate.value.trim(),
+            startTime: allDay ? '' : form.startTime.value.trim(),
+            endTime: allDay ? '' : form.endTime.value.trim(),
             hastickets: document.getElementById('editEventHastickets').checked ? '1' : '0',
             ticket: document.getElementById('editEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('editEventTicketUrl').value.trim() || null,
@@ -718,6 +854,8 @@
             citySlug: document.getElementById('editEventCitySlug').value.trim() || null,
         };
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
+        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
+        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Events sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/events/' + id, {
