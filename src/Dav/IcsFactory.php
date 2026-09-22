@@ -41,17 +41,6 @@ final readonly class IcsFactory
             'CLASS' => $this->classFromVisibility((int) ($event['visibility'] ?? 0)),
         ];
 
-        if ($allDay) {
-            $startDt = new DateTimeImmutable($event['startDate'], new DateTimeZone('UTC'));
-            $endDt = (new DateTimeImmutable($event['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
-            $properties['DTSTART'] = $startDt;
-            $properties['DTEND'] = $endDt;
-            $properties['TRANSP'] = 'TRANSPARENT';
-        } else {
-            $properties['DTSTART'] = new DateTimeImmutable($event['startDate'] . ' ' . $event['startTime'], new DateTimeZone('UTC'));
-            $properties['DTEND'] = new DateTimeImmutable($event['endDate'] . ' ' . $event['endTime'], new DateTimeZone('UTC'));
-        }
-
         if (!empty($event['description'])) {
             $properties['DESCRIPTION'] = (string) $event['description'];
         }
@@ -59,6 +48,7 @@ final readonly class IcsFactory
         $properties['ORGANIZER'] = 'mailto:' . $event['creatorId'] . self::UID_DOMAIN;
 
         $vevent = $vcal->add('VEVENT', $properties);
+        $this->addDateRange($vevent, $event, $allDay);
 
         foreach ($participants as $participant) {
             $vevent->add(
@@ -149,17 +139,6 @@ final readonly class IcsFactory
             'CLASS' => $this->classFromVisibility((int) ($detail['visibility'] ?? 0)),
         ];
 
-        if ($allDay) {
-            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
-            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
-            $properties['DTSTART'] = $startDt;
-            $properties['DTEND'] = $endDt;
-            $properties['TRANSP'] = 'TRANSPARENT';
-        } else {
-            $properties['DTSTART'] = new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC'));
-            $properties['DTEND'] = new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC'));
-        }
-
         if (!empty($detail['description'])) {
             $properties['DESCRIPTION'] = (string) $detail['description'];
         }
@@ -167,6 +146,7 @@ final readonly class IcsFactory
         $properties['ORGANIZER'] = 'mailto:' . $detail['creatorId'] . self::UID_DOMAIN;
 
         $vevent = $vcal->add('VEVENT', $properties);
+        $this->addDateRange($vevent, $item, $allDay);
 
         $participants = $detail['participants'] ?? [];
         foreach ($participants as $participant) {
@@ -195,22 +175,12 @@ final readonly class IcsFactory
             'SUMMARY' => (string) $item['title'],
         ];
 
-        if ($allDay) {
-            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
-            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
-            $properties['DTSTART'] = $startDt;
-            $properties['DTEND'] = $endDt;
-            $properties['TRANSP'] = 'TRANSPARENT';
-        } else {
-            $properties['DTSTART'] = new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC'));
-            $properties['DTEND'] = new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC'));
-        }
-
         if (!empty($detail['description'])) {
             $properties['DESCRIPTION'] = (string) $detail['description'];
         }
 
         $vevent = $vcal->add('VEVENT', $properties);
+        $this->addDateRange($vevent, $item, $allDay);
 
         $participants = $detail['participants'] ?? [];
         foreach ($participants as $participant) {
@@ -239,29 +209,36 @@ final readonly class IcsFactory
             'SUMMARY' => (string) $item['title'],
         ];
 
-        if ($allDay) {
-            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
-            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
-            $properties['DTSTART'] = $startDt;
-            $properties['DTEND'] = $endDt;
-            $properties['TRANSP'] = 'TRANSPARENT';
-        } else {
-            $properties['DTSTART'] = new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC'));
-            $properties['DTEND'] = new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC'));
-        }
-
         if (!empty($detail['description'])) {
             $properties['DESCRIPTION'] = (string) $detail['description'];
         }
 
         $vevent = $vcal->add('VEVENT', $properties);
-
-        if ($allDay) {
-            $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
-            $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
-        }
+        $this->addDateRange($vevent, $item, $allDay);
 
         return $vcal->serialize();
+    }
+
+    /**
+     * Setzt DTSTART/DTEND auf einem VEVENT. Ganztägige Einträge werden als
+     * VALUE=DATE mit exklusivem DTEND (End-Tag + 1 Tag) serialisiert, getaktete
+     * Einträge als UTC DATE-TIME aus Datum + Uhrzeit.
+     *
+     * @param \Sabre\VObject\Node $vevent
+     * @param array<string, mixed> $item
+     */
+    private function addDateRange(\Sabre\VObject\Node $vevent, array $item, bool $allDay): void
+    {
+        if ($allDay) {
+            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
+            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
+            $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
+            $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
+            $vevent->add('TRANSP', 'TRANSPARENT');
+        } else {
+            $vevent->add('DTSTART', new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC')));
+            $vevent->add('DTEND', new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC')));
+        }
     }
 
     /** @param array<string, mixed> $item */
