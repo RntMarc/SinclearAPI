@@ -51,7 +51,7 @@ final readonly class TravelTripRepository
              FROM TravelTrip t
              JOIN TravelRelation r ON r.tripid = t.id
              WHERE r.userid = ?
-             ORDER BY t.start DESC
+             ORDER BY t.startDate DESC, t.startTime DESC
              LIMIT ? OFFSET ?'
         );
         $dataStmt->execute([...$params, $limit, $offset]);
