@@ -9069,6 +9069,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Konflikt – der Datensatz existiert bereits (Duplikat)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /calendar/all:
     get:

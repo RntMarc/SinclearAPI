@@ -29,10 +29,12 @@ final readonly class CalendarEventRepository
             $data['description'] ?? null,
             $this->formatDate($data['startDate']),
             $this->formatDate($data['endDate']),
-            $data['startTime'] ?? null,
-            $data['endTime'] ?? null,
-            $data['allDay'] ?? 0,
-            $data['visibility'] ?? 0,
+            $this->normalizeTime($data['startTime'] ?? null),
+            $this->normalizeTime($data['endTime'] ?? null),
+            // (int): PDO bindet execute()-Parameter als String – false
+            // waere '' und loest in MySQL-Strict-Mode Fehler 1366 aus.
+            (int) ($data['allDay'] ?? 0),
+            (int) ($data['visibility'] ?? 0),
         ]);
 
         return $id;
@@ -50,7 +52,9 @@ final readonly class CalendarEventRepository
                 if (in_array($field, ['startDate', 'endDate'], true)) {
                     $value = $this->formatDate($value);
                 } elseif (in_array($field, ['startTime', 'endTime'], true)) {
-                    $value = ($value === null || $value === '') ? null : $this->formatTime($value);
+                    $value = $this->normalizeTime($value);
+                } elseif (in_array($field, ['allDay', 'visibility'], true)) {
+                    $value = (int) $value;
                 }
                 $params[] = $value;
             }
@@ -315,6 +319,17 @@ final readonly class CalendarEventRepository
         } catch (\Exception $e) {
             throw new RuntimeException('Invalid date');
         }
+    }
+
+    /**
+     * Normalisiert eine Uhrzeit auf `H:i:s`; leer/null bleibt NULL.
+     */
+    private function normalizeTime(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        return $this->formatTime((string) $value);
     }
 
     private function formatTime(string $value): string

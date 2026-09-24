@@ -151,6 +151,37 @@ Bei ganztägigen Events (`allDay: true`) werden `startTime`/`endTime` weggelasse
 }
 ```
 
+## Fehlercodes
+
+Fehlerantworten folgen dem `Error`-Schema `{"error": "<code>"}`. Das
+zusätzliche Feld `message` mit der konkreten Ursache liefert die API nur,
+wenn sie im Debug-Modus läuft; Clients sollen am Code `error` orientieren.
+Jeder abgefangene Fehler wird im Anwendungslog (`var/log/app.log`)
+geschrieben und ab Stufe `error` zusätzlich in PHPs `error_log` des
+Hostings.
+
+| Code | Status | Bedeutung |
+|------|--------|-----------|
+| `title_required` | 400 | `title` fehlt oder ist leer. |
+| `invalid_visibility` | 400 | `visibility` ausserhalb 0–2. |
+| `date_required` | 400 | Ganztägiges Event ohne `startDate`/`endDate`. |
+| `time_required` | 400 | Getaktetes Event ohne Datum oder Uhrzeit. |
+| `time_forbidden` | 400 | `allDay: true` zusammen mit `startTime`/`endTime`. |
+| `invalid_date` | 400 | Datum nicht im Format `YYYY-MM-DD`. |
+| `invalid_time` | 400 | Uhrzeit nicht im Format `HH:MM:SS`. |
+| `invalid_time_range` | 400 | Ende liegt nicht nach Beginn; beim Feed unvollständiger Zeitraum. |
+| `invalid_datetime` | 400 | Datetime-Format eines Feed-Eintrags ungültig. |
+| `invalid_type` | 400 | Unbekannter Wert in `types` des Feeds. |
+| `invalid_value` | 400 | Wert passt nicht ins Spaltenformat (z. B. ungültige Zeitangabe). |
+| `invalid_reference` | 400 | Referenz existiert nicht (Fremdschlüsselverletzung). |
+| `userId_required` | 400 | `POST .../participants` ohne `userId`. |
+| `no_fields_to_update` | 400 | `PUT /calendar/{id}` ohne änderbare Felder. |
+| `unauthorized` | 401 | Kein gültiges Token. |
+| `forbidden` | 403 | Keine Berechtigung (weder Ersteller noch Teilnehmer). |
+| `event_not_found` | 404 | Event existiert nicht oder ist für den Nutzer nicht sichtbar. |
+| `conflict` | 409 | Datensatz existiert bereits (Duplikat). |
+| `internal_error` | 500 | Unerwarteter Fehler; Details stehen im Serverlog. |
+
 ## CalDAV (read-only)
 
 Die API stellt eine lesende CalDAV-Schnittstelle unter `/api/dav/` bereit,

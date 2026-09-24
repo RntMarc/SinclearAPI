@@ -4,7 +4,9 @@ namespace Sinclear\Api\Controllers;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Log\LoggerInterface;
 use Sinclear\Api\Application\ResponseFactory;
+use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
@@ -17,11 +19,15 @@ final readonly class CalendarEventController
         'Invalid datetime' => ['invalid_datetime', 400],
         'Invalid date' => ['invalid_date', 400],
         'Invalid time' => ['invalid_time', 400],
+        'Invalid time range' => ['invalid_time_range', 400],
+        'Authentication required' => ['unauthorized', 401],
     ];
 
     public function __construct(
         private CalendarEventService $calendarService,
         private CalendarFeedService $calendarFeedService,
+        private LoggerInterface $logger,
+        private Settings $settings,
     ) {}
 
     public function create(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -95,7 +101,7 @@ final readonly class CalendarEventController
                 'visibility' => $visibility,
                 'participants' => $participants,
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
 
@@ -201,7 +207,7 @@ final readonly class CalendarEventController
         try {
             $event = $this->calendarService->update($args['id'], $user->id, $data);
             return ResponseFactory::json(['data' => $event], 200, $response);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
     }
@@ -213,7 +219,7 @@ final readonly class CalendarEventController
         try {
             $this->calendarService->delete($args['id'], $user->id);
             return ResponseFactory::noContent($response);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
     }
@@ -225,7 +231,7 @@ final readonly class CalendarEventController
         try {
             $event = $this->calendarService->get($args['id'], $user->id);
             return ResponseFactory::json(['data' => $event], 200, $response);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
     }
@@ -265,7 +271,11 @@ final readonly class CalendarEventController
             }
         }
 
-        $result = $this->calendarService->listVisible($user->id, $start, $end, $page, $limit);
+        try {
+            $result = $this->calendarService->listVisible($user->id, $start, $end, $page, $limit);
+        } catch (\Throwable $e) {
+            return $this->errorResponse($e, $response);
+        }
         return ResponseFactory::paginated($result['data'], $result['meta'], $response);
     }
 
@@ -310,7 +320,7 @@ final readonly class CalendarEventController
 
         try {
             $feed = $this->calendarFeedService->buildFeed($user->id, $start, $end, $types);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
 
@@ -330,7 +340,7 @@ final readonly class CalendarEventController
         try {
             $result = $this->calendarService->addParticipant($args['id'], $user->id, $participantId);
             return ResponseFactory::json(['data' => $result], 201, $response);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
     }
@@ -342,7 +352,7 @@ final readonly class CalendarEventController
         try {
             $this->calendarService->removeParticipant($args['id'], $user->id, $args['userId']);
             return ResponseFactory::noContent($response);
-        } catch (\RuntimeException $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e, $response);
         }
     }
@@ -356,9 +366,46 @@ final readonly class CalendarEventController
         return $user;
     }
 
-    private function errorResponse(\RuntimeException $e, ResponseInterface $response): ResponseInterface
+    private function errorResponse(\Throwable $e, ResponseInterface $response): ResponseInterface
     {
-        $mapped = self::ERROR_MAP[$e->getMessage()] ?? ['internal_error', 500];
-        return ResponseFactory::json(['error' => $mapped[0]], $mapped[1], $response);
+        $mapped = $e instanceof \PDOException
+            ? self::mapDbError($e)
+            : (self::ERROR_MAP[$e->getMessage()] ?? ['internal_error', 500]);
+        [$code, $status] = $mapped;
+
+        $context = [
+            'exception' => $e,
+            'errorCode' => $code,
+            'status' => $status,
+        ];
+        if ($status >= 500) {
+            $this->logger->error('Calendar request failed: ' . $e->getMessage(), $context);
+        } else {
+            $this->logger->warning('Calendar request rejected: ' . $e->getMessage(), $context);
+        }
+
+        $payload = ['error' => $code];
+        if ($this->settings->app['debug']) {
+            $payload['message'] = $e->getMessage();
+        }
+        return ResponseFactory::json($payload, $status, $response);
+    }
+
+    /**
+     * Uebersetzt einen PDO-Fehler in einen passenden API-Fehlercode.
+     * 1452 = Fremdschluessel verletzt (z.B. unbekannter Teilnehmer),
+     * 1062 = Duplikat, 1264/1265/1292/1366 = Wert passt nicht ins Spaltenformat.
+     */
+    private static function mapDbError(\PDOException $e): array
+    {
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        return match (true) {
+            $driverCode === 1452 => ['invalid_reference', 400],
+            $driverCode === 1062 => ['conflict', 409],
+            in_array($driverCode, [1264, 1265, 1292, 1366], true) => ['invalid_value', 400],
+            str_starts_with((string) $e->getCode(), '22') => ['invalid_value', 400],
+            default => ['internal_error', 500],
+        };
     }
 }

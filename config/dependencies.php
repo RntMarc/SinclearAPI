@@ -4,6 +4,7 @@ namespace Sinclear\Api\Application;
 
 use GuzzleHttp\Client;
 use Psr\Http\Client\ClientInterface;
+use Monolog\Handler\ErrorLogHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
 use Monolog\Processor\UidProcessor;
@@ -174,6 +175,15 @@ return [
         $logger->pushHandler(new StreamHandler(
             __DIR__ . '/../var/log/app.log',
             $logLevel,
+        ));
+        // ERROR-Eintraege zusaetzlich nach PHPs error_log (Hosting-Log)
+        // spiegeln, damit Fehler auch ohne Zugriff auf var/log/app.log
+        // sichtbar sind.
+        $logger->pushHandler(new ErrorLogHandler(
+            ErrorLogHandler::OPERATING_SYSTEM,
+            Logger::ERROR,
+            true,
+            true,
         ));
 
         return $logger;
