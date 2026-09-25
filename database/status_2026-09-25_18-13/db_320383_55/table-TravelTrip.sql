@@ -11,14 +11,18 @@ CREATE TABLE IF NOT EXISTS `TravelTrip` (
   `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
-  `start` datetime NOT NULL,
-  `end` datetime NOT NULL,
+  `startDate` date NOT NULL,
+  `endDate` date NOT NULL,
+  `startTime` time DEFAULT NULL,
+  `endTime` time DEFAULT NULL,
+  `allDay` tinyint(1) NOT NULL DEFAULT '1',
   `hastickets` enum('1','0') COLLATE utf8mb4_unicode_ci DEFAULT '0',
   `ticket` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ticketUrl` text COLLATE utf8mb4_unicode_ci,
   `forumId` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_trip_forum` (`forumId`),
+  KEY `idx_trip_time` (`startDate`,`endDate`),
   CONSTRAINT `TravelTrip_ibfk_1` FOREIGN KEY (`forumId`) REFERENCES `Forum` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

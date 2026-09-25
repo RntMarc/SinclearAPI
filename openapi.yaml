@@ -20,6 +20,13 @@ components:
       in: header
       name: X-Centrifugo-Proxy-Key
       description: Shared Secret für Centrifugo Proxy-Endpoints (intern, kein JWT)
+    LaMetricToken:
+      type: apiKey
+      in: query
+      name: token
+      description: >-
+        Persönlicher LaMetric-Token (64 Hex-Zeichen), gültig 1 Jahr. Wird von der
+        LaMetric Time als Query-Parameter an den Poll-Endpunkt gesendet.
 
   schemas:
     Error:
@@ -4207,6 +4214,71 @@ components:
         meta:
           $ref: '#/components/schemas/PaginationMeta'
 
+    LaMetricToken:
+      type: object
+      required: [id, label, token, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Token-ID
+        label:
+          type: string
+          description: Bezeichnung des Tokens (z.B. "Wohnzimmer")
+        token:
+          type: string
+          description: >-
+            Der vollständige Token im Klartext. Anders als bei MCP-/DAV-Tokens
+            kann er später erneut abgerufen werden, um weitere Uhren/Apps zu
+            verknüpfen.
+        expiresAt:
+          type: string
+          format: date-time
+          description: Ablaufzeitpunkt (1 Jahr nach Erstellung)
+        lastUsedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Letzter erfolgreicher Abruf durch eine Uhr (auf 1 Stunde gedrosselt)
+        createdAt:
+          type: string
+          format: date-time
+          description: Erstellungszeitpunkt
+
+    LaMetricTokenResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          oneOf:
+            - $ref: '#/components/schemas/LaMetricToken'
+            - type: 'null'
+          description: Das Token des Nutzers oder null, wenn noch keines existiert
+
+    LaMetricFrame:
+      type: object
+      required: [text]
+      properties:
+        icon:
+          type: string
+          description: Icon-ID oder Base64-Daten (optional)
+        text:
+          type: string
+          description: Anzuzeigender Text (zu langer Text läuft durch)
+        duration:
+          type: integer
+          description: Anzeigedauer in Millisekunden (max. 10000, nur ohne Scrollen)
+
+    LaMetricFrames:
+      type: object
+      required: [frames]
+      properties:
+        frames:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/LaMetricFrame'
+
     DavToken:
       type: object
       required: [id, label, expiresAt, createdAt]
@@ -5621,6 +5693,81 @@ components:
           description: Abdeckungsstatus (full, auto)
 
 paths:
+  /lametric/token:
+    get:
+      summary: LaMetric-Token abrufen
+      description: >
+        Gibt das persönliche LaMetric-Token des Nutzers inklusive Klartext zurück,
+        damit es für weitere Uhren/Apps verwendet werden kann. Ist noch kein Token
+        vorhanden, ist `token` null. Genau ein Token pro Nutzer, gültig 1 Jahr.
+      tags: [LaMetric]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Vorhandenes Token oder null
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaMetricTokenResponse'
+    put:
+      summary: LaMetric-Token erzeugen oder ersetzen
+      description: >
+        Erzeugt ein neues Token bzw. ersetzt das bestehende. Ein Nutzer besitzt
+        höchstens ein LaMetric-Token. Der Klartext-Token ist im Response enthalten
+        und wird in der LaMetric-App als Query-Parameter `token` konfiguriert.
+      tags: [LaMetric]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                  maxLength: 100
+                  description: Optionale Bezeichnung (Standard "LaMetric Time")
+      responses:
+        '200':
+          description: Neu erzeugtes Token (jederzeit erneut abrufbar)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaMetricTokenResponse'
+    delete:
+      summary: LaMetric-Token widerrufen
+      description: Löscht das LaMetric-Token des Nutzers.
+      tags: [LaMetric]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Token gelöscht (auch wenn keines existierte)
+
+  /lametric/notification:
+    get:
+      summary: LaMetric Notification-App – Zusammenfassung ungelesener Benachrichtigungen
+      description: >
+        Poll-Endpunkt für die LaMetric-Time-Indicator-Notification-App. Liefert
+        LaMetric-Frames im von der Uhr erwarteten JSON-Format. Ausgegeben wird eine
+        gebündelte Zusammenfassung aller ungelesenen Benachrichtigungen (keine
+        Nachrichteninhalte), z.B. "10 neue Chats, 3 neue Foren-Beiträge und 1 neue
+        Reise". Antwortet immer mit HTTP 200; bei fehlendem oder ungültigem Token
+        mit einem Fehler-Frame.
+      tags: [LaMetric]
+      security:
+        - LaMetricToken: []
+      responses:
+        '200':
+          description: LaMetric-Frames mit der Zusammenfassung oder Fehler-Frame
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LaMetricFrames'
+
   /mcp:
     get:
       summary: MCP-Endpunkt – SSE-Stream öffnen

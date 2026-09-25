@@ -19,6 +19,7 @@ use Sinclear\Api\Controllers\CentrifugoProxyController;
 use Sinclear\Api\Controllers\ChatController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
+use Sinclear\Api\Controllers\LaMetricController;
 use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\ExploreController;
 use Sinclear\Api\Controllers\FeedbackController;
@@ -69,6 +70,7 @@ use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
+use Sinclear\Api\Middleware\LaMetricTokenMiddleware;
 use Sinclear\Api\Middleware\McpApiKeyMiddleware;
 use Sinclear\Api\Middleware\UserActivityMiddleware;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
@@ -105,6 +107,7 @@ use Sinclear\Api\Repository\StoryRepository;
 use Sinclear\Api\Repository\PhotoRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
+use Sinclear\Api\Repository\LaMetricTokenRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
@@ -140,6 +143,8 @@ use Sinclear\Api\Services\NominatimRateLimiter;
 use Sinclear\Api\Services\ProfileService;
 use Sinclear\Api\Services\Mcp\DocumentationProvider;
 use Sinclear\Api\Services\Mcp\McpServer;
+use Sinclear\Api\Services\LaMetricSummaryService;
+use Sinclear\Api\Services\LaMetricTokenService;
 use Sinclear\Api\Services\McpApiKeyService;
 use Sinclear\Api\Services\DavTokenService;
 use Sinclear\Api\Services\RecipeService;
@@ -546,6 +551,12 @@ return [
     McpApiKeyRepository::class => autowire(),
     McpApiKeyService::class => autowire(),
     McpApiKeyMiddleware::class => autowire(),
+
+    LaMetricController::class => autowire(),
+    LaMetricTokenRepository::class => autowire(),
+    LaMetricTokenService::class => autowire(),
+    LaMetricTokenMiddleware::class => autowire(),
+    LaMetricSummaryService::class => autowire(),
 
     DavTokenRepository::class => autowire(),
     DavTokenService::class => autowire(),

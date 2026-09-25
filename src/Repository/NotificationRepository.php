@@ -119,6 +119,29 @@ final readonly class NotificationRepository
         }, $rows);
     }
 
+    /**
+     * Zählt ungelesene Benachrichtigungen gruppiert nach Typ.
+     *
+     * @return array<string, int> Typ => Anzahl
+     */
+    public function countUnreadGroupedByType(string $userId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT type, COUNT(*) AS count
+             FROM Notification
+             WHERE userId = ? AND isRead = 0
+             GROUP BY type'
+        );
+        $stmt->execute([$userId]);
+
+        $counts = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $counts[(string) $row['type']] = (int) $row['count'];
+        }
+
+        return $counts;
+    }
+
     public function markRead(string $userId, array $ids): void
     {
         if ($ids === []) {

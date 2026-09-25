@@ -12,14 +12,17 @@ CREATE TABLE IF NOT EXISTS `CalendarEvent` (
   `creatorId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `startTime` datetime NOT NULL,
-  `endTime` datetime NOT NULL,
+  `startDate` date NOT NULL,
+  `endDate` date NOT NULL,
+  `startTime` time DEFAULT NULL,
+  `endTime` time DEFAULT NULL,
+  `allDay` tinyint(1) NOT NULL DEFAULT '0',
   `visibility` tinyint(1) NOT NULL DEFAULT '0',
   `createdAt` datetime(3) NOT NULL,
   `updatedAt` datetime(3) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_calendar_creator` (`creatorId`),
-  KEY `idx_calendar_time` (`startTime`,`endTime`)
+  KEY `idx_calendar_time` (`startDate`,`endDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

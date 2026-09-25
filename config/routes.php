@@ -15,6 +15,7 @@ use Sinclear\Api\Controllers\ForumController;
 use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
+use Sinclear\Api\Controllers\LaMetricController;
 use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\NotificationController;
@@ -34,6 +35,7 @@ use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
+use Sinclear\Api\Middleware\LaMetricTokenMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
 use Sinclear\Api\Middleware\McpApiKeyMiddleware;
 use Slim\App;
@@ -57,6 +59,19 @@ return function (App $app): void {
         $group->get('/keys', [McpController::class, 'listKeys']);
         $group->delete('/keys/{id}', [McpController::class, 'deleteKey']);
     })->add($container->get(AuthenticationMiddleware::class));
+
+    // LaMetric Time – Token-Verwaltung (JWT auth required)
+    $app->group('/lametric', function (RouteCollectorProxy $group) {
+        $group->get('/token', [LaMetricController::class, 'getToken']);
+        $group->put('/token', [LaMetricController::class, 'saveToken']);
+        $group->delete('/token', [LaMetricController::class, 'deleteToken']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    // LaMetric Time – Notification-App (public, Token als Query-Parameter)
+    $app->get('/lametric/notification', [LaMetricController::class, 'notification'])
+        ->add($container->get(LaMetricTokenMiddleware::class));
+    $app->get('/lametric/notification/', [LaMetricController::class, 'notification'])
+        ->add($container->get(LaMetricTokenMiddleware::class));
 
     $app->group('/auth', function (RouteCollectorProxy $group) use ($container) {
         $group->group('/login', function (RouteCollectorProxy $login) use ($container) {
