@@ -142,13 +142,14 @@ class LaMetricIntegrationTest extends TestCase
     public function testSummaryBuildsSingleFrame(): void
     {
         $insert = $this->db->prepare(
-            'INSERT INTO Notification (id, userId, type, isRead, createdAt) VALUES (?, ?, ?, 0, NOW(3))'
+            'INSERT INTO Notification (id, userId, type, title, body, isRead, createdAt)
+             VALUES (?, ?, ?, ?, ?, 0, NOW(3))'
         );
         for ($i = 0; $i < 10; $i++) {
-            $insert->execute(['c' . $i, 'user-6', 'direct_message']);
+            $insert->execute(['c' . $i, 'user-6', 'direct_message', 'Neue Nachricht', '']);
         }
-        $insert->execute(['r1', 'user-6', 'trip_user_added']);
-        $insert->execute(['read1', 'user-6', 'forum_post']);
+        $insert->execute(['r1', 'user-6', 'trip_user_added', 'Du wurdest zu einer Reise hinzugefügt', '']);
+        $insert->execute(['read1', 'user-6', 'forum_post', 'Neuer Beitrag im Forum', '']);
         $this->db->exec("UPDATE Notification SET isRead = 1 WHERE id = 'read1'");
 
         $service = new LaMetricSummaryService(new NotificationRepository($this->db));
