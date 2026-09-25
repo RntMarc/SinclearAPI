@@ -127,25 +127,6 @@ final readonly class ChatController
         return ResponseFactory::json($result, 200, $response);
     }
 
-    public function sendMessage(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
-    {
-        $user = $this->requireUser($request);
-        $conversationId = $args['id'];
-        $body = $request->getParsedBody();
-
-        if (!$this->policy->canAccess($user, $conversationId)) {
-            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
-        }
-
-        try {
-            $result = $this->service->sendMessage($user->id, $conversationId, $body);
-        } catch (\RuntimeException $e) {
-            return $this->errorResponse($e->getMessage(), $response);
-        }
-
-        return ResponseFactory::json(['data' => $result], 201, $response);
-    }
-
     public function editMessage(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);

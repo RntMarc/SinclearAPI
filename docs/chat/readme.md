@@ -5,11 +5,11 @@
 ## Architektur-Überblick
 
 ```
-Sender-Client ──REST──► PHP-API (persist, validate)
-                         │ ──publish──► Centrifugo (chat.sinclear.de) ──WS/SSE──► Empfänger-Clients
-                         │ ──presence──► Centrifugo (Push-Suppression)
+Client ──WS publish (message)──► Centrifugo ──Publish-Proxy──► PHP (persist, validate, notify)
+                                                               │ ──presence──► Centrifugo (Push-Suppression)
+Centrifugo ──broadcast message_created──► alle Subscriber (inkl. Sender)
 Centrifugo ──Subscribe-Proxy──► POST /api/v2/centrifugo/subscribe (PHP prüft ChatParticipant)
-Client ──WS publish (typing)──► Centrifugo ──Publish-Proxy──► PHP (validiert) ──► Broadcast
+Client ──WS publish (typing/reaction)──► Centrifugo ──Publish-Proxy──► PHP (validiert) ──► Broadcast
 ```
 
 Die API ist die Source of Truth. Centrifugo ist Transport, Recovery und Presence – kein Persistenz-Backend.
@@ -19,7 +19,7 @@ Die API ist die Source of Truth. Centrifugo ist Transport, Recovery und Presence
 | Thema | Entscheidung | Begründung |
 |---|---|---|
 | **Persistenz** | API-DB bleibt Source of Truth | 90-Tage-Retention, Unread-Counts, Moderation, Notifications funktionieren weiter; Centrifugo ist nur Transport/Recovery |
-| **Sende-Flow** | REST + Server-API Publish | Idiomatisch (Centrifugo Design Doku), graceful degradation, Response enthält finale Message |
+| **Sende-Flow** | WS publish über den Publish-Proxy (kein REST) | Client nutzt den bereits offenen Kanal; ein Broadcast pro Nachricht; kein zusätzlicher HTTP-Roundtrip. Der Proxy persistiert und liefert das `message_created`-Event zurück |
 | **Push-Suppression** | Conversation-Presence | `presence(chat:<convId>)` prüft, ob Empfänger den Chat *gerade offen* hat (vs. bisher: App-weit aktiv) |
 | **PHP-Client** | Eigene schlanke Implementierung | Guzzle ^7.9 bereits im Projekt; keine neue Dependency; Shared Hosting bleibt ausreichend |
 | **Hosting Clients** | Direkt an `chat.sinclear.de` (WS/SSE) | PHP-Server hält **nie** lange Verbindungen |
@@ -66,7 +66,7 @@ Response 200:
 |---|---|
 | `ChatConversation` | Konversation (type: direct/group), `name` (optional), `image` (optional, base64) |
 | `ChatParticipant` | Teilnehmer + `lastReadSeq` (DEFAULT 0) + `lastSeenAt` (NULL) |
-| `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor), `clientId` (Idempotenz), `senderId`, `type`, `content`, `payload`, `editedAt`, `deletedAt` |
+| `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor), `clientId` (Idempotenz), `senderId`, `type`, `content`, `payload`, `replyToMessageId` (optionaler Zitat-Verweis, Self-FK ON DELETE SET NULL), `editedAt`, `deletedAt` |
 | `MessageReaction` | Reaktion (`emoji`) eines Nutzers auf eine Nachricht; UNIQUE `(messageId, userId, emoji)`, FK auf `DirectMessage`/`User` (ON DELETE CASCADE) |
 | `TravelChat` | Verknüpfung von Gruppenchat mit Reise oder Event |
 
@@ -176,6 +176,8 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "content": "Hallo!",
   "payload": null,
   "clientId": "client-123",
+  "replyToMessageId": null,
+  "replyTo": null,
   "editedAt": null,
   "deleted": false,
   "reactions": [
@@ -195,6 +197,8 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 - `content`: Leerstring wenn `deleted == true`
 - `payload`: null wenn `deleted == true` oder `type == text`
 - `sender`: Engeschachteltes Objekt mit Absender-Details (aus User-Tabelle)
+- `replyToMessageId`: ID der beantworteten Nachricht (null, wenn keine Antwort)
+- `replyTo`: eingebettetes Zitat (`id`, `seq`, `senderId`, `sender`, `type`, `content`, `deleted`) – Text auf 150 Zeichen gekürzt (`…`); `deleted: true` mit leerem `content`, wenn die Elternnachricht gelöscht wurde; null ohne Antwort oder nach hartem Löschen der Elternnachricht (Cron)
 - `reactions`: aggregierte Reaktionen (siehe [Reaktionen](#reaktionen)); leer bei gelöschten Nachrichten. Das eigene Reagieren leitet der Client durch Abgleich der eigenen User-ID mit `users` ab (kein eigenes `me`-Feld).
 
 ## REST-API
@@ -210,17 +214,18 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | POST | `/chat/conversations` | 1:1-Konversation öffnen (idempotent: get-or-create) → 200 (bestehend) oder 201 (neu) |
 | GET | `/chat/conversations/{id}` | Konversation + Teilnehmer (lastReadSeq, otherLastReadSeq) |
 | GET | `/chat/conversations/{id}/messages?before=<seq>&limit=50` | History (Cursor `before`, max 100) |
-| POST | `/chat/conversations/{id}/messages` | Senden (`{clientId, type, content, payload?}`) |
 | PATCH | `/chat/messages/{id}` | Bearbeiten (nur eigener, 10 Min-Fenster) |
 | DELETE | `/chat/messages/{id}` | Löschen für alle (Platzhalter "Nachricht gelöscht") |
 | POST | `/chat/conversations/{id}/read` | Lesestand setzen (`{seq}`) |
+
+> **Senden läuft nicht über REST.** Es gibt bewusst keinen `POST /chat/conversations/{id}/messages`: Der Client publiziert Nachrichten (und Antworten) über den bereits offenen Centrifugo-Kanal (siehe [Nachrichten via Publish-Proxy](#nachrichten-via-publish-proxy)).
 
 ### Interne Proxy-Endpoints (von Centrifugo aufgerufen, kein JWT)
 
 | Methode | Pfad | Security | Zweck |
 |---|---|---|---|
 | POST | `/centrifugo/subscribe` | `X-Centrifugo-Proxy-Key` + HTTPS | Subscribe-Validierung (ChatParticipant) |
-| POST | `/centrifugo/publish` | `X-Centrifugo-Proxy-Key` + HTTPS | Typing- und Reaktions-Validierung (Participant + Rate-Limit) |
+| POST | `/centrifugo/publish` | `X-Centrifugo-Proxy-Key` + HTTPS | Nachrichten-, Typing- und Reaktions-Validierung (Participant + Rate-Limit) |
 
 **Security:** Kein JWT – gesichert via Shared Secret (`CENTRIFUGO_PROXY_KEY`) in `X-Centrifugo-Proxy-Key` Header (Centrifugo sendet via `http.static_headers`). HTTPS erzwungen durch vorgeschaltetes `RequireHttpsMiddleware`; die Shared-Secret-Prüfung liegt in `CentrifugoProxyMiddleware`.
 
@@ -248,16 +253,23 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 
 ### Senden einer Nachricht
 
+Der Versand läuft vollständig über den Publish-Proxy (kein REST):
+
 ```
-1. Client sendet POST /chat/conversations/{id}/messages
-2. PHP-API: Validierung (Content, Rate-Limit 20/min, Idempotenz via clientId)
-3. PHP-API: Persistenz in DirectMessage (seq wird automatisch zugewiesen)
-4. PHP-API: CentrifugoServer-API publish → chat:{conversationId} (message_created-Event)
+1. Client: sub.publish({ message: { clientId, type: "text", content, replyToMessageId? } })
+2. Centrifugo ruft POST /centrifugo/publish
+3. PHP-API: Participant-Check + Validierung (Content, Rate-Limit 20/min, Idempotenz via clientId, Reply-Ziel)
+4. PHP-API: Persistenz in DirectMessage (seq wird automatisch zugewiesen)
 5. PHP-API: Presence-Check → Empfänger im Channel? → suppressPush
 6. PHP-API: Notification erstellen (in-App immer, Push nur wenn nicht online)
-7. PHP-API: Response an Sender mit finalem Message-Objekt
-8. Centrifugo: Distribuiert an alle abonnierten Clients (WS/SSE)
+7. PHP-API: antwortet
+   { "result": { "data": { "type": "message_created", "message": { ... } } } }
+8. Centrifugo broadcastet das message_created-Event an alle Subscriber (inkl. Sender)
 ```
+
+- Der Proxy-Broadcast ist die **einzige** Publikation: Der Server ruft `sendMessage(..., publishToCentrifugo: false)` auf, damit kein Doppel-Event entsteht.
+- Nicht-ephemer (kein `skip_history`): Die Nachricht landet in der Centrifugo-History und wird bei Recovery nachgeliefert.
+- Die REST-Response entfällt; der Sender erhält seine eigene Nachricht über das Broadcast-Event (Client upsertet per `id`).
 
 ### Empfangen von Nachrichten
 
@@ -268,6 +280,30 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 4. Centrifugo ruft POST /centrifugo/subscribe (PHP prüft ChatParticipant)
 5. Client empfängt Echtzeit-Events (message_created, message_edited, message_deleted, read, reaction_updated)
 ```
+
+## Nachrichten via Publish-Proxy
+
+```
+1. Client sendet via Centrifugo WS publish
+   Channel: chat:{conversationId}
+   Data: { "message": { "clientId": "...", "type": "text", "content": "...", "replyToMessageId": "<uuid|null>" } }
+2. Centrifugo ruft POST /centrifugo/publish
+3. PHP-API: Participant-Check + Rate-Limit (20/min) + Persistenz + Notifications
+4. PHP-API: antwortet { "result": { "data": { "type": "message_created", "message": { ... } } } }
+5. Centrifugo broadcastet an alle Subscriber (inkl. Sender)
+```
+
+**Rate-Limit:** 20 Nachrichten pro Minute pro Nutzer (Key: `chat_send:{userId}`).
+
+**Idempotenz:** `clientId` (UNIQUE `(senderId, clientId)`); ein Retry liefert die bestehende Nachricht erneut als `message_created` (Client upsertet per `id`).
+
+**Antwort-Ziel:** Ist `replyToMessageId` gesetzt, muss die Nachricht existieren und zur Konversation gehören, sonst `400 reply_not_found`.
+
+**Fehler:** `content_required`, `content_too_long`, `invalid_type`, `invalid_payload`, `reply_not_found` → HTTP 400; Nicht-Teilnehmer → 403; Rate-Limit → 429.
+
+**Unbekanntes Payload:** Ein `data`-Objekt ohne `message`, `reaction` und ohne `typing` wird mit `400 invalid_publish` abgelehnt (nicht als Typing fehlinterpretiert).
+
+**Proxy-Timeout:** Der Publish-Proxy-Timeout ist auf **10s** gesetzt (Centrifugo `channel.proxy.publish.timeout`), da der Sendepfad DB-Write + Presence + synchrone Push-Sends umfasst (Default 1s reicht nicht).
 
 ## Typing via Publish-Proxy
 
@@ -316,13 +352,37 @@ Reaktionen laufen – wie Typing – vollständig über den **Publish-Proxy**, n
 - **Persistenz:** Tabelle `MessageReaction`; die Summary wird in `DirectMessageService::formatMessage()`
   in jede Nachricht eingebettet (Batch-Load in `getMessages`, kein N+1).
 
+## Antworten
+
+Eine Antwort ist eine normale Nachricht mit `replyToMessageId`. Das Zitat wird
+serverseitig in `DirectMessageService::formatMessage()` als `replyTo` eingebettet
+(analog `reactions`) und reitet dadurch im `message_created`-Event mit – kein
+zusätzlicher Endpoint, kein eigener Event-Typ.
+
+```
+1. Client: sub.publish({ message: { clientId, content, replyToMessageId: "<parent-uuid>" } })
+2. Centrifugo → POST /centrifugo/publish → PHP: Persistenz + Embed
+3. PHP antwortet { result: { data: { type: "message_created",
+      message: { ..., replyToMessageId, replyTo: { id, seq, senderId, sender, type, content, deleted } } } } }
+4. Centrifugo broadcastet an alle Subscriber
+```
+
+- **Zitat-Kürzung:** `replyTo.content` wird auf `REPLY_PREVIEW_LENGTH = 150` Zeichen gekürzt (`…`). Der Client begrenzt zusätzlich auf zwei Zeilen.
+- **Gelöschte Elternnachricht (soft):** `replyTo.deleted = true`, `content = ''`; der Client zeigt einen Platzhalter. Beim Löschen werden die Reaktionen der Elternnachricht entfernt, der Verweis der Antworten bleibt.
+- **Hart gelöschte Elternnachricht (90-Tage-Cron):** Self-FK `ON DELETE SET NULL` → `replyToMessageId`/`replyTo` werden `null`; die Antwort bleibt bestehen.
+- **Live-Aktualisierung:** Wird die Elternnachricht bearbeitet oder gelöscht, ziehen Clients bereits angezeigte Zitate beim `message_edited`/`message_deleted`-Event inline mit (Client-seitig, kein API-Change).
+- **Sprung zur Nachricht:** Der Client lädt bei Bedarf älteren Verlauf per `before`-Cursor nach und scrollt zur Elternnachricht (`replyTo.seq`).
+- **Validierung:** `replyToMessageId` muss existieren und zur selben Konversation gehören (`reply_not_found`), sonst HTTP 400.
+
 ## Echtzeit-Events
 
 Clients empfangen folgende Events über den Centrifugo-Channel `chat:<conversationId>`:
 
 ### `message_created`
 
-Neue Nachricht. Enthält das vollständige `DirectMessage`-Objekt (gleiches Schema wie REST-Response).
+Neue Nachricht (auch Antworten). Enthält das vollständige `DirectMessage`-Objekt
+(inkl. `replyToMessageId`/`replyTo`). Dieser Event wird über den Publish-Proxy
+ausgeliefert (siehe [Nachrichten via Publish-Proxy](#nachrichten-via-publish-proxy)).
 
 ```json
 {
@@ -331,7 +391,8 @@ Neue Nachricht. Enthält das vollständige `DirectMessage`-Objekt (gleiches Sche
     "id": "uuid", "seq": 42, "conversationId": "uuid",
     "senderId": "uuid", "sender": {"id": "...", "displayName": "...", "avatar": "..."},
     "type": "text", "content": "Hallo!", "payload": null,
-    "clientId": "...", "editedAt": null, "deleted": false, "createdAt": "2026-..."
+    "clientId": "...", "replyToMessageId": null, "replyTo": null,
+    "editedAt": null, "deleted": false, "createdAt": "2026-..."
   }
 }
 ```
@@ -471,6 +532,8 @@ aggregierte Reaktions-Summary der betroffenen Nachricht. Wird mit
 | Rate-Limit Reaktion | 60 Events/Minute pro Nutzer (Key: `chat_reaction:{userId}`) |
 | Emoji | Nur Allowlist (normalisiert), sonst `invalid_emoji` |
 | Reaktion auf gelöschte Nachricht | Abgelehnt (`message_deleted`) |
+| Antwort-Ziel | `replyToMessageId` muss in derselben Konversation existieren, sonst `reply_not_found` |
+| Zitat-Kürzung | `REPLY_PREVIEW_LENGTH = 150` Zeichen (`…`) |
 | Edit-Fenster | 10 Minuten nach `createdAt` (UTC) |
 | Delete | Kein Zeitfenster, idempotent |
 | Idempotenz | `clientId` → UNIQUE `(senderId, clientId)` |
@@ -561,4 +624,6 @@ Die Migration `20260916120000_drop_chat_realtime_tables.sql` löscht:
 - **Paket:** `centrifuge` 0.20.1 (pub.dev)
 - **Token-Refresh:** via `getToken` Callback → `GET /chat/centrifugo/token`
 - **Subscription:** `Subscription` auf `chat:<conversationId>`
+- **Nachrichten/Antworten:** Client-seitiges Publish mit `{ message: { clientId, type, content, replyToMessageId? } }`
 - **Typing:** Client-seitiges Publish mit `{ typing: bool }`
+- **Reaktionen:** Client-seitiges Publish mit `{ reaction: { messageId, emoji, add } }`

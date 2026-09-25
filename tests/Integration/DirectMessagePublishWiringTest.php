@@ -115,6 +115,7 @@ class DirectMessagePublishWiringTest extends TestCase
                 content text NOT NULL,
                 payload json DEFAULT NULL,
                 clientId varchar(64) DEFAULT NULL,
+                replyToMessageId varchar(191) DEFAULT NULL,
                 editedAt datetime(3) DEFAULT NULL,
                 deletedAt datetime(3) DEFAULT NULL,
                 deletedBy varchar(191) DEFAULT NULL,
@@ -122,8 +123,10 @@ class DirectMessagePublishWiringTest extends TestCase
                 UNIQUE KEY uk_dm_seq (seq),
                 KEY idx_dm_conversation_seq (conversationId, seq),
                 KEY idx_dm_sender (senderId),
+                KEY idx_dm_reply_to (replyToMessageId),
                 CONSTRAINT fk_dm_conversation FOREIGN KEY (conversationId) REFERENCES ChatConversation (id) ON DELETE CASCADE,
-                CONSTRAINT fk_dm_sender FOREIGN KEY (senderId) REFERENCES User (id) ON DELETE CASCADE
+                CONSTRAINT fk_dm_sender FOREIGN KEY (senderId) REFERENCES User (id) ON DELETE CASCADE,
+                CONSTRAINT fk_dm_reply_to FOREIGN KEY (replyToMessageId) REFERENCES DirectMessage (id) ON DELETE SET NULL
             )
         ");
 
@@ -363,5 +366,50 @@ class DirectMessagePublishWiringTest extends TestCase
 
         // Message still published
         $this->assertSame('message_created', $this->fakeClient->publishedData['type']);
+    }
+
+    public function testSendMessageEmbedsTruncatedReplyQuote(): void
+    {
+        $parent = $this->service->sendMessage('recv-1', 'test-conv', [
+            'content' => str_repeat('b', 200),
+        ]);
+
+        $reply = $this->service->sendMessage('sender-1', 'test-conv', [
+            'content' => 'Antwort',
+            'replyToMessageId' => $parent['id'],
+        ]);
+
+        $this->assertSame($parent['id'], $reply['replyToMessageId']);
+        $this->assertSame($parent['id'], $reply['replyTo']['id']);
+        $this->assertSame('recv-1', $reply['replyTo']['senderId']);
+        $this->assertFalse($reply['replyTo']['deleted']);
+        $this->assertSame(str_repeat('b', 150) . '…', $reply['replyTo']['content']);
+    }
+
+    public function testSendMessageReplyCrossConversationThrows(): void
+    {
+        $this->db->exec("INSERT INTO ChatConversation (id, type) VALUES ('other-conv', 'direct')");
+        $this->db->exec("INSERT INTO ChatParticipant (conversationId, userId) VALUES ('other-conv', 'sender-1')");
+        $other = $this->service->sendMessage('sender-1', 'other-conv', [
+            'content' => 'Anderer Chat',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('reply_not_found');
+        $this->service->sendMessage('sender-1', 'test-conv', [
+            'content' => 'Antwort',
+            'replyToMessageId' => $other['id'],
+        ]);
+    }
+
+    public function testSendMessageWithProxyFlagDoesNotPublish(): void
+    {
+        $result = $this->service->sendMessage('sender-1', 'test-conv', [
+            'content' => 'Proxy-Versand',
+        ], publishToCentrifugo: false);
+
+        // The proxy broadcasts the returned message itself — no server publish.
+        $this->assertSame('', $this->fakeClient->publishedChannel);
+        $this->assertSame('Proxy-Versand', $result['content']);
     }
 }

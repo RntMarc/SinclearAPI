@@ -25,6 +25,38 @@ final readonly class DirectMessageRepository
     }
 
     /**
+     * Load many messages by ID (with sender info), keyed by message ID.
+     *
+     * Used to resolve reply quotes for a page of messages in one query
+     * (no N+1).
+     *
+     * @param array<int, string> $ids
+     * @return array<string, array>
+     */
+    public function findByIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids, static fn ($id) => $id !== '')));
+        if ($ids === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT dm.*, u.displayName AS senderDisplayName, u.image AS senderImage
+             FROM DirectMessage dm
+             LEFT JOIN User u ON u.id = dm.senderId
+             WHERE dm.id IN ($placeholders)"
+        );
+        $stmt->execute($ids);
+
+        $result = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $result[$row['id']] = $row;
+        }
+        return $result;
+    }
+
+    /**
      * Create a new direct message. Returns the created record.
      *
      * @return array{id: string, seq: int, createdAt: string}
@@ -33,8 +65,8 @@ final readonly class DirectMessageRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO DirectMessage (id, conversationId, senderId, type, content, payload, clientId, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3))'
+            'INSERT INTO DirectMessage (id, conversationId, senderId, type, content, payload, clientId, replyToMessageId, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(3))'
         );
         $stmt->execute([
             $id,
@@ -44,6 +76,7 @@ final readonly class DirectMessageRepository
             $data['content'] ?? '',
             isset($data['payload']) ? json_encode($data['payload'], JSON_UNESCAPED_UNICODE) : null,
             $data['clientId'] ?? null,
+            $data['replyToMessageId'] ?? null,
         ]);
 
         $stmt = $this->pdo->prepare('SELECT seq, createdAt FROM DirectMessage WHERE id = ?');

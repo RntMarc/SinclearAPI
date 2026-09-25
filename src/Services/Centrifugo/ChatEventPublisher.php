@@ -20,7 +20,7 @@ final readonly class ChatEventPublisher
     /**
      * Publish a new message event.
      *
-     * @param array{id: string, seq: int, conversationId: string, senderId: string, sender: array, type: string, content: string, payload: mixed, clientId: string|null, editedAt: string|null, deleted: bool, reactions: array, createdAt: string} $formattedMessage
+     * @param array{id: string, seq: int, conversationId: string, senderId: string, sender: array, type: string, content: string, payload: mixed, clientId: string|null, replyToMessageId: string|null, replyTo: array|null, editedAt: string|null, deleted: bool, reactions: array, createdAt: string} $formattedMessage
      */
     public function publishMessageCreated(array $formattedMessage): void
     {
@@ -33,7 +33,7 @@ final readonly class ChatEventPublisher
     /**
      * Publish an edited message event.
      *
-     * @param array{id: string, seq: int, conversationId: string, senderId: string, sender: array, type: string, content: string, payload: mixed, clientId: string|null, editedAt: string|null, deleted: bool, reactions: array, createdAt: string} $formattedMessage
+     * @param array{id: string, seq: int, conversationId: string, senderId: string, sender: array, type: string, content: string, payload: mixed, clientId: string|null, replyToMessageId: string|null, replyTo: array|null, editedAt: string|null, deleted: bool, reactions: array, createdAt: string} $formattedMessage
      */
     public function publishMessageEdited(array $formattedMessage): void
     {

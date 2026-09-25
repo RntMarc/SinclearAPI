@@ -5061,6 +5061,20 @@ components:
           type: string
           nullable: true
           description: Client-seitige ID für Idempotenz
+        replyToMessageId:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID der Elternnachricht, wenn dies eine Antwort ist
+        replyTo:
+          allOf:
+            - $ref: '#/components/schemas/DirectMessageReply'
+          nullable: true
+          description: >
+            Eingebettetes Zitat der Elternnachricht (gekürzt auf 150 Zeichen);
+            `deleted: true` mit leerem `content`, wenn die Elternnachricht
+            gelöscht wurde. Null, wenn keine Antwort oder die Elternnachricht
+            per Cron hart gelöscht wurde.
         editedAt:
           type: string
           format: date-time
@@ -5081,6 +5095,46 @@ components:
           type: string
           format: date-time
           description: Erstellungszeitpunkt (UTC)
+
+    DirectMessageReply:
+      type: object
+      description: Eingebettetes Zitat einer beantworteten Nachricht (gekürzt).
+      required: [id, seq, senderId, type, content, deleted]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: ID der Elternnachricht
+        seq:
+          type: integer
+          format: int64
+          description: Seq der Elternnachricht (für den Sprung zur Nachricht)
+        senderId:
+          type: string
+          format: uuid
+          description: Absender der Elternnachricht
+        sender:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            displayName:
+              type: string
+              nullable: true
+            avatar:
+              type: string
+              nullable: true
+        type:
+          type: string
+          enum: [text, image, location]
+          description: Typ der Elternnachricht
+        content:
+          type: string
+          description: Gekürzter Text der Elternnachricht (leer wenn gelöscht)
+        deleted:
+          type: boolean
+          description: True, wenn die Elternnachricht gelöscht wurde
 
     MessageReaction:
       type: object
@@ -5140,30 +5194,6 @@ components:
           type: string
           format: uuid
           description: ID des anderen Nutzers
-
-    ChatMessageRequest:
-      type: object
-      required: [content]
-      properties:
-        content:
-          type: string
-          maxLength: 2000
-          description: Nachrichtentext
-        type:
-          type: string
-          enum: [text]
-          default: text
-          description: Nachrichtentyp
-        clientId:
-          type: string
-          nullable: true
-          description: Client-seitige ID für Idempotenz (Retry-Schutz)
-        payload:
-          type: object
-          nullable: true
-          description: >
-            Strukturierte Daten. Aktuell nur für zukünftige Typen (image/location);
-            bei `type: text` wird `payload` abgelehnt.
 
     ChatMessageEditRequest:
       type: object
@@ -6770,6 +6800,14 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /chat/conversations/{id}/messages:
+    description: >
+      Nachrichten werden NICHT über REST gesendet. Der Client publiziert über
+      den bereits offenen Centrifugo-Kanal: `sub.publish({ "message": {
+      "clientId": "...", "type": "text", "content": "...",
+      "replyToMessageId": "<uuid|null>" } })`. Der Publish-Proxy persistiert und
+      broadcastet ein `message_created`-Event an alle Teilnehmer (inkl. Sender).
+      Eine Antwort referenziert die Elternnachricht über `replyToMessageId`;
+      deren Zitat steckt eingebettet in `replyTo`.
     get:
       summary: Nachrichten abrufen
       description: >
@@ -6821,67 +6859,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Konversation nicht gefunden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-    post:
-      summary: Nachricht senden
-      description: >
-        Sendet eine neue Nachricht in die Konversation. Der `clientId`
-        dient der Idempotenz: Bei Netzwerk-Retry wird dieselbe Nachricht
-        nicht doppelt gespeichert. Maximal 2000 Zeichen.
-      tags: [Chat]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-          description: Konversations-ID
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ChatMessageRequest'
-      responses:
-        '201':
-          description: Nachricht erfolgreich gesendet
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DirectMessageResponse'
-        '400':
-          description: Ungültige Eingabe (leer, zu lang, ungültiger Typ)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '401':
-          description: Nicht autorisiert
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '403':
-          description: Kein Teilnehmer der Konversation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Konversation nicht gefunden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '429':
-          description: Zu viele Nachrichten (Rate-Limit 20/Minute)
           content:
             application/json:
               schema:

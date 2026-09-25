@@ -17,6 +17,7 @@ final readonly class DirectMessageService
     private const int SEND_RATE_LIMIT = 20;       // Nachrichten pro Minute
     private const int SEND_RATE_WINDOW = 60;
     private const int NOTIFICATION_PREVIEW_LENGTH = 160;
+    private const int REPLY_PREVIEW_LENGTH = 150;
 
     private const array VALID_TYPES = ['text'];
 
@@ -149,9 +150,15 @@ final readonly class DirectMessageService
         $messages = $this->messageRepo->findByConversation($conversationId, $before, $limit);
 
         $reactionsByMessage = $this->reactionService->forMessages(array_column($messages, 'id'));
+        $repliesByMessage = $this->messageRepo->findByIds(
+            array_column($messages, 'replyToMessageId')
+        );
 
-        $data = array_map(function (array $row) use ($reactionsByMessage) {
-            return $this->formatMessage($row, $reactionsByMessage[$row['id']] ?? []);
+        $data = array_map(function (array $row) use ($reactionsByMessage, $repliesByMessage) {
+            $replyTo = $row['replyToMessageId'] !== null
+                ? ($repliesByMessage[$row['replyToMessageId']] ?? null)
+                : null;
+            return $this->formatMessage($row, $reactionsByMessage[$row['id']] ?? [], $replyTo);
         }, $messages);
 
         // Update lastSeenAt
@@ -167,8 +174,13 @@ final readonly class DirectMessageService
 
     /**
      * Send a new message.
+     *
+     * When invoked through the Centrifugo publish proxy, the caller sets
+     * [$publishToCentrifugo] to false: the proxy broadcasts the returned
+     * formatted message itself, so a second server-API publish would produce
+     * a duplicate event. The REST send path keeps the default (true).
      */
-    public function sendMessage(string $userId, string $conversationId, array $body): array
+    public function sendMessage(string $userId, string $conversationId, array $body, bool $publishToCentrifugo = true): array
     {
         $conversation = $this->conversationRepo->findById($conversationId);
         if ($conversation === null) {
@@ -191,6 +203,8 @@ final readonly class DirectMessageService
         if (isset($body['payload'])) {
             throw new \RuntimeException('invalid_payload');
         }
+
+        $replyToMessageId = $this->resolveReplyTarget($conversationId, $body['replyToMessageId'] ?? null);
 
         if (!$this->rateLimiter->isAllowed('chat_send:' . $userId, self::SEND_RATE_LIMIT, self::SEND_RATE_WINDOW)) {
             throw new \RuntimeException('rate_limit_exceeded');
@@ -221,6 +235,7 @@ final readonly class DirectMessageService
                 'content' => $content,
                 'payload' => null,
                 'clientId' => $clientId,
+                'replyToMessageId' => $replyToMessageId,
             ]);
         } catch (\PDOException $e) {
             // Unique (senderId, clientId): concurrent duplicate → return existing
@@ -239,13 +254,43 @@ final readonly class DirectMessageService
         $message = $this->messageRepo->findById($result['id']);
         $formatted = $this->formatMessage($message);
 
-        // Publish event to Centrifugo
-        $this->eventPublisher->publishMessageCreated($formatted);
+        // Publish event to Centrifugo (skipped for the proxy path, which
+        // broadcasts the returned message itself).
+        if ($publishToCentrifugo) {
+            $this->eventPublisher->publishMessageCreated($formatted);
+        }
 
         // Send notification to other participants
         $this->notifyParticipants($userId, $conversationId, $formatted);
 
         return $formatted;
+    }
+
+    /**
+     * Validate an optional reply target and return its ID (or null).
+     *
+     * The target must exist and belong to the same conversation. A message
+     * deleted between compose and send is accepted; its quote renders as
+     * "deleted".
+     */
+    private function resolveReplyTarget(string $conversationId, mixed $rawReplyToMessageId): ?string
+    {
+        if ($rawReplyToMessageId === null) {
+            return null;
+        }
+        if (!is_scalar($rawReplyToMessageId)) {
+            throw new \RuntimeException('reply_not_found');
+        }
+        $replyToMessageId = trim((string) $rawReplyToMessageId);
+        if ($replyToMessageId === '') {
+            return null;
+        }
+
+        $parent = $this->messageRepo->findById($replyToMessageId);
+        if ($parent === null || $parent['conversationId'] !== $conversationId) {
+            throw new \RuntimeException('reply_not_found');
+        }
+        return $replyToMessageId;
     }
 
     /**
@@ -378,7 +423,7 @@ final readonly class DirectMessageService
         ];
     }
 
-    private function formatMessage(array $message, ?array $reactions = null): array
+    private function formatMessage(array $message, ?array $reactions = null, ?array $replyTo = null): array
     {
         $payload = null;
         if (isset($message['payload'])) {
@@ -390,8 +435,17 @@ final readonly class DirectMessageService
         $deleted = $message['deletedAt'] !== null;
         if ($deleted) {
             $reactions = [];
-        } elseif ($reactions === null) {
-            $reactions = $this->reactionService->forMessage($message['id']);
+            $replyToMessageId = null;
+            $replyTo = null;
+        } else {
+            if ($reactions === null) {
+                $reactions = $this->reactionService->forMessage($message['id']);
+            }
+            $replyToMessageId = $message['replyToMessageId'] ?? null;
+            if ($replyToMessageId !== null && $replyTo === null) {
+                $replyTo = $this->messageRepo->findById($replyToMessageId);
+            }
+            $replyTo = $replyTo !== null ? $this->formatReplyTo($replyTo) : null;
         }
 
         return [
@@ -408,11 +462,49 @@ final readonly class DirectMessageService
             'content' => $deleted ? '' : $message['content'],
             'payload' => $deleted ? null : $payload,
             'clientId' => $message['clientId'],
+            'replyToMessageId' => $replyToMessageId,
+            'replyTo' => $replyTo,
             'editedAt' => $message['editedAt'] !== null ? self::stripFractionalSeconds($message['editedAt']) : null,
             'deleted' => $deleted,
             'reactions' => $reactions,
             'createdAt' => self::stripFractionalSeconds($message['createdAt']),
         ];
+    }
+
+    /**
+     * Build the embedded quote preview for a reply.
+     *
+     * Content is truncated to [REPLY_PREVIEW_LENGTH]; a soft-deleted parent
+     * yields `deleted: true` with empty content (client shows a placeholder).
+     *
+     * @param array<string, mixed> $parent
+     * @return array{id: string, seq: int, senderId: string, sender: array{id: string, displayName: string|null, avatar: string|null}, type: string, content: string, deleted: bool}
+     */
+    private function formatReplyTo(array $parent): array
+    {
+        $deleted = $parent['deletedAt'] !== null;
+        return [
+            'id' => $parent['id'],
+            'seq' => (int) $parent['seq'],
+            'senderId' => $parent['senderId'],
+            'sender' => [
+                'id' => $parent['senderId'],
+                'displayName' => $parent['senderDisplayName'] ?? null,
+                'avatar' => $parent['senderImage'] ?? null,
+            ],
+            'type' => $parent['type'],
+            'content' => $deleted ? '' : self::truncateReplyPreview($parent['content']),
+            'deleted' => $deleted,
+        ];
+    }
+
+    private static function truncateReplyPreview(string $content): string
+    {
+        $preview = trim(preg_replace('/\s+/', ' ', $content) ?? '');
+        if (mb_strlen($preview) > self::REPLY_PREVIEW_LENGTH) {
+            return mb_substr($preview, 0, self::REPLY_PREVIEW_LENGTH) . '…';
+        }
+        return $preview;
     }
 
     private function notifyParticipants(string $senderId, string $conversationId, array $formattedMessage): void

@@ -406,7 +406,6 @@ return function (App $app): void {
         $group->post('/conversations', [ChatController::class, 'openConversation']);
         $group->get('/conversations/{id}', [ChatController::class, 'getConversation']);
         $group->get('/conversations/{id}/messages', [ChatController::class, 'listMessages']);
-        $group->post('/conversations/{id}/messages', [ChatController::class, 'sendMessage']);
         $group->post('/conversations/{id}/read', [ChatController::class, 'markRead']);
     })->add($container->get(AuthenticationMiddleware::class));
 

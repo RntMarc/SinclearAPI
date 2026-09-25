@@ -91,6 +91,7 @@ Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Ver
       },
       "publish": {
         "endpoint": "https://sinclear.de/api/v2/centrifugo/publish",
+        "timeout": "10s",
         "http": {
           "static_headers": { "X-Centrifugo-Proxy-Key": "xxxx" }
         }
@@ -106,7 +107,8 @@ Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Ver
 |---|---|
 | `engine: "memory"` | Single-Node, ~10 Nutzer, kein Redis nötig |
 | `chat.subscribe_proxy_enabled` | Centrifugo ruft PHP-API für Subscribe-Validierung auf |
-| `chat.publish_proxy_enabled` | Centrifugo ruft PHP-API für Publish-Validierung auf (Typing, Reaktionen) |
+| `chat.publish_proxy_enabled` | Centrifugo ruft PHP-API für Publish-Validierung auf (Nachrichten, Typing, Reaktionen) |
+| `channel.proxy.publish.timeout` | Timeout des Publish-Proxy-Aufrufs. **10s** statt Default 1s, da der Nachrichtenversand DB-Write + `presence()` + synchrone Push-Sends enthält |
 | `chat.presence` | Ermöglicht Presence-Abfragen via Server-API |
 | `chat.force_recovery` | Clients erhalten verpasste Nachrichten bei Reconnect |
 | `chat.force_positioning` | Position-Tracking für zuverlässige Zustellung |
@@ -212,7 +214,8 @@ server {
 - [ ] `CENTRIFUGO_ENABLED=true` in `.env` auf API-Server gesetzt
 - [ ] Test: `GET https://chat.sinclear.de/api/info` → 200
 - [ ] Test: Client verbindet via WebSocket und erhält Token
-- [ ] Test: Nachricht wird via REST gesendet und via WebSocket empfangen
+- [ ] Test: Nachricht wird via WebSocket-Publish gesendet und als `message_created` empfangen
+- [ ] Test: Antwort setzt `replyToMessageId`; `replyTo`-Zitat (150 Zeichen gekürzt) ist im Event enthalten
 - [ ] Test: Typing-Event wird via WebSocket gesendet und validiert
 - [ ] Test: Reaktions-Event wird via WebSocket gesendet und validiert
 - [ ] Test: PWA (`https://sinclear.de`) kann WebSocket-Verbindung aufbauen

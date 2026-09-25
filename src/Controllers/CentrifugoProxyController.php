@@ -6,6 +6,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\ChatParticipantRepository;
+use Sinclear\Api\Services\DirectMessageService;
 use Sinclear\Api\Services\MessageReactionService;
 use Sinclear\Api\Services\RateLimiter;
 
@@ -26,6 +27,7 @@ final readonly class CentrifugoProxyController
         private ChatParticipantRepository $participantRepo,
         private RateLimiter $rateLimiter,
         private MessageReactionService $reactionService,
+        private DirectMessageService $messageService,
     ) {}
 
     /**
@@ -75,13 +77,16 @@ final readonly class CentrifugoProxyController
     }
 
     /**
-     * Centrifugo publish proxy: validates participant + rate limit for
-     * typing events and chat reactions.
+     * Centrifugo publish proxy: validates participant + rate limit and handles
+     * message sends, typing events and chat reactions.
      *
-     * Typing request:   { "user": "<userId>", "channel": "chat:<conversationId>", "data": { "typing": true } }
+     * Message request:   { "user": "<userId>", "channel": "chat:<conversationId>",
+     *                      "data": { "message": { "clientId": "...", "content": "...", "replyToMessageId": "..." } } }
+     * Typing request:    { "user": "<userId>", "channel": "chat:<conversationId>", "data": { "typing": true } }
      * Reaction request:  { "user": "<userId>", "channel": "chat:<conversationId>", "data": { "reaction": { "messageId": "...", "emoji": "👍", "add": true } } }
-     * Typing response:   { "result": { "data": { "typing": true } } }
-     * Reaction response: { "result": { "data": { "type": "reaction_updated", "messageId": "...", "reactions": [ ... ] } } }
+     * Message response:  { "result": { "data": { "type": "message_created", "message": { ... } } } }
+     * Typing response:   { "result": { "data": { "typing": true }, "skip_history": true } }
+     * Reaction response: { "result": { "data": { "type": "reaction_updated", "messageId": "...", "reactions": [ ... ] }, "skip_history": true } }
      */
     public function publish(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -103,9 +108,21 @@ final readonly class CentrifugoProxyController
             return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
         }
 
+        // Client-published message: persist + notify, return the full event so
+        // Centrifugo broadcasts it to all subscribers (incl. the sender).
+        if (isset($payload['message']) && is_array($payload['message'])) {
+            return $this->handleMessage($userId, $conversationId, $payload['message'], $response);
+        }
+
         // Client-published reactions: persist and broadcast the new summary.
         if (isset($payload['reaction']) && is_array($payload['reaction'])) {
             return $this->handleReaction($userId, $conversationId, $payload['reaction'], $response);
+        }
+
+        // Only typing is accepted beyond this point; reject unknown payloads
+        // instead of silently broadcasting them as typing.
+        if (!array_key_exists('typing', $payload)) {
+            return ResponseFactory::json(['error' => 'invalid_publish'], 400, $response);
         }
 
         // Rate limit typing events
@@ -125,6 +142,52 @@ final readonly class CentrifugoProxyController
                 'skip_history' => true,
             ],
         ], 200, $response);
+    }
+
+    /**
+     * Handle a client-published message: persist via the chat service and
+     * return the `message_created` event for Centrifugo to broadcast.
+     *
+     * The service is called with broadcasting disabled so the proxy response
+     * is the single source of the publication (no duplicate event).
+     *
+     * @param array<string, mixed> $message
+     */
+    private function handleMessage(
+        string $userId,
+        string $conversationId,
+        array $message,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        try {
+            $formatted = $this->messageService->sendMessage($userId, $conversationId, $message, false);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
+        }
+
+        // Not ephemeral: Centrifugo stores this in history for recovery.
+        return ResponseFactory::json([
+            'result' => [
+                'data' => [
+                    'type' => 'message_created',
+                    'message' => $formatted,
+                ],
+            ],
+        ], 200, $response);
+    }
+
+    /**
+     * Map a service error code to the matching HTTP status for the proxy.
+     */
+    private function errorResponse(string $error, ResponseInterface $response): ResponseInterface
+    {
+        $status = match ($error) {
+            'conversation_not_found' => 404,
+            'forbidden' => 403,
+            'rate_limit_exceeded' => 429,
+            default => 400,
+        };
+        return ResponseFactory::json(['error' => $error], $status, $response);
     }
 
     /**
