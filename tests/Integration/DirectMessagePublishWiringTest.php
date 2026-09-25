@@ -7,9 +7,11 @@ use PHPUnit\Framework\TestCase;
 use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\DirectMessageRepository;
+use Sinclear\Api\Repository\MessageReactionRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Services\Centrifugo\ChatEventPublisher;
 use Sinclear\Api\Services\DirectMessageService;
+use Sinclear\Api\Services\MessageReactionService;
 use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Tests\Unit\FakeCentrifugoClient;
@@ -53,6 +55,7 @@ class DirectMessagePublishWiringTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS NotificationPreference");
         $this->db->exec("DROP TABLE IF EXISTS Notification");
         $this->db->exec("DROP TABLE IF EXISTS PushSubscription");
+        $this->db->exec("DROP TABLE IF EXISTS MessageReaction");
         $this->db->exec("DROP TABLE IF EXISTS DirectMessage");
         $this->db->exec("DROP TABLE IF EXISTS ChatParticipant");
         $this->db->exec("DROP TABLE IF EXISTS ChatConversation");
@@ -121,6 +124,20 @@ class DirectMessagePublishWiringTest extends TestCase
                 KEY idx_dm_sender (senderId),
                 CONSTRAINT fk_dm_conversation FOREIGN KEY (conversationId) REFERENCES ChatConversation (id) ON DELETE CASCADE,
                 CONSTRAINT fk_dm_sender FOREIGN KEY (senderId) REFERENCES User (id) ON DELETE CASCADE
+            )
+        ");
+
+        $this->db->exec("
+            CREATE TABLE MessageReaction (
+                id varchar(191) NOT NULL PRIMARY KEY,
+                messageId varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                emoji varchar(32) NOT NULL,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                UNIQUE KEY uk_reaction_msg_user_emoji (messageId, userId, emoji),
+                KEY idx_reaction_message (messageId),
+                CONSTRAINT fk_reaction_message FOREIGN KEY (messageId) REFERENCES DirectMessage (id) ON DELETE CASCADE,
+                CONSTRAINT fk_reaction_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
             )
         ");
 
@@ -215,6 +232,10 @@ class DirectMessagePublishWiringTest extends TestCase
             rateLimiter: $rateLimiter,
             centrifugoClient: $this->fakeClient,
             eventPublisher: $eventPublisher,
+            reactionService: new MessageReactionService(
+                new MessageReactionRepository($this->db),
+                $messageRepo,
+            ),
         );
     }
 
@@ -276,6 +297,10 @@ class DirectMessagePublishWiringTest extends TestCase
             rateLimiter: new RateLimiter(),
             centrifugoClient: $noopClient,
             eventPublisher: $noopPublisher,
+            reactionService: new MessageReactionService(
+                new MessageReactionRepository($this->db),
+                new DirectMessageRepository($this->db),
+            ),
         );
 
         $result = $service->sendMessage('sender-1', 'test-conv', [

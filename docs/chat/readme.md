@@ -67,6 +67,7 @@ Response 200:
 | `ChatConversation` | Konversation (type: direct/group), `name` (optional), `image` (optional, base64) |
 | `ChatParticipant` | Teilnehmer + `lastReadSeq` (DEFAULT 0) + `lastSeenAt` (NULL) |
 | `DirectMessage` | Nachrichten mit `seq` (globaler Sync-Cursor), `clientId` (Idempotenz), `senderId`, `type`, `content`, `payload`, `editedAt`, `deletedAt` |
+| `MessageReaction` | Reaktion (`emoji`) eines Nutzers auf eine Nachricht; UNIQUE `(messageId, userId, emoji)`, FK auf `DirectMessage`/`User` (ON DELETE CASCADE) |
 | `TravelChat` | Verknüpfung von Gruppenchat mit Reise oder Event |
 
 **PK von `ChatParticipant`:** `(conversationId, userId)`
@@ -177,6 +178,16 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
   "clientId": "client-123",
   "editedAt": null,
   "deleted": false,
+  "reactions": [
+    {
+      "emoji": "👍",
+      "count": 2,
+      "users": [
+        {"id": "uuid-1", "displayName": "Alice", "avatar": "https://..."},
+        {"id": "uuid-2", "displayName": "Bob", "avatar": null}
+      ]
+    }
+  ],
   "createdAt": "2026-01-15 10:30:00"
 }
 ```
@@ -184,6 +195,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 - `content`: Leerstring wenn `deleted == true`
 - `payload`: null wenn `deleted == true` oder `type == text`
 - `sender`: Engeschachteltes Objekt mit Absender-Details (aus User-Tabelle)
+- `reactions`: aggregierte Reaktionen (siehe [Reaktionen](#reaktionen)); leer bei gelöschten Nachrichten. Das eigene Reagieren leitet der Client durch Abgleich der eigenen User-ID mit `users` ab (kein eigenes `me`-Feld).
 
 ## REST-API
 
@@ -208,7 +220,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 | Methode | Pfad | Security | Zweck |
 |---|---|---|---|
 | POST | `/centrifugo/subscribe` | `X-Centrifugo-Proxy-Key` + HTTPS | Subscribe-Validierung (ChatParticipant) |
-| POST | `/centrifugo/publish` | `X-Centrifugo-Proxy-Key` + HTTPS | Typing-Validierung (Participant + Rate-Limit) |
+| POST | `/centrifugo/publish` | `X-Centrifugo-Proxy-Key` + HTTPS | Typing- und Reaktions-Validierung (Participant + Rate-Limit) |
 
 **Security:** Kein JWT – gesichert via Shared Secret (`CENTRIFUGO_PROXY_KEY`) in `X-Centrifugo-Proxy-Key` Header (Centrifugo sendet via `http.static_headers`). HTTPS erzwungen durch vorgeschaltetes `RequireHttpsMiddleware`; die Shared-Secret-Prüfung liegt in `CentrifugoProxyMiddleware`.
 
@@ -254,7 +266,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 2. Client erhält Connection-JWT via GET /chat/centrifugo/token
 3. Client abonniert Channel chat:{conversationId}
 4. Centrifugo ruft POST /centrifugo/subscribe (PHP prüft ChatParticipant)
-5. Client empfängt Echtzeit-Events (message_created, message_edited, message_deleted, read)
+5. Client empfängt Echtzeit-Events (message_created, message_edited, message_deleted, read, reaction_updated)
 ```
 
 ## Typing via Publish-Proxy
@@ -275,6 +287,34 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 **History:** Die Proxy-Antwort setzt `skip_history: true` – Typing-Events sind ephemer und werden nicht in der Channel-History gespeichert (kein Replay als „verpasste“ Nachricht bei Recovery).
 
 **Channel-Validierung:** `parseConversationId` prüft Kanal gegen Regex `^chat:([A-Za-z0-9_-]+)$` → `400 invalid_channel` bei Nichteinhaltung.
+
+## Reaktionen
+
+Reaktionen laufen – wie Typing – vollständig über den **Publish-Proxy**, nicht über REST. Es gibt bewusst keinen REST-Endpoint: Der Client entscheidet lokal, ob er eine Reaktion hinzufügt oder entfernt, und persistiert+routet sie über die bestehende WS-Verbindung.
+
+```
+1. Client sendet via Centrifugo WS publish
+   Channel: chat:{conversationId}
+   Data: { "reaction": { "messageId": "<uuid>", "emoji": "👍", "add": true } }
+2. Centrifugo ruft POST /centrifugo/publish
+3. PHP-API: Participant-Check + Rate-Limit (60/min) + Persistenz (MessageReaction)
+4. PHP-API: berechnet die aktualisierte Summary und antwortet
+   { "result": { "data": { "type": "reaction_updated", "messageId": "...", "reactions": [ ... ] },
+                 "skip_history": true } }
+5. Centrifugo broadcastet die Summary an alle Subscriber (inkl. Sender)
+```
+
+- **Explizites `add`** statt „toggle": Wiederholte Zustellung (Proxy-Retry) ist damit idempotent (Add = `INSERT … ON DUPLICATE KEY UPDATE`, Remove = `DELETE`).
+- **Rate-Limit:** 60 Reaktionen pro Minute pro Nutzer (Key: `chat_reaction:{userId}`).
+- **Fehler:** `invalid_emoji` (nicht in Allowlist), `message_not_found` (unbekannt oder falsche Konversation), `message_deleted` → HTTP 400; Nicht-Teilnehmer → 403.
+- **Ephemer:** `skip_history: true`. Bei Reconnect lädt der Client den Verlauf per REST neu; die Reaktionen sind dort in der Nachricht eingebettet.
+- **Gelöschte Nachrichten** liefern `reactions: []`; beim Löschen werden die Reaktionszeilen entfernt.
+- **Allowlist (normalisiert, ohne Variation Selectors):** 👍 ❤ 😂 😮 😢 🎉 🔥 👏.
+  Clients senden dasselbe Set; `❤️` und `❤` werden serverseitig auf `❤` normalisiert.
+- **Aggregation:** `reactions` ist nach Emoji gruppiert (`{emoji, count, users:[{id,displayName,avatar}]}`),
+  sortiert nach `count` absteigend. Gruppenchats zeigen so mehrere Reagierende.
+- **Persistenz:** Tabelle `MessageReaction`; die Summary wird in `DirectMessageService::formatMessage()`
+  in jede Nachricht eingebettet (Batch-Load in `getMessages`, kein N+1).
 
 ## Echtzeit-Events
 
@@ -329,6 +369,29 @@ Lesestand-Update eines Teilnehmers. Wird mit `skip_history: true` publiziert (ep
   "seq": 42,
   "lastReadSeq": 42,
   "userId": "uuid"
+}
+```
+
+### `reaction_updated`
+
+Eine Reaktion wurde hinzugefügt oder entfernt. Enthält die vollständige, neu
+aggregierte Reaktions-Summary der betroffenen Nachricht. Wird mit
+`skip_history: true` publiziert (ephemer; REST-Verlauf ist maßgeblich).
+
+```json
+{
+  "type": "reaction_updated",
+  "messageId": "uuid",
+  "reactions": [
+    {
+      "emoji": "👍",
+      "count": 2,
+      "users": [
+        {"id": "uuid-1", "displayName": "Alice", "avatar": "https://..."},
+        {"id": "uuid-2", "displayName": "Bob", "avatar": null}
+      ]
+    }
+  ]
 }
 ```
 
@@ -405,6 +468,9 @@ Lesestand-Update eines Teilnehmers. Wird mit `skip_history: true` publiziert (ep
 | Payload | Bei `type: text` abgelehnt (`invalid_payload`) |
 | Rate-Limit Senden | 20 Nachrichten/Minute pro Nutzer (Key: `chat_send:{userId}`) |
 | Rate-Limit Typing | 30 Events/Minute pro Nutzer (Key: `chat_typing:{userId}`) |
+| Rate-Limit Reaktion | 60 Events/Minute pro Nutzer (Key: `chat_reaction:{userId}`) |
+| Emoji | Nur Allowlist (normalisiert), sonst `invalid_emoji` |
+| Reaktion auf gelöschte Nachricht | Abgelehnt (`message_deleted`) |
 | Edit-Fenster | 10 Minuten nach `createdAt` (UTC) |
 | Delete | Kein Zeitfenster, idempotent |
 | Idempotenz | `clientId` → UNIQUE `(senderId, clientId)` |

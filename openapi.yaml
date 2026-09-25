@@ -5069,10 +5069,46 @@ components:
         deleted:
           type: boolean
           description: True, wenn die Nachricht gelöscht wurde (Platzhalter)
+        reactions:
+          type: array
+          description: >
+            Aggregierte Reaktionen der Nachricht, nach Emoji gruppiert (Anzahl
+            absteigend). Leer bei gelöschten Nachrichten. Das eigene Reagieren
+            leitet der Client aus `users` (Abgleich mit der eigenen User-ID) ab.
+          items:
+            $ref: '#/components/schemas/MessageReaction'
         createdAt:
           type: string
           format: date-time
           description: Erstellungszeitpunkt (UTC)
+
+    MessageReaction:
+      type: object
+      required: [emoji, count, users]
+      properties:
+        emoji:
+          type: string
+          description: >
+            Normalisiertes Emoji aus der festen Allowlist (Unicode-Variation-
+            Selectoren entfernt). Siehe docs/chat/readme.md.
+        count:
+          type: integer
+          description: Anzahl der Nutzer, die mit diesem Emoji reagiert haben
+        users:
+          type: array
+          description: Nutzer, die mit diesem Emoji reagiert haben
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              displayName:
+                type: string
+                nullable: true
+              avatar:
+                type: string
+                nullable: true
 
     DirectMessageListResponse:
       type: object

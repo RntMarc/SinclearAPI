@@ -8,6 +8,9 @@ use Slim\Psr7\Response;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Sinclear\Api\Controllers\CentrifugoProxyController;
 use Sinclear\Api\Repository\ChatParticipantRepository;
+use Sinclear\Api\Repository\DirectMessageRepository;
+use Sinclear\Api\Repository\MessageReactionRepository;
+use Sinclear\Api\Services\MessageReactionService;
 use Sinclear\Api\Services\RateLimiter;
 
 /**
@@ -45,6 +48,7 @@ class CentrifugoProxyTest extends TestCase
 
         // Drop tables in dependency order
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $this->db->exec("DROP TABLE IF EXISTS MessageReaction");
         $this->db->exec("DROP TABLE IF EXISTS DirectMessage");
         $this->db->exec("DROP TABLE IF EXISTS ChatParticipant");
         $this->db->exec("DROP TABLE IF EXISTS ChatConversation");
@@ -121,10 +125,28 @@ class CentrifugoProxyTest extends TestCase
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName) VALUES ('user-2', 'u2@test.de', 'x', 'Bob')");
         $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName) VALUES ('user-3', 'u3@test.de', 'x', 'Charlie')");
 
+        $this->db->exec("
+            CREATE TABLE MessageReaction (
+                id varchar(191) NOT NULL PRIMARY KEY,
+                messageId varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                emoji varchar(32) NOT NULL,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                UNIQUE KEY uk_reaction_msg_user_emoji (messageId, userId, emoji),
+                KEY idx_reaction_message (messageId),
+                CONSTRAINT fk_reaction_message FOREIGN KEY (messageId) REFERENCES DirectMessage (id) ON DELETE CASCADE,
+                CONSTRAINT fk_reaction_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
+            )
+        ");
+
         $participantRepo = new ChatParticipantRepository($this->db);
         $this->controller = new CentrifugoProxyController(
             participantRepo: $participantRepo,
             rateLimiter: new RateLimiter(),
+            reactionService: new MessageReactionService(
+                new MessageReactionRepository($this->db),
+                new DirectMessageRepository($this->db),
+            ),
         );
     }
 
@@ -266,11 +288,173 @@ class CentrifugoProxyTest extends TestCase
         $this->assertSame(400, $result->getStatusCode());
     }
 
+    // ── reaction tests ──
+
+    public function testPublishReactionAddsAndReturnsSummary(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1', 'user-2']);
+        $this->createMessage('msg-1', 'conv-1', 'user-1');
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-2',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'msg-1', 'emoji' => '👍', 'add' => true]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(200, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('reaction_updated', $body['result']['data']['type']);
+        $this->assertSame('msg-1', $body['result']['data']['messageId']);
+        $this->assertTrue($body['result']['skip_history']);
+        $this->assertSame('👍', $body['result']['data']['reactions'][0]['emoji']);
+        $this->assertSame(1, $body['result']['data']['reactions'][0]['count']);
+        $this->assertSame('user-2', $body['result']['data']['reactions'][0]['users'][0]['id']);
+
+        $count = (int) $this->db->query("SELECT COUNT(*) FROM MessageReaction WHERE messageId = 'msg-1'")->fetchColumn();
+        $this->assertSame(1, $count);
+    }
+
+    public function testPublishReactionRemoveClearsSummary(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1', 'user-2']);
+        $this->createMessage('msg-1', 'conv-1', 'user-1');
+        $this->db->exec("INSERT INTO MessageReaction (id, messageId, userId, emoji) VALUES ('r-1', 'msg-1', 'user-2', '👍')");
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-2',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'msg-1', 'emoji' => '👍', 'add' => false]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(200, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame([], $body['result']['data']['reactions']);
+        $count = (int) $this->db->query("SELECT COUNT(*) FROM MessageReaction WHERE messageId = 'msg-1'")->fetchColumn();
+        $this->assertSame(0, $count);
+    }
+
+    public function testPublishReactionNormalizesVariationSelector(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1', 'user-2']);
+        $this->createMessage('msg-1', 'conv-1', 'user-1');
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-2',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'msg-1', 'emoji' => "❤\u{FE0F}", 'add' => true]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(200, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('❤', $body['result']['data']['reactions'][0]['emoji']);
+    }
+
+    public function testPublishReactionInvalidEmojiReturns400(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1']);
+        $this->createMessage('msg-1', 'conv-1', 'user-1');
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-1',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'msg-1', 'emoji' => 'free-text', 'add' => true]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('invalid_emoji', $body['error']);
+    }
+
+    public function testPublishReactionUnknownMessageReturns400(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1']);
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-1',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'missing', 'emoji' => '👍', 'add' => true]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('message_not_found', $body['error']);
+    }
+
+    public function testPublishReactionDeletedMessageReturns400(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1']);
+        $this->createMessage('msg-1', 'conv-1', 'user-1', deleted: true);
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-1',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'msg-1', 'emoji' => '👍', 'add' => true]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('message_deleted', $body['error']);
+    }
+
+    public function testPublishReactionCannotCrossConversation(): void
+    {
+        $this->createConversationWithParticipants('conv-1', ['user-1']);
+        $this->createConversationWithParticipants('conv-2', ['user-1']);
+        $this->createMessage('msg-1', 'conv-2', 'user-1');
+
+        $request = (new ServerRequestFactory())->createServerRequest('POST', '/centrifugo/proxy')
+            ->withParsedBody([
+                'user' => 'user-1',
+                'channel' => 'chat:conv-1',
+                'data' => ['reaction' => ['messageId' => 'msg-1', 'emoji' => '👍', 'add' => true]],
+            ]);
+        $response = new Response();
+
+        $result = $this->controller->publish($request, $response);
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('message_not_found', $body['error']);
+    }
+
     private function createConversationWithParticipants(string $convId, array $userIds): void
     {
         $this->db->exec("INSERT INTO ChatConversation (id, type, name) VALUES ('$convId', 'direct', NULL)");
         foreach ($userIds as $userId) {
             $this->db->exec("INSERT INTO ChatParticipant (conversationId, userId) VALUES ('$convId', '$userId')");
         }
+    }
+
+    private function createMessage(string $messageId, string $convId, string $senderId, bool $deleted = false): void
+    {
+        $deletedAt = $deleted ? 'NOW(3)' : 'NULL';
+        $this->db->exec(
+            "INSERT INTO DirectMessage (id, conversationId, senderId, type, content, deletedAt)
+             VALUES ('$messageId', '$convId', '$senderId', 'text', 'Hallo', $deletedAt)"
+        );
     }
 }

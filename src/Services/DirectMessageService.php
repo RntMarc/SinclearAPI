@@ -29,6 +29,7 @@ final readonly class DirectMessageService
         private RateLimiter $rateLimiter,
         private CentrifugoClientInterface $centrifugoClient,
         private ChatEventPublisher $eventPublisher,
+        private MessageReactionService $reactionService,
     ) {}
 
     /**
@@ -147,8 +148,10 @@ final readonly class DirectMessageService
         $before = $beforeSeq ?? 0;
         $messages = $this->messageRepo->findByConversation($conversationId, $before, $limit);
 
-        $data = array_map(function (array $row) {
-            return $this->formatMessage($row);
+        $reactionsByMessage = $this->reactionService->forMessages(array_column($messages, 'id'));
+
+        $data = array_map(function (array $row) use ($reactionsByMessage) {
+            return $this->formatMessage($row, $reactionsByMessage[$row['id']] ?? []);
         }, $messages);
 
         // Update lastSeenAt
@@ -308,6 +311,7 @@ final readonly class DirectMessageService
         }
 
         $this->messageRepo->markDeleted($messageId, $userId);
+        $this->reactionService->clearMessage($messageId);
 
         // Publish event to Centrifugo (need seq from the deleted message)
         $deletedMessage = $this->messageRepo->findById($messageId);
@@ -374,13 +378,20 @@ final readonly class DirectMessageService
         ];
     }
 
-    private function formatMessage(array $message): array
+    private function formatMessage(array $message, ?array $reactions = null): array
     {
         $payload = null;
         if (isset($message['payload'])) {
             $payload = is_string($message['payload'])
                 ? json_decode($message['payload'], true)
                 : $message['payload'];
+        }
+
+        $deleted = $message['deletedAt'] !== null;
+        if ($deleted) {
+            $reactions = [];
+        } elseif ($reactions === null) {
+            $reactions = $this->reactionService->forMessage($message['id']);
         }
 
         return [
@@ -394,11 +405,12 @@ final readonly class DirectMessageService
                 'avatar' => $message['senderImage'] ?? null,
             ],
             'type' => $message['type'],
-            'content' => $message['deletedAt'] !== null ? '' : $message['content'],
-            'payload' => $message['deletedAt'] !== null ? null : $payload,
+            'content' => $deleted ? '' : $message['content'],
+            'payload' => $deleted ? null : $payload,
             'clientId' => $message['clientId'],
             'editedAt' => $message['editedAt'] !== null ? self::stripFractionalSeconds($message['editedAt']) : null,
-            'deleted' => $message['deletedAt'] !== null,
+            'deleted' => $deleted,
+            'reactions' => $reactions,
             'createdAt' => self::stripFractionalSeconds($message['createdAt']),
         ];
     }

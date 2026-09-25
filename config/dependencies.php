@@ -307,6 +307,8 @@ return [
     DirectMessageRepository::class => autowire(),
     DirectMessagePolicy::class => autowire(),
     DirectMessageService::class => autowire(),
+    \Sinclear\Api\Repository\MessageReactionRepository::class => autowire(),
+    \Sinclear\Api\Services\MessageReactionService::class => autowire(),
     ChatController::class => function (ContainerInterface $c): ChatController {
         $settings = $c->get(Settings::class);
         return new ChatController(

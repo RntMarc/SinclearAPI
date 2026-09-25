@@ -106,7 +106,7 @@ Config-Vorschlag mit Claude überarbeitet, Original war für alte Centrifugo-Ver
 |---|---|
 | `engine: "memory"` | Single-Node, ~10 Nutzer, kein Redis nötig |
 | `chat.subscribe_proxy_enabled` | Centrifugo ruft PHP-API für Subscribe-Validierung auf |
-| `chat.publish_proxy_enabled` | Centrifugo ruft PHP-API für Publish-Validierung auf (Typing) |
+| `chat.publish_proxy_enabled` | Centrifugo ruft PHP-API für Publish-Validierung auf (Typing, Reaktionen) |
 | `chat.presence` | Ermöglicht Presence-Abfragen via Server-API |
 | `chat.force_recovery` | Clients erhalten verpasste Nachrichten bei Reconnect |
 | `chat.force_positioning` | Position-Tracking für zuverlässige Zustellung |
@@ -214,5 +214,6 @@ server {
 - [ ] Test: Client verbindet via WebSocket und erhält Token
 - [ ] Test: Nachricht wird via REST gesendet und via WebSocket empfangen
 - [ ] Test: Typing-Event wird via WebSocket gesendet und validiert
+- [ ] Test: Reaktions-Event wird via WebSocket gesendet und validiert
 - [ ] Test: PWA (`https://sinclear.de`) kann WebSocket-Verbindung aufbauen
 - [ ] Test: Android-App kann WebSocket-Verbindung aufbauen (ohne Origin-Header)

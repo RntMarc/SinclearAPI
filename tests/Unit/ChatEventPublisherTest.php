@@ -133,6 +133,7 @@ class ChatEventPublisherTest extends TestCase
             'clientId' => null,
             'editedAt' => null,
             'deleted' => false,
+            'reactions' => [],
             'createdAt' => '2025-01-15 10:30:00',
         ];
     }

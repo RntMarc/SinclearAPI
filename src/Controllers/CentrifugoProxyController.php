@@ -6,6 +6,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\ChatParticipantRepository;
+use Sinclear\Api\Services\MessageReactionService;
 use Sinclear\Api\Services\RateLimiter;
 
 /**
@@ -18,10 +19,13 @@ final readonly class CentrifugoProxyController
 {
     private const int TYPING_RATE_LIMIT = 30;
     private const int TYPING_RATE_WINDOW = 60;
+    private const int REACTION_RATE_LIMIT = 60;
+    private const int REACTION_RATE_WINDOW = 60;
 
     public function __construct(
         private ChatParticipantRepository $participantRepo,
         private RateLimiter $rateLimiter,
+        private MessageReactionService $reactionService,
     ) {}
 
     /**
@@ -71,10 +75,13 @@ final readonly class CentrifugoProxyController
     }
 
     /**
-     * Centrifugo publish proxy: validates participant + rate limit for typing events.
+     * Centrifugo publish proxy: validates participant + rate limit for
+     * typing events and chat reactions.
      *
-     * Request:  { "user": "<userId>", "channel": "chat:<conversationId>", "data": { "typing": true } }
-     * Response: { "result": { "data": { "typing": true } } } on success
+     * Typing request:   { "user": "<userId>", "channel": "chat:<conversationId>", "data": { "typing": true } }
+     * Reaction request:  { "user": "<userId>", "channel": "chat:<conversationId>", "data": { "reaction": { "messageId": "...", "emoji": "👍", "add": true } } }
+     * Typing response:   { "result": { "data": { "typing": true } } }
+     * Reaction response: { "result": { "data": { "type": "reaction_updated", "messageId": "...", "reactions": [ ... ] } } }
      */
     public function publish(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
@@ -96,6 +103,11 @@ final readonly class CentrifugoProxyController
             return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
         }
 
+        // Client-published reactions: persist and broadcast the new summary.
+        if (isset($payload['reaction']) && is_array($payload['reaction'])) {
+            return $this->handleReaction($userId, $conversationId, $payload['reaction'], $response);
+        }
+
         // Rate limit typing events
         if (!$this->rateLimiter->isAllowed('chat_typing:' . $userId, self::TYPING_RATE_LIMIT, self::TYPING_RATE_WINDOW)) {
             return ResponseFactory::json(['error' => 'rate_limit_exceeded'], 429, $response);
@@ -110,6 +122,53 @@ final readonly class CentrifugoProxyController
         return ResponseFactory::json([
             'result' => [
                 'data' => $sanitized,
+                'skip_history' => true,
+            ],
+        ], 200, $response);
+    }
+
+    /**
+     * Handle a client-published reaction: rate limit, persist, return the
+     * updated summary which Centrifugo broadcasts to all subscribers.
+     *
+     * Request payload: { "reaction": { "messageId": "<uuid>", "emoji": "👍", "add": true } }
+     *
+     * @param array<string, mixed> $reaction
+     */
+    private function handleReaction(
+        string $userId,
+        string $conversationId,
+        array $reaction,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        if (!$this->rateLimiter->isAllowed('chat_reaction:' . $userId, self::REACTION_RATE_LIMIT, self::REACTION_RATE_WINDOW)) {
+            return ResponseFactory::json(['error' => 'rate_limit_exceeded'], 429, $response);
+        }
+
+        $messageId = (string) ($reaction['messageId'] ?? '');
+        $emoji = (string) ($reaction['emoji'] ?? '');
+        $add = !empty($reaction['add']);
+
+        try {
+            $reactions = $this->reactionService->applyReaction(
+                $userId,
+                $conversationId,
+                $messageId,
+                $emoji,
+                $add,
+            );
+        } catch (\RuntimeException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+        }
+
+        // Ephemeral: clients reload the full message state via REST on recovery.
+        return ResponseFactory::json([
+            'result' => [
+                'data' => [
+                    'type' => 'reaction_updated',
+                    'messageId' => $messageId,
+                    'reactions' => $reactions,
+                ],
                 'skip_history' => true,
             ],
         ], 200, $response);

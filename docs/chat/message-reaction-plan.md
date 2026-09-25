@@ -1,145 +1,73 @@
-# Message Reaction Plan
+# Message Reaction Plan (implementiert)
 
-## Overview
-This document outlines the planned implementation for message reactions in Sinclear's chat system.
+Reaktionen auf Chat-Nachrichten, umgesetzt über den Centrifugo Publish-Proxy.
+Diese Datei beschreibt den **umgesetzten** Stand (der frühere Entwurf mit
+REST-Endpunkten und FK auf `Message` ist überholt).
 
-## Goals
-- Allow users to react to messages with Unicode emoji
-- Show reaction counts and which users reacted
-- Support adding/removing reactions
-- Real-time updates via Centrifugo
+## Transport
 
-## Data Model
+Es gibt **keinen REST-Endpoint**. Client-seitige Reaktionen laufen über die
+bestehende WebSocket-Verbindung und den Publish-Proxy:
 
-### Database Schema
+```
+Client: sub.publish({ reaction: { messageId, emoji, add } })
+  → Centrifugo → POST /api/v2/centrifugo/publish
+  → PHP: Participant-Check + Rate-Limit + Persistenz + Summary
+  → Centrifugo broadcastet { type: "reaction_updated", messageId, reactions:[…] }
+  → alle Clients (inkl. Sender) aktualisieren die Bubble
+```
+
+- Explizites `add: true|false` (kein Toggle) → idempotent bei Retry.
+- `skip_history: true` (ephemer); Reconnect lädt den Verlauf per REST.
+- Rate-Limit: 60/min pro Nutzer (`chat_reaction:{userId}`).
+
+## Datenmodell
+
 ```sql
 CREATE TABLE MessageReaction (
-  id VARCHAR(191) NOT NULL,
-  messageId VARCHAR(191) NOT NULL,
-  userId VARCHAR(191) NOT NULL,
-  emoji VARCHAR(10) NOT NULL,
-  createdAt DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  id varchar(191) NOT NULL,
+  messageId varchar(191) NOT NULL,
+  userId varchar(191) NOT NULL,
+  emoji varchar(32) NOT NULL,
+  createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  UNIQUE KEY uk_message_user_emoji (messageId, userId, emoji),
-  CONSTRAINT fk_reaction_message FOREIGN KEY (messageId) REFERENCES Message(id) ON DELETE CASCADE,
-  CONSTRAINT fk_reaction_user FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+  UNIQUE KEY uk_reaction_msg_user_emoji (messageId, userId, emoji),
+  KEY idx_reaction_message (messageId),
+  CONSTRAINT fk_reaction_message FOREIGN KEY (messageId) REFERENCES DirectMessage (id) ON DELETE CASCADE,
+  CONSTRAINT fk_reaction_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### API Endpoints
+## Allowlist
 
-#### Add Reaction
-```
-POST /chat/messages/{messageId}/reactions
-Body: { "emoji": "👍" }
-Response: 201 Created
-```
+Feste, normalisierte Liste (Variation Selectors entfernt):
+`👍 ❤ 😂 😮 😢 🎉 🔥 👏`.
+Client und Server spiegeln exakt dieselbe Liste.
 
-#### Remove Reaction
-```
-DELETE /chat/messages/{messageId}/reactions/{emoji}
-Response: 204 No Content
-```
+## DTO / Aggregation
 
-#### Get Reactions for Message
-```
-GET /chat/messages/{messageId}/reactions
-Response: 200 OK
-{
-  "data": {
-    "👍": {
-      "count": 3,
-      "users": ["user1", "user2", "user3"],
-      "me": true
-    },
-    "❤️": {
-      "count": 1,
-      "users": ["user4"],
-      "me": false
-    }
-  }
-}
-```
+`DirectMessage.reactions` ist eingebettet:
 
-## Centrifugo Events
-
-### Reaction Added
 ```json
-{
-  "type": "reaction_added",
-  "messageId": "msg_123",
-  "userId": "user_456",
-  "emoji": "👍",
-  "seq": 789
-}
+"reactions": [
+  {"emoji": "👍", "count": 2, "users": [{"id": "…", "displayName": "…", "avatar": "…"}]}
+]
 ```
 
-### Reaction Removed
-```json
-{
-  "type": "reaction_removed",
-  "messageId": "msg_123",
-  "userId": "user_456",
-  "emoji": "👍",
-  "seq": 790
-}
-```
+Sortiert nach `count` absteigend. Kein `me`-Flag; der Client leitet „me" durch
+Abgleich seiner User-ID mit `users` ab. Batch-Load in `getMessages` (kein N+1).
 
-## UI Design
+## Beteiligte Komponenten
 
-### Reaction Display
-- Show reactions below message content
-- Group by emoji with count
-- Highlight own reactions
-- Tap to toggle own reaction
+- `src/Repository/MessageReactionRepository.php`
+- `src/Services/MessageReactionService.php`
+- `src/Controllers/CentrifugoProxyController.php` (Reaktionszweig)
+- `src/Services/DirectMessageService.php` (Einbettung in `formatMessage`)
+- `config/dependencies.php`, `openapi.yaml`, `docs/chat/readme.md`
 
-### Reaction Picker
-- Long-press on message to open reaction picker
-- Show frequently used emoji
-- Support custom emoji (future)
+## Nicht enthalten (bewusst)
 
-## Implementation Phases
-
-### Phase 1: Backend
-1. Create MessageReaction table migration
-2. Implement MessageReactionRepository
-3. Add API endpoints to ChatController
-4. Update openapi.yaml
-5. Add Centrifugo event publishing
-
-### Phase 2: Client
-1. Add reaction models
-2. Create ReactionService
-3. Extend CentrifugoService for reaction events
-4. Build reaction picker widget
-5. Add reactions to message bubbles
-6. Update chat list for reaction indicators
-
-### Phase 3: Polish
-1. Add reaction animations
-2. Optimize performance for messages with many reactions
-3. Add reaction search/filter (future)
-
-## Technical Considerations
-
-### Performance
-- Index on (messageId, emoji) for fast counts
-- Cache reaction counts in Message table for quick access
-- Batch reaction updates for bulk operations
-
-### Real-time
-- Use existing Centrifugo chat channel
-- Include reaction data in message events
-- Optimistic UI updates with server confirmation
-
-### Accessibility
-- Screen reader labels for reactions
-- Keyboard navigation for reaction picker
-- High contrast mode support
-
-## Future Enhancements
-- Custom emoji support
-- Reaction animations
-- Reaction notifications
-- Reaction analytics
-- Animated emoji
+- Keine Reaction-Notifications, keine Reaktions-Moderation.
+- Kein REST-Fallback (Reaktionen sind ein Realtime-Feature; bei deaktiviertem
+  Centrifugo nicht verfügbar).
+- Keine freien Emojis (nur Allowlist).
