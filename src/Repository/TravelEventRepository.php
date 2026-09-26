@@ -2,8 +2,10 @@
 
 namespace Sinclear\Api\Repository;
 
+use DateTimeImmutable;
 use PDO;
 use Ramsey\Uuid\Uuid;
+use Sinclear\Api\Support\DateTimeValue;
 
 final readonly class TravelEventRepository
 {
@@ -14,14 +16,16 @@ final readonly class TravelEventRepository
     /** @return list<array<string, mixed>> */
     public function findAll(): array
     {
-        $stmt = $this->pdo->query('SELECT * FROM TravelEvent ORDER BY startDate DESC, startTime DESC');
+        $stmt = $this->pdo->query(
+            'SELECT * FROM TravelEvent ORDER BY COALESCE(startAt, TIMESTAMP(startDate)) DESC, ID ASC'
+        );
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function findByTrip(string $tripId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM TravelEvent WHERE trip = ? ORDER BY startDate ASC, startTime ASC'
+            'SELECT * FROM TravelEvent WHERE trip = ? ORDER BY COALESCE(startAt, TIMESTAMP(startDate)) ASC, ID ASC'
         );
         $stmt->execute([$tripId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -46,14 +50,14 @@ final readonly class TravelEventRepository
     }
 
     /**
-     * Alle Events, die für den Nutzer sichtbar sind und den Zeitraum
-     * überlappen. Standalone-Events über EventRelation, Reise-Events
-     * über die TravelRelation der zugehörigen Reise.
-     * Inklusiver Datumsbereich: endDate >= :start AND startDate <= :end
+     * Alle Events, die fuer den Nutzer sichtbar sind und den Zeitraum
+     * ueberlappen. Standalone-Events ueber EventRelation, Reise-Events
+     * ueber die TravelRelation der zugehoerigen Reise.
+     * Der Zeitraum ist in zivilen Tagen der Zone `$rangeTimezone` definiert.
      *
      * @return list<array<string, mixed>>
      */
-    public function findVisibleInRange(string $userId, string $start, string $end, int $limit): array
+    public function findVisibleInRange(string $userId, string $start, string $end, string $rangeTimezone, int $limit): array
     {
         $stmt = $this->pdo->prepare(
             'SELECT DISTINCT e.*
@@ -64,12 +68,26 @@ final readonly class TravelEventRepository
                  (e.trip IS NULL AND er.userId IS NOT NULL)
                  OR (e.trip IS NOT NULL AND tr.userid IS NOT NULL)
              )
-               AND e.endDate >= ?
-               AND e.startDate <= ?
-             ORDER BY e.startDate ASC, e.startTime ASC
+               AND (
+                 (e.allDay = 0 AND e.endAt >= ?)
+                 OR (e.allDay = 1 AND e.endDate >= ?)
+               )
+               AND (
+                 (e.allDay = 0 AND e.startAt < ?)
+                 OR (e.allDay = 1 AND e.startDate <= ?)
+               )
+             ORDER BY COALESCE(e.startAt, TIMESTAMP(e.startDate)) ASC, e.ID ASC
              LIMIT ?'
         );
-        $stmt->execute([$userId, $userId, $start, $end, $limit]);
+        $stmt->execute([
+            $userId,
+            $userId,
+            DateTimeValue::civilDayStartUtc($start, $rangeTimezone),
+            DateTimeValue::formatDate(DateTimeValue::parseDate($start)),
+            DateTimeValue::civilDayEndUtcExclusive($end, $rangeTimezone),
+            DateTimeValue::formatDate(DateTimeValue::parseDate($end)),
+            $limit,
+        ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -112,7 +130,7 @@ final readonly class TravelEventRepository
              FROM TravelEvent e
              JOIN EventRelation r ON r.eventId = e.ID
              WHERE e.trip IS NULL AND r.userId = ?
-             ORDER BY e.startDate DESC, e.startTime DESC
+             ORDER BY COALESCE(e.startAt, TIMESTAMP(e.startDate)) DESC, e.ID ASC
              LIMIT ? OFFSET ?'
         );
         $dataStmt->execute([...$params, $limit, $offset]);
@@ -182,19 +200,20 @@ final readonly class TravelEventRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelEvent (ID, trip, name, description, startDate, endDate, startTime, endTime, allDay, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID, citySlug)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelEvent (ID, trip, name, description, allDay, timezone, startAt, endAt, startDate, endDate, hastickets, ticket, ticketUrl, url, image, organizer, address, latitude, longitude, OSMID, citySlug)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
             $data['trip'] ?? null,
             $data['name'],
             $data['description'] ?? null,
-            $data['startDate'],
-            $data['endDate'],
-            $data['startTime'] ?? null,
-            $data['endTime'] ?? null,
-            $data['allDay'] ?? 0,
+            (int) ($data['allDay'] ?? 0),
+            DateTimeValue::normalizeTimeZone($data['timezone'] ?? null),
+            self::instant($data['startAt'] ?? null),
+            self::instant($data['endAt'] ?? null),
+            self::date($data['startDate'] ?? null),
+            self::date($data['endDate'] ?? null),
             $data['hastickets'] ?? '0',
             $data['ticket'] ?? null,
             $data['ticketUrl'] ?? null,
@@ -215,11 +234,19 @@ final readonly class TravelEventRepository
         $sets = [];
         $values = [];
 
-        foreach (['trip', 'name', 'description', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'hastickets', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address', 'latitude', 'longitude', 'OSMID', 'citySlug'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $sets[] = "`$field` = ?";
-                $values[] = $data[$field];
+        foreach (['trip', 'name', 'description', 'allDay', 'timezone', 'startAt', 'endAt', 'startDate', 'endDate', 'hastickets', 'ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address', 'latitude', 'longitude', 'OSMID', 'citySlug'] as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
             }
+
+            $sets[] = "`$field` = ?";
+            $values[] = match ($field) {
+                'allDay' => (int) $data[$field],
+                'timezone' => DateTimeValue::normalizeTimeZone($data[$field]),
+                'startAt', 'endAt' => self::instant($data[$field]),
+                'startDate', 'endDate' => self::date($data[$field]),
+                default => $data[$field],
+            };
         }
 
         if ($sets === []) {
@@ -236,5 +263,38 @@ final readonly class TravelEventRepository
     {
         $stmt = $this->pdo->prepare('DELETE FROM TravelEvent WHERE ID = ?');
         $stmt->execute([$id]);
+    }
+
+    private static function instant(DateTimeImmutable|string|null $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof DateTimeImmutable) {
+            return DateTimeValue::toDatabase($value);
+        }
+
+        try {
+            return DateTimeValue::toDatabase(DateTimeValue::parseInstant($value));
+        } catch (\InvalidArgumentException) {
+            $instant = DateTimeValue::fromDatabase($value);
+            if ($instant === null) {
+                throw new \InvalidArgumentException('Invalid datetime');
+            }
+
+            return DateTimeValue::toDatabase($instant);
+        }
+    }
+
+    private static function date(DateTimeImmutable|string|null $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return DateTimeValue::formatDate(
+            $value instanceof DateTimeImmutable ? $value : DateTimeValue::parseDate($value),
+        );
     }
 }

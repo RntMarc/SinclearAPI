@@ -82,11 +82,12 @@ class CalendarFeedServiceTest extends TestCase
                 creatorId varchar(191) NOT NULL,
                 title varchar(255) NOT NULL,
                 description text DEFAULT NULL,
-                startDate date NOT NULL,
-                endDate date NOT NULL,
-                startTime time DEFAULT NULL,
-                endTime time DEFAULT NULL,
                 allDay tinyint NOT NULL DEFAULT 0,
+                timezone varchar(64) NOT NULL DEFAULT 'Europe/Berlin',
+                startAt datetime(3) DEFAULT NULL,
+                endAt datetime(3) DEFAULT NULL,
+                startDate date DEFAULT NULL,
+                endDate date DEFAULT NULL,
                 visibility tinyint NOT NULL DEFAULT 0,
                 createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
                 updatedAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
@@ -105,11 +106,12 @@ class CalendarFeedServiceTest extends TestCase
                 id varchar(191) NOT NULL PRIMARY KEY,
                 name varchar(255) DEFAULT NULL,
                 description text DEFAULT NULL,
-                startDate date NOT NULL,
-                endDate date NOT NULL,
-                startTime time DEFAULT NULL,
-                endTime time DEFAULT NULL,
                 allDay tinyint NOT NULL DEFAULT 1,
+                timezone varchar(64) NOT NULL DEFAULT 'Europe/Berlin',
+                startAt datetime(3) DEFAULT NULL,
+                endAt datetime(3) DEFAULT NULL,
+                startDate date DEFAULT NULL,
+                endDate date DEFAULT NULL,
                 hastickets varchar(255) DEFAULT NULL,
                 ticket text DEFAULT NULL,
                 ticketUrl text DEFAULT NULL,
@@ -130,11 +132,12 @@ class CalendarFeedServiceTest extends TestCase
                 trip varchar(191) DEFAULT NULL,
                 name varchar(255) DEFAULT NULL,
                 description text DEFAULT NULL,
-                startDate date NOT NULL,
-                endDate date NOT NULL,
-                startTime time DEFAULT NULL,
-                endTime time DEFAULT NULL,
                 allDay tinyint NOT NULL DEFAULT 0,
+                timezone varchar(64) NOT NULL DEFAULT 'Europe/Berlin',
+                startAt datetime(3) DEFAULT NULL,
+                endAt datetime(3) DEFAULT NULL,
+                startDate date DEFAULT NULL,
+                endDate date DEFAULT NULL,
                 hastickets varchar(255) DEFAULT NULL,
                 ticket text DEFAULT NULL,
                 ticketUrl text DEFAULT NULL,
@@ -250,10 +253,16 @@ class CalendarFeedServiceTest extends TestCase
 
     private function insertCalendarEvent(string $id, string $creatorId, string $startDate, string $endDate, int $visibility, string $startTime = '10:00:00', string $endTime = '12:00:00', int $allDay = 0): void
     {
+        // Getaktet: UTC-Instants; ganztägig: zivile Tage.
+        $startAt = $allDay === 1 ? null : $startDate . ' ' . $startTime;
+        $endAt = $allDay === 1 ? null : $endDate . ' ' . $endTime;
+        $dayStart = $allDay === 1 ? $startDate : null;
+        $dayEnd = $allDay === 1 ? $endDate : null;
+
         $stmt = $this->db->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, startDate, endDate, startTime, endTime, allDay, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO CalendarEvent (id, creatorId, title, allDay, timezone, startAt, endAt, startDate, endDate, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$id, $creatorId, 'Event ' . $id, $startDate, $endDate, $startTime, $endTime, $allDay, $visibility]);
+        $stmt->execute([$id, $creatorId, 'Event ' . $id, $allDay, 'UTC', $startAt, $endAt, $dayStart, $dayEnd, $visibility]);
     }
 
     private function itemIds(array $items, string $type): array
@@ -291,10 +300,10 @@ class CalendarFeedServiceTest extends TestCase
         $this->db->exec("INSERT INTO TravelRelation (ID, userid, tripid) VALUES ('rel-1', 'user-1', 'trip-1')");
         $this->db->exec("INSERT INTO TravelRelation (ID, userid, tripid) VALUES ('rel-2', 'user-2', 'trip-2')");
 
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-1', 'trip-1', 'Museum', '2026-07-02', '2026-07-02', '09:00:00', '11:00:00')");
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-2', NULL, 'Konzert', '2026-08-01', '2026-08-01', '20:00:00', '23:00:00')");
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-3', NULL, 'Theater', '2026-08-02', '2026-08-02', '20:00:00', '23:00:00')");
-        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, startDate, endDate, startTime, endTime) VALUES ('event-4', 'trip-2', 'Dom', '2026-07-11', '2026-07-11', '10:00:00', '12:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, allDay, timezone, startAt, endAt) VALUES ('event-1', 'trip-1', 'Museum', 0, 'UTC', '2026-07-02 09:00:00', '2026-07-02 11:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, allDay, timezone, startAt, endAt) VALUES ('event-2', NULL, 'Konzert', 0, 'UTC', '2026-08-01 20:00:00', '2026-08-01 23:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, allDay, timezone, startAt, endAt) VALUES ('event-3', NULL, 'Theater', 0, 'UTC', '2026-08-02 20:00:00', '2026-08-02 23:00:00')");
+        $this->db->exec("INSERT INTO TravelEvent (ID, trip, name, allDay, timezone, startAt, endAt) VALUES ('event-4', 'trip-2', 'Dom', 0, 'UTC', '2026-07-11 10:00:00', '2026-07-11 12:00:00')");
         $this->db->exec("INSERT INTO EventRelation (id, eventId, userId) VALUES ('er-1', 'event-2', 'user-1')");
         $this->db->exec("INSERT INTO EventRelation (id, eventId, userId) VALUES ('er-2', 'event-3', 'user-2')");
 
@@ -382,11 +391,6 @@ class CalendarFeedServiceTest extends TestCase
 
         $feed = $this->service->buildFeed('user-1', '2026-01-01', '2026-12-31', CalendarFeedService::SUPPORTED_TYPES);
 
-        $startDates = array_column($feed['data'], 'startDate');
-        $sorted = $startDates;
-        sort($sorted);
-        $this->assertSame($sorted, $startDates);
-
         $insertedIds = array_values(array_map(
             fn(array $item) => $item['id'],
             array_filter(
@@ -400,17 +404,17 @@ class CalendarFeedServiceTest extends TestCase
     public function testTruncationIsReported(): void
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, startDate, endDate, startTime, endTime, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO CalendarEvent (id, creatorId, title, allDay, timezone, startAt, endAt, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         );
         for ($i = 1; $i <= 501; $i++) {
             $stmt->execute([
                 'ev-' . $i,
                 'user-1',
                 'Event ' . $i,
-                '2026-03-10',
-                '2026-03-10',
-                '10:00:00',
-                '12:00:00',
+                0,
+                'UTC',
+                '2026-03-10 10:00:00',
+                '2026-03-10 12:00:00',
                 0,
             ]);
         }

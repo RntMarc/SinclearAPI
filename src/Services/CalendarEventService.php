@@ -6,6 +6,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\CloseFriendRepository;
+use Sinclear\Api\Support\DateTimeValue;
 
 final readonly class CalendarEventService
 {
@@ -42,9 +43,7 @@ final readonly class CalendarEventService
             throw new \RuntimeException('Forbidden');
         }
 
-        // Merge incoming data with existing to validate cross-field constraints
-        $merged = array_merge($event, $data);
-        $this->validateDateTimeConsistency($merged);
+        $data = $this->normalizeTiming($event, $data);
 
         $this->eventRepo->update($id, $data);
 
@@ -54,32 +53,63 @@ final readonly class CalendarEventService
         return $event;
     }
 
-    private function validateDateTimeConsistency(array $event): void
+    /**
+     * Bringt die Timing-Felder in eine konsistente Form: ganztägige Events
+     * tragen nur startDate/endDate, getaktete nur startAt/endAt. Die jeweils
+     * andere Feldgruppe wird explizit geleert, damit ein Umschalten des
+     * allDay-Flags keine veralteten Werte hinterlaesst.
+     */
+    private function normalizeTiming(array $event, array $data): array
     {
-        $allDay = (bool) ($event['allDay'] ?? 0);
+        $allDay = array_key_exists('allDay', $data)
+            ? (bool) $data['allDay']
+            : ((int) ($event['allDay'] ?? 0) === 1);
 
         if ($allDay) {
-            // All-day: dates required, times must be empty
-            if (empty($event['startDate']) || empty($event['endDate'])) {
+            $rawStart = array_key_exists('startDate', $data) ? $data['startDate'] : ($event['startDate'] ?? null);
+            $rawEnd = array_key_exists('endDate', $data) ? $data['endDate'] : ($event['endDate'] ?? null);
+            if ($rawStart === null || $rawStart === '' || $rawEnd === null || $rawEnd === '') {
                 throw new \RuntimeException('Invalid date');
             }
-            if ($event['startDate'] > $event['endDate']) {
+
+            $start = DateTimeValue::parseDate((string) $rawStart);
+            $end = DateTimeValue::parseDate((string) $rawEnd);
+            if ($end < $start) {
                 throw new \RuntimeException('Invalid time range');
             }
-            if (!empty($event['startTime']) || !empty($event['endTime'])) {
-                throw new \RuntimeException('Invalid time');
-            }
-        } else {
-            // Timed: all four fields required
-            if (empty($event['startDate']) || empty($event['endDate']) || empty($event['startTime']) || empty($event['endTime'])) {
-                throw new \RuntimeException('Invalid datetime');
-            }
-            $startMoment = $event['startDate'] . ' ' . $event['startTime'];
-            $endMoment = $event['endDate'] . ' ' . $event['endTime'];
-            if ($startMoment >= $endMoment) {
-                throw new \RuntimeException('Invalid time range');
-            }
+
+            return array_merge($data, [
+                'allDay' => 1,
+                'startDate' => DateTimeValue::formatDate($start),
+                'endDate' => DateTimeValue::formatDate($end),
+                'startAt' => null,
+                'endAt' => null,
+            ]);
         }
+
+        $rawStart = array_key_exists('startAt', $data)
+            ? $data['startAt']
+            : DateTimeValue::fromDatabase($event['startAt'] ?? null);
+        $rawEnd = array_key_exists('endAt', $data)
+            ? $data['endAt']
+            : DateTimeValue::fromDatabase($event['endAt'] ?? null);
+        if ($rawStart === null || $rawStart === '' || $rawEnd === null || $rawEnd === '') {
+            throw new \RuntimeException('Invalid datetime');
+        }
+
+        $start = $rawStart instanceof DateTimeImmutable ? $rawStart : DateTimeValue::parseInstant((string) $rawStart);
+        $end = $rawEnd instanceof DateTimeImmutable ? $rawEnd : DateTimeValue::parseInstant((string) $rawEnd);
+        if ($end <= $start) {
+            throw new \RuntimeException('Invalid time range');
+        }
+
+        return array_merge($data, [
+            'allDay' => 0,
+            'startAt' => DateTimeValue::toDatabase($start),
+            'endAt' => DateTimeValue::toDatabase($end),
+            'startDate' => null,
+            'endDate' => null,
+        ]);
     }
 
     public function delete(string $id, string $userId): void
@@ -113,10 +143,11 @@ final readonly class CalendarEventService
         string $userId,
         ?string $start,
         ?string $end,
+        string $rangeTimezone,
         int $page,
         int $limit,
     ): array {
-        $result = $this->eventRepo->findAllVisible($userId, $start, $end, $page, $limit);
+        $result = $this->eventRepo->findAllVisible($userId, $start, $end, $rangeTimezone, $page, $limit);
         $result['data'] = array_map(fn(array $e) => $this->enrich($e), $result['data']);
         return $result;
     }
@@ -185,44 +216,22 @@ final readonly class CalendarEventService
         return false;
     }
 
+    /**
+     * Normalisiert die Ausgabe: getaktete Events als RFC 3339 in ihrer
+     * Zeitzone, ganztägige als ziviler Datumsbereich, jeweils inkl. `timezone`.
+     */
     private function enrich(array $event): array
     {
-        // Normalize date/time fields for response
-        if (isset($event['startDate'])) {
-            $event['startDate'] = $this->formatDate($event['startDate']);
-        }
-        if (isset($event['endDate'])) {
-            $event['endDate'] = $this->formatDate($event['endDate']);
-        }
-        if (isset($event['startTime'])) {
-            $event['startTime'] = $this->formatTime($event['startTime']);
-        }
-        if (isset($event['endTime'])) {
-            $event['endTime'] = $this->formatTime($event['endTime']);
-        }
-        // For all-day events, omit time fields (they are NULL in DB)
-        if (($event['allDay'] ?? 0) === 1) {
-            unset($event['startTime'], $event['endTime']);
-        }
+        $event = DateTimeValue::normalizeTimingForOutput($event);
 
         foreach (['createdAt', 'updatedAt'] as $field) {
-            if (isset($event[$field])) {
-                $event[$field] = (new DateTimeImmutable($event[$field], new DateTimeZone('UTC')))
-                    ->format('Y-m-d H:i:s');
+            $instant = DateTimeValue::fromDatabase($event[$field] ?? null);
+            if ($instant !== null) {
+                $event[$field] = DateTimeValue::formatInstant($instant, new DateTimeZone('UTC'));
             }
         }
 
         $event['participants'] = $this->eventRepo->findParticipantsByEvent($event['id']);
         return $event;
-    }
-
-    private function formatDate(string $value): string
-    {
-        return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->format('Y-m-d');
-    }
-
-    private function formatTime(string $value): string
-    {
-        return (new DateTimeImmutable($value, new DateTimeZone('UTC')))->format('H:i:s');
     }
 }

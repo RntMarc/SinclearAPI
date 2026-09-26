@@ -3,10 +3,9 @@
 namespace Sinclear\Api\Repository;
 
 use DateTimeImmutable;
-use DateTimeZone;
 use PDO;
 use Ramsey\Uuid\Uuid;
-use RuntimeException;
+use Sinclear\Api\Support\DateTimeValue;
 
 final readonly class CalendarEventRepository
 {
@@ -19,21 +18,20 @@ final readonly class CalendarEventRepository
         $id = Uuid::uuid7()->toString();
 
         $stmt = $this->pdo->prepare(
-            'INSERT INTO CalendarEvent (id, creatorId, title, description, startDate, endDate, startTime, endTime, allDay, visibility, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
+            'INSERT INTO CalendarEvent (id, creatorId, title, description, allDay, timezone, startAt, endAt, startDate, endDate, visibility, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
         );
         $stmt->execute([
             $id,
             $creatorId,
             $data['title'],
             $data['description'] ?? null,
-            $this->formatDate($data['startDate']),
-            $this->formatDate($data['endDate']),
-            $this->normalizeTime($data['startTime'] ?? null),
-            $this->normalizeTime($data['endTime'] ?? null),
-            // (int): PDO bindet execute()-Parameter als String – false
-            // waere '' und loest in MySQL-Strict-Mode Fehler 1366 aus.
             (int) ($data['allDay'] ?? 0),
+            DateTimeValue::normalizeTimeZone($data['timezone'] ?? null),
+            self::instant($data['startAt'] ?? null),
+            self::instant($data['endAt'] ?? null),
+            self::date($data['startDate'] ?? null),
+            self::date($data['endDate'] ?? null),
             (int) ($data['visibility'] ?? 0),
         ]);
 
@@ -45,19 +43,19 @@ final readonly class CalendarEventRepository
         $fields = [];
         $params = [];
 
-        foreach (['title', 'description', 'startDate', 'endDate', 'startTime', 'endTime', 'allDay', 'visibility'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $fields[] = "`$field` = ?";
-                $value = $data[$field];
-                if (in_array($field, ['startDate', 'endDate'], true)) {
-                    $value = $this->formatDate($value);
-                } elseif (in_array($field, ['startTime', 'endTime'], true)) {
-                    $value = $this->normalizeTime($value);
-                } elseif (in_array($field, ['allDay', 'visibility'], true)) {
-                    $value = (int) $value;
-                }
-                $params[] = $value;
+        foreach (['title', 'description', 'allDay', 'timezone', 'startAt', 'endAt', 'startDate', 'endDate', 'visibility'] as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
             }
+
+            $fields[] = "`$field` = ?";
+            $params[] = match ($field) {
+                'allDay', 'visibility' => (int) $data[$field],
+                'timezone' => DateTimeValue::normalizeTimeZone($data[$field]),
+                'startAt', 'endAt' => self::instant($data[$field]),
+                'startDate', 'endDate' => self::date($data[$field]),
+                default => $data[$field],
+            };
         }
 
         if ($fields === []) {
@@ -92,10 +90,16 @@ final readonly class CalendarEventRepository
         return $result ?: null;
     }
 
+    /**
+     * Sichtbare Events im Zeitraum. Der Zeitraum ist in zivilen Tagen der
+     * Zone `$rangeTimezone` definiert: Getaktete Eintraege werden gegen ihre
+     * UTC-Instants geprueft, ganztägige gegen ihre zivilen Tage.
+     */
     public function findAllVisible(
         string $userId,
         ?string $start,
         ?string $end,
+        string $rangeTimezone,
         int $page,
         int $limit,
     ): array {
@@ -111,12 +115,14 @@ final readonly class CalendarEventRepository
 
         $timeConditions = [];
         if ($start !== null) {
-            $timeConditions[] = 'e.endDate >= ?';
-            $params[] = $this->formatDate($start);
+            $timeConditions[] = '((e.allDay = 0 AND e.endAt >= ?) OR (e.allDay = 1 AND e.endDate >= ?))';
+            $params[] = DateTimeValue::civilDayStartUtc($start, $rangeTimezone);
+            $params[] = DateTimeValue::formatDate(DateTimeValue::parseDate($start));
         }
         if ($end !== null) {
-            $timeConditions[] = 'e.startDate <= ?';
-            $params[] = $this->formatDate($end);
+            $timeConditions[] = '((e.allDay = 0 AND e.startAt < ?) OR (e.allDay = 1 AND e.startDate <= ?))';
+            $params[] = DateTimeValue::civilDayEndUtcExclusive($end, $rangeTimezone);
+            $params[] = DateTimeValue::formatDate(DateTimeValue::parseDate($end));
         }
 
         $where = '(' . $visibilityWhere . ')';
@@ -135,7 +141,7 @@ final readonly class CalendarEventRepository
             "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
              FROM CalendarEvent e
              LEFT JOIN User u ON u.id = e.creatorId
-             WHERE $where ORDER BY e.startDate ASC, e.startTime ASC LIMIT ? OFFSET ?"
+             WHERE $where ORDER BY COALESCE(e.startAt, TIMESTAMP(e.startDate)) ASC, e.id ASC LIMIT ? OFFSET ?"
         );
         $dataStmt->execute([...$params, $limit, $offset]);
         $events = $dataStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -148,87 +154,6 @@ final readonly class CalendarEventRepository
                 'total' => $total,
                 'totalPages' => (int) ceil($total / $limit),
             ],
-        ];
-    }
-
-    /**
-     * Liefert alle fuer den Nutzer sichtbaren Events ohne Pagination
-     * (fuer CalDAV), optional auf einen Zeitraum begrenzt (YYYY-MM-DD).
-     *
-     * @return list<array<string, mixed>>
-     */
-    public function findAllVisibleForDav(string $userId, ?string $start = null, ?string $end = null): array
-    {
-        [$where, $params] = $this->visibilityWhere($userId);
-
-        if ($start !== null) {
-            $where .= ' AND e.endDate >= ?';
-            $params[] = $this->formatDate($start);
-        }
-        if ($end !== null) {
-            $where .= ' AND e.startDate <= ?';
-            $params[] = $this->formatDate($end);
-        }
-
-        $stmt = $this->pdo->prepare(
-            "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
-             FROM CalendarEvent e
-             LEFT JOIN User u ON u.id = e.creatorId
-             WHERE $where ORDER BY e.startDate ASC, e.startTime ASC"
-        );
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    /**
-     * Liefert ein einzelnes Event, aber nur wenn der Nutzer es sehen darf.
-     *
-     * @return array<string, mixed>|null
-     */
-    public function findVisibleByIdForDav(string $userId, string $id): ?array
-    {
-        [$where, $params] = $this->visibilityWhere($userId);
-        $where .= ' AND (e.id = ?)';
-        $params[] = $id;
-
-        $stmt = $this->pdo->prepare(
-            "SELECT e.*, u.displayName AS creatorDisplayName, u.image AS creatorImage
-             FROM CalendarEvent e
-             LEFT JOIN User u ON u.id = e.creatorId
-             WHERE $where LIMIT 1"
-        );
-        $stmt->execute($params);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
-    }
-
-    /**
-     * Baut die gemeinsame Sichtbarkeits-Bedingung fuer den Kalender:
-     * sichtbar sind eigene Events, Events mit Teilnahme, oeffentliche
-     * Events und Events fuer enge Freunde.
-     *
-     * @return array{string, list<string>}
-     */
-    private function visibilityWhere(string $userId): array
-    {
-        $conditions = [
-            'e.creatorId = ?',
-            'EXISTS (SELECT 1 FROM CalendarEventParticipant p WHERE p.eventId = e.id AND p.userId = ?)',
-            'e.visibility = 1',
-            '(e.visibility = 2 AND EXISTS (SELECT 1 FROM CloseFriend cf WHERE cf.userId = e.creatorId AND cf.friendId = ?))',
-        ];
-
-        $visibilityWhere = implode(
-            ' OR ',
-            array_map(
-                static fn (string $condition): string => '(' . $condition . ')',
-                $conditions,
-            ),
-        );
-
-        return [
-            '(' . $visibilityWhere . ')',
-            [$userId, $userId, $userId],
         ];
     }
 
@@ -311,34 +236,36 @@ final readonly class CalendarEventRepository
         return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
-    private function formatDate(string $value): string
-    {
-        try {
-            return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
-                ->format('Y-m-d');
-        } catch (\Exception $e) {
-            throw new RuntimeException('Invalid date');
-        }
-    }
-
-    /**
-     * Normalisiert eine Uhrzeit auf `H:i:s`; leer/null bleibt NULL.
-     */
-    private function normalizeTime(mixed $value): ?string
+    private static function instant(DateTimeImmutable|string|null $value): ?string
     {
         if ($value === null || $value === '') {
             return null;
         }
-        return $this->formatTime((string) $value);
+
+        if ($value instanceof DateTimeImmutable) {
+            return DateTimeValue::toDatabase($value);
+        }
+
+        try {
+            return DateTimeValue::toDatabase(DateTimeValue::parseInstant($value));
+        } catch (\InvalidArgumentException) {
+            $instant = DateTimeValue::fromDatabase($value);
+            if ($instant === null) {
+                throw new \InvalidArgumentException('Invalid datetime');
+            }
+
+            return DateTimeValue::toDatabase($instant);
+        }
     }
 
-    private function formatTime(string $value): string
+    private static function date(DateTimeImmutable|string|null $value): ?string
     {
-        try {
-            return (new DateTimeImmutable($value, new DateTimeZone('UTC')))
-                ->format('H:i:s');
-        } catch (\Exception $e) {
-            throw new RuntimeException('Invalid time');
+        if ($value === null || $value === '') {
+            return null;
         }
+
+        return DateTimeValue::formatDate(
+            $value instanceof DateTimeImmutable ? $value : DateTimeValue::parseDate($value),
+        );
     }
 }

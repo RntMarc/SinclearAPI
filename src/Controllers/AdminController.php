@@ -33,6 +33,7 @@ use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\ImageService;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
+use Sinclear\Api\Support\DateTimeValue;
 use PDO;
 
 final readonly class AdminController
@@ -240,19 +241,30 @@ ROW;
         }
 
         $tripRows = '';
+        $tripsData = [];
         foreach ($allTrips as $t) {
             $id = htmlspecialchars($t['id']);
             $name = htmlspecialchars($t['name']);
             $desc = htmlspecialchars($t['description'] ?? '');
-            $allDay = !empty($t['allDay']);
-            if ($allDay) {
-                $start = date('d.m.Y', strtotime($t['startDate']));
-                $end = date('d.m.Y', strtotime($t['endDate']));
-            } else {
-                $start = date('d.m.Y H:i', strtotime($t['startDate'] . ' ' . $t['startTime']));
-                $end = date('d.m.Y H:i', strtotime($t['endDate'] . ' ' . $t['endTime']));
-            }
+            [$start, $end] = $this->formatPeriod($t);
             $hastickets = $t['hastickets'] === '1' ? 'Ja' : 'Nein';
+            $timezone = DateTimeValue::normalizeTimeZone(
+                isset($t['timezone']) ? (string) $t['timezone'] : null,
+            );
+            $tripsData[$t['id']] = [
+                'id' => $t['id'],
+                'name' => $t['name'] ?? '',
+                'description' => $t['description'] ?? '',
+                'allDay' => !empty($t['allDay']),
+                'timezone' => $timezone,
+                'startDate' => $t['startDate'] ?? '',
+                'endDate' => $t['endDate'] ?? '',
+                'startAtLocal' => self::storedInstantForInput($t['startAt'] ?? null, $timezone),
+                'endAtLocal' => self::storedInstantForInput($t['endAt'] ?? null, $timezone),
+                'hastickets' => $t['hastickets'] ?? '0',
+                'ticket' => $t['ticket'] ?? '',
+                'ticketUrl' => $t['ticketUrl'] ?? '',
+            ];
             $tripRows .= <<<ROW
             <tr>
                 <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$id}">{$id}</td>
@@ -261,7 +273,7 @@ ROW;
                 <td>{$start} – {$end}</td>
                 <td>{$hastickets}</td>
                 <td class="flex" style="gap:0.4rem;">
-                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}', `{$name}`, `{$desc}`, '{$t['startDate']}', '{$t['endDate']}', '{$t['startTime']}', '{$t['endTime']}', '{$t['allDay']}', '{$t['hastickets']}', `{$t['ticket']}`, `{$t['ticketUrl']}`)">Bearbeiten</button>
+                    <button class="btn btn-sm btn-primary" onclick="editTrip('{$id}')">Bearbeiten</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteTrip('{$id}', '{$name}')">Löschen</button>
                 </td>
             </tr>
@@ -277,14 +289,7 @@ ROW;
             $eTripName = $eTripId !== '' && isset($tripById[$eTripId])
                 ? htmlspecialchars($tripById[$eTripId])
                 : '–';
-            $eAllDay = !empty($e['allDay']);
-            if ($eAllDay) {
-                $eStart = date('d.m.Y', strtotime($e['startDate']));
-                $eEnd = date('d.m.Y', strtotime($e['endDate']));
-            } else {
-                $eStart = date('d.m.Y H:i', strtotime($e['startDate'] . ' ' . $e['startTime']));
-                $eEnd = date('d.m.Y H:i', strtotime($e['endDate'] . ' ' . $e['endTime']));
-            }
+            [$eStart, $eEnd] = $this->formatPeriod($e);
             $eventRows .= <<<ROW
             <tr>
                 <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$eId}">{$eId}</td>
@@ -310,16 +315,20 @@ ROW;
 
         $eventsData = [];
         foreach ($allEvents as $e) {
+            $timezone = DateTimeValue::normalizeTimeZone(
+                isset($e['timezone']) ? (string) $e['timezone'] : null,
+            );
             $eventsData[$e['ID']] = [
                 'id' => $e['ID'],
                 'name' => $e['name'] ?? '',
                 'description' => $e['description'] ?? '',
                 'trip' => $e['trip'] ?? '',
+                'allDay' => !empty($e['allDay']),
+                'timezone' => $timezone,
                 'startDate' => $e['startDate'] ?? '',
                 'endDate' => $e['endDate'] ?? '',
-                'startTime' => $e['startTime'] ?? '',
-                'endTime' => $e['endTime'] ?? '',
-                'allDay' => !empty($e['allDay']),
+                'startAtLocal' => self::storedInstantForInput($e['startAt'] ?? null, $timezone),
+                'endAtLocal' => self::storedInstantForInput($e['endAt'] ?? null, $timezone),
                 'hastickets' => $e['hastickets'] ?? '0',
                 'ticket' => $e['ticket'] ?? '',
                 'ticketUrl' => $e['ticketUrl'] ?? '',
@@ -338,7 +347,9 @@ ROW;
             'tripRows' => $tripRows,
             'eventRows' => $eventRows,
             'tripOptions' => $tripOptions,
+            'tripsData' => json_encode($tripsData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT),
             'eventsData' => json_encode($eventsData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT),
+            'timezoneOptions' => $this->timezoneOptions(DateTimeValue::DEFAULT_TIMEZONE),
         ]);
         $html = $this->renderLayout('Reisen & Events', $contentHtml, $user->email);
 
@@ -356,43 +367,22 @@ ROW;
             return ResponseFactory::json(['error' => 'name_required'], 400, $response);
         }
 
-        $allDay = !empty($body['allDay']) ? (bool) $body['allDay'] : true; // trips default all-day
-        $startDate = trim((string) ($body['startDate'] ?? ''));
-        $endDate = trim((string) ($body['endDate'] ?? ''));
-        $startTime = trim((string) ($body['startTime'] ?? ''));
-        $endTime = trim((string) ($body['endTime'] ?? ''));
-
-        if ($allDay) {
-            if ($startDate === '' || $endDate === '') {
-                return ResponseFactory::json(['error' => 'date_required'], 400, $response);
-            }
-            if ($startDate > $endDate) {
-                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
-            }
-        } else {
-            if ($startDate === '' || $endDate === '' || $startTime === '' || $endTime === '') {
-                return ResponseFactory::json(['error' => 'time_required'], 400, $response);
-            }
-            if ($startDate . ' ' . $startTime >= $endDate . ' ' . $endTime) {
-                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
-            }
+        try {
+            $timing = $this->timingFromBody($body, true); // trips default all-day
+        } catch (\InvalidArgumentException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
         }
 
-        $id = $this->tripRepo->create([
+        $id = $this->tripRepo->create(array_merge($timing, [
             'name' => $name,
             'description' => isset($body['description']) && is_string($body['description'])
                 ? trim($body['description']) : null,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
-            'startTime' => $allDay ? null : $startTime,
-            'endTime' => $allDay ? null : $endTime,
-            'allDay' => $allDay ? 1 : 0,
             'hastickets' => !empty($body['hastickets']) ? '1' : '0',
             'ticket' => isset($body['ticket']) && is_string($body['ticket'])
                 ? trim($body['ticket']) : null,
             'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
                 ? trim($body['ticketUrl']) : null,
-        ]);
+        ]));
 
         $trip = $this->tripRepo->findById($id);
         return ResponseFactory::json(['data' => $trip], 201, $response);
@@ -421,22 +411,15 @@ ROW;
             $data['description'] = is_string($body['description'])
                 ? trim($body['description']) : null;
         }
-        if (array_key_exists('allDay', $body)) {
-            $data['allDay'] = (bool) $body['allDay'] ? 1 : 0;
-        }
-        if (array_key_exists('startDate', $body)) {
-            $data['startDate'] = trim((string) $body['startDate']);
-        }
-        if (array_key_exists('endDate', $body)) {
-            $data['endDate'] = trim((string) $body['endDate']);
-        }
-        if (array_key_exists('startTime', $body)) {
-            $raw = $body['startTime'];
-            $data['startTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
-        }
-        if (array_key_exists('endTime', $body)) {
-            $raw = $body['endTime'];
-            $data['endTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
+        if ($this->hasTimingFields($body)) {
+            try {
+                $data = array_merge($data, $this->timingFromBody(
+                    $body,
+                    (int) ($trip['allDay'] ?? 0) === 1,
+                ));
+            } catch (\InvalidArgumentException $e) {
+                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            }
         }
         if (isset($body['hastickets'])) {
             $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
@@ -492,25 +475,10 @@ ROW;
         }
 
         $allDay = !empty($body['allDay']) ? (bool) $body['allDay'] : false;
-        $startDate = trim((string) ($body['startDate'] ?? ''));
-        $endDate = trim((string) ($body['endDate'] ?? ''));
-        $startTime = trim((string) ($body['startTime'] ?? ''));
-        $endTime = trim((string) ($body['endTime'] ?? ''));
-
-        if ($allDay) {
-            if ($startDate === '' || $endDate === '') {
-                return ResponseFactory::json(['error' => 'date_required'], 400, $response);
-            }
-            if ($startDate > $endDate) {
-                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
-            }
-        } else {
-            if ($startDate === '' || $endDate === '' || $startTime === '' || $endTime === '') {
-                return ResponseFactory::json(['error' => 'time_required'], 400, $response);
-            }
-            if ($startDate . ' ' . $startTime >= $endDate . ' ' . $endTime) {
-                return ResponseFactory::json(['error' => 'invalid_time_range'], 400, $response);
-            }
+        try {
+            $timing = $this->timingFromBody($body, $allDay);
+        } catch (\InvalidArgumentException $e) {
+            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
         }
 
         $tripId = isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
@@ -526,16 +494,11 @@ ROW;
             }
         }
 
-        $id = $this->eventRepo->create([
+        $id = $this->eventRepo->create(array_merge($timing, [
             'trip' => $tripId,
             'name' => $name,
             'description' => isset($body['description']) && is_string($body['description'])
                 ? trim($body['description']) : null,
-            'startDate' => $startDate,
-            'endDate' => $endDate,
-            'startTime' => $allDay ? null : $startTime,
-            'endTime' => $allDay ? null : $endTime,
-            'allDay' => $allDay ? 1 : 0,
             'hastickets' => !empty($body['hastickets']) ? '1' : '0',
             'ticket' => isset($body['ticket']) && is_string($body['ticket'])
                 ? trim($body['ticket']) : null,
@@ -556,7 +519,7 @@ ROW;
                 ? (int) $body['OSMID'] : null,
             'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
                 ? trim($body['citySlug']) : null,
-        ]);
+        ]));
 
         $event = $this->eventRepo->findById($id);
 
@@ -590,22 +553,15 @@ ROW;
             $data['description'] = is_string($body['description'])
                 ? trim($body['description']) : null;
         }
-        if (array_key_exists('allDay', $body)) {
-            $data['allDay'] = (bool) $body['allDay'] ? 1 : 0;
-        }
-        if (array_key_exists('startDate', $body)) {
-            $data['startDate'] = trim((string) $body['startDate']);
-        }
-        if (array_key_exists('endDate', $body)) {
-            $data['endDate'] = trim((string) $body['endDate']);
-        }
-        if (array_key_exists('startTime', $body)) {
-            $raw = $body['startTime'];
-            $data['startTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
-        }
-        if (array_key_exists('endTime', $body)) {
-            $raw = $body['endTime'];
-            $data['endTime'] = ($raw === null || $raw === '') ? null : trim((string) $raw);
+        if ($this->hasTimingFields($body)) {
+            try {
+                $data = array_merge($data, $this->timingFromBody(
+                    $body,
+                    (int) ($event['allDay'] ?? 0) === 1,
+                ));
+            } catch (\InvalidArgumentException $e) {
+                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            }
         }
         $stringFields = ['ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address'];
         foreach ($stringFields as $field) {
@@ -1024,13 +980,7 @@ ROW;
             foreach ($tripEvents as $e) {
                 $eId = htmlspecialchars($e['ID']);
                 $eName = htmlspecialchars($e['name']);
-                if (!empty($e['allDay'])) {
-                    $eStart = date('d.m.Y', strtotime($e['startDate']));
-                    $eEnd = date('d.m.Y', strtotime($e['endDate']));
-                } else {
-                    $eStart = date('d.m.Y H:i', strtotime($e['startDate'] . ' ' . $e['startTime']));
-                    $eEnd = date('d.m.Y H:i', strtotime($e['endDate'] . ' ' . $e['endTime']));
-                }
+                [$eStart, $eEnd] = $this->formatPeriod($e);
                 $tripEventRows .= <<<ROW
                 <tr>
                     <td><a href="/api/v2/admin/travel/events/{$eId}" style="color:#5865F2;text-decoration:none;">{$eName}</a></td>
@@ -1065,13 +1015,7 @@ ROW;
 
         $tripName = htmlspecialchars($trip['name']);
         $tripDesc = htmlspecialchars($trip['description'] ?? '');
-        if (!empty($trip['allDay'])) {
-            $tripStart = date('d.m.Y', strtotime($trip['startDate']));
-            $tripEnd = date('d.m.Y', strtotime($trip['endDate']));
-        } else {
-            $tripStart = date('d.m.Y H:i', strtotime($trip['startDate'] . ' ' . $trip['startTime']));
-            $tripEnd = date('d.m.Y H:i', strtotime($trip['endDate'] . ' ' . $trip['endTime']));
-        }
+        [$tripStart, $tripEnd] = $this->formatPeriod($trip);
 
         // Forum linking
         $forumId = $trip['forumId'] ?? null;
@@ -1417,13 +1361,10 @@ ROW;
 
         $eventName = htmlspecialchars($event['name']);
         $eventDesc = htmlspecialchars($event['description'] ?? '');
-        if (!empty($event['allDay'])) {
-            $eventStart = date('d.m.Y', strtotime($event['startDate']));
-            $eventEnd = date('d.m.Y', strtotime($event['endDate']));
-        } else {
-            $eventStart = date('d.m.Y H:i', strtotime($event['startDate'] . ' ' . $event['startTime']));
-            $eventEnd = date('d.m.Y H:i', strtotime($event['endDate'] . ' ' . $event['endTime']));
-        }
+        [$eventStart, $eventEnd] = $this->formatPeriod($event);
+        $eventTimezone = DateTimeValue::normalizeTimeZone(
+            isset($event['timezone']) ? (string) $event['timezone'] : null,
+        );
         $eventTrip = $event['trip'] ?? null;
         if ($eventTrip !== null) {
             $trip = $this->tripRepo->findById($eventTrip);
@@ -1455,10 +1396,11 @@ ROW;
             'description' => $event['description'] ?? '',
             'trip' => $event['trip'] ?? '',
             'allDay' => !empty($event['allDay']),
-            'startDate' => $event['startDate'],
-            'endDate' => $event['endDate'],
-            'startTime' => $event['startTime'] ?? '',
-            'endTime' => $event['endTime'] ?? '',
+            'timezone' => $eventTimezone,
+            'startDate' => $event['startDate'] ?? '',
+            'endDate' => $event['endDate'] ?? '',
+            'startAtLocal' => self::storedInstantForInput($event['startAt'] ?? null, $eventTimezone),
+            'endAtLocal' => self::storedInstantForInput($event['endAt'] ?? null, $eventTimezone),
             'hastickets' => $event['hastickets'] ?? '0',
             'ticket' => $event['ticket'] ?? '',
             'ticketUrl' => $event['ticketUrl'] ?? '',
@@ -1546,6 +1488,7 @@ HTML;
             'userOptions' => $userOptions,
             'tripOptions' => $tripOptions,
             'eventEditData' => $editData,
+            'timezoneOptions' => $this->timezoneOptions($eventTimezone),
             'chatInfo' => $chatInfo,
             'noChatTextStyle' => $noChatTextStyle,
             'createChatBtnStyle' => $createChatBtnStyle,
@@ -2703,6 +2646,174 @@ ROW;
         ], 201, $response);
     }
 
+    /**
+     * Formatiert den Zeitraum eines Datensatzes fuer die Admin-Anzeige.
+     * Getaktete Eintraege werden in ihrer eigenen Zeitzone dargestellt.
+     *
+     * @param array<string, mixed> $row
+     * @return array{0: string, 1: string}
+     */
+    private function formatPeriod(array $row): array
+    {
+        $allDay = (int) ($row['allDay'] ?? 0) === 1;
+        $timezone = DateTimeValue::normalizeTimeZone(
+            isset($row['timezone']) ? (string) $row['timezone'] : null,
+        );
+
+        if ($allDay) {
+            return [
+                self::formatDayValue($row['startDate'] ?? null),
+                self::formatDayValue($row['endDate'] ?? null),
+            ];
+        }
+
+        $zone = DateTimeValue::assertTimeZone($timezone);
+        $start = DateTimeValue::fromDatabase($row['startAt'] ?? null);
+        $end = DateTimeValue::fromDatabase($row['endAt'] ?? null);
+
+        return [
+            $start !== null ? $start->setTimezone($zone)->format('d.m.Y H:i') . ' (' . $timezone . ')' : '–',
+            $end !== null ? $end->setTimezone($zone)->format('d.m.Y H:i') . ' (' . $timezone . ')' : '–',
+        ];
+    }
+
+    private static function formatDayValue(mixed $value): string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return '–';
+        }
+
+        try {
+            return DateTimeValue::parseDate($value)->format('d.m.Y');
+        } catch (\InvalidArgumentException) {
+            return '–';
+        }
+    }
+
+    /**
+     * Wandelt einen gespeicherten UTC-Instant in einen Wandzeit-Wert fuer
+     * `<input type="datetime-local">` in der Eintragszeitzone um.
+     */
+    private static function storedInstantForInput(mixed $value, string $timezone): string
+    {
+        $instant = DateTimeValue::fromDatabase(is_string($value) ? $value : null);
+        if ($instant === null) {
+            return '';
+        }
+
+        return $instant
+            ->setTimezone(DateTimeValue::assertTimeZone($timezone))
+            ->format('Y-m-d\TH:i');
+    }
+
+    /**
+     * Prueft, ob der Request Timing-Felder enthaelt. Reine Verknuepfungs-
+     * Updates (z. B. Event einer Reise zuordnen) duerfen die Zeit nicht
+     * anfassen.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function hasTimingFields(array $body): bool
+    {
+        foreach (['allDay', 'timezone', 'startAt', 'endAt', 'startDate', 'endDate'] as $field) {
+            if (array_key_exists($field, $body)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Baut die kanonischen Timing-Felder fuer Reise-/Event-Schreiboperationen.
+     * Getaktete Werte kommen als RFC 3339 (aus dem Admin-Formular in UTC
+     * umgerechnet), ganztägige als zivile Tage.
+     *
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     * @throws \InvalidArgumentException mit einem API-Fehlercode als Message
+     */
+    private function timingFromBody(array $body, bool $defaultAllDay = false): array
+    {
+        $allDay = array_key_exists('allDay', $body) ? (bool) $body['allDay'] : $defaultAllDay;
+
+        try {
+            $timezone = DateTimeValue::normalizeTimeZone(
+                isset($body['timezone']) && is_string($body['timezone']) ? $body['timezone'] : null,
+            );
+        } catch (\InvalidArgumentException) {
+            throw new \InvalidArgumentException('invalid_timezone');
+        }
+
+        if ($allDay) {
+            $startDate = trim((string) ($body['startDate'] ?? ''));
+            $endDate = trim((string) ($body['endDate'] ?? ''));
+            if ($startDate === '' || $endDate === '') {
+                throw new \InvalidArgumentException('date_required');
+            }
+            try {
+                $start = DateTimeValue::parseDate($startDate);
+                $end = DateTimeValue::parseDate($endDate);
+            } catch (\InvalidArgumentException) {
+                throw new \InvalidArgumentException('invalid_date');
+            }
+            if ($end < $start) {
+                throw new \InvalidArgumentException('invalid_time_range');
+            }
+
+            return [
+                'allDay' => 1,
+                'timezone' => $timezone,
+                'startDate' => DateTimeValue::formatDate($start),
+                'endDate' => DateTimeValue::formatDate($end),
+                'startAt' => null,
+                'endAt' => null,
+            ];
+        }
+
+        $startAt = trim((string) ($body['startAt'] ?? ''));
+        $endAt = trim((string) ($body['endAt'] ?? ''));
+        if ($startAt === '' || $endAt === '') {
+            throw new \InvalidArgumentException('time_required');
+        }
+        try {
+            $start = DateTimeValue::parseInstant($startAt);
+            $end = DateTimeValue::parseInstant($endAt);
+        } catch (\InvalidArgumentException) {
+            throw new \InvalidArgumentException('invalid_datetime');
+        }
+        if ($end <= $start) {
+            throw new \InvalidArgumentException('invalid_time_range');
+        }
+
+        return [
+            'allDay' => 0,
+            'timezone' => $timezone,
+            'startAt' => DateTimeValue::toDatabase($start),
+            'endAt' => DateTimeValue::toDatabase($end),
+            'startDate' => null,
+            'endDate' => null,
+        ];
+    }
+
+    /**
+     * Liefert die Zeitzonen-Auswahlliste fuer die Admin-Formulare.
+     */
+    private function timezoneOptions(string $selected): string
+    {
+        $zones = \DateTimeZone::listIdentifiers();
+        sort($zones);
+
+        $html = '';
+        foreach ($zones as $zone) {
+            $value = htmlspecialchars($zone);
+            $isSelected = $zone === $selected ? ' selected' : '';
+            $html .= "<option value=\"{$value}\"{$isSelected}>{$value}</option>";
+        }
+
+        return $html;
+    }
+
     private function requireUser(ServerRequestInterface $request): AuthenticatedUser
     {
         $user = $request->getAttribute(AuthenticatedUser::class);
@@ -2914,10 +3025,11 @@ ROW;
         $fieldLabels = [
             'name' => 'Name',
             'description' => 'Beschreibung',
+            'startAt' => 'Startzeitpunkt',
+            'endAt' => 'Endzeitpunkt',
             'startDate' => 'Startdatum',
             'endDate' => 'Enddatum',
-            'startTime' => 'Startzeit',
-            'endTime' => 'Endzeit',
+            'timezone' => 'Zeitzone',
             'allDay' => 'Ganztägig',
             'hastickets' => 'Ticket-Status',
             'ticket' => 'Ticket-Informationen',
@@ -2948,10 +3060,11 @@ ROW;
         $fieldLabels = [
             'name' => 'Name',
             'description' => 'Beschreibung',
+            'startAt' => 'Startzeitpunkt',
+            'endAt' => 'Endzeitpunkt',
             'startDate' => 'Startdatum',
             'endDate' => 'Enddatum',
-            'startTime' => 'Startzeit',
-            'endTime' => 'Endzeit',
+            'timezone' => 'Zeitzone',
             'allDay' => 'Ganztägig',
             'hastickets' => 'Ticket-Status',
             'ticket' => 'Ticket-Informationen',

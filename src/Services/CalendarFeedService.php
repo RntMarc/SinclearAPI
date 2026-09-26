@@ -9,6 +9,7 @@ use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Support\DateTimeValue;
 
 final readonly class CalendarFeedService
 {
@@ -33,21 +34,27 @@ final readonly class CalendarFeedService
     /**
      * @param list<string> $types
      */
-    public function buildFeed(string $userId, string $start, string $end, array $types): array
-    {
+    public function buildFeed(
+        string $userId,
+        string $start,
+        string $end,
+        array $types,
+        string $rangeTimezone = 'UTC',
+    ): array {
         $this->assertValidDate($start);
         $this->assertValidDate($end);
+        DateTimeValue::assertTimeZone($rangeTimezone);
 
         $items = [];
         $truncated = false;
 
         foreach ($types as $type) {
             $result = match ($type) {
-                'calendar_event' => $this->calendarEvents($userId, $start, $end),
-                'travel_event' => $this->travelEvents($userId, $start, $end),
-                'trip' => $this->trips($userId, $start, $end),
+                'calendar_event' => $this->calendarEvents($userId, $start, $end, $rangeTimezone),
+                'travel_event' => $this->travelEvents($userId, $start, $end, $rangeTimezone),
+                'trip' => $this->trips($userId, $start, $end, $rangeTimezone),
                 'birthday' => $this->birthdays($userId, $start, $end),
-                'pt_journey' => $this->ptJourneys($userId, $start, $end),
+                'pt_journey' => $this->ptJourneys($userId, $start, $end, $rangeTimezone),
                 default => ['items' => [], 'truncated' => false],
             };
             $items = array_merge($items, $result['items']);
@@ -55,13 +62,11 @@ final readonly class CalendarFeedService
         }
 
         usort($items, fn(array $a, array $b): int => [
-            $a['startDate'],
-            $a['startTime'] ?? '',
+            self::sortKey($a),
             $a['type'],
             $a['id'],
         ] <=> [
-            $b['startDate'],
-            $b['startTime'] ?? '',
+            self::sortKey($b),
             $b['type'],
             $b['id'],
         ]);
@@ -71,6 +76,7 @@ final readonly class CalendarFeedService
             'meta' => [
                 'start' => $start,
                 'end' => $end,
+                'timezone' => $rangeTimezone,
                 'types' => $types,
                 'count' => count($items),
                 'truncated' => $truncated,
@@ -78,32 +84,31 @@ final readonly class CalendarFeedService
         ];
     }
 
-    private function calendarEvents(string $userId, string $start, string $end): array
+    private function calendarEvents(string $userId, string $start, string $end, string $rangeTimezone): array
     {
         $result = $this->calendarEventService->listVisible(
             $userId,
             $start,
             $end,
+            $rangeTimezone,
             1,
             self::MAX_ITEMS_PER_SOURCE,
         );
 
         $items = [];
         foreach ($result['data'] as $event) {
-            $item = [
-                'type' => 'calendar_event',
-                'id' => $event['id'],
-                'title' => $event['title'] ?? null,
-                'startDate' => $event['startDate'],
-                'endDate' => $event['endDate'],
-                'allDay' => (bool) ($event['allDay'] ?? 0),
-                'detail' => $event,
-            ];
-            if (empty($event['allDay'])) {
-                $item['startTime'] = $event['startTime'];
-                $item['endTime'] = $event['endTime'];
-            }
-            $items[] = $item;
+            $items[] = $this->eventItem(
+                type: 'calendar_event',
+                id: $event['id'],
+                title: $event['title'] ?? null,
+                timed: !$event['allDay'],
+                startDate: $event['startDate'] ?? null,
+                endDate: $event['endDate'] ?? null,
+                startAt: $event['startAt'] ?? null,
+                endAt: $event['endAt'] ?? null,
+                timezone: $event['timezone'] ?? 'UTC',
+                detail: $event,
+            );
         }
 
         return [
@@ -112,12 +117,13 @@ final readonly class CalendarFeedService
         ];
     }
 
-    private function travelEvents(string $userId, string $start, string $end): array
+    private function travelEvents(string $userId, string $start, string $end, string $rangeTimezone): array
     {
         $events = $this->travelEventRepo->findVisibleInRange(
             $userId,
             $start,
             $end,
+            $rangeTimezone,
             self::MAX_ITEMS_PER_SOURCE + 1,
         );
 
@@ -135,35 +141,33 @@ final readonly class CalendarFeedService
 
         $items = [];
         foreach ($events as $event) {
-            $detail = $event; // dates/times already in new format
+            $detail = DateTimeValue::normalizeTimingForOutput($event);
             $detail['participants'] = $participantsByEvent[$event['ID']] ?? [];
 
-            $allDay = (bool) ($detail['allDay'] ?? 0);
-            $item = [
-                'type' => 'travel_event',
-                'id' => $event['ID'],
-                'title' => $event['name'] ?? null,
-                'startDate' => $detail['startDate'],
-                'endDate' => $detail['endDate'],
-                'allDay' => $allDay,
-                'detail' => $detail,
-            ];
-            if (!$allDay) {
-                $item['startTime'] = $detail['startTime'] ?? $detail['endTime'];
-                $item['endTime'] = $detail['endTime'] ?? $detail['startTime'];
-            }
-            $items[] = $item;
+            $items[] = $this->eventItem(
+                type: 'travel_event',
+                id: $event['ID'],
+                title: $event['name'] ?? null,
+                timed: !$detail['allDay'],
+                startDate: $detail['startDate'] ?? null,
+                endDate: $detail['endDate'] ?? null,
+                startAt: $detail['startAt'] ?? null,
+                endAt: $detail['endAt'] ?? null,
+                timezone: $detail['timezone'] ?? 'UTC',
+                detail: $detail,
+            );
         }
 
         return ['items' => $items, 'truncated' => $truncated];
     }
 
-    private function trips(string $userId, string $start, string $end): array
+    private function trips(string $userId, string $start, string $end, string $rangeTimezone): array
     {
         $trips = $this->tripRepo->findByParticipantInRange(
             $userId,
             $start,
             $end,
+            $rangeTimezone,
             self::MAX_ITEMS_PER_SOURCE + 1,
         );
 
@@ -172,21 +176,20 @@ final readonly class CalendarFeedService
 
         $items = [];
         foreach ($trips as $trip) {
-            $allDay = (bool) ($trip['allDay'] ?? 1);
-            $item = [
-                'type' => 'trip',
-                'id' => $trip['id'],
-                'title' => $trip['name'] ?? null,
-                'startDate' => $trip['startDate'],
-                'endDate' => $trip['endDate'],
-                'allDay' => $allDay,
-                'detail' => $trip,
-            ];
-            if (!$allDay) {
-                $item['startTime'] = $trip['startTime'] ?? $trip['endTime'];
-                $item['endTime'] = $trip['endTime'] ?? $trip['startTime'];
-            }
-            $items[] = $item;
+            $detail = DateTimeValue::normalizeTimingForOutput($trip);
+
+            $items[] = $this->eventItem(
+                type: 'trip',
+                id: $trip['id'],
+                title: $trip['name'] ?? null,
+                timed: !$detail['allDay'],
+                startDate: $detail['startDate'] ?? null,
+                endDate: $detail['endDate'] ?? null,
+                startAt: $detail['startAt'] ?? null,
+                endAt: $detail['endAt'] ?? null,
+                timezone: $detail['timezone'] ?? 'UTC',
+                detail: $detail,
+            );
         }
 
         return ['items' => $items, 'truncated' => $truncated];
@@ -232,6 +235,7 @@ final readonly class CalendarFeedService
                     'startDate' => $occurrence,
                     'endDate' => $occurrence,
                     'allDay' => true,
+                    'timezone' => 'UTC',
                     'detail' => [
                         'userId' => $candidate['id'],
                         'displayName' => $candidate['displayName'],
@@ -246,11 +250,11 @@ final readonly class CalendarFeedService
         return ['items' => $items, 'truncated' => $truncated];
     }
 
-    private function ptJourneys(string $userId, string $start, string $end): array
+    private function ptJourneys(string $userId, string $start, string $end, string $rangeTimezone): array
     {
         // PtJourney uses datetime columns; expand date bounds to half-open datetime window
-        $startDt = $start . ' 00:00:00';
-        $endDt = (new DateTimeImmutable($end . ' 00:00:00', new DateTimeZone('UTC')))->modify('+1 day')->format('Y-m-d H:i:s');
+        $startDt = DateTimeValue::civilDayStartUtc($start, $rangeTimezone);
+        $endDt = DateTimeValue::civilDayEndUtcExclusive($end, $rangeTimezone);
 
         $journeys = $this->ptJourneyRepo->findByParticipantInRange(
             $userId,
@@ -267,35 +271,91 @@ final readonly class CalendarFeedService
             $legsByJourney[$leg['journeyId']][] = $this->formatLeg($leg);
         }
 
+        $utc = new DateTimeZone('UTC');
         $items = [];
         foreach ($journeys as $journey) {
             $detail = $this->formatJourney($journey);
             $detail['legs'] = $legsByJourney[$journey['id']] ?? [];
 
-            $departure = $detail['departureTime'] ?? $detail['arrivalTime'];
-            $arrival = $detail['arrivalTime'] ?? $detail['departureTime'];
-
-            // Split datetime into date + time
-            $depDate = $departure ? substr($departure, 0, 10) : $start;
-            $arrDate = $arrival ? substr($arrival, 0, 10) : $end;
-            $depTime = $departure ? substr($departure, 11, 8) : '00:00:00';
-            $arrTime = $arrival ? substr($arrival, 11, 8) : '00:00:00';
+            $departure = DateTimeValue::fromDatabase($detail['departureTime']);
+            $arrival = DateTimeValue::fromDatabase($detail['arrivalTime']);
 
             $item = [
                 'type' => 'pt_journey',
                 'id' => $journey['id'],
                 'title' => trim(($journey['fromStationName'] ?? '') . ' → ' . ($journey['toStationName'] ?? '')),
-                'startDate' => $depDate,
-                'endDate' => $arrDate,
-                'startTime' => $depTime,
-                'endTime' => $arrTime,
                 'allDay' => false,
+                'timezone' => 'UTC',
+                'startAt' => $departure !== null ? DateTimeValue::formatInstant($departure, $utc) : null,
+                'endAt' => $arrival !== null ? DateTimeValue::formatInstant($arrival, $utc) : null,
                 'detail' => $detail,
             ];
             $items[] = $item;
         }
 
         return ['items' => $items, 'truncated' => $truncated];
+    }
+
+    /**
+     * Baut ein Feed-Item. Getaktete Eintraege tragen `startAt`/`endAt`,
+     * ganztägige `startDate`/`endDate`; beide immer `allDay` und `timezone`.
+     *
+     * @param array<string, mixed> $detail
+     * @return array<string, mixed>
+     */
+    private function eventItem(
+        string $type,
+        string $id,
+        ?string $title,
+        bool $timed,
+        ?string $startDate,
+        ?string $endDate,
+        ?string $startAt,
+        ?string $endAt,
+        string $timezone,
+        array $detail,
+    ): array {
+        $item = [
+            'type' => $type,
+            'id' => $id,
+            'title' => $title,
+            'allDay' => !$timed,
+            'timezone' => $timezone,
+            'detail' => $detail,
+        ];
+
+        if ($timed) {
+            $item['startAt'] = $startAt;
+            $item['endAt'] = $endAt;
+        } else {
+            $item['startDate'] = $startDate;
+            $item['endDate'] = $endDate;
+        }
+
+        return $item;
+    }
+
+    /**
+     * Chronologischer Sortierschluessel: ganztägige Eintraege am Tagesbeginn,
+     * getaktete auf ihrem UTC-Instant.
+     *
+     * @param array<string, mixed> $item
+     */
+    private static function sortKey(array $item): string
+    {
+        if (($item['allDay'] ?? false) === true) {
+            return ($item['startDate'] ?? '9999-12-31') . ' 00:00:00';
+        }
+
+        $startAt = $item['startAt'] ?? null;
+        if (is_string($startAt) && $startAt !== '') {
+            try {
+                return DateTimeValue::toDatabase(DateTimeValue::parseInstant($startAt));
+            } catch (\InvalidArgumentException) {
+            }
+        }
+
+        return ($item['startDate'] ?? '9999-12-31') . ' 00:00:00';
     }
 
     private function canSeeBirthday(string $userId, array $candidate): bool

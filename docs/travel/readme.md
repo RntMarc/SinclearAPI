@@ -4,21 +4,19 @@ Die Travel-Funktion erlaubt Nutzern das Verwalten und Abrufen von Reisen,
 zugehörigen Events und Unterkünften. Jeder Nutzer sieht nur die Reisen,
 bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 
-> **Hinweis zu Zeitangaben:** Alle Datum- und Zeitangaben werden ausschließlich in UTC gespeichert und von der API in UTC ausgegeben.
+> **Hinweis zu Zeitangaben:** Die API ist zeitzonen-bewusst. Jede Reise und jedes Event trägt eine IANA-Zeitzone (`timezone`, z. B. `Europe/Berlin`).
 > 
-> - **Datum (Date):** Format `YYYY-MM-DD` (z. B. `2026-07-01`), repräsentiert ein Kalenderdatum in UTC.
-> - **Uhrzeit (Time):** Format `HH:MM:SS` (z. B. `10:00:00`), repräsentiert eine Uhrzeit in UTC.
-> - **Kombination:** Ein Zeitpunkt in UTC ergibt sich aus der Kombination `startDate` + `startTime` (bzw. `endDate` + `endTime`).
-> - **Ganztägige Events/Reisen:** Werden durch das Flag `allDay: true` gekennzeichnet. Bei ganztägigen Einträgen werden nur `startDate` und `endDate` (inklusiv) verwendet, die Felder `startTime`/`endTime` sind nicht gesetzt.
-> 
-> Clients sind eigenständig für die Konvertierung lokaler Zeitangaben nach UTC vor dem Senden und von UTC in die lokale Zeitzone bei der Anzeige verantwortlich. Die API führt keine Zeitzonenkonvertierung durch.
+> - **Getaktet (`allDay: false`):** `startAt`/`endAt` sind RFC 3339 **mit Offset** (`2026-09-26T14:30:00+02:00` oder `...Z`); intern wird der UTC-Instant gespeichert.
+> - **Ganztägig (`allDay: true`, Standard bei Reisen):** `startDate`/`endDate` sind zivile Tage (`YYYY-MM-DD`, inklusives Ende), ohne Uhrzeitfelder.
+> - **Ausgabe:** Getaktete Einträge werden im Offset ihrer `timezone` ausgegeben, ganztägige als `startDate`/`endDate`.
+> - Clients senden Wandzeiten mit Offset und der gemeinten IANA-Zeitzone; die eigene Zeitzone stammt aus `UserPreferences.timezone` bzw. der Gerätezeitzone.
 
 ## Datenbank-Tabellen
 
 | Tabelle | Beschreibung |
 |---------|-------------|
-| `TravelTrip` | Reisedaten (Name, Beschreibung, Start/End-Datum, Start/End-Uhrzeit, All-Day-Flag) |
-| `TravelEvent` | Ereignisse (Reise-Events + Standalone-Events via `trip IS NULL`, citySlug, Start/End-Datum, Start/End-Uhrzeit, All-Day-Flag) |
+| `TravelTrip` | Reisedaten (Name, Beschreibung, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
+| `TravelEvent` | Ereignisse (Reise-Events + Standalone-Events via `trip IS NULL`, citySlug, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
 | `TravelEventTicket` | Tickets für Reisen, Events oder persönliche Nutzer-Tickets |
 | `TravelAccommodation` | Unterkünfte (Hotels, Ferienwohnungen, etc., citySlug) |
 | `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften |

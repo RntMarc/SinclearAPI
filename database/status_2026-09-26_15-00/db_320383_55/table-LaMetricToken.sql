@@ -7,22 +7,19 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `CalendarEvent` (
-  `id` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `creatorId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `startDate` date NOT NULL,
-  `endDate` date NOT NULL,
-  `startTime` time DEFAULT NULL,
-  `endTime` time DEFAULT NULL,
-  `allDay` tinyint(1) NOT NULL DEFAULT '0',
-  `visibility` tinyint(1) NOT NULL DEFAULT '0',
+CREATE TABLE IF NOT EXISTS `LaMetricToken` (
+  `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `label` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'LaMetric Time',
+  `token` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expiresAt` datetime NOT NULL,
+  `lastUsedAt` datetime(3) DEFAULT NULL,
   `createdAt` datetime(3) NOT NULL,
-  `updatedAt` datetime(3) NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_calendar_creator` (`creatorId`),
-  KEY `idx_calendar_time` (`startDate`,`endDate`)
+  UNIQUE KEY `idx_lametric_token_value` (`token`),
+  UNIQUE KEY `idx_lametric_token_user` (`userId`),
+  KEY `idx_lametric_token_expires` (`expiresAt`),
+  CONSTRAINT `fk_lametric_token_user` FOREIGN KEY (`userId`) REFERENCES `User` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

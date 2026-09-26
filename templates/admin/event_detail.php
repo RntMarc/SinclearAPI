@@ -51,25 +51,31 @@
                 Ganztägig
             </label>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="editEventStartDate">Start-Datum *</label>
-                <input type="date" id="editEventStartDate" name="startDate" required>
-            </div>
-            <div class="form-group">
-                <label for="editEventEndDate">End-Datum *</label>
-                <input type="date" id="editEventEndDate" name="endDate" required>
+        <div class="form-group">
+            <label for="editEventTimezone">Zeitzone</label>
+            <select id="editEventTimezone" name="timezone">{{timezoneOptions}}</select>
+        </div>
+        <div id="editEventDayFields">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editEventStartDate">Start-Datum *</label>
+                    <input type="date" id="editEventStartDate" name="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="editEventEndDate">End-Datum *</label>
+                    <input type="date" id="editEventEndDate" name="endDate">
+                </div>
             </div>
         </div>
         <div id="editEventTimeFields" style="display:none;">
             <div class="form-row">
                 <div class="form-group">
-                    <label for="editEventStartTime">Start-Uhrzeit (UTC)</label>
-                    <input type="time" id="editEventStartTime" name="startTime">
+                    <label for="editEventStartAt">Beginn (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="editEventStartAt" name="startAt">
                 </div>
                 <div class="form-group">
-                    <label for="editEventEndTime">End-Uhrzeit (UTC)</label>
-                    <input type="time" id="editEventEndTime" name="endTime">
+                    <label for="editEventEndAt">Ende (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="editEventEndAt" name="endAt">
                 </div>
             </div>
         </div>
@@ -238,11 +244,13 @@
         document.getElementById('editEventDescription').value = d.description;
         document.getElementById('editEventTrip').value = d.trip || '';
         document.getElementById('editEventAllDay').checked = !!d.allDay;
+        document.getElementById('editEventTimezone').value = d.timezone;
         document.getElementById('editEventStartDate').value = d.startDate || '';
         document.getElementById('editEventEndDate').value = d.endDate || '';
-        document.getElementById('editEventStartTime').value = d.startTime || '';
-        document.getElementById('editEventEndTime').value = d.endTime || '';
+        document.getElementById('editEventStartAt').value = d.startAtLocal || '';
+        document.getElementById('editEventEndAt').value = d.endAtLocal || '';
         document.getElementById('editEventTimeFields').style.display = d.allDay ? 'none' : 'block';
+        document.getElementById('editEventDayFields').style.display = d.allDay ? 'block' : 'none';
         const hasTickets = d.hastickets === '1';
         document.getElementById('editEventHastickets').checked = hasTickets;
         document.getElementById('editEventTicketFields').style.display = hasTickets ? 'block' : 'none';
@@ -266,10 +274,7 @@
     function toggleEditEventAllDay() {
         const allDay = document.getElementById('editEventAllDay').checked;
         document.getElementById('editEventTimeFields').style.display = allDay ? 'none' : 'block';
-        if (allDay) {
-            document.getElementById('editEventStartTime').value = '';
-            document.getElementById('editEventEndTime').value = '';
-        }
+        document.getElementById('editEventDayFields').style.display = allDay ? 'block' : 'none';
     }
 
     function isValidImageData(value) {
@@ -408,15 +413,13 @@
         const id = document.getElementById('editEventId').value;
         const imageData = document.getElementById('editEventImage').value;
         const allDay = document.getElementById('editEventAllDay').checked;
-        const data = {
+        const timezone = document.getElementById('editEventTimezone').value;
+        const timing = buildTimingPayload(allDay, timezone, 'editEvent');
+        if (timing.error) { showToast(timing.error, 'error'); return; }
+        const data = Object.assign({
             name: document.getElementById('editEventName').value.trim(),
             description: document.getElementById('editEventDescription').value.trim() || null,
             trip: document.getElementById('editEventTrip').value || null,
-            allDay: allDay,
-            startDate: document.getElementById('editEventStartDate').value.trim(),
-            endDate: document.getElementById('editEventEndDate').value.trim(),
-            startTime: allDay ? null : document.getElementById('editEventStartTime').value.trim(),
-            endTime: allDay ? null : document.getElementById('editEventEndTime').value.trim(),
             hastickets: document.getElementById('editEventHastickets').checked ? '1' : '0',
             ticket: document.getElementById('editEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('editEventTicketUrl').value.trim() || null,
@@ -428,7 +431,7 @@
             longitude: document.getElementById('editEventLongitude').value.trim() || null,
             OSMID: document.getElementById('editEventOSMID').value.trim() || null,
             citySlug: document.getElementById('editEventCitySlug').value.trim() || null,
-        };
+        }, timing.data);
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
 
         try {

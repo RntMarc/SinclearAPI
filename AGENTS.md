@@ -81,24 +81,41 @@ Auf dem lokalen Entwicklungs-System wird NICHT gegen eine Datenbank getestet (ke
 - Lokal sind nur statische Prüfungen erlaubt: `php -l`, `vendor/bin/phpstan`, Unit-Tests ohne DB-Abhängigkeit.
 - DB-abhängige Integrationstests dürfen geschrieben werden, laufen aber erst auf dem Server.
 
-## Date/Time Convention (UTC-only)
-The API operates exclusively in UTC. This is a hard requirement that all implementations MUST follow:
+## Date/Time Convention (timezone-aware)
+The API exchanges timestamps with explicit timezone information. Every
+timestamped entity (CalendarEvent, TravelEvent, TravelTrip) carries its own
+IANA timezone. There is no UTC-only requirement anymore.
 
 ### Format
-- **Input (von Clients):** 
-  - **Datum (Date):** `YYYY-MM-DD` (ohne Uhrzeit, für ganztägige Events und Datumsbereiche)
-  - **Uhrzeit (Time):** `HH:MM:SS` (24h-Format, ohne Millisekunden, UTC)
-  - **Kombination:** Ein UTC-Zeitpunkt ergibt sich aus `startDate` + `startTime` bzw. `endDate` + `endTime`
-  - **Ganztägige Events:** Werden durch das Flag `allDay: true` gekennzeichnet. Bei `allDay: true` werden nur `startDate`/`endDate` (Datum, inklusives Ende) verwendet; `startTime`/`endTime` sind nicht gesetzt.
-- **Output (an Clients):** Identisches Format wie Input. Ganztägige Events liefern nur `startDate`/`endDate` (Format `YYYY-MM-DD`), getaktete Events liefern `startDate`/`endDate` + `startTime`/`endTime`.
-- **Keine** ISO 8601-Erweiterungen wie `T`, `Z`, `+00:00`, `.000Z` oder Millisekunden/Mikrosekunden.
+- **Input (von Clients):**
+  - **Getaktet (timed):** `startAt`/`endAt` als RFC 3339 **mit Offset**
+    (`2026-09-26T14:30:00+02:00` oder `...Z`) plus `timezone` (IANA, z. B.
+    `Europe/Berlin`).
+  - **Ganztägig (allDay: true):** `startDate`/`endDate` als zivile Tage
+    (`YYYY-MM-DD`, inklusives Ende) plus `timezone`; keine Uhrzeitfelder.
+  - Die jeweils andere Feldgruppe darf nicht mitgesendet werden
+    (`date_forbidden` bei getaktet, `time_forbidden` bei ganztägig).
+- **Output (an Clients):** Identisches Format wie Input. Getaktete Einträge
+  werden als RFC 3339 im Offset der Eintragszeitzone ausgegeben, ganztägige
+  als `startDate`/`endDate`. `createdAt`/`updatedAt` sind RFC 3339 in UTC (`Z`).
+- **Zeitraum-Parameter** (`start`/`end` bei `GET /calendar`, `GET /calendar/all`)
+  sind zivile Tage; die optionale Query-Zeitzone (`timezone`, Default `UTC`)
+  legt fest, in welcher Zone die Tagesgrenzen liegen.
 
 ### Verantwortlichkeiten
-- **API:** Speichert und liefert ausschließlich UTC-Zeitstempel. Ganztägige Events speichert die API als Datum (`startDate`/`endDate` inklusiv) plus optional Uhrzeit. Keine Zeitzonen-Konvertierung im API-Code.
-- **Clients:** Sind verantwortlich für die Umrechnung von UTC in die lokale Zeitzone des Nutzers (Anzeige) und für die Umrechnung lokaler Zeit in UTC vor dem Senden an die API. Bei ganztägigen Events (`allDay: true`) erfolgt keine Zeitzonen-Konvertierung – das Datum wird 1:1 angezeigt.
+- **API:** Validiert IANA-Zeitzonen, speichert getaktete Einträge als
+  UTC-Instants (`DATETIME(3)`) plus `timezone`, ganztägige als zivile Tage
+  plus `timezone`. Sortierung und Zeitraumfilter laufen auf UTC-Instants.
+- **Clients:** Senden Wandzeiten mit korrektem Offset (bzw. Datum) und der
+  gemeinten IANA-Zeitzone; rechnen bei der Anzeige in die Eintragszeitzone um.
+  Die eigene Zeitzone kommt aus `UserPreferences.timezone` bzw. der
+  Gerätezeitzone.
 
 ### Begründung
-- Vermeidet Inkonsistenzen durch mehrfache Zeitzonen-Konvertierung
-- Hält die API einfach und deterministisch
-- Verschiebt die Zeitzonen-Logik dorthin, wo sie hingehört: auf das Client-Gerät des Nutzers
-- Ganztägige Events sind zeitzonenunabhängig (ziviler Tag)
+- Absolute Zeitpunkte bleiben eindeutig (UTC-Instant), während die gemeinte
+  Wandzeit über die IANA-Zeitzone erhalten bleibt (Anzeige, Bearbeitung,
+  Sommer-/Winterzeit).
+- Ganztägige Einträge sind zivile Tage und werden nicht verschoben.
+- Entspricht dem Branchenstandard (Google Calendar, RFC 5545/CalDAV,
+  RFC 3339).
+

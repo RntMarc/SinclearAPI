@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS `DirectMessage` (
   `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `payload` json DEFAULT NULL,
   `clientId` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `replyToMessageId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `editedAt` datetime(3) DEFAULT NULL,
   `deletedAt` datetime(3) DEFAULT NULL,
   `deletedBy` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -25,9 +26,11 @@ CREATE TABLE IF NOT EXISTS `DirectMessage` (
   UNIQUE KEY `uk_dm_sender_client` (`senderId`,`clientId`),
   KEY `idx_dm_conversation_seq` (`conversationId`,`seq`),
   KEY `idx_dm_sender` (`senderId`),
+  KEY `idx_dm_reply_to` (`replyToMessageId`),
   CONSTRAINT `fk_dm_conversation` FOREIGN KEY (`conversationId`) REFERENCES `ChatConversation` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_dm_reply_to` FOREIGN KEY (`replyToMessageId`) REFERENCES `DirectMessage` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_dm_sender` FOREIGN KEY (`senderId`) REFERENCES `User` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=200 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=214 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

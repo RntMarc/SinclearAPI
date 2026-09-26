@@ -1001,42 +1001,38 @@ components:
         description:
           type: string
           nullable: true
-        start:
-          type: string
-          format: date
-          deprecated: true
-          description: 'Deprecated: use startDate. Reisebeginn (UTC), Format `YYYY-MM-DD`'
-        end:
-          type: string
-          format: date
-          deprecated: true
-          description: 'Deprecated: use endDate. Reiseende (UTC), Format `YYYY-MM-DD`'
         allDay:
           type: boolean
           default: true
           description: Ob die Reise ganztägig ist
+        timezone:
+          type: string
+          description: IANA-Zeitzone der Reise (z. B. `Europe/Berlin`)
+          example: Europe/Berlin
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn als RFC 3339 mit Offset (nur bei `!allDay`)
+          example: '2026-07-01T10:00:00+02:00'
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende als RFC 3339 mit Offset (nur bei `!allDay`)
+          example: '2026-07-01T18:00:00+02:00'
         startDate:
           type: string
           format: date
-          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          nullable: true
+          description: Start-Datum, Format `YYYY-MM-DD` (nur bei `allDay`, inklusiv)
           example: '2026-07-01'
         endDate:
           type: string
           format: date
-          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          nullable: true
+          description: End-Datum, Format `YYYY-MM-DD` (nur bei `allDay`, inklusiv)
           example: '2026-07-05'
-        startTime:
-          type: string
-          format: time
-          nullable: true
-          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '10:00:00'
-        endTime:
-          type: string
-          format: time
-          nullable: true
-          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '18:00:00'
         hastickets:
           type: string
           enum: ['0', '1']
@@ -1111,42 +1107,38 @@ components:
         description:
           type: string
           nullable: true
-        start:
-          type: string
-          format: date
-          deprecated: true
-          description: 'Deprecated: use startDate. Event-Beginn (UTC), Format `YYYY-MM-DD`'
-        end:
-          type: string
-          format: date
-          deprecated: true
-          description: 'Deprecated: use endDate. Event-Ende (UTC), Format `YYYY-MM-DD`'
         allDay:
           type: boolean
           default: false
           description: Ob das Event ganztägig ist
+        timezone:
+          type: string
+          description: IANA-Zeitzone des Events (z. B. `Europe/Berlin`)
+          example: Europe/Berlin
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn als RFC 3339 mit Offset (nur bei `!allDay`)
+          example: '2026-07-10T14:00:00+02:00'
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende als RFC 3339 mit Offset (nur bei `!allDay`)
+          example: '2026-07-10T18:00:00+02:00'
         startDate:
           type: string
           format: date
-          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          nullable: true
+          description: Start-Datum, Format `YYYY-MM-DD` (nur bei `allDay`, inklusiv)
           example: '2026-07-10'
         endDate:
           type: string
           format: date
-          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          nullable: true
+          description: End-Datum, Format `YYYY-MM-DD` (nur bei `allDay`, inklusiv)
           example: '2026-07-10'
-        startTime:
-          type: string
-          format: time
-          nullable: true
-          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '14:00:00'
-        endTime:
-          type: string
-          format: time
-          nullable: true
-          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '18:00:00'
         hastickets:
           type: string
           enum: ['0', '1']
@@ -1680,28 +1672,34 @@ components:
           type: boolean
           description: Ob das Event ganztägig ist
           example: false
+        timezone:
+          type: string
+          description: IANA-Zeitzone des Events (z. B. `Europe/Berlin`)
+          example: Europe/Berlin
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn als RFC 3339 mit Offset (nur bei `!allDay`)
+          example: '2026-07-01T10:00:00+02:00'
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende als RFC 3339 mit Offset (nur bei `!allDay`)
+          example: '2026-07-01T11:00:00+02:00'
         startDate:
           type: string
           format: date
-          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          nullable: true
+          description: Start-Datum, Format `YYYY-MM-DD` (nur bei `allDay`, inklusiv)
           example: '2026-07-01'
         endDate:
           type: string
           format: date
-          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          nullable: true
+          description: End-Datum, Format `YYYY-MM-DD` (nur bei `allDay`, inklusiv)
           example: '2026-07-01'
-        startTime:
-          type: string
-          format: time
-          nullable: true
-          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '10:00:00'
-        endTime:
-          type: string
-          format: time
-          nullable: true
-          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '11:00:00'
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1714,11 +1712,11 @@ components:
         createdAt:
           type: string
           format: date-time
-          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          description: Erstellungszeitpunkt als RFC 3339 in UTC (`Z`)
         updatedAt:
           type: string
           format: date-time
-          description: Änderungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          description: Änderungszeitpunkt als RFC 3339 in UTC (`Z`)
 
     CalendarEventListResponse:
       type: object
@@ -1740,7 +1738,7 @@ components:
 
     CalendarEventCreateRequest:
       type: object
-      required: [title, allDay, startDate, endDate]
+      required: [title, allDay, timezone]
       properties:
         title:
           type: string
@@ -1752,28 +1750,34 @@ components:
           type: boolean
           default: false
           description: Ob das Event ganztägig ist
+        timezone:
+          type: string
+          description: IANA-Zeitzone des Events (z. B. `Europe/Berlin`); Default `Europe/Berlin`
+          example: Europe/Berlin
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn als RFC 3339 mit Offset (Pflicht bei `!allDay`)
+          example: '2026-07-01T10:00:00+02:00'
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende als RFC 3339 mit Offset (Pflicht bei `!allDay`)
+          example: '2026-07-01T11:00:00+02:00'
         startDate:
           type: string
           format: date
-          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          nullable: true
+          description: Start-Datum, Format `YYYY-MM-DD` (Pflicht bei `allDay`, inklusiv)
           example: '2026-07-01'
         endDate:
           type: string
           format: date
-          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
+          nullable: true
+          description: End-Datum, Format `YYYY-MM-DD` (Pflicht bei `allDay`, inklusiv)
           example: '2026-07-01'
-        startTime:
-          type: string
-          format: time
-          nullable: true
-          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '10:00:00'
-        endTime:
-          type: string
-          format: time
-          nullable: true
-          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-          example: '11:00:00'
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1796,24 +1800,29 @@ components:
         allDay:
           type: boolean
           description: Ob das Event ganztägig ist
+        timezone:
+          type: string
+          description: IANA-Zeitzone des Events (z. B. `Europe/Berlin`)
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn als RFC 3339 mit Offset (bei `!allDay`)
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende als RFC 3339 mit Offset (bei `!allDay`)
         startDate:
           type: string
           format: date
-          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          nullable: true
+          description: Start-Datum, Format `YYYY-MM-DD` (bei `allDay`, inklusiv)
         endDate:
           type: string
           format: date
-          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
-        startTime:
-          type: string
-          format: time
           nullable: true
-          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-        endTime:
-          type: string
-          format: time
-          nullable: true
-          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          description: End-Datum, Format `YYYY-MM-DD` (bei `allDay`, inklusiv)
         visibility:
           type: integer
           enum: [0, 1, 2]
@@ -1843,7 +1852,7 @@ components:
 
     CalendarFeedItem:
       type: object
-      required: [type, id, title, startDate, endDate, allDay, detail]
+      required: [type, id, title, allDay, timezone, detail]
       properties:
         type:
           type: string
@@ -1859,24 +1868,29 @@ components:
         allDay:
           type: boolean
           description: Ganzttägiger Eintrag
+        timezone:
+          type: string
+          description: IANA-Zeitzone des Eintrags (`UTC` bei Geburtstagen)
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Beginn als RFC 3339 mit Offset (nur bei `!allDay`)
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Ende als RFC 3339 mit Offset (nur bei `!allDay`)
         startDate:
           type: string
           format: date
-          description: Start-Datum (UTC), Format `YYYY-MM-DD`
+          nullable: true
+          description: Start-Datum, Format `YYYY-MM-DD` (nur bei `allDay`)
         endDate:
           type: string
           format: date
-          description: End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv)
-        startTime:
-          type: string
-          format: time
           nullable: true
-          description: Start-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
-        endTime:
-          type: string
-          format: time
-          nullable: true
-          description: End-Uhrzeit (UTC), Format `HH:MM:SS` (nur bei !allDay)
+          description: End-Datum, Format `YYYY-MM-DD`, inklusiv (nur bei `allDay`)
         detail:
           type: object
           description: >
@@ -1893,11 +1907,14 @@ components:
         start:
           type: string
           format: date
-          description: Beginn des abgefragten Zeitraums (UTC), Format `YYYY-MM-DD`
+          description: Beginn des abgefragten Zeitraums, Format `YYYY-MM-DD`
         end:
           type: string
           format: date
-          description: Ende des abgefragten Zeitraums (UTC), Format `YYYY-MM-DD` (inklusiv)
+          description: Ende des abgefragten Zeitraums, Format `YYYY-MM-DD` (inklusiv)
+        timezone:
+          type: string
+          description: Zeitzone, in der die Tagesgrenzen von `start`/`end` liegen
         types:
           type: array
           items:
@@ -4434,7 +4451,7 @@ components:
           description: Ob die Benachrichtigung bereits gelesen wurde
         createdAt:
           type: string
-          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          description: Erstellungszeitpunkt als RFC 3339 in UTC (`Z`)
 
     NotificationListResponse:
       type: object
@@ -4675,7 +4692,7 @@ components:
           description: Bildunterschrift (optional)
         createdAt:
           type: string
-          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          description: Erstellungszeitpunkt als RFC 3339 in UTC (`Z`)
         expiresAt:
           type: string
           description: Ablaufzeitpunkt (UTC, createdAt + 7 Tage), Format `YYYY-MM-DD HH:MM:SS`
@@ -4703,7 +4720,7 @@ components:
           description: Bildunterschrift (optional)
         createdAt:
           type: string
-          description: Erstellungszeitpunkt (UTC), Format `YYYY-MM-DD HH:MM:SS`
+          description: Erstellungszeitpunkt als RFC 3339 in UTC (`Z`)
         expiresAt:
           type: string
           description: Ablaufzeitpunkt (UTC, createdAt + 7 Tage), Format `YYYY-MM-DD HH:MM:SS`
@@ -9161,8 +9178,9 @@ paths:
             type: string
             format: date
           description: >
-            Start-Datum (UTC), Format `YYYY-MM-DD`. Events deren `endDate`
-            nach oder an diesem Tag liegen werden zurückgegeben.
+            Start-Datum, Format `YYYY-MM-DD` (ziviler Tag in `timezone`).
+            Events deren Ende nach oder an diesem Tag liegen werden
+            zurückgegeben.
         - name: end
           in: query
           required: false
@@ -9170,8 +9188,17 @@ paths:
             type: string
             format: date
           description: >
-            End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv). Events deren
-            `startDate` vor oder an diesem Tag liegen werden zurückgegeben.
+            End-Datum, Format `YYYY-MM-DD` (inklusiv). Events deren Start
+            vor oder an diesem Tag liegen werden zurückgegeben.
+        - name: timezone
+          in: query
+          required: false
+          schema:
+            type: string
+            default: UTC
+          description: >
+            IANA-Zeitzone, in der die Tagesgrenzen von `start`/`end` liegen
+            (z. B. `Europe/Berlin`).
         - name: range
           in: query
           required: false
@@ -9179,8 +9206,8 @@ paths:
             type: string
             enum: [week, month]
           description: >
-            Vordefinierter Zeitbereich (aktuelle Woche / aktueller Monat).
-            Wird ignoriert, wenn `start` und `end` gesetzt sind.
+            Vordefinierter Zeitbereich (aktuelle Woche / aktueller Monat in
+            `timezone`). Wird ignoriert, wenn `start` und `end` gesetzt sind.
       responses:
         '200':
           description: Paginierte Liste der Kalender-Events
@@ -9240,7 +9267,7 @@ paths:
     get:
       summary: Kombinierter Kalender-Feed
       description: >
-        Gibt einen kombinierten, nach `startTime` sortierten Feed aller für
+        Gibt einen kombinierten, chronologisch sortierten Feed aller für
         den Nutzer sichtbaren Termine zurück: Kalender-Events, Reise-Events,
         Reisen (als Zeitraum), Geburtstage und ÖPNV-Fahrten. Jedes Item trägt
         ein `type`-Feld und ein typspezifisches `detail`-Objekt. Ohne `start`
@@ -9258,9 +9285,9 @@ paths:
             type: string
             format: date
           description: >
-            Start-Datum (UTC), Format `YYYY-MM-DD`. Nur Termine, die diesen
-            oder spätere Tage überlappen, werden zurückgegeben. Muss
-            zusammen mit `end` gesetzt werden.
+            Start-Datum, Format `YYYY-MM-DD` (ziviler Tag in `timezone`).
+            Nur Termine, die diesen oder spätere Tage überlappen, werden
+            zurückgegeben. Muss zusammen mit `end` gesetzt werden.
         - name: end
           in: query
           required: false
@@ -9268,9 +9295,17 @@ paths:
             type: string
             format: date
           description: >
-            End-Datum (UTC), Format `YYYY-MM-DD` (inklusiv). Nur Termine,
-            die diesen oder frühere Tage überlappen, werden zurückgegeben.
+            End-Datum, Format `YYYY-MM-DD` (inklusiv). Nur Termine, die
+            diesen oder frühere Tage überlappen, werden zurückgegeben.
             Muss zusammen mit `start` gesetzt werden.
+        - name: timezone
+          in: query
+          required: false
+          schema:
+            type: string
+            default: UTC
+          description: >
+            IANA-Zeitzone, in der die Tagesgrenzen von `start`/`end` liegen.
         - name: types
           in: query
           required: false

@@ -7,18 +7,19 @@ namespace Sinclear\Api\Dav;
 use DateTimeImmutable;
 use DateTimeZone;
 use Sabre\VObject\Component\VCalendar;
+use Sinclear\Api\Support\DateTimeValue;
 
 /**
-     * Erzeugt iCalendar-Daten (RFC 5545) aus Kalender-Events der Datenbank
-     * sowie aus Feed-Items (CalendarFeedService).
-     *
-     * Alle Zeitangaben werden ausschliesslich in UTC serialisiert (Format mit
-     * "Z"-Suffix), passend zur UTC-only-Konvention der API. Clients sind fuer
-     * die Umrechnung in lokale Zeiten verantwortlich.
-     *
-     * Ganztägige Events (allDay=true) werden als VALUE=DATE serialisiert mit
-     * exklusivem DTEND (End-Tag + 1 Tag). Getaktete Events als DATE-TIME (Z).
-     */
+ * Erzeugt iCalendar-Daten (RFC 5545) aus Kalender-Events der Datenbank
+ * sowie aus Feed-Items (CalendarFeedService).
+ *
+ * Getaktete Eintraege sind absolute Zeitpunkte und werden in UTC (Format mit
+ * "Z"-Suffix) serialisiert, damit Kalender-Clients sie unabhaengig von der
+ * Geraetezeitzone korrekt sortieren. Die gemeinte Zeitzone des Eintrags wird
+ * zusaetzlich als X-WR-TIMEZONE am VCALENDAR ausgewiesen. Ganztägige Events
+ * (allDay=true) werden als VALUE=DATE serialisiert mit exklusivem DTEND
+ * (End-Tag + 1 Tag).
+ */
 final readonly class IcsFactory
 {
     private const string PRODID = '-//Sinclear Beyond//CalDAV Server//DE';
@@ -29,9 +30,8 @@ final readonly class IcsFactory
     /** @param array<string, mixed> $event */
     public function eventToIcs(array $event, array $participants = []): string
     {
-        $vcal = $this->createCalendar();
-
         $allDay = (bool) ($event['allDay'] ?? 0);
+        $vcal = $this->createCalendar($event['timezone'] ?? null);
         $dtStamp = $event['updatedAt'] ?? $event['createdAt'];
 
         $properties = [
@@ -87,7 +87,7 @@ final readonly class IcsFactory
      * Konvertiert ein Feed-Item (CalendarFeedService) in ein CalDAV-
      * CalendarObject-Array. Dispatcht je nach type auf die passende Methode.
      *
-     * @param array<string, mixed> $item Feed-Item mit type, id, title, startDate, endDate, startTime, endTime, allDay, detail
+     * @param array<string, mixed> $item Feed-Item mit type, id, title, allDay, timezone, startAt/endAt bzw. startDate/endDate, detail
      * @return array<string, mixed> CalDAV calendar-object array
      */
     public function feedItemToCalendarObject(array $item): array
@@ -101,12 +101,12 @@ final readonly class IcsFactory
             default => $this->calendarEventFromFeed($item),
         };
 
-        $lastModified = $item['detail']['updatedAt'] ?? $item['detail']['createdAt'] ?? $item['startDate'];
+        $lastModified = $item['detail']['updatedAt'] ?? $item['detail']['createdAt'] ?? $item['startDate'] ?? $item['startAt'] ?? null;
 
         return [
             'uri' => $item['id'] . '.ics',
             'calendardata' => $ics,
-            'lastmodified' => is_string($lastModified) ? strtotime($lastModified) : (int) $lastModified,
+            'lastmodified' => is_string($lastModified) ? strtotime($lastModified) : (int) ($lastModified ?? 0),
             'etag' => '"' . sha1($ics) . '"',
             'size' => strlen($ics),
             'component' => 'vevent',
@@ -126,11 +126,10 @@ final readonly class IcsFactory
     /** @param array<string, mixed> $item */
     private function calendarEventFromFeed(array $item): string
     {
-        $vcal = $this->createCalendar();
         $detail = $item['detail'];
-
         $allDay = (bool) ($item['allDay'] ?? 0);
-        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'];
+        $vcal = $this->createCalendar($item['timezone'] ?? null);
+        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'] ?? $item['startAt'] ?? 'now';
 
         $properties = [
             'UID' => $this->feedItemUid($item),
@@ -163,11 +162,10 @@ final readonly class IcsFactory
     /** @param array<string, mixed> $item */
     private function travelEventToIcs(array $item): string
     {
-        $vcal = $this->createCalendar();
         $detail = $item['detail'];
-
         $allDay = (bool) ($item['allDay'] ?? 0);
-        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'];
+        $vcal = $this->createCalendar($item['timezone'] ?? null);
+        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'] ?? $item['startAt'] ?? 'now';
 
         $properties = [
             'UID' => $this->feedItemUid($item),
@@ -197,11 +195,10 @@ final readonly class IcsFactory
     /** @param array<string, mixed> $item */
     private function tripToIcs(array $item): string
     {
-        $vcal = $this->createCalendar();
         $detail = $item['detail'];
-
         $allDay = (bool) ($item['allDay'] ?? 1);
-        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'];
+        $vcal = $this->createCalendar($item['timezone'] ?? null);
+        $dtStamp = $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'] ?? $item['startAt'] ?? 'now';
 
         $properties = [
             'UID' => $this->feedItemUid($item),
@@ -230,28 +227,33 @@ final readonly class IcsFactory
     private function addDateRange(\Sabre\VObject\Node $vevent, array $item, bool $allDay): void
     {
         if ($allDay) {
-            $startDt = new DateTimeImmutable($item['startDate'], new DateTimeZone('UTC'));
-            $endDt = (new DateTimeImmutable($item['endDate'], new DateTimeZone('UTC')))->modify('+1 day');
+            $startDt = DateTimeValue::parseDate((string) $item['startDate']);
+            $endDt = DateTimeValue::parseDate((string) $item['endDate'])->modify('+1 day');
             $vevent->add('DTSTART', $startDt, ['VALUE' => 'DATE']);
             $vevent->add('DTEND', $endDt, ['VALUE' => 'DATE']);
             $vevent->add('TRANSP', 'TRANSPARENT');
-        } else {
-            $vevent->add('DTSTART', new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC')));
-            $vevent->add('DTEND', new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC')));
+            return;
         }
+
+        $startDt = DateTimeValue::parseInstant((string) $item['startAt'])
+            ->setTimezone(new DateTimeZone('UTC'));
+        $endDt = DateTimeValue::parseInstant((string) $item['endAt'])
+            ->setTimezone(new DateTimeZone('UTC'));
+        $vevent->add('DTSTART', $startDt);
+        $vevent->add('DTEND', $endDt);
     }
 
     /** @param array<string, mixed> $item */
     private function ptJourneyToIcs(array $item): string
     {
-        $vcal = $this->createCalendar();
+        $vcal = $this->createCalendar($item['timezone'] ?? 'UTC');
         $detail = $item['detail'];
 
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'],
-            'DTSTART' => new DateTimeImmutable($item['startDate'] . ' ' . $item['startTime'], new DateTimeZone('UTC')),
-            'DTEND' => new DateTimeImmutable($item['endDate'] . ' ' . $item['endTime'], new DateTimeZone('UTC')),
+            'DTSTAMP' => $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'] ?? $item['startAt'] ?? 'now',
+            'DTSTART' => DateTimeValue::parseInstant((string) $item['startAt'])->setTimezone(new DateTimeZone('UTC')),
+            'DTEND' => DateTimeValue::parseInstant((string) $item['endAt'])->setTimezone(new DateTimeZone('UTC')),
             'SUMMARY' => (string) $item['title'],
         ];
 
@@ -270,14 +272,13 @@ final readonly class IcsFactory
     {
         $vcal = $this->createCalendar();
         $detail = $item['detail'];
-
         $dateStr = $detail['occurrenceDate'] ?? $item['startDate'];
         $startDt = new DateTimeImmutable($dateStr, new DateTimeZone('UTC'));
         $endDt = $startDt->modify('+1 day');
 
         $properties = [
             'UID' => $this->feedItemUid($item),
-            'DTSTAMP' => $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'],
+            'DTSTAMP' => $detail['updatedAt'] ?? $detail['createdAt'] ?? $item['startDate'] ?? $item['startAt'] ?? 'now',
             'SUMMARY' => (string) $item['title'],
             'TRANSP' => 'TRANSPARENT',
             'RRULE' => 'FREQ=YEARLY',
@@ -292,13 +293,22 @@ final readonly class IcsFactory
 
     // ─── Helpers ───────────────────────────────────────────────────────
 
-    private function createCalendar(): VCalendar
+    private function createCalendar(?string $timezone = null): VCalendar
     {
-        return new VCalendar([
+        $calendar = new VCalendar([
             'VERSION' => '2.0',
             'PRODID' => self::PRODID,
             'CALSCALE' => 'GREGORIAN',
         ]);
+
+        if ($timezone !== null && trim($timezone) !== '') {
+            try {
+                $calendar->add('X-WR-TIMEZONE', DateTimeValue::assertTimeZone($timezone)->getName());
+            } catch (\InvalidArgumentException) {
+            }
+        }
+
+        return $calendar;
     }
 
     private function classFromVisibility(int $visibility): string

@@ -11,6 +11,7 @@ use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\ForumRepository;
 use Sinclear\Api\Repository\UserRepository;
+use Sinclear\Api\Support\DateTimeValue;
 
 final readonly class TravelService
 {
@@ -327,7 +328,7 @@ final readonly class TravelService
         $travelChat = $this->travelChatRepo->findByTripId($trip['id']);
         $trip['conversationId'] = $travelChat !== null ? $travelChat['conversationId'] : null;
 
-        return $trip;
+        return DateTimeValue::normalizeTimingForOutput($trip);
     }
 
     private function enrichEvent(array $event): array
@@ -337,7 +338,7 @@ final readonly class TravelService
         $travelChat = $this->travelChatRepo->findByEventId($event['ID']);
         $event['conversationId'] = $travelChat !== null ? $travelChat['conversationId'] : null;
 
-        return $event;
+        return DateTimeValue::normalizeTimingForOutput($event);
     }
 
     private function enrichAccommodation(array $accommodation, string $tripId): array

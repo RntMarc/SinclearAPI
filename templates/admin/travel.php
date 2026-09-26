@@ -70,25 +70,31 @@
                 Ganztägig
             </label>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="newTripStartDate">Start-Datum *</label>
-                <input type="date" id="newTripStartDate" name="startDate" required>
-            </div>
-            <div class="form-group">
-                <label for="newTripEndDate">End-Datum *</label>
-                <input type="date" id="newTripEndDate" name="endDate" required>
+        <div class="form-group">
+            <label for="newTripTimezone">Zeitzone</label>
+            <select id="newTripTimezone" name="timezone">{{timezoneOptions}}</select>
+        </div>
+        <div id="newTripDayFields">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newTripStartDate">Start-Datum *</label>
+                    <input type="date" id="newTripStartDate" name="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="newTripEndDate">End-Datum *</label>
+                    <input type="date" id="newTripEndDate" name="endDate">
+                </div>
             </div>
         </div>
         <div id="newTripTimeFields" style="display:none;">
             <div class="form-row">
                 <div class="form-group">
-                    <label for="newTripStartTime">Start-Uhrzeit (UTC)</label>
-                    <input type="time" id="newTripStartTime" name="startTime" placeholder="10:00">
+                    <label for="newTripStartAt">Beginn (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="newTripStartAt" name="startAt">
                 </div>
                 <div class="form-group">
-                    <label for="newTripEndTime">End-Uhrzeit (UTC)</label>
-                    <input type="time" id="newTripEndTime" name="endTime" placeholder="18:00">
+                    <label for="newTripEndAt">Ende (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="newTripEndAt" name="endAt">
                 </div>
             </div>
         </div>
@@ -136,25 +142,31 @@
                 Ganztägig
             </label>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="editTripStartDate">Start-Datum *</label>
-                <input type="date" id="editTripStartDate" name="startDate" required>
-            </div>
-            <div class="form-group">
-                <label for="editTripEndDate">End-Datum *</label>
-                <input type="date" id="editTripEndDate" name="endDate" required>
+        <div class="form-group">
+            <label for="editTripTimezone">Zeitzone</label>
+            <select id="editTripTimezone" name="timezone">{{timezoneOptions}}</select>
+        </div>
+        <div id="editTripDayFields">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editTripStartDate">Start-Datum *</label>
+                    <input type="date" id="editTripStartDate" name="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="editTripEndDate">End-Datum *</label>
+                    <input type="date" id="editTripEndDate" name="endDate">
+                </div>
             </div>
         </div>
         <div id="editTripTimeFields" style="display:none;">
             <div class="form-row">
                 <div class="form-group">
-                    <label for="editTripStartTime">Start-Uhrzeit (UTC)</label>
-                    <input type="time" id="editTripStartTime" name="startTime" placeholder="10:00">
+                    <label for="editTripStartAt">Beginn (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="editTripStartAt" name="startAt">
                 </div>
                 <div class="form-group">
-                    <label for="editTripEndTime">End-Uhrzeit (UTC)</label>
-                    <input type="time" id="editTripEndTime" name="endTime" placeholder="18:00">
+                    <label for="editTripEndAt">Ende (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="editTripEndAt" name="endAt">
                 </div>
             </div>
         </div>
@@ -207,25 +219,31 @@
                 Ganztägig
             </label>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="newEventStartDate">Start-Datum *</label>
-                <input type="date" id="newEventStartDate" name="startDate" required>
-            </div>
-            <div class="form-group">
-                <label for="newEventEndDate">End-Datum *</label>
-                <input type="date" id="newEventEndDate" name="endDate" required>
+        <div class="form-group">
+            <label for="newEventTimezone">Zeitzone</label>
+            <select id="newEventTimezone" name="timezone">{{timezoneOptions}}</select>
+        </div>
+        <div id="newEventDayFields">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="newEventStartDate">Start-Datum *</label>
+                    <input type="date" id="newEventStartDate" name="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="newEventEndDate">End-Datum *</label>
+                    <input type="date" id="newEventEndDate" name="endDate">
+                </div>
             </div>
         </div>
         <div id="newEventTimeFields" style="display:none;">
             <div class="form-row">
                 <div class="form-group">
-                    <label for="newEventStartTime">Start-Uhrzeit (UTC)</label>
-                    <input type="time" id="newEventStartTime" name="startTime" placeholder="14:00">
+                    <label for="newEventStartAt">Beginn (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="newEventStartAt" name="startAt">
                 </div>
                 <div class="form-group">
-                    <label for="newEventEndTime">End-Uhrzeit (UTC)</label>
-                    <input type="time" id="newEventEndTime" name="endTime" placeholder="18:00">
+                    <label for="newEventEndAt">Ende (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="newEventEndAt" name="endAt">
                 </div>
             </div>
         </div>
@@ -319,25 +337,31 @@
                 Ganztägig
             </label>
         </div>
-        <div class="form-row">
-            <div class="form-group">
-                <label for="editEventStartDate">Start-Datum *</label>
-                <input type="date" id="editEventStartDate" name="startDate" required>
-            </div>
-            <div class="form-group">
-                <label for="editEventEndDate">End-Datum *</label>
-                <input type="date" id="editEventEndDate" name="endDate" required>
+        <div class="form-group">
+            <label for="editEventTimezone">Zeitzone</label>
+            <select id="editEventTimezone" name="timezone">{{timezoneOptions}}</select>
+        </div>
+        <div id="editEventDayFields">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editEventStartDate">Start-Datum *</label>
+                    <input type="date" id="editEventStartDate" name="startDate">
+                </div>
+                <div class="form-group">
+                    <label for="editEventEndDate">End-Datum *</label>
+                    <input type="date" id="editEventEndDate" name="endDate">
+                </div>
             </div>
         </div>
         <div id="editEventTimeFields" style="display:none;">
             <div class="form-row">
                 <div class="form-group">
-                    <label for="editEventStartTime">Start-Uhrzeit (UTC)</label>
-                    <input type="time" id="editEventStartTime" name="startTime" placeholder="14:00">
+                    <label for="editEventStartAt">Beginn (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="editEventStartAt" name="startAt">
                 </div>
                 <div class="form-group">
-                    <label for="editEventEndTime">End-Uhrzeit (UTC)</label>
-                    <input type="time" id="editEventEndTime" name="endTime" placeholder="18:00">
+                    <label for="editEventEndAt">Ende (Wandzeit in Zeitzone) *</label>
+                    <input type="datetime-local" id="editEventEndAt" name="endAt">
                 </div>
             </div>
         </div>
@@ -424,6 +448,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script>
     const eventsData = {{eventsData}};
+    const tripsData = {{tripsData}};
     let cropper = null;
     let cropResolve = null;
 
@@ -460,18 +485,12 @@
     function toggleTripAllDay() {
         const allDay = document.getElementById('newTripAllDay').checked;
         document.getElementById('newTripTimeFields').style.display = allDay ? 'none' : 'block';
-        if (allDay) {
-            document.getElementById('newTripStartTime').value = '';
-            document.getElementById('newTripEndTime').value = '';
-        }
+        document.getElementById('newTripDayFields').style.display = allDay ? 'block' : 'none';
     }
     function toggleEditTripAllDay() {
         const allDay = document.getElementById('editTripAllDay').checked;
         document.getElementById('editTripTimeFields').style.display = allDay ? 'none' : 'block';
-        if (allDay) {
-            document.getElementById('editTripStartTime').value = '';
-            document.getElementById('editTripEndTime').value = '';
-        }
+        document.getElementById('editTripDayFields').style.display = allDay ? 'block' : 'none';
     }
 
     // Event utilities
@@ -509,18 +528,12 @@
     function toggleEventAllDay() {
         const allDay = document.getElementById('newEventAllDay').checked;
         document.getElementById('newEventTimeFields').style.display = allDay ? 'none' : 'block';
-        if (allDay) {
-            document.getElementById('newEventStartTime').value = '';
-            document.getElementById('newEventEndTime').value = '';
-        }
+        document.getElementById('newEventDayFields').style.display = allDay ? 'block' : 'none';
     }
     function toggleEditEventAllDay() {
         const allDay = document.getElementById('editEventAllDay').checked;
         document.getElementById('editEventTimeFields').style.display = allDay ? 'none' : 'block';
-        if (allDay) {
-            document.getElementById('editEventStartTime').value = '';
-            document.getElementById('editEventEndTime').value = '';
-        }
+        document.getElementById('editEventDayFields').style.display = allDay ? 'block' : 'none';
     }
 
     // Image handling
@@ -646,23 +659,18 @@
     // CRUD: Trips
     async function submitCreateTrip(event) {
         event.preventDefault();
-        const form = document.getElementById('newTripForm');
         const allDay = document.getElementById('newTripAllDay').checked;
-        const data = {
-            name: form.name.value.trim(),
-            description: form.description.value.trim() || null,
-            allDay: allDay,
-            startDate: form.startDate.value.trim(),
-            endDate: form.endDate.value.trim(),
-            startTime: allDay ? null : form.startTime.value.trim(),
-            endTime: allDay ? null : form.endTime.value.trim(),
+        const timezone = document.getElementById('newTripTimezone').value;
+        const timing = buildTimingPayload(allDay, timezone, 'newTrip');
+        if (timing.error) { showToast(timing.error, 'error'); return; }
+        const data = Object.assign({
+            name: document.getElementById('newTripName').value.trim(),
+            description: document.getElementById('newTripDescription').value.trim() || null,
             hastickets: document.getElementById('newTripHastickets').checked ? '1' : '0',
             ticket: document.getElementById('newTripTicket').value.trim() || null,
             ticketUrl: document.getElementById('newTripTicketUrl').value.trim() || null,
-        };
+        }, timing.data);
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
-        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
-        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Reisen sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/trips', {
@@ -685,11 +693,13 @@
         document.getElementById('editEventDescription').value = d.description;
         document.getElementById('editEventTrip').value = d.trip || '';
         document.getElementById('editEventAllDay').checked = d.allDay;
-        document.getElementById('editEventStartDate').value = d.startDate;
-        document.getElementById('editEventEndDate').value = d.endDate;
-        document.getElementById('editEventStartTime').value = d.startTime || '';
-        document.getElementById('editEventEndTime').value = d.endTime || '';
+        document.getElementById('editEventTimezone').value = d.timezone;
+        document.getElementById('editEventStartDate').value = d.startDate || '';
+        document.getElementById('editEventEndDate').value = d.endDate || '';
+        document.getElementById('editEventStartAt').value = d.startAtLocal || '';
+        document.getElementById('editEventEndAt').value = d.endAtLocal || '';
         document.getElementById('editEventTimeFields').style.display = d.allDay ? 'none' : 'block';
+        document.getElementById('editEventDayFields').style.display = d.allDay ? 'block' : 'none';
         const hasTickets = d.hastickets === '1';
         document.getElementById('editEventHastickets').checked = hasTickets;
         document.getElementById('editEventTicketFields').style.display = hasTickets ? 'block' : 'none';
@@ -717,44 +727,43 @@
         return value.startsWith('/9j/') || value.startsWith('iVBOR') || value.startsWith('UklGR');
     }
 
-    function editTrip(id, name, description, startDate, endDate, startTime, endTime, allDay, hastickets, ticket, ticketUrl) {
-        document.getElementById('editTripId').value = id;
-        document.getElementById('editTripName').value = name;
-        document.getElementById('editTripDescription').value = description;
-        document.getElementById('editTripAllDay').checked = allDay;
-        document.getElementById('editTripStartDate').value = startDate;
-        document.getElementById('editTripEndDate').value = endDate;
-        document.getElementById('editTripStartTime').value = startTime || '';
-        document.getElementById('editTripEndTime').value = endTime || '';
-        document.getElementById('editTripTimeFields').style.display = allDay ? 'none' : 'block';
-        const hasTickets = hastickets === '1';
+    function editTrip(id) {
+        const d = tripsData[id];
+        if (!d) return;
+        document.getElementById('editTripId').value = d.id;
+        document.getElementById('editTripName').value = d.name;
+        document.getElementById('editTripDescription').value = d.description;
+        document.getElementById('editTripAllDay').checked = d.allDay;
+        document.getElementById('editTripTimezone').value = d.timezone;
+        document.getElementById('editTripStartDate').value = d.startDate || '';
+        document.getElementById('editTripEndDate').value = d.endDate || '';
+        document.getElementById('editTripStartAt').value = d.startAtLocal || '';
+        document.getElementById('editTripEndAt').value = d.endAtLocal || '';
+        document.getElementById('editTripTimeFields').style.display = d.allDay ? 'none' : 'block';
+        document.getElementById('editTripDayFields').style.display = d.allDay ? 'block' : 'none';
+        const hasTickets = d.hastickets === '1';
         document.getElementById('editTripHastickets').checked = hasTickets;
         document.getElementById('editTripTicketFields').style.display = hasTickets ? 'block' : 'none';
-        document.getElementById('editTripTicket').value = ticket || '';
-        document.getElementById('editTripTicketUrl').value = ticketUrl || '';
+        document.getElementById('editTripTicket').value = d.ticket || '';
+        document.getElementById('editTripTicketUrl').value = d.ticketUrl || '';
         showEditTripForm();
     }
 
     async function submitEditTrip(event) {
         event.preventDefault();
-        const form = document.getElementById('editTripFormEl');
         const id = document.getElementById('editTripId').value;
         const allDay = document.getElementById('editTripAllDay').checked;
-        const data = {
-            name: form.name.value.trim(),
-            description: form.description.value.trim() || null,
-            allDay: allDay,
-            startDate: form.startDate.value.trim(),
-            endDate: form.endDate.value.trim(),
-            startTime: allDay ? null : form.startTime.value.trim(),
-            endTime: allDay ? null : form.endTime.value.trim(),
+        const timezone = document.getElementById('editTripTimezone').value;
+        const timing = buildTimingPayload(allDay, timezone, 'editTrip');
+        if (timing.error) { showToast(timing.error, 'error'); return; }
+        const data = Object.assign({
+            name: document.getElementById('editTripName').value.trim(),
+            description: document.getElementById('editTripDescription').value.trim() || null,
             hastickets: document.getElementById('editTripHastickets').checked ? '1' : '0',
             ticket: document.getElementById('editTripTicket').value.trim() || null,
             ticketUrl: document.getElementById('editTripTicketUrl').value.trim() || null,
-        };
+        }, timing.data);
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
-        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
-        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Reisen sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/trips/' + id, {
@@ -785,18 +794,15 @@
     // CRUD: Events
     async function submitCreateEvent(event) {
         event.preventDefault();
-        const form = document.getElementById('newEventForm');
         const imageData = document.getElementById('newEventImage').value;
         const allDay = document.getElementById('newEventAllDay').checked;
-        const data = {
-            name: form.name.value.trim(),
-            description: form.description.value.trim() || null,
-            trip: form.trip.value || null,
-            allDay: allDay,
-            startDate: form.startDate.value.trim(),
-            endDate: form.endDate.value.trim(),
-            startTime: allDay ? null : form.startTime.value.trim(),
-            endTime: allDay ? null : form.endTime.value.trim(),
+        const timezone = document.getElementById('newEventTimezone').value;
+        const timing = buildTimingPayload(allDay, timezone, 'newEvent');
+        if (timing.error) { showToast(timing.error, 'error'); return; }
+        const data = Object.assign({
+            name: document.getElementById('newEventName').value.trim(),
+            description: document.getElementById('newEventDescription').value.trim() || null,
+            trip: document.getElementById('newEventTrip').value || null,
             hastickets: document.getElementById('newEventHastickets').checked ? '1' : '0',
             ticket: document.getElementById('newEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('newEventTicketUrl').value.trim() || null,
@@ -808,10 +814,8 @@
             longitude: document.getElementById('newEventLongitude').value.trim() || null,
             OSMID: document.getElementById('newEventOSMID').value.trim() || null,
             citySlug: document.getElementById('newEventCitySlug').value.trim() || null,
-        };
+        }, timing.data);
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
-        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
-        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Events sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/events', {
@@ -828,19 +832,16 @@
 
     async function submitEditEvent(event) {
         event.preventDefault();
-        const form = document.getElementById('editEventFormEl');
         const id = document.getElementById('editEventId').value;
         const imageData = document.getElementById('editEventImage').value;
         const allDay = document.getElementById('editEventAllDay').checked;
-        const data = {
-            name: form.name.value.trim(),
-            description: form.description.value.trim() || null,
-            trip: form.trip.value || null,
-            allDay: allDay,
-            startDate: form.startDate.value.trim(),
-            endDate: form.endDate.value.trim(),
-            startTime: allDay ? null : form.startTime.value.trim(),
-            endTime: allDay ? null : form.endTime.value.trim(),
+        const timezone = document.getElementById('editEventTimezone').value;
+        const timing = buildTimingPayload(allDay, timezone, 'editEvent');
+        if (timing.error) { showToast(timing.error, 'error'); return; }
+        const data = Object.assign({
+            name: document.getElementById('editEventName').value.trim(),
+            description: document.getElementById('editEventDescription').value.trim() || null,
+            trip: document.getElementById('editEventTrip').value || null,
             hastickets: document.getElementById('editEventHastickets').checked ? '1' : '0',
             ticket: document.getElementById('editEventTicket').value.trim() || null,
             ticketUrl: document.getElementById('editEventTicketUrl').value.trim() || null,
@@ -852,10 +853,8 @@
             longitude: document.getElementById('editEventLongitude').value.trim() || null,
             OSMID: document.getElementById('editEventOSMID').value.trim() || null,
             citySlug: document.getElementById('editEventCitySlug').value.trim() || null,
-        };
+        }, timing.data);
         if (!data.name) { showToast('Name ist erforderlich.', 'error'); return; }
-        if (!data.startDate || !data.endDate) { showToast('Start-Datum und End-Datum sind erforderlich.', 'error'); return; }
-        if (!allDay && (!data.startTime || !data.endTime)) { showToast('Bei getakteten Events sind Start- und End-Uhrzeit erforderlich.', 'error'); return; }
 
         try {
             const res = await fetch('/api/v2/admin/travel/events/' + id, {

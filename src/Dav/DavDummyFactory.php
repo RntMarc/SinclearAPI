@@ -6,6 +6,7 @@ namespace Sinclear\Api\Dav;
 
 use DateTimeImmutable;
 use DateTimeZone;
+use Sinclear\Api\Support\DateTimeValue;
 
 /**
  * Erzeugt den Hinweis-Kalendereintrag bzw. den Hinweis-Kontakt fuer Clients,
@@ -31,16 +32,16 @@ final readonly class DavDummyFactory
     {
         $start = $this->todayNoon();
         $end = $start->modify('+1 hour');
+        $utc = new DateTimeZone('UTC');
 
         $event = [
             'id' => 'sinclear-dav-invalid-token',
             'title' => self::TITLE,
             'description' => self::DESCRIPTION,
             'allDay' => false,
-            'startDate' => $start->format('Y-m-d'),
-            'endDate' => $end->format('Y-m-d'),
-            'startTime' => $start->format('H:i:s'),
-            'endTime' => $end->format('H:i:s'),
+            'timezone' => 'UTC',
+            'startAt' => DateTimeValue::formatInstant($start, $utc),
+            'endAt' => DateTimeValue::formatInstant($end, $utc),
             'visibility' => 1,
             'creatorId' => 'sinclear-dav',
             'updatedAt' => $start->format('Y-m-d H:i:s'),

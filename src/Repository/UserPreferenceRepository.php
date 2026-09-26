@@ -74,6 +74,6 @@ final readonly class UserPreferenceRepository
                 1, 1, 1,
                 NOW(3), NOW(3))'
         );
-        $stmt->execute([$id, $userId, 'de', 'light', '#6366f1', 'Europe/Berlin']);
+        $stmt->execute([$id, $userId, 'de', 'light', '#6366f1', null]);
     }
 }

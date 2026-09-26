@@ -189,7 +189,7 @@ Der Request Body kann eine beliebige Kombination der folgenden Felder enthalten:
 | `language` | String (z.B. `"de"`, `"en"`) |
 | `theme` | String (z.B. `"light"`, `"dark"`) |
 | `primaryColor` | Hex-String (z.B. `"#6366f1"`) |
-| `timezone` | IANA-Timezone (z.B. `"Europe/Berlin"`) |
+| `timezone` | IANA-Timezone (z.B. `"Europe/Berlin"`). Bestimmt die Standard-Zeitzone für neue Kalender-/Reise-Einträge und die Tagesgrenzen von Zeitraum-Abfragen. `null` bedeutet Gerätezeitzone. |
 
 ### E-Mail-Änderung (mit OTP-Bestätigung)
 

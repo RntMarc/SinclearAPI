@@ -112,8 +112,8 @@ Die Daten stammen aus demselben Service wie `GET /calendar/all`
 | ICS-Eigenschaft | Quelle |
 |-----------------|--------|
 | `UID` | `{feedItemId}@sinclear.de` |
-| `DTSTART` / `DTEND` | Bei ganztägigen Events (`allDay: true`): `VALUE=DATE`, `startDate` / `endDate + 1 Tag` (exklusiv, UTC). Bei getakteten Events: `startDate` + `startTime` / `endDate` + `endTime` als UTC DateTime mit `Z`-Suffix. |
-| `DTSTAMP` | `updatedAt` bzw. `createdAt` bzw. `startDate` (stabil, für ETag-Stabilität) |
+| `DTSTART` / `DTEND` | Bei ganztägigen Events (`allDay: true`): `VALUE=DATE`, `startDate` / `endDate + 1 Tag` (exklusiv). Bei getakteten Events: `startAt` / `endAt` als UTC DateTime mit `Z`-Suffix. |
+| `DTSTAMP` | `updatedAt` bzw. `createdAt` bzw. `startDate`/`startAt` (stabil, für ETag-Stabilität) |
 | `SUMMARY` / `DESCRIPTION` | `title` / `description` (bzw. Leg-Details bei ÖPNV) |
 | `CLASS` | `visibility`: 0 → `PRIVATE`, 1 → `PUBLIC`, 2 → `CONFIDENTIAL` (nur calendar_event) |
 | `ORGANIZER` / `ATTENDEE` | `mailto:{userId}@sinclear.de` (keine echten E-Mail-Adressen) |
@@ -140,11 +140,14 @@ Die Daten stammen aus demselben Service wie `GET /calendar/all`
 - Die eigenen Daten sind vollständig sichtbar (auch bei Sichtbarkeit 0).
 - Schreibzugriffe werden mit `403 Forbidden` beantwortet.
 
-## Zeitzonen (UTC-only)
+## Zeitzonen
 
-Die API arbeitet ausschließlich in UTC. Alle Datums-/Zeitangaben im ICS
-werden mit `Z`-Suffix (UTC) serialisiert. Die Umrechnung in die lokale
-Zeitzone übernimmt der Client.
+Jeder getaktete Eintrag trägt eine IANA-Zeitzone (`timezone`). Im ICS werden
+absolute Zeitpunkte dennoch als UTC (`Z`-Suffix) serialisiert, damit
+Kalender-Clients sie geräteunabhängig korrekt sortieren und anzeigen; die
+gemeinte Zone wird zusätzlich als `X-WR-TIMEZONE` am `VCALENDAR` ausgewiesen.
+Ganztägige Einträge bleiben zivile Tage (`VALUE=DATE`) und werden nicht
+verschoben. Die Anzeige in der lokalen Zeitzone übernimmt der Client.
 
 ## Client-Einrichtung (Beispiele)
 

@@ -25,10 +25,9 @@ final class CalendarEventControllerTest extends TestCase
     private const array VALID_BODY = [
         'title' => 'Standup',
         'allDay' => false,
-        'startDate' => '2026-09-26',
-        'endDate' => '2026-09-26',
-        'startTime' => '20:00:00',
-        'endTime' => '23:59:00',
+        'timezone' => 'Europe/Berlin',
+        'startAt' => '2026-09-26T20:00:00+02:00',
+        'endAt' => '2026-09-26T23:59:00+02:00',
         'visibility' => 0,
     ];
 
@@ -156,6 +155,95 @@ final class CalendarEventControllerTest extends TestCase
         $this->assertSame(404, $result->getStatusCode());
         $body = json_decode((string) $result->getBody(), true);
         $this->assertSame('event_not_found', $body['error'] ?? null);
+    }
+
+    public function testCreateRejectsInvalidTimeZone(): void
+    {
+        $result = $this->createController()->create(
+            $this->createRequest([...self::VALID_BODY, 'timezone' => 'Nonsense/Zone']),
+            new Response(),
+        );
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('invalid_timezone', $body['error'] ?? null);
+    }
+
+    public function testCreateRejectsInvalidInstant(): void
+    {
+        $result = $this->createController()->create(
+            $this->createRequest([...self::VALID_BODY, 'startAt' => '2026-09-26 20:00:00']),
+            new Response(),
+        );
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('invalid_datetime', $body['error'] ?? null);
+    }
+
+    public function testCreateRejectsDateFieldsOnTimedEvent(): void
+    {
+        $result = $this->createController()->create(
+            $this->createRequest([...self::VALID_BODY, 'startDate' => '2026-09-26']),
+            new Response(),
+        );
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('date_forbidden', $body['error'] ?? null);
+    }
+
+    public function testCreateRejectsInstantFieldsOnAllDayEvent(): void
+    {
+        $result = $this->createController()->create(
+            $this->createRequest([
+                'title' => 'Feiertag',
+                'allDay' => true,
+                'timezone' => 'Europe/Berlin',
+                'startDate' => '2026-10-03',
+                'endDate' => '2026-10-03',
+                'startAt' => '2026-10-03T00:00:00+02:00',
+            ]),
+            new Response(),
+        );
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('time_forbidden', $body['error'] ?? null);
+    }
+
+    public function testCreateRejectsReversedInstantRange(): void
+    {
+        $result = $this->createController()->create(
+            $this->createRequest([
+                ...self::VALID_BODY,
+                'startAt' => '2026-09-26T20:00:00+02:00',
+                'endAt' => '2026-09-26T19:00:00+02:00',
+            ]),
+            new Response(),
+        );
+
+        $this->assertSame(400, $result->getStatusCode());
+        $body = json_decode((string) $result->getBody(), true);
+        $this->assertSame('invalid_time_range', $body['error'] ?? null);
+    }
+
+    public function testCreateAcceptsAllDayEvent(): void
+    {
+        $this->pdo->method('prepare')->willThrowException(new \RuntimeException('reached repo'));
+
+        $result = $this->createController()->create(
+            $this->createRequest([
+                'title' => 'Feiertag',
+                'allDay' => true,
+                'timezone' => 'Europe/Berlin',
+                'startDate' => '2026-10-03',
+                'endDate' => '2026-10-04',
+            ]),
+            new Response(),
+        );
+
+        $this->assertSame(500, $result->getStatusCode());
     }
 
     private function createController(bool $debug = false): CalendarEventController

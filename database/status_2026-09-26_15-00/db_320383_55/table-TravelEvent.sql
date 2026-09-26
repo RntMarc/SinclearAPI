@@ -12,11 +12,12 @@ CREATE TABLE IF NOT EXISTS `TravelEvent` (
   `trip` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text COLLATE utf8mb4_unicode_ci,
-  `startDate` date NOT NULL,
-  `endDate` date NOT NULL,
-  `startTime` time DEFAULT NULL,
-  `endTime` time DEFAULT NULL,
+  `startDate` date DEFAULT NULL,
+  `endDate` date DEFAULT NULL,
   `allDay` tinyint(1) NOT NULL DEFAULT '0',
+  `timezone` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Europe/Berlin',
+  `startAt` datetime(3) DEFAULT NULL,
+  `endAt` datetime(3) DEFAULT NULL,
   `hastickets` enum('1','0') COLLATE utf8mb4_unicode_ci DEFAULT '0',
   `ticket` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `ticketUrl` text COLLATE utf8mb4_unicode_ci,
@@ -29,7 +30,8 @@ CREATE TABLE IF NOT EXISTS `TravelEvent` (
   `OSMID` bigint DEFAULT NULL,
   `citySlug` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`ID`),
-  KEY `idx_travel_event_time` (`startDate`,`endDate`)
+  KEY `idx_travel_event_instant` (`startAt`,`endAt`),
+  KEY `idx_travel_event_day` (`startDate`,`endDate`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

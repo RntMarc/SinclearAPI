@@ -226,6 +226,64 @@
             setTimeout(() => el.remove(), 3000);
         }
 
+        // Zeitzonen-Helfer (IANA): Wandzeit <-> RFC-3339-Instant.
+        // offsetMs liefert die Zonen-Differenz zu UTC zum Zeitpunkt epochMs.
+        function zoneOffsetMs(epochMs, timezone) {
+            const dtf = new Intl.DateTimeFormat('en-US', {
+                timeZone: timezone, hour12: false,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+            });
+            const parts = {};
+            for (const p of dtf.formatToParts(new Date(epochMs))) parts[p.type] = p.value;
+            const asUtc = Date.UTC(
+                +parts.year, +parts.month - 1, +parts.day,
+                (+parts.hour) % 24, +parts.minute, +parts.second
+            );
+            return asUtc - epochMs;
+        }
+
+        // Wandelt einen datetime-local-Wert (Wandzeit in `timezone`) in einen
+        // RFC-3339-UTC-String um. Beruecksichtigt Sommer-/Winterzeit.
+        function zonedInputToRfc3339(localValue, timezone) {
+            if (!localValue) return null;
+            const [datePart, timePart] = localValue.split('T');
+            if (!datePart || !timePart) return null;
+            const [y, mo, d] = datePart.split('-').map(Number);
+            const [h, mi] = timePart.split(':').map(Number);
+            const utcGuess = Date.UTC(y, mo - 1, d, h, mi);
+            const offset = zoneOffsetMs(utcGuess, timezone);
+            let instant = utcGuess - offset;
+            const offsetAtInstant = zoneOffsetMs(instant, timezone);
+            if (offsetAtInstant !== offset) instant = utcGuess - offsetAtInstant;
+            return new Date(instant).toISOString().replace('.000Z', 'Z');
+        }
+
+        // Baut die Timing-Felder (allDay/Zeitzone/Datum bzw. RFC-3339-Instant)
+        // aus einem Admin-Formular mit den IDs <prefix>StartDate/EndDate und
+        // <prefix>StartAt/EndAt. Liefert {data} oder {error}.
+        function buildTimingPayload(allDay, timezone, idPrefix) {
+            if (allDay) {
+                const startDate = document.getElementById(idPrefix + 'StartDate').value.trim();
+                const endDate = document.getElementById(idPrefix + 'EndDate').value.trim();
+                if (!startDate || !endDate) {
+                    return { error: 'Start-Datum und End-Datum sind erforderlich.' };
+                }
+                return { data: { allDay: true, timezone: timezone, startDate: startDate, endDate: endDate } };
+            }
+            const startLocal = document.getElementById(idPrefix + 'StartAt').value.trim();
+            const endLocal = document.getElementById(idPrefix + 'EndAt').value.trim();
+            if (!startLocal || !endLocal) {
+                return { error: 'Bei getakteten Einträgen sind Beginn und Ende erforderlich.' };
+            }
+            return { data: {
+                allDay: false,
+                timezone: timezone,
+                startAt: zonedInputToRfc3339(startLocal, timezone),
+                endAt: zonedInputToRfc3339(endLocal, timezone),
+            } };
+        }
+
         // Active nav highlighting
         document.querySelectorAll('.nav-link').forEach(function(link) {
             if (window.location.pathname === link.getAttribute('data-path')) {
