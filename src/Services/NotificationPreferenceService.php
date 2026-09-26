@@ -33,6 +33,10 @@ final readonly class NotificationPreferenceService
         'event_user_added_others',
         'event_ticket_added',
         'event_info_changed',
+        'poll_invite',
+        'poll_counter_proposal',
+        'poll_finalized',
+        'poll_deadline_reminder',
     ];
 
     /**
@@ -68,6 +72,10 @@ final readonly class NotificationPreferenceService
         'forum_post' => ['relation' => 'parent_forum', 'dataKey' => 'forumIds'],
         'story_post' => ['relation' => 'story_author', 'dataKey' => 'userIds'],
         'direct_message' => ['relation' => 'sender', 'dataKey' => 'userIds'],
+        'poll_invite' => ['relation' => 'poll', 'dataKey' => 'pollIds'],
+        'poll_counter_proposal' => ['relation' => 'poll', 'dataKey' => 'pollIds'],
+        'poll_finalized' => ['relation' => 'poll', 'dataKey' => 'pollIds'],
+        'poll_deadline_reminder' => ['relation' => 'poll', 'dataKey' => 'pollIds'],
     ];
 
     private const VALID_STATES = ['enabled', 'disabled', 'custom'];

@@ -243,6 +243,52 @@ class NotificationPreferenceServiceTest extends TestCase
         $this->assertTrue($this->service->shouldSend('user-1', 'story_post', $data));
     }
 
+    public function testPollTypesSupportCustom(): void
+    {
+        $all = $this->service->getAll('user-1');
+
+        foreach (['poll_invite', 'poll_counter_proposal', 'poll_finalized', 'poll_deadline_reminder'] as $type) {
+            $this->assertArrayHasKey($type, $all);
+            $this->assertTrue($all[$type]['customAllowed']);
+        }
+    }
+
+    public function testUpdateCustomForPollStoresData(): void
+    {
+        $result = $this->service->update('user-1', [
+            ['type' => 'poll_invite', 'state' => 'custom', 'customData' => ['pollIds' => ['p1', 'p2']]],
+        ]);
+
+        $this->assertSame('custom', $result['poll_invite']['state']);
+        $this->assertSame(['pollIds' => ['p1', 'p2']], $result['poll_invite']['customData']);
+    }
+
+    public function testShouldSendCustomBlocksPollOnDenylist(): void
+    {
+        $this->service->update('user-1', [
+            ['type' => 'poll_invite', 'state' => 'custom', 'customData' => ['pollIds' => ['p1']]],
+        ]);
+
+        $data = [
+            ['relation' => 'poll', 'object' => 'Poll', 'identifier' => 'p1'],
+        ];
+
+        $this->assertFalse($this->service->shouldSend('user-1', 'poll_invite', $data));
+    }
+
+    public function testShouldSendCustomAllowsPollNotOnDenylist(): void
+    {
+        $this->service->update('user-1', [
+            ['type' => 'poll_invite', 'state' => 'custom', 'customData' => ['pollIds' => ['p1']]],
+        ]);
+
+        $data = [
+            ['relation' => 'poll', 'object' => 'Poll', 'identifier' => 'p9'],
+        ];
+
+        $this->assertTrue($this->service->shouldSend('user-1', 'poll_invite', $data));
+    }
+
     public function testShouldSendMapsInternalTypeToUnifiedPreference(): void
     {
         // Disable the unified preference for event_user_added

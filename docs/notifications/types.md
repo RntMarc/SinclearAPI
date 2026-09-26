@@ -2,7 +2,7 @@
 
 Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihre Trigger und die übermittelten Eigenschaften. Technische Details zur API stehen in [readme.md](./readme.md). Sie muss bei jeder Änderung an Notification-Typen aktualisiert werden.
 
-> **Präferenzen:** Die vom Preferences-Endpoint angebotenen Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Interne Event-Typen werden dabei zu gemeinsamen Preference-Schlüsseln zusammengefasst. Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply`, `forum_post` (Denylist `forumIds`), `story_post` (Denylist `userIds`) und `direct_message` (Denylist `userIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
+> **Präferenzen:** Die vom Preferences-Endpoint angebotenen Typen können vom Nutzer über `PUT /notifications/preferences` aktiviert (`enabled`) oder deaktiviert (`disabled`) werden (Standard: `enabled`). Interne Event-Typen werden dabei zu gemeinsamen Preference-Schlüsseln zusammengefasst. Folgende Typen unterstützen zusätzlich `custom` (Denylist: IDs im `customData` werden vom Versand ausgeschlossen): `forum_comment`, `forum_reply`, `forum_post` (Denylist `forumIds`), `story_post` (Denylist `userIds`), `direct_message` (Denylist `userIds`) sowie `poll_invite`, `poll_counter_proposal`, `poll_finalized` und `poll_deadline_reminder` (Denylist `pollIds`). Details und Format-Regeln siehe [readme.md](./readme.md).
 >
 > **Vereinheitlichte Event-Typen:** Interne Notification-Typen (z.B. `standalone_event_user_added`, `trip_event_user_added`) werden bei den Präferenzen auf vereinheitlichte Typen gemappt. Der Nutzer sieht nur: `event_user_added` / `event_user_added_others`, `event_ticket_added` und `event_info_changed`. Diese gelten sowohl für Reise-Events als auch für eigenständige Events.
 
@@ -83,3 +83,23 @@ Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihr
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
 | `trip_subscription_added` | Abo wird mit einer Reise verknüpft | Alle Reise-Teilnehmer | `subscription` (Subscription), `trip` (Trip) | `Neues Abo verknüpft` | Dynamisch: `Das Abo "{subscription.name}" wurde mit der Reise "{trip.name}" verknüpft.` |
+
+## Umfragen (Polls)
+
+Ausgelöst vom `PollService` bzw. `PollNotificationService`. Der Aufbau der
+Umfrage (Formular, Terminfindung, Abstimmung) ergibt sich aus `poll.type`;
+der nächstgelegene Client-Deeplink lässt sich lokal aus der `poll`-Relation
+ableiten. Die Empfängerlogik liegt zentral in `PollNotificationService`.
+
+| Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
+|------|---------|-----------|--------------------|-----------------------|----------------------|
+| `poll_invite` | Nutzer wird zu einer Umfrage eingeladen | Der eingeladene Nutzer (kein Self-Trigger) | `poll` (Poll), `inviter` (User) | `Neue Umfrage-Einladung` | `''` |
+| `poll_counter_proposal` | Bei einer Terminfindung wird ein Gegenvorschlag angelegt | Ersteller plus übrige Teilnehmer (außer dem Vorschlagenden) | `poll` (Poll), `proposer` (User), `option` (PollOption) | `Neuer Gegenvorschlag` | `''` |
+| `poll_finalized` | Termin wird festgelegt **oder** Umfrage manuell/automatisch geschlossen | Alle Teilnehmer (Einladungen, Formular-Antworten, Verfügbarkeitsstimmen; außer dem Auslöser) | `poll` (Poll), `finalized_option` (PollOption, optional) | `Umfrage aktualisiert` | `''` |
+| `poll_deadline_reminder` | Cron `polls_deadline`: offene Umfrage kurz vor `closesAt` | Teilnehmer ohne Antwort/Verfügbarkeit/Stimme (`vote` via HMAC-Hash) | `poll` (Poll) | `Erinnerung: Umfrage endet bald` | `''` |
+
+**Hinweis:** `poll_deadline_reminder` wird pro Umfrage und Empfänger
+dedupliziert (`dedupeKey = "poll:<pollId>:deadline"`). Bei anonymen
+Abstimmungen bleibt die Anonymität gewahrt: Die bereits erfolgte Teilnahme
+wird serverseitig über den HMAC-Hash `participantHash` geprüft, ohne
+`userId` in der Stimmtabelle zu speichern.

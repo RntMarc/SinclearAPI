@@ -19,6 +19,9 @@ use Sinclear\Api\Controllers\LaMetricController;
 use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\NotificationController;
+use Sinclear\Api\Controllers\PollAppointmentController;
+use Sinclear\Api\Controllers\PollController;
+use Sinclear\Api\Controllers\PollVoteController;
 use Sinclear\Api\Controllers\RecipeController;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Controllers\ReviewController;
@@ -280,6 +283,37 @@ return function (App $app): void {
         $group->delete('/suggestions/{id}/comments/{commentId}', [FeedbackController::class, 'deleteComment']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    // Polls — Umfragen: Formular, Terminfindung, anonyme Abstimmung
+    $app->group('/polls', function (RouteCollectorProxy $group) {
+        $group->get('', [PollController::class, 'list']);
+        $group->post('', [PollController::class, 'create']);
+
+        // Statische Unterpfade MUST come before /{id}
+        $group->get('/{id}/invites', [PollController::class, 'listInvites']);
+        $group->post('/{id}/invites', [PollController::class, 'addInvites']);
+        $group->delete('/{id}/invites/{userId}', [PollController::class, 'removeInvite']);
+
+        $group->get('/{id}/responses/me', [PollController::class, 'getMyResponse']);
+        $group->get('/{id}/responses', [PollController::class, 'listResponses']);
+        $group->post('/{id}/responses', [PollController::class, 'submitResponse']);
+        $group->patch('/{id}/responses/{responseId}', [PollController::class, 'updateResponse']);
+
+        $group->post('/{id}/options', [PollAppointmentController::class, 'addCounterProposal']);
+        $group->delete('/{id}/options/{optionId}', [PollAppointmentController::class, 'deleteCounterProposal']);
+        $group->get('/{id}/availability', [PollAppointmentController::class, 'listAvailability']);
+        $group->put('/{id}/availability', [PollAppointmentController::class, 'setAvailability']);
+        $group->post('/{id}/finalize', [PollAppointmentController::class, 'finalize']);
+
+        $group->get('/{id}/vote-status', [PollVoteController::class, 'voteStatus']);
+        $group->post('/{id}/vote', [PollVoteController::class, 'vote']);
+        $group->get('/{id}/results', [PollVoteController::class, 'results']);
+
+        $group->get('/{id}', [PollController::class, 'get']);
+        $group->patch('/{id}', [PollController::class, 'update']);
+        $group->delete('/{id}', [PollController::class, 'delete']);
+        $group->post('/{id}/close', [PollController::class, 'close']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
     // Moderation requests — Melde- und Anfragensystem (Nutzer)
     $app->group('/moderation-requests', function (RouteCollectorProxy $group) {
         $group->post('', [ModerationRequestController::class, 'create']);
@@ -435,6 +469,11 @@ return function (App $app): void {
         $group->delete('/forums/{id}', [AdminController::class, 'deleteForum']);
         $group->get('/recipes', [AdminController::class, 'recipes']);
         $group->delete('/recipes/{id}', [AdminController::class, 'deleteRecipe']);
+        $group->get('/polls', [AdminController::class, 'polls']);
+        $group->get('/polls/json', [AdminController::class, 'adminPollsJson']);
+        $group->get('/polls/{id}', [AdminController::class, 'pollDetail']);
+        $group->post('/polls/{id}/close', [AdminController::class, 'closePoll']);
+        $group->delete('/polls/{id}', [AdminController::class, 'deletePoll']);
         $group->get('/travel', [AdminController::class, 'travel']);
         $group->post('/travel/trips', [AdminController::class, 'createTrip']);
         $group->put('/travel/trips/{id}', [AdminController::class, 'updateTrip']);

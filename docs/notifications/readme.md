@@ -248,6 +248,10 @@ geleert werden, ohne den State zu ändern.
 | `forum_post` | `forumIds` | Forum-IDs, deren Benachrichtigungen unterdrückt werden | `parent_forum` |
 | `story_post` | `userIds` | Nutzer-IDs (Story-Autoren), deren Stories unterdrückt werden | `story_author` |
 | `direct_message` | `userIds` | Nutzer-IDs (Absender), deren Nachrichten unterdrückt werden | `sender` |
+| `poll_invite` | `pollIds` | Umfrage-IDs, deren Benachrichtigungen unterdrückt werden | `poll` |
+| `poll_counter_proposal` | `pollIds` | Umfrage-IDs, deren Benachrichtigungen unterdrückt werden | `poll` |
+| `poll_finalized` | `pollIds` | Umfrage-IDs, deren Benachrichtigungen unterdrückt werden | `poll` |
+| `poll_deadline_reminder` | `pollIds` | Umfrage-IDs, deren Benachrichtigungen unterdrückt werden | `poll` |
 
 **Beispiel Foren (Denylist):**
 ```json
@@ -463,6 +467,33 @@ Benachrichtigt darüber, dass eine neue Direktnachricht eingegangen ist – sowo
 ```
 
 **Coalesced Upsert:** Der `NotificationService` prüft bei `dedupeKey` auf eine vorhandene ungelesene Notification mit demselben Key. Existiert eine, wird `title`/`body`/`data` aktualisiert und `createdAt` auf `NOW(3)` gesetzt. Die `data`-Relationen werden dabei überschrieben (nicht gemerged) – der Client sollte die `message`-ID aus der zuletzt eingegangenen Notification verwenden.
+
+### Umfragen (Polls)
+
+Die vier Umfrage-Typen werden in `PollNotificationService` ausgelöst (siehe auch [types.md](./types.md) und die Modul-Doku [../polls/readme.md](../polls/readme.md)):
+
+| Type | Empfänger | Pflicht-Relations (`data`) | Optionale Relations |
+|------|-----------|----------------------------|---------------------|
+| `poll_invite` | Eingeladene:r | `poll` (Poll), `inviter` (User) | – |
+| `poll_counter_proposal` | Ersteller + übrige Teilnehmer (außer Vorschlagendem) | `poll` (Poll), `proposer` (User), `option` (PollOption) | – |
+| `poll_finalized` | Alle Teilnehmer (außer Auslöser) | `poll` (Poll) | `finalized_option` (PollOption) |
+| `poll_deadline_reminder` | Teilnehmer ohne Antwort/Stimme | `poll` (Poll) | – |
+
+**Data-Format (Beispiel `poll_counter_proposal`):**
+```json
+[
+  { "relation": "poll", "object": "Poll", "identifier": "poll-uuid" },
+  { "relation": "proposer", "object": "User", "identifier": "user-uuid" },
+  { "relation": "option", "object": "PollOption", "identifier": "option-uuid" }
+]
+```
+
+`poll_finalized` wird sowohl beim Festlegen eines Termins (`POST /polls/{id}/finalize`)
+als auch beim manuellen Schließen (`POST /polls/{id}/close`) und beim
+automatischen Auto-Close via Cron verwendet. `poll_deadline_reminder` bündelt
+pro Umfrage und Empfänger (`dedupeKey = "poll:<pollId>:deadline"`). Bei
+`vote`-Umfragen wird die bereits erfolgte Teilnahme über den HMAC-basierten
+`participantHash` geprüft, ohne den Nutzer in der Stimmtabelle zu speichern.
 
 ## Push-Versand
 

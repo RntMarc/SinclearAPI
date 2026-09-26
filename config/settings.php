@@ -88,6 +88,10 @@ $settings['vapid'] = [
     'subject' => $_ENV['VAPID_SUBJECT'] ?? 'mailto:contact@sinclear.de',
 ];
 
+$settings['polls'] = [
+    'anonymity_secret' => $_ENV['POLL_ANONYMITY_SECRET'] ?? '',
+];
+
 $settings['external_data'] = [
     'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://infranode.dev/api/v1',
     'open_meteo_base_url' => $_ENV['OPEN_METEO_BASE_URL'] ?? 'https://api.open-meteo.com/v1',

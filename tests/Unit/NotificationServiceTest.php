@@ -39,6 +39,19 @@ class NotificationServiceTest extends TestCase
         ['relation' => 'parent_post', 'object' => 'ForumPost', 'identifier' => 'post-1'],
         ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => 'forum-1'],
     ];
+    private const POLL_INVITE_DATA = [
+        ['relation' => 'poll', 'object' => 'Poll', 'identifier' => 'poll-1'],
+        ['relation' => 'inviter', 'object' => 'User', 'identifier' => 'user-1'],
+    ];
+    private const POLL_COUNTER_PROPOSAL_DATA = [
+        ['relation' => 'poll', 'object' => 'Poll', 'identifier' => 'poll-1'],
+        ['relation' => 'proposer', 'object' => 'User', 'identifier' => 'user-1'],
+        ['relation' => 'option', 'object' => 'PollOption', 'identifier' => 'option-1'],
+    ];
+    private const POLL_FINALIZED_DATA = [
+        ['relation' => 'poll', 'object' => 'Poll', 'identifier' => 'poll-1'],
+        ['relation' => 'finalized_option', 'object' => 'PollOption', 'identifier' => 'option-1'],
+    ];
     private PDO $db;
     private NotificationService $service;
 
@@ -481,6 +494,70 @@ class NotificationServiceTest extends TestCase
         $this->assertSame('forum_reply', $row['type']);
         $this->assertSame('Neue Antwort', $row['title']);
         $this->assertSame('Body', $row['body']);
+    }
+
+    // ── Poll types ────────────────────────────────────────
+
+    public function testCreateStoresStructuredPollInviteData(): void
+    {
+        $id = $this->service->create('user-1', 'poll_invite', '', '', self::POLL_INVITE_DATA);
+
+        $stmt = $this->db->prepare('SELECT type, data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertSame('poll_invite', $row['type']);
+        $this->assertStringContainsString('poll', $row['data']);
+        $this->assertStringContainsString('inviter', $row['data']);
+    }
+
+    public function testCreateGeneratesTitleForPollInvite(): void
+    {
+        $id = $this->service->create('user-1', 'poll_invite', '', '', self::POLL_INVITE_DATA);
+
+        $stmt = $this->db->prepare('SELECT title FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $this->assertSame('Neue Umfrage-Einladung', $stmt->fetch()['title']);
+    }
+
+    public function testCreateThrowsOnMissingPollRelation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $data = self::POLL_INVITE_DATA;
+        array_shift($data);
+
+        $this->service->create('user-1', 'poll_invite', 'Title', 'Body', $data);
+    }
+
+    public function testCreateStoresPollCounterProposalData(): void
+    {
+        $id = $this->service->create('user-1', 'poll_counter_proposal', '', '', self::POLL_COUNTER_PROPOSAL_DATA);
+
+        $stmt = $this->db->prepare('SELECT data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch();
+
+        $this->assertStringContainsString('proposer', $row['data']);
+        $this->assertStringContainsString('option', $row['data']);
+    }
+
+    public function testCreateStoresPollFinalizedWithOption(): void
+    {
+        $id = $this->service->create('user-1', 'poll_finalized', '', '', self::POLL_FINALIZED_DATA);
+
+        $stmt = $this->db->prepare('SELECT data FROM Notification WHERE id = ?');
+        $stmt->execute([$id]);
+        $this->assertStringContainsString('finalized_option', $stmt->fetch()['data']);
+    }
+
+    public function testCreateStoresPollFinalizedWithoutOption(): void
+    {
+        $id = $this->service->create('user-1', 'poll_finalized', '', '', [
+            ['relation' => 'poll', 'object' => 'Poll', 'identifier' => 'poll-1'],
+        ]);
+
+        $this->assertNotEmpty($id);
     }
 
     // ── Preference filtering ──────────────────────────────

@@ -18,5 +18,6 @@ final readonly class Settings
         public array $external_data = [],
         public array $unsplash = [],
         public array $centrifugo = [],
+        public array $polls = [],
     ) {}
 }

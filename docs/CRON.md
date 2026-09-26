@@ -32,6 +32,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 4 | `pt_refresh_stale_legs` | 5 Minuten | Aktualisiert veraltete PT-Legs mit Echtzeitdaten |
 | 5 | `cleanup_external_data_cache` | 24 Stunden | Entfernt abgelaufene Cache-Einträge (ExternalDataCache) |
 | 6 | `cleanup_stale_push_subscriptions` | 24 Stunden | Löscht tote Push-Subscriptions (10+ Fehlversuche oder 90 Tage ohne Lebenszeichen) |
+| 7 | `polls_deadline` | 1 Stunde | Schließt abgelaufene Umfragen und erinnert Teilnehmer vor der Deadline |
 
 ## Details
 
@@ -73,6 +74,15 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
   2. Veraltete Endpoints: `lastSeenAt` älter als 90 Tage **und** kein erfolgreicher Versand (`lastSuccessAt`) in diesem Zeitraum. Die 90-Tage-Übergangsfrist schützt nur vorübergehend offline Geräte — Clients re-registrieren bei App-Start/Login/Resume (`POST /notifications/push-subscription` als Upsert) und setzen damit `lastSeenAt` und den Failure-Zähler zurück. Die Frist entspricht der Refresh-Token-Lebensdauer (90 Tage).
 - **Datei:** `src/Services/Cron/Tasks/CleanupStalePushSubscriptionsTask.php`
 - **Hintergrund:** Siehe [notifications/readme.md](./notifications/readme.md) → „Bereinigung toter Subscriptions".
+
+### Polls Deadline
+- **Task-Name:** `polls_deadline`
+- **Intervall:** 3600 Sekunden (1 Stunde)
+- **Aktion:**
+  1. Offene Umfragen mit `closesAt < NOW(3)` auf `status = 'closed'` setzen und Teilnehmer via `poll_finalized` benachrichtigen.
+  2. Offene Umfragen, deren `closesAt` innerhalb der nächsten 24 Stunden liegt und für die noch kein Reminder gesendet wurde (`reminderSentAt IS NULL`), benachrichtigen Teilnehmer ohne Antwort/Verfügbarkeit/Stimme via `poll_deadline_reminder` (dedupliziert pro Umfrage) und setzen `reminderSentAt`.
+- **Datei:** `src/Services/Cron/Tasks/PollDeadlineTask.php`
+- **Hintergrund:** Siehe [polls/readme.md](./polls/readme.md) und [notifications/types.md](./notifications/types.md).
 
 ## CronSchedule-Tabelle
 

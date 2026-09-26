@@ -1616,6 +1616,234 @@ ROW;
         return ResponseFactory::noContent($response);
     }
 
+    public function polls(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        $typeLabels = ['form' => 'Formular', 'appointment' => 'Terminfindung', 'vote' => 'Abstimmung'];
+
+        $stmt = $this->pdo->query(
+            'SELECT p.*, u.displayName AS creatorDisplayName,
+                    (SELECT COUNT(*) FROM PollInvite i WHERE i.pollId = p.id) AS inviteCount,
+                    (SELECT COUNT(*) FROM PollResponse r WHERE r.pollId = p.id) AS responseCount,
+                    (SELECT COUNT(DISTINCT v.participantHash) FROM PollVote v WHERE v.pollId = p.id) AS voterCount
+             FROM Poll p
+             JOIN User u ON u.id = p.creatorId
+             ORDER BY p.createdAt DESC
+             LIMIT 500'
+        );
+        $polls = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $rows = '';
+        foreach ($polls as $p) {
+            $id = htmlspecialchars((string) $p['id']);
+            $title = htmlspecialchars((string) $p['title']);
+            $type = htmlspecialchars($typeLabels[$p['type']] ?? (string) $p['type']);
+            $creator = htmlspecialchars((string) ($p['creatorDisplayName'] ?? 'Unbekannt'));
+            $statusBadge = $p['status'] === 'open'
+                ? '<span class="badge badge-success">offen</span>'
+                : '<span class="badge" style="background:#6b7280;color:#fff">geschlossen</span>';
+            $participation = (int) $p['responseCount'] . ' Antworten / ' . (int) $p['voterCount'] . ' Stimmen';
+            $createdAt = date('d.m.Y H:i', strtotime((string) $p['createdAt']));
+            $rows .= <<<ROW
+            <tr>
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$id}">{$title}</td>
+                <td>{$type}</td>
+                <td>{$creator}</td>
+                <td>{$participation}</td>
+                <td>{$statusBadge}</td>
+                <td>{$createdAt}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <a class="btn btn-sm btn-primary" href="/api/v2/admin/polls/{$id}">Details</a>
+                    <button class="btn btn-sm btn-danger" onclick="deletePoll('{$id}', '{$title}')">Löschen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        if ($rows === '') {
+            $rows = '<tr><td colspan="7" style="text-align:center;color:#666;padding:2rem;">Keine Umfragen vorhanden</td></tr>';
+        }
+
+        $contentHtml = $this->renderTemplate('polls.php', ['rows' => $rows]);
+        $html = $this->renderLayout('Umfragen', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminPollsJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $stmt = $this->pdo->query(
+            'SELECT p.id, p.type, p.title, p.status, p.accessMode, p.closesAt, p.createdAt,
+                    u.displayName AS creatorDisplayName
+             FROM Poll p
+             JOIN User u ON u.id = p.creatorId
+             ORDER BY p.createdAt DESC
+             LIMIT 500'
+        );
+
+        $data = array_map(static fn(array $p) => [
+            'id' => $p['id'],
+            'type' => $p['type'],
+            'title' => $p['title'],
+            'status' => $p['status'],
+            'accessMode' => $p['accessMode'],
+            'closesAt' => $p['closesAt'],
+            'creatorDisplayName' => $p['creatorDisplayName'],
+            'createdAt' => $p['createdAt'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        return ResponseFactory::json(['data' => $data], 200, $response);
+    }
+
+    public function pollDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $id = $args['id'];
+
+        $stmt = $this->pdo->prepare(
+            'SELECT p.*, u.displayName AS creatorDisplayName
+             FROM Poll p JOIN User u ON u.id = p.creatorId
+             WHERE p.id = ?'
+        );
+        $stmt->execute([$id]);
+        $poll = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($poll === false) {
+            $response->getBody()->write('Umfrage nicht gefunden');
+            return $response->withStatus(404)->withHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+
+        $questionStmt = $this->pdo->prepare('SELECT * FROM PollQuestion WHERE pollId = ? ORDER BY position ASC');
+        $questionStmt->execute([$id]);
+        $questions = $questionStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $optionStmt = $this->pdo->prepare('SELECT * FROM PollOption WHERE pollId = ? ORDER BY position ASC');
+        $optionStmt->execute([$id]);
+        $options = $optionStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $inviteStmt = $this->pdo->prepare(
+            'SELECT i.*, u.displayName AS userDisplayName FROM PollInvite i
+             JOIN User u ON u.id = i.userId WHERE i.pollId = ? ORDER BY i.createdAt ASC'
+        );
+        $inviteStmt->execute([$id]);
+        $invites = $inviteStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $responseStmt = $this->pdo->prepare(
+            'SELECT r.*, u.displayName AS userDisplayName FROM PollResponse r
+             JOIN User u ON u.id = r.userId WHERE r.pollId = ? ORDER BY r.createdAt ASC'
+        );
+        $responseStmt->execute([$id]);
+        $responses = $responseStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $voteStmt = $this->pdo->prepare(
+            'SELECT optionId, COUNT(*) AS votes FROM PollVote WHERE pollId = ? GROUP BY optionId'
+        );
+        $voteStmt->execute([$id]);
+        $voteCounts = [];
+        foreach ($voteStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $voteCounts[$row['optionId']] = (int) $row['votes'];
+        }
+
+        $availStmt = $this->pdo->prepare('SELECT COUNT(*) FROM PollAvailabilityVote WHERE pollId = ?');
+        $availStmt->execute([$id]);
+        $availabilityCount = (int) $availStmt->fetchColumn();
+
+        $questionRows = '';
+        foreach ($questions as $q) {
+            $questionRows .= '<tr><td>' . htmlspecialchars((string) $q['type']) . '</td>'
+                . '<td>' . htmlspecialchars((string) $q['title']) . '</td>'
+                . '<td>' . ((int) $q['isRequired'] === 1 ? 'ja' : 'nein') . '</td></tr>';
+        }
+        if ($questionRows === '') {
+            $questionRows = '<tr><td colspan="3" style="color:#666;">Keine Fragen</td></tr>';
+        }
+
+        $optionRows = '';
+        foreach ($options as $o) {
+            $label = $o['label'] !== null && $o['label'] !== '' ? htmlspecialchars((string) $o['label']) : '—';
+            $time = '';
+            if ((int) $o['allDay'] === 1) {
+                $time = htmlspecialchars((string) $o['startDate'] . ' – ' . (string) $o['endDate']);
+            } elseif ($o['startAt'] !== null) {
+                $time = htmlspecialchars((string) $o['startAt'] . ' – ' . (string) ($o['endAt'] ?? ''));
+            }
+            $counter = (int) $o['isCounterProposal'] === 1 ? 'Gegenvorschlag' : '';
+            $votes = isset($voteCounts[$o['id']]) ? (string) $voteCounts[$o['id']] : '0';
+            $optionRows .= '<tr><td>' . $label . '</td><td>' . $time . '</td>'
+                . '<td>' . $counter . '</td><td>' . $votes . '</td></tr>';
+        }
+        if ($optionRows === '') {
+            $optionRows = '<tr><td colspan="4" style="color:#666;">Keine Optionen</td></tr>';
+        }
+
+        $inviteRows = '';
+        foreach ($invites as $i) {
+            $inviteRows .= '<tr><td>' . htmlspecialchars((string) ($i['userDisplayName'] ?? $i['userId'])) . '</td></tr>';
+        }
+        if ($inviteRows === '') {
+            $inviteRows = '<tr><td style="color:#666;">Keine Einladungen</td></tr>';
+        }
+
+        $responseRows = '';
+        foreach ($responses as $r) {
+            $responseRows .= '<tr><td>' . htmlspecialchars((string) ($r['userDisplayName'] ?? $r['userId'])) . '</td>'
+                . '<td>' . htmlspecialchars(date('d.m.Y H:i', strtotime((string) $r['createdAt']))) . '</td></tr>';
+        }
+        if ($responseRows === '') {
+            $responseRows = '<tr><td colspan="2" style="color:#666;">Keine Antworten</td></tr>';
+        }
+
+        $statusBadge = $poll['status'] === 'open'
+            ? '<span class="badge badge-success">offen</span>'
+            : '<span class="badge" style="background:#6b7280;color:#fff">geschlossen</span>';
+        $closeButton = $poll['status'] === 'open'
+            ? '<button class="btn btn-primary" onclick="closePoll(\'' . htmlspecialchars((string) $poll['id']) . '\')">Jetzt schließen</button>'
+            : '';
+
+        $contentHtml = $this->renderTemplate('poll_detail.php', [
+            'pollId' => htmlspecialchars((string) $poll['id']),
+            'pollTitle' => htmlspecialchars((string) $poll['title']),
+            'pollType' => htmlspecialchars((string) $poll['type']),
+            'creatorName' => htmlspecialchars((string) ($poll['creatorDisplayName'] ?? 'Unbekannt')),
+            'statusBadge' => $statusBadge,
+            'closeButton' => $closeButton,
+            'description' => htmlspecialchars((string) ($poll['description'] ?? '')),
+            'questionRows' => $questionRows,
+            'optionRows' => $optionRows,
+            'inviteRows' => $inviteRows,
+            'responseRows' => $responseRows,
+            'availabilityCount' => (string) $availabilityCount,
+        ]);
+        $html = $this->renderLayout('Umfrage-Details', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function closePoll(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $stmt = $this->pdo->prepare("UPDATE Poll SET status = 'closed', updatedAt = NOW(3) WHERE id = ? AND status = 'open'");
+        $stmt->execute([$args['id']]);
+
+        return ResponseFactory::json(['ok' => true], 200, $response);
+    }
+
+    public function deletePoll(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $stmt = $this->pdo->prepare('DELETE FROM Poll WHERE id = ?');
+        $stmt->execute([$args['id']]);
+
+        return ResponseFactory::noContent($response);
+    }
+
     public function forums(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);

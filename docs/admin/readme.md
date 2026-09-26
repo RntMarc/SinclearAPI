@@ -77,6 +77,16 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Teilnehmerverwaltung pro Abo (hinzufügen, entfernen, Bezahlstatus ändern)
 - Abos können über die Reisedetail-Seite mit Reisen verknüpft werden
 
+### Umfragen (`/polls`) – **voll implementiert**
+- Listet alle Umfragen (Formular, Terminfindung, Abstimmung) mit Ersteller,
+  Teilnahme-Zählern und Status
+- Detailseite pro Umfrage: Beschreibung, Fragen, Optionen (inkl. Stimmen),
+  Einladungen und Formular-Antworten
+- Umfrage manuell schließen (`POST /admin/polls/{id}/close`)
+- Umfrage löschen (`DELETE /admin/polls/{id}`; löscht per FK-Cascade Fragen,
+  Optionen, Einladungen, Antworten und Stimmen)
+- JSON-Liste für Auswahllisten (`GET /admin/polls/json`)
+
 ### Benachrichtigungen (`/notifications`) – **voll implementiert**
 - Sendet Test-Benachrichtigungen an beliebige Nutzer
 - Benachrichtigungen sind exakt identisch mit echten Benachrichtigungen (gleiches Schema, Push-Zustellung)
@@ -127,6 +137,11 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/moderation-requests` | Moderations-Anfragen mit Filtern (geschützt) |
 | GET | `/admin/moderation-requests/{id}` | Detailseite einer Anfrage (geschützt) |
 | POST | `/admin/moderation-requests/{id}/update` | Status + Admin-Kommentar setzen (geschützt) |
+| GET | `/admin/polls` | Umfragen-Übersicht (geschützt) |
+| GET | `/admin/polls/json` | Umfragen als JSON-Liste (geschützt) |
+| GET | `/admin/polls/{id}` | Detailseite einer Umfrage (geschützt) |
+| POST | `/admin/polls/{id}/close` | Umfrage schließen (geschützt) |
+| DELETE | `/admin/polls/{id}` | Umfrage löschen (geschützt) |
 | GET | `/admin/notifications` | Benachrichtigungs-Testseite (geschützt) |
 | GET | `/admin/notifications/json` | Entitäten als JSON für Dropdowns (geschützt) |
 | POST | `/admin/notifications/send` | Test-Benachrichtigung senden (geschützt) |

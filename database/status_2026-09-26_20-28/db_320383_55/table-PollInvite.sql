@@ -7,17 +7,17 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `Poll` (
+CREATE TABLE IF NOT EXISTS `PollInvite` (
   `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `creatorId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `finalizedOptionId` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `createdAt` datetime(3) NOT NULL,
-  `updatedAt` datetime(3) NOT NULL,
-  `type` enum('appointment','survey') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'appointment',
-  `description` text COLLATE utf8mb4_unicode_ci,
-  `allowCounterProposals` tinyint NOT NULL DEFAULT '0',
-  PRIMARY KEY (`id`)
+  `pollId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `isIndispensable` tinyint NOT NULL DEFAULT '0',
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_invite_poll_user` (`pollId`,`userId`),
+  KEY `fk_invite_user` (`userId`),
+  CONSTRAINT `fk_invite_poll` FOREIGN KEY (`pollId`) REFERENCES `Poll` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_invite_user` FOREIGN KEY (`userId`) REFERENCES `User` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

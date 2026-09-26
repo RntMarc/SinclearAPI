@@ -11,6 +11,7 @@ use Sinclear\Api\Services\Cron\Tasks\CleanupOldLocationSharingTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupExternalDataCacheTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupStalePushSubscriptionsTask;
 use Sinclear\Api\Services\Cron\Tasks\PtRefreshStaleLegsTask;
+use Sinclear\Api\Services\Cron\Tasks\PollDeadlineTask;
 
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -40,6 +41,7 @@ $scheduler->register(new CleanupOldDirectMessagesTask());
 $scheduler->register(new CleanupExternalDataCacheTask());
 $scheduler->register(new CleanupStalePushSubscriptionsTask());
 $scheduler->register(new PtRefreshStaleLegsTask());
+$scheduler->register(new PollDeadlineTask());
 
 
 // Ausstehende Tasks ausführen

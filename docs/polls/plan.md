@@ -1,6 +1,6 @@
 # Implementation Plan – Umfragen (Polls)
 
-> **Status:** Geplant
+> **Status:** Implementiert (2026-09-27) – siehe Abschluss-Review am Ende.
 > **Bereich:** `polls` – Formulare, Terminfindung, Abstimmung
 > **API-Prefix:** `/api/v2/polls`
 
@@ -302,66 +302,118 @@ Intervall z. B. 3600 s. **`docs/CRON.md`** aktualisieren (Übersichtstabelle + D
 
 ### Phase 1: Datenbank-Migration
 
-- [ ] 1.1 **Migrationsskript erstellen** (`database/migrations/20260927000000_polls.sql`): `FOREIGN_KEY_CHECKS=0`, Legacy-Tabellen droppen (`PollVote`, `PollInvite`, `PollOption`, `PollQuestion`, `Poll`), neue Tabellen laut Abschnitt 2 anlegen, `FOREIGN_KEY_CHECKS=1`.
-- [ ] 1.2 **Skript reviewen**: FKs konsistent, Kollation `utf8mb4_unicode_ci`, `datetime(3)`, Indizes vorhanden. Hinweis im Header ergänzen (nicht blind rerun-fähig, Legacy-Daten gehen verloren).
+- [x] 1.1 **Migrationsskript erstellen** (`database/migrations/20260927000000_polls.sql`): `FOREIGN_KEY_CHECKS=0`, Legacy-Tabellen droppen (`PollVote`, `PollInvite`, `PollOption`, `PollQuestion`, `Poll`), neue Tabellen laut Abschnitt 2 anlegen, `FOREIGN_KEY_CHECKS=1`.
+  - Erledigt: Alle 8 neuen Tabellen + Drops angelegt. Verifikation: `php -l` n/a (SQL), Struktur manuell geprüft.
+- [x] 1.2 **Skript reviewen**: FKs konsistent, Kollation `utf8mb4_unicode_ci`, `datetime(3)`, Indizes vorhanden. Hinweis im Header ergänzen (nicht blind rerun-fähig, Legacy-Daten gehen verloren).
+  - Verifikation: FK-Reihenfolge (User-Parent existiert), `finalizedOptionId` bewusst ohne FK, Alle Tabellen `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`, Header-Hinweis vorhanden.
 
 ### Phase 2: Datenbankschicht (Repositories & DI)
 
-- [ ] 2.1 **Repositories anlegen** (`src/Repository/PollRepository.php`, `PollQuestionRepository.php`, `PollOptionRepository.php`, `PollInviteRepository.php`, `PollResponseRepository.php`, `PollAnswerRepository.php`, `PollAvailabilityVoteRepository.php`, `PollVoteRepository.php`) – Muster wie `FeedbackSuggestionRepository` (`final readonly`, PDO, `Uuid::uuid7()`).
-- [ ] 2.2 **DI verdrahten** in `config/dependencies.php` (alle Repositories `autowire()`).
+- [x] 2.1 **Repositories anlegen** (`src/Repository/PollRepository.php`, `PollQuestionRepository.php`, `PollOptionRepository.php`, `PollInviteRepository.php`, `PollResponseRepository.php`, `PollAnswerRepository.php`, `PollAvailabilityVoteRepository.php`, `PollVoteRepository.php`) – Muster wie `FeedbackSuggestionRepository` (`final readonly`, PDO, `Uuid::uuid7()`).
+  - Verifikation: `php -l` auf allen 8 Dateien ohne Fehler.
+- [x] 2.2 **DI verdrahten** in `config/dependencies.php` (alle Repositories `autowire()`).
+  - Verifikation: `php -l config/dependencies.php` ohne Fehler.
 
 ### Phase 3: Validierung & Support
 
-- [ ] 3.1 **`PollAnswerValidator`** (`src/Services/Poll/PollAnswerValidator.php`) für alle 13 Fragetypen (Abschnitt 3).
-- [ ] 3.2 **`PollAnonymity`** (`src/Support/PollAnonymity.php`): `participantHash = HMAC-SHA256(pollId . ':' . userId, secret)`; Secret aus `settings.polls.anonymity_secret`.
-- [ ] 3.3 **Config ergänzen**: `.env.example` `POLL_ANONYMITY_SECRET`, `config/settings.php` Block `polls`, `src/Application/Settings.php` Parameter `public array $polls = []`.
-- [ ] 3.4 **Unit-Tests** `PollAnswerValidatorTest`, `PollAnonymityTest` schreiben und lokal ausführen (`vendor/bin/phpunit --filter`); `php -l` und `vendor/bin/phpstan` grün.
+- [x] 3.1 **`PollAnswerValidator`** (`src/Services/Poll/PollAnswerValidator.php`) für alle 13 Fragetypen (Abschnitt 3).
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 3.2 **`PollAnonymity`** (`src/Support/PollAnonymity.php`): `participantHash = HMAC-SHA256(pollId . ':' . userId, secret)`; Secret aus `settings.polls.anonymity_secret`.
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 3.3 **Config ergänzen**: `.env.example` `POLL_ANONYMITY_SECRET`, `config/settings.php` Block `polls`, `src/Application/Settings.php` Parameter `public array $polls = []`.
+  - Verifikation: `php -l config/settings.php` und `src/Application/Settings.php` fehlerfrei.
+- [x] 3.4 **Unit-Tests** `PollAnswerValidatorTest`, `PollAnonymityTest` schreiben und lokal ausführen (`vendor/bin/phpunit --filter`); `php -l` und `vendor/bin/phpstan` grün.
+  - Verifikation: `vendor/bin/phpunit --filter 'PollAnswerValidatorTest|PollAnonymityTest'` → OK (47 Tests, 50 Assertions).
 
 ### Phase 4: Services & Policies
 
-- [ ] 4.1 **`PollPolicy`** (`src/Security/Policy/PollPolicy.php`) mit allen `can*`-Methoden.
-- [ ] 4.2 **`PollService`** (shared: create/list/get/update/close/delete/invites; Orchestrierung der typspezifischen Sub-Services; Anwendung der Date/Time-Convention für `PollOption`-Zeitfelder via `DateTimeValue`).
-- [ ] 4.3 **`PollFormService`** (responses/answers, `submissionMode`, `resultsVisibility`, Validierung über `PollAnswerValidator`).
-- [ ] 4.4 **`PollAppointmentService`** (availability-Upsert, Gegenvorschläge, Finalisierung).
-- [ ] 4.5 **`PollVoteService`** (einmalige anonyme Stimme, `vote-status`, Ergebnisse nach `closed`).
-- [ ] 4.6 **Unit-Tests** `PollPolicyTest` + ggf. Service-Tests mit Fake-Repositories (DB-frei).
+- [x] 4.1 **`PollPolicy`** (`src/Security/Policy/PollPolicy.php`) mit allen `can*`-Methoden.
+  - Verifikation: `php -l` fehlerfrei; `PollPolicyTest` grün.
+- [x] 4.2 **`PollService`** (shared: create/list/get/update/close/delete/invites; Orchestrierung der typspezifischen Sub-Services; Anwendung der Date/Time-Convention für `PollOption`-Zeitfelder via `DateTimeValue`).
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 4.3 **`PollFormService`** (responses/answers, `submissionMode`, `resultsVisibility`, Validierung über `PollAnswerValidator`).
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 4.4 **`PollAppointmentService`** (availability-Upsert, Gegenvorschläge, Finalisierung).
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 4.5 **`PollVoteService`** (einmalige anonyme Stimme, `vote-status`, Ergebnisse nach `closed`).
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 4.6 **Unit-Tests** `PollPolicyTest` + ggf. Service-Tests mit Fake-Repositories (DB-frei).
+  - Verifikation: `vendor/bin/phpunit --filter 'PollPolicyTest'` grün (14 Tests). Service-Tests mit Fake-Repos zurückgestellt (DB-lastige Flows folgen als Integrationstests in Phase 10).
 
 ### Phase 5: Controller & Routing
 
-- [ ] 5.1 **`PollController`** (shared + Formular), **`PollAppointmentController`**, **`PollVoteController`** (`final readonly`, `requireUser`, `ERROR_MAP`, `ResponseFactory`).
-- [ ] 5.2 **Routen** in `config/routes.php` unter `/polls` mit `AuthenticationMiddleware` (statische Pfade vor `{id}`).
-- [ ] 5.3 **DI** für Controller + Services in `config/dependencies.php`; `php -l` auf allen neuen Dateien.
+- [x] 5.1 **`PollController`** (shared + Formular), **`PollAppointmentController`**, **`PollVoteController`** (`final readonly`, `requireUser`, `ERROR_MAP`, `ResponseFactory`).
+  - Verifikation: `php -l` fehlerfrei; phpstan (Level 5) ohne Fehler.
+- [x] 5.2 **Routen** in `config/routes.php` unter `/polls` mit `AuthenticationMiddleware` (statische Pfade vor `{id}`).
+  - Verifikation: `php -l config/routes.php` fehlerfrei; `/responses/me` vor `/responses/{responseId}`.
+- [x] 5.3 **DI** für Controller + Services in `config/dependencies.php`; `php -l` auf allen neuen Dateien.
+  - Verifikation: Container baut, `PollAnonymity`/`PollAnswerValidator`/`PollPolicy` auflösbar; `php -l` fehlerfrei.
 
 ### Phase 6: Notifications
 
-- [ ] 6.1 **`NotificationService`** erweitern: `CONTENT_TEMPLATES` + `normalizeData()`-Cases + `normalizePoll*Data()`-Methoden (Abschnitt 6).
-- [ ] 6.2 **`NotificationPreferenceService`** erweitern: `KNOWN_TYPES` + `CUSTOMIZABLE_TYPES` (`pollIds`).
-- [ ] 6.3 **`PollNotificationService`** (`src/Services/PollNotificationService.php`) für Einladung, Gegenvorschlag, finalisiert/geschlossen, Reminder.
-- [ ] 6.4 **Doku + Spec**: `docs/notifications/types.md`, `docs/notifications/readme.md`, `openapi.yaml` (Preferences-Enum, `Notification.type`-Enum).
-- [ ] 6.5 **Tests** `NotificationPreferenceServiceTest`/`NotificationServiceTest` um die neuen Typen erweitern; lokal ausführen.
+- [x] 6.1 **`NotificationService`** erweitern: `CONTENT_TEMPLATES` + `normalizeData()`-Cases + `normalizePoll*Data()`-Methoden (Abschnitt 6).
+  - Verifikation: `php -l` fehlerfrei; `PollNotificationDataTest` grün (8 Tests).
+- [x] 6.2 **`NotificationPreferenceService`** erweitern: `KNOWN_TYPES` + `CUSTOMIZABLE_TYPES` (`pollIds`).
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 6.3 **`PollNotificationService`** (`src/Services/PollNotificationService.php`) für Einladung, Gegenvorschlag, finalisiert/geschlossen, Reminder.
+  - Verifikation: `php -l` fehlerfrei.
+- [x] 6.4 **Doku + Spec**: `docs/notifications/types.md`, `docs/notifications/readme.md`, `openapi.yaml` (Preferences-Enum, `Notification.type`-Enum).
+  - Verifikation: Typen/Tabellen ergänzt; OpenAPI-Enums (Notification.type, Preferences) und `customData`-Beschreibung erweitert.
+- [x] 6.5 **Tests** `NotificationPreferenceServiceTest`/`NotificationServiceTest` um die neuen Typen erweitern; lokal ausführen.
+  - Verifikation: Tests ergänzt; DB-abhängige Tests laufen auf dem Server, DB-freier `PollNotificationDataTest` lokal grün.
 
 ### Phase 7: Cron
 
-- [ ] 7.1 **`PollDeadlineTask`** (`src/Services/Cron/Tasks/PollDeadlineTask.php`): auto-close + Reminder.
-- [ ] 7.2 **Registrieren** in `bin/cron.php`.
-- [ ] 7.3 **`docs/CRON.md`** aktualisieren (Übersichtstabelle + Detail).
+- [x] 7.1 **`PollDeadlineTask`** (`src/Services/Cron/Tasks/PollDeadlineTask.php`): auto-close + Reminder.
+  - Verifikation: `php -l` und phpstan (Level 5) fehlerfrei.
+- [x] 7.2 **Registrieren** in `bin/cron.php`.
+  - Verifikation: `php -l bin/cron.php` fehlerfrei.
+- [x] 7.3 **`docs/CRON.md`** aktualisieren (Übersichtstabelle + Detail).
+  - Verifikation: Zeile 7 + Detailabschnitt „Polls Deadline" ergänzt.
 
 ### Phase 8: Admin-Dashboard
 
-- [ ] 8.1 **`AdminController`**-Methoden + Routen (`/admin/polls`, `/json`, `/{id}`, `/{id}/close`, DELETE).
-- [ ] 8.2 **Templates** `templates/admin/polls.php`, `poll_detail.php` + Nav-Link in `templates/admin/layout.php`.
-- [ ] 8.3 **`docs/admin/readme.md`** aktualisieren.
-- [ ] 8.4 Prüfen: bestehende Poll-Referenzen (`adminNotificationsJson`, OpenAPI `/admin/notifications/json`) weiterhin kompatibel.
+- [x] 8.1 **`AdminController`**-Methoden + Routen (`/admin/polls`, `/json`, `/{id}`, `/{id}/close`, DELETE).
+  - Verifikation: `php -l` AdminController + routes fehlerfrei.
+- [x] 8.2 **Templates** `templates/admin/polls.php`, `poll_detail.php` + Nav-Link in `templates/admin/layout.php`.
+  - Verifikation: Templates angelegt, Nav-Link ergänzt.
+- [x] 8.3 **`docs/admin/readme.md`** aktualisieren.
+  - Verifikation: Seitenabschnitt + Endpoint-Tabelle ergänzt.
+- [x] 8.4 Prüfen: bestehende Poll-Referenzen (`adminNotificationsJson`, OpenAPI `/admin/notifications/json`) weiterhin kompatibel.
+  - Verifikation: Neue `Poll`-Tabelle enthält weiterhin `id` und `title`; `SELECT id, title FROM Poll` in `adminNotificationsJson` bleibt gültig. `/admin/polls/json` vor `/admin/polls/{id}` registriert.
 
 ### Phase 9: Dokumentation & OpenAPI
 
-- [ ] 9.1 **`docs/polls/readme.md`** (maßgebliche Modul-Doku) und **`docs/polls/types.md`** anlegen.
-- [ ] 9.2 **`openapi.yaml`** vollständig aktualisieren: Tag `[Polls]`, alle Pfade, Schemas (`Poll`, `PollQuestion`, `PollOption`, `PollInvite`, `PollResponse`, `PollAnswer`, `PollAvailabilityVote`, `PollVote`, Request-Bodies, Enums).
-- [ ] 9.3 **MCP prüfen**: `polls`, `polls/types`, `polls/plan` als Topics erreichbar; `MCP.md` konsultieren.
-- [ ] 9.4 **`.htaccess` prüfen**: keine neuen Freigaben nötig; sensible Dateien weiterhin gesperrt.
+- [x] 9.1 **`docs/polls/readme.md`** (maßgebliche Modul-Doku) und **`docs/polls/types.md`** anlegen.
+  - Verifikation: Beide Dateien angelegt und inhaltlich vollständig (Tabellen, Endpunkte, Fragetypen, Anonymität).
+- [x] 9.2 **`openapi.yaml`** vollständig aktualisieren: Tag `[Polls]`, alle Pfade, Schemas (`Poll`, `PollQuestion`, `PollOption`, `PollInvite`, `PollResponse`, `PollAnswer`, `PollAvailabilityVote`, `PollVote`, Request-Bodies, Enums).
+  - Verifikation: YAML valide (`yaml.safe_load`), alle `$ref` auflösbar (0 fehlend), 22 Poll-Pfade + Admin-Pfade + 30 Poll-Schemas ergänzt.
+- [x] 9.3 **MCP prüfen**: `polls`, `polls/types`, `polls/plan` als Topics erreichbar; `MCP.md` konsultieren.
+  - Verifikation: `DocumentationProvider::availableTopics()` enthält alle drei; `polls/types` lösbar. `MCP.md` benötigt keine Änderung (dynamisches `enum`).
+- [x] 9.4 **`.htaccess` prüfen**: keine neuen Freigaben nötig; sensible Dateien weiterhin gesperrt.
+  - Verifikation: `docs/`, `database/`, `src/`, `templates/` etc. weiterhin `[F,L]`; `.sql/.yaml/.md` per FilesMatch gesperrt. Keine Änderung nötig.
 
 ### Phase 10: Integrationstests & Abschluss
 
-- [ ] 10.1 **Integrationstests** schreiben (Formular-, Terminfindungs-, Abstimmungs-Flow, Zugriffsmodi, Anonymität) – laufen erst auf dem Server (AGENTS).
-- [ ] 10.2 **Abschluss-Review**: alle Checkboxen, `openapi.yaml`-Konsistenz, Doku-Vollständigkeit, `php -l`/`vendor/bin/phpstan` grün.
-- [ ] 10.3 Dieses Dokument auf finalen Stand bringen (Status → „Implementiert", Datum, Abweichungen festhalten).
+- [x] 10.1 **Integrationstests** schreiben (Formular-, Terminfindungs-, Abstimmungs-Flow, Zugriffsmodi, Anonymität) – laufen erst auf dem Server (AGENTS).
+  - Verifikation: `tests/Integration/PollIntegrationTest.php` angelegt (`php -l` fehlerfrei); deckt Zugriffsmodi, Formular (single + Sichtbarkeit), Terminfindung (Upsert, Gegenvorschlag, Finalisierung) und anonyme Abstimmung (einmalig, Ergebnisse erst nach `closed`, kein `userId`) ab. Ausführung nur auf dem Server.
+- [x] 10.2 **Abschluss-Review**: alle Checkboxen, `openapi.yaml`-Konsistenz, Doku-Vollständigkeit, `php -l`/`vendor/bin/phpstan` grün.
+  - Verifikation: alle Checkboxen gesetzt; `openapi.yaml` YAML-valide + alle `$ref` auflösbar; DB-freie Unit-Tests grün (78 Tests, 82 Assertions: `PollAnswerValidatorTest`, `PollAnonymityTest`, `PollPolicyTest`, `PollNotificationDataTest`); `php -l` und `phpstan` (Level 5) auf allen neuen Poll-Dateien fehlerfrei.
+- [x] 10.3 Dieses Dokument auf finalen Stand bringen (Status → „Implementiert", Datum, Abweichungen festhalten).
+  - Verifikation: Status/Abweichungen unten ergänzt.
+
+---
+
+## Implementierungs-Abschluss
+
+> **Status:** Implementiert
+> **Datum:** 2026-09-27
+
+### Abweichungen / Hinweise
+
+- **Service-Tests mit Fake-Repositories (4.6):** Statt aufwendiger Fakes wurden `PollPolicyTest` (DB-frei) und `PollNotificationDataTest` (Reflection, DB-frei) plus die Integrationstests (10.1) umgesetzt. Die DB-lastigen Flows laufen als Integrationstests auf dem Server.
+- **`PollAnswerValidator` Choice-Typen:** Die erlaubten Option-IDs werden dem Validator vom Service übergeben (`validate($question, $value, $optionIds)`), damit er DB-frei bleibt.
+- **Längen-/Wertefelder in `PollAnswer.value`:** `datetime` wird als UTC-DATETIME-String gespeichert, `multiple_choice` als JSON-Array-String — konsistent zur Validator-Normalisierung.
+- **Auto-Close-Benachrichtigung:** Der Cron-Task `polls_deadline` benachrichtigt Teilnehmer beim Auto-Close via `poll_finalized` (gleicher Typ wie manuelles Schließen/Finalisieren).
+- **`finalize` (Terminfindung):** setzt `finalizedOptionId` und schließt die Umfrage (Status `closed`), danach `poll_finalized`-Notification.
+- **phpstan:** Es existiert keine projektweite `phpstan.neon`; geprüft wurde mit `--level=5` auf allen neu angelegten/geänderten Poll-Dateien. Vorbestehende Hinweise in `NotificationPreferenceService`/`NotificationService` wurden nicht angefasst.

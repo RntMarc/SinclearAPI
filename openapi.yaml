@@ -28,6 +28,16 @@ components:
         Persönlicher LaMetric-Token (64 Hex-Zeichen), gültig 1 Jahr. Wird von der
         LaMetric Time als Query-Parameter an den Poll-Endpunkt gesendet.
 
+  parameters:
+    PollId:
+      name: id
+      in: path
+      required: true
+      description: Umfrage-ID
+      schema:
+        type: string
+        format: uuid
+
   schemas:
     Error:
       type: object
@@ -4391,6 +4401,665 @@ components:
           type: string
           description: ID der referenzierten Ressource.
 
+    Poll:
+      type: object
+      required:
+        - id
+        - type
+        - creatorId
+        - title
+        - status
+        - accessMode
+        - submissionMode
+        - resultsVisibility
+        - allowCounterProposals
+        - isCreator
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Eindeutige Umfrage-ID
+        type:
+          type: string
+          enum: [form, appointment, vote]
+          description: >
+            Umfrageart: `form` (Formular), `appointment` (Terminfindung),
+            `vote` (anonyme Abstimmung).
+        creatorId:
+          type: string
+          format: uuid
+          description: ID des Erstellers
+        creatorDisplayName:
+          type: string
+          nullable: true
+          description: Anzeigename des Erstellers
+        creatorImage:
+          type: string
+          nullable: true
+          description: Profilbild des Erstellers
+        title:
+          type: string
+          description: Titel der Umfrage
+        description:
+          type: string
+          nullable: true
+          description: Beschreibung (Plain Text)
+        status:
+          type: string
+          enum: [open, closed]
+          description: Offen oder geschlossen
+        closesAt:
+          type: string
+          nullable: true
+          description: Optionale Frist als RFC 3339 in UTC (`Z`)
+        accessMode:
+          type: string
+          enum: [invited, all_users]
+          description: >
+            `invited` (nur Eingeladene + Ersteller) oder `all_users`
+            (alle angemeldeten Nutzer).
+        submissionMode:
+          type: string
+          enum: [single, multiple]
+          description: Nur für `form`; `single` = einmal, editierbar bis Frist.
+        resultsVisibility:
+          type: string
+          enum: [creator, participants]
+          description: Nur für `form`; wer die Rohantworten sehen darf.
+        allowCounterProposals:
+          type: boolean
+          description: Nur für `appointment`; ob Gegenvorschläge erlaubt sind.
+        finalizedOptionId:
+          type: string
+          nullable: true
+          description: Nur für `appointment`; festgelegte Option.
+        isCreator:
+          type: boolean
+          description: Ob der aktuelle Nutzer der Ersteller ist.
+        createdAt:
+          type: string
+          description: Erstellungszeitpunkt als RFC 3339 in UTC (`Z`)
+        updatedAt:
+          type: string
+          description: Änderungszeitpunkt als RFC 3339 in UTC (`Z`)
+
+    PollQuestion:
+      type: object
+      required: [id, pollId, type, title, isRequired, position]
+      properties:
+        id:
+          type: string
+          format: uuid
+        pollId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - text
+            - textarea
+            - number
+            - email
+            - coordinates
+            - date
+            - datetime
+            - url
+            - phone
+            - single_choice
+            - multiple_choice
+            - boolean
+            - rating
+          description: Fragetyp, steuert die Antwortvalidierung.
+        title:
+          type: string
+          description: Fragetext
+        description:
+          type: string
+          nullable: true
+        isRequired:
+          type: boolean
+        position:
+          type: integer
+          description: Sortierposition
+        config:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: >
+            Typspezifische Grenzen (z.B. `minLength`/`maxLength`,
+            `min`/`max`, `minDate`/`maxDate`, `minSelected`/`maxSelected`,
+            `allowOther`, `allowedSchemes`, `timezone`). Siehe
+            `docs/polls/types.md`.
+
+    PollOption:
+      type: object
+      required: [id, pollId, allDay, timezone, isCounterProposal, position]
+      properties:
+        id:
+          type: string
+          format: uuid
+        pollId:
+          type: string
+          format: uuid
+        questionId:
+          type: string
+          nullable: true
+          description: Zugehörige Frage bei Auswahl-Fragetypen
+        label:
+          type: string
+          nullable: true
+        allDay:
+          type: boolean
+          description: Ganztägiger Termin (nur Terminfindung)
+        timezone:
+          type: string
+          description: IANA-Zeitzone der Option
+        startAt:
+          type: string
+          nullable: true
+          description: Beginn als RFC 3339 in der Options-Zeitzone (getaktet)
+        endAt:
+          type: string
+          nullable: true
+          description: Ende als RFC 3339 in der Options-Zeitzone (getaktet)
+        startDate:
+          type: string
+          nullable: true
+          description: Ziviler Starttag `YYYY-MM-DD` (ganztägig)
+        endDate:
+          type: string
+          nullable: true
+          description: Ziviler Endtag `YYYY-MM-DD` (ganztägig, inklusiv)
+        isCounterProposal:
+          type: boolean
+          description: Ob es sich um einen Gegenvorschlag handelt
+        proposedBy:
+          type: string
+          nullable: true
+          format: uuid
+          description: Nutzer, der den Gegenvorschlag eingereicht hat
+        position:
+          type: integer
+        createdAt:
+          type: string
+
+    PollInvite:
+      type: object
+      required: [id, pollId, userId, isIndispensable, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        pollId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+        userImage:
+          type: string
+          nullable: true
+        isIndispensable:
+          type: boolean
+          description: Markierung als unverzichtbarer Teilnehmer
+        createdAt:
+          type: string
+
+    PollResponse:
+      type: object
+      required: [id, pollId, userId, answers, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        pollId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+        userImage:
+          type: string
+          nullable: true
+        answers:
+          type: object
+          additionalProperties: true
+          description: >
+            Map `questionId` → gespeicherter Wert. `text`/`textarea`/`email`/
+            `url`/`phone` als String, `number`/`rating` als Zahl, `boolean`
+            als `"1"/"0"`, `coordinates` als `"lat,lon"`, `date`/`datetime`
+            als String, `single_choice` als Option-ID, `multiple_choice` als
+            JSON-Array von Option-IDs.
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    PollAvailabilityVote:
+      type: object
+      required: [id, optionId, userId, availability, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        optionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+        userImage:
+          type: string
+          nullable: true
+        availability:
+          type: string
+          enum: [yes, maybe, no]
+        updatedAt:
+          type: string
+
+    PollResultEntry:
+      type: object
+      required: [optionId, votes, percentage]
+      properties:
+        optionId:
+          type: string
+          format: uuid
+        label:
+          type: string
+          nullable: true
+        votes:
+          type: integer
+          description: Anzahl Stimmen für diese Option
+        percentage:
+          type: number
+          format: float
+          description: Anteil an den abgegebenen Stimmen in Prozent
+
+    PollVoteStatus:
+      type: object
+      required: [hasVoted, votedOptionIds]
+      properties:
+        hasVoted:
+          type: boolean
+        votedOptionIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Vom Nutzer gewählte Optionen (leer, wenn nicht abgestimmt)
+
+    PollParticipantStatus:
+      type: object
+      required: [hasResponded, hasAvailability]
+      properties:
+        hasResponded:
+          type: boolean
+          description: Ob der Nutzer bereits ein Formular abgeschickt hat
+        hasAvailability:
+          type: boolean
+          description: Ob der Nutzer bereits Verfügbarkeiten gesetzt hat
+
+    PollDetail:
+      allOf:
+        - $ref: '#/components/schemas/Poll'
+        - type: object
+          properties:
+            isInvited:
+              type: boolean
+              description: Ob der aktuelle Nutzer eingeladen ist
+            questions:
+              type: array
+              items:
+                $ref: '#/components/schemas/PollQuestion'
+            options:
+              type: array
+              items:
+                $ref: '#/components/schemas/PollOption'
+            participantStatus:
+              $ref: '#/components/schemas/PollParticipantStatus'
+
+    PollListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Poll'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PollDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/PollDetail'
+
+    PollInviteListResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollInvite'
+
+    PollResponseListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollResponse'
+        meta:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+
+    PollResponseWrapper:
+      type: object
+      required: [data]
+      properties:
+        data:
+          allOf:
+            - $ref: '#/components/schemas/PollResponse'
+          nullable: true
+
+    PollOptionWrapper:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/PollOption'
+
+    PollAvailabilityListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollAvailabilityVote'
+        meta:
+          type: object
+          required: [total]
+          properties:
+            total:
+              type: integer
+
+    PollAvailabilitySetResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required: [optionId, availability]
+            properties:
+              optionId:
+                type: string
+                format: uuid
+              availability:
+                type: string
+                enum: [yes, maybe, no]
+
+    PollVoteStatusResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/PollVoteStatus'
+
+    PollVoteResultResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollResultEntry'
+        meta:
+          type: object
+          required: [totalParticipants]
+          properties:
+            totalParticipants:
+              type: integer
+
+    PollQuestionInput:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          type: string
+          enum:
+            - text
+            - textarea
+            - number
+            - email
+            - coordinates
+            - date
+            - datetime
+            - url
+            - phone
+            - single_choice
+            - multiple_choice
+            - boolean
+            - rating
+        title:
+          type: string
+        description:
+          type: string
+        isRequired:
+          type: boolean
+          default: false
+        config:
+          type: object
+          nullable: true
+          additionalProperties: true
+        options:
+          type: array
+          description: Auswahloptionen bei `single_choice`/`multiple_choice`.
+          items:
+            type: object
+            required: [label]
+            properties:
+              label:
+                type: string
+
+    PollOptionInput:
+      type: object
+      properties:
+        label:
+          type: string
+        allDay:
+          type: boolean
+          default: false
+        timezone:
+          type: string
+          description: IANA-Zeitzone (Default `Europe/Berlin`)
+        startAt:
+          type: string
+          description: RFC 3339 mit Offset (bei `allDay=false` erforderlich)
+        endAt:
+          type: string
+          description: RFC 3339 mit Offset (bei `allDay=false` erforderlich)
+        startDate:
+          type: string
+          description: Ziviler Tag `YYYY-MM-DD` (bei `allDay=true` erforderlich)
+        endDate:
+          type: string
+          description: Ziviler Tag `YYYY-MM-DD` (bei `allDay=true` erforderlich)
+
+    PollCreateRequest:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          type: string
+          enum: [form, appointment, vote]
+        title:
+          type: string
+        description:
+          type: string
+        closesAt:
+          type: string
+          nullable: true
+          description: Optionale Frist als RFC 3339 mit Offset
+        accessMode:
+          type: string
+          enum: [invited, all_users]
+          default: invited
+        submissionMode:
+          type: string
+          enum: [single, multiple]
+          default: single
+          description: Nur für `form`
+        resultsVisibility:
+          type: string
+          enum: [creator, participants]
+          default: creator
+          description: Nur für `form`
+        allowCounterProposals:
+          type: boolean
+          default: false
+          description: Nur für `appointment`
+        inviteUserIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        questions:
+          type: array
+          description: Nur für `form`
+          items:
+            $ref: '#/components/schemas/PollQuestionInput'
+        options:
+          type: array
+          description: Nur für `appointment`/`vote`
+          items:
+            $ref: '#/components/schemas/PollOptionInput'
+
+    PollUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        closesAt:
+          type: string
+          nullable: true
+        accessMode:
+          type: string
+          enum: [invited, all_users]
+        status:
+          type: string
+          enum: [open, closed]
+          description: Nicht bei `vote` erlaubt
+        submissionMode:
+          type: string
+          enum: [single, multiple]
+        resultsVisibility:
+          type: string
+          enum: [creator, participants]
+        allowCounterProposals:
+          type: boolean
+
+    PollInviteAddRequest:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    PollAnswerInput:
+      type: object
+      required: [questionId]
+      properties:
+        questionId:
+          type: string
+          format: uuid
+        value:
+          nullable: true
+          description: Antwortwert (Typ hängt vom Fragetyp ab)
+
+    PollResponseSubmitRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollAnswerInput'
+          description: >
+            Liste der Antworten. Alternativ wird auch eine Map
+            `questionId` → Wert akzeptiert.
+
+    PollAvailabilityInput:
+      type: object
+      required: [optionId, availability]
+      properties:
+        optionId:
+          type: string
+          format: uuid
+        availability:
+          type: string
+          enum: [yes, maybe, no]
+
+    PollAvailabilitySetRequest:
+      type: object
+      required: [availability]
+      properties:
+        availability:
+          type: array
+          items:
+            $ref: '#/components/schemas/PollAvailabilityInput'
+
+    PollCounterProposalRequest:
+      allOf:
+        - $ref: '#/components/schemas/PollOptionInput'
+        - type: object
+          required: [timezone]
+
+    PollFinalizeRequest:
+      type: object
+      required: [optionId]
+      properties:
+        optionId:
+          type: string
+          format: uuid
+
+    PollVoteRequest:
+      type: object
+      required: [optionIds]
+      properties:
+        optionIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+
     Notification:
       type: object
       required: [id, userId, type, title, text, data, isRead, createdAt]
@@ -4427,11 +5096,17 @@ components:
             - standalone_event_info_changed
             - trip_event_info_changed
             - trip_subscription_added
+            - poll_invite
+            - poll_counter_proposal
+            - poll_finalized
+            - poll_deadline_reminder
           description: >
             Strukturierter Benachrichtigungstyp. Interne Typen
             (standalone_event_*, trip_event_*) werden bei den
             Präferenzen auf vereinheitlichte Typen gemappt
             (event_user_added, event_ticket_added, event_info_changed).
+            Umfrage-Typen (`poll_*`) referenzieren die Umfrage über die
+            Relation `poll` (Poll).
         title:
           type: string
           description: Von der API aus dem Typ generierter Kurztitel.
@@ -4513,9 +5188,11 @@ components:
           nullable: true
           description: >
             Denylist bei `state=custom`: IDs, deren Benachrichtigungen
-            unterdrückt werden. Format: `{ "forumIds": ["..."] }` für
+            unterdrückt werden.             Format: `{ "forumIds": ["..."] }` für
             `forum_comment`/`forum_reply`/`forum_post`, `{ "userIds": ["..."] }` für
-            `story_post`. Leeres Array erlaubt (= nichts ausgeschlossen).
+            `story_post`/`direct_message`, `{ "pollIds": ["..."] }` für
+            `poll_invite`/`poll_counter_proposal`/`poll_finalized`/
+            `poll_deadline_reminder`. Leeres Array erlaubt (= nichts ausgeschlossen).
           additionalProperties: true
 
     NotificationPreferencesResponse:
@@ -4546,6 +5223,10 @@ components:
             - event_user_added_others
             - event_ticket_added
             - event_info_changed
+            - poll_invite
+            - poll_counter_proposal
+            - poll_finalized
+            - poll_deadline_reminder
           additionalProperties: false
           properties:
             forum_reply:
@@ -4582,6 +5263,14 @@ components:
               $ref: '#/components/schemas/NotificationPreferenceItem'
             event_info_changed:
               $ref: '#/components/schemas/NotificationPreferenceItem'
+            poll_invite:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            poll_counter_proposal:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            poll_finalized:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            poll_deadline_reminder:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
 
     NotificationPreferenceUpdateItem:
       type: object
@@ -4607,6 +5296,10 @@ components:
             - event_user_added_others
             - event_ticket_added
             - event_info_changed
+            - poll_invite
+            - poll_counter_proposal
+            - poll_finalized
+            - poll_deadline_reminder
           description: >
             Vereinheitlichter Benachrichtigungstyp. Interne Typen
             (standalone_event_*, trip_event_*) werden automatisch
@@ -9144,6 +9837,691 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /polls:
+    get:
+      summary: Sichtbare Umfragen auflisten
+      description: >
+        Listet Umfragen, die für den aktuellen Nutzer sichtbar sind: eigene,
+        `all_users`-Umfragen und solche, zu denen der Nutzer eingeladen wurde.
+        Optionale Filter `type` und `status`, paginiert.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          description: Filter nach Umfrageart
+          schema:
+            type: string
+            enum: [form, appointment, vote]
+        - name: status
+          in: query
+          description: Filter nach Status
+          schema:
+            type: string
+            enum: [open, closed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Paginierte Liste sichtbarer Umfragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollListResponse'
+        '400':
+          description: Ungültiger `type` oder `status`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Umfrage anlegen
+      description: >
+        Legt atomar eine Umfrage samt Fragen/Optionen und Einladungen an. Der
+        Aufbau des Payloads hängt vom `type` ab: `form` nutzt `questions`,
+        `appointment` nutzt `options` mit Zeitfeldern und
+        `allowCounterProposals`, `vote` nutzt `options` (Auswahloptionen).
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollCreateRequest'
+      responses:
+        '201':
+          description: Umfrage erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollDetailResponse'
+        '400':
+          description: >
+            Ungültige Eingabe (`invalid_type`, `title_required`,
+            `invalid_config`, `invalid_access_mode`, `invalid_submission_mode`,
+            `invalid_visibility`, `time_forbidden`, `date_forbidden`,
+            `invalid_answer`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}:
+    get:
+      summary: Umfrage-Detail abrufen
+      description: >
+        Liefert die Umfrage inklusive Fragen bzw. Optionen und den eigenen
+        Teilnahmestatus (`participantStatus`). Sichtbarkeit: Ersteller,
+        Eingeladene oder (bei `accessMode=all_users`) alle Angemeldeten.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Umfrage-Detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollDetailResponse'
+        '403':
+          description: Nicht sichtbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Umfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Umfrage-Metadaten/Settings ändern
+      description: >
+        Nur Ersteller/Admin. Änderbar sind Titel, Beschreibung, `closesAt`,
+        `accessMode`, `status` (nicht bei `vote`), bei `form`
+        `submissionMode`/`resultsVisibility` und bei `appointment`
+        `allowCounterProposals`.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollUpdateRequest'
+      responses:
+        '200':
+          description: Aktualisierte Umfrage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Umfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Umfrage löschen
+      description: Nur Ersteller/Admin. Löscht Fragen, Optionen, Einladungen, Antworten und Stimmen kaskadierend.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Umfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/close:
+    post:
+      summary: Umfrage manuell schließen
+      description: Nur Ersteller/Admin. Benachrichtigt Teilnehmer via `poll_finalized`.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Geschlossene Umfrage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollDetailResponse'
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Umfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/invites:
+    get:
+      summary: Einladungen auflisten
+      description: Nur Ersteller/Admin.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Liste der Einladungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollInviteListResponse'
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Nutzer einladen
+      description: >
+        Nur Ersteller/Admin. Lädt einen oder mehrere Nutzer ein und sendet
+        `poll_invite`-Benachrichtigungen. Bereits eingeladene Nutzer werden
+        übersprungen.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollInviteAddRequest'
+      responses:
+        '201':
+          description: Aktualisierte Einladungsliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollInviteListResponse'
+        '400':
+          description: Ungültiger Nutzer (`invalid_target`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/invites/{userId}:
+    delete:
+      summary: Einladung entfernen
+      description: Nur Ersteller/Admin.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Einladung entfernt
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/responses:
+    get:
+      summary: Formular-Antworten (Roh) abrufen
+      description: >
+        Ersteller/Admin oder Teilnehmer, wenn `resultsVisibility=participants`.
+        Andernfalls `results_hidden`.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Antworten der Umfrage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollResponseListResponse'
+        '403':
+          description: Ergebnisse sind ausgeblendet (`results_hidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Formular absenden
+      description: >
+        Nur sichtbare, offene `form`-Umfragen. Pflichtfragen müssen beantwortet
+        sein. Bei `submissionMode=single` ist nach der ersten Antwort kein
+        weiteres Absenden möglich (`already_responded`).
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollResponseSubmitRequest'
+      responses:
+        '201':
+          description: Antwort gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollResponseWrapper'
+        '400':
+          description: Ungültige Antwort (`invalid_answer`, `answer_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Poll geschlossen (`poll_closed`) oder bereits geantwortet (`already_responded`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/responses/me:
+    get:
+      summary: Eigene Formular-Antwort abrufen
+      description: "Liefert die eigene Antwort oder `data` = null."
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Eigene Antwort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollResponseWrapper'
+        '404':
+          description: Umfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/responses/{responseId}:
+    patch:
+      summary: Formular-Antwort ändern
+      description: >
+        Nur Eigentümer (oder Admin), nur bei `submissionMode=single` und
+        offener Umfrage.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+        - name: responseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollResponseSubmitRequest'
+      responses:
+        '200':
+          description: Aktualisierte Antwort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollResponseWrapper'
+        '403':
+          description: Kein Eigentümer oder Umfrage geschlossen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/options:
+    post:
+      summary: Gegenvorschlag anlegen (Terminfindung)
+      description: >
+        Nur sichtbare, offene `appointment`-Umfragen mit
+        `allowCounterProposals=true`; sonst `counter_proposals_disabled`.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollCounterProposalRequest'
+      responses:
+        '201':
+          description: Gegenvorschlag erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollOptionWrapper'
+        '400':
+          description: Ungültige Zeitfelder (`time_forbidden`, `date_forbidden`, `invalid_config`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Gegenvorschläge deaktiviert oder nicht sichtbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/options/{optionId}:
+    delete:
+      summary: Eigenen Gegenvorschlag löschen
+      description: Vorschlagender, Ersteller oder Admin.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+        - name: optionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Gegenvorschlag gelöscht
+        '403':
+          description: Keine Berechtigung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Option nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/availability:
+    get:
+      summary: Alle Verfügbarkeiten abrufen
+      description: Alle Teilnehmer sehen alle Verfügbarkeiten (Doodle-artig).
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Verfügbarkeitsliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollAvailabilityListResponse'
+        '403':
+          description: Nicht sichtbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Eigene Verfügbarkeiten setzen (Upsert)
+      description: >
+        Nur sichtbare, offene `appointment`-Umfragen. Ersetzt die eigenen
+        Verfügbarkeiten vollständig. Leere Liste entfernt alle eigenen Stimmen.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollAvailabilitySetRequest'
+      responses:
+        '200':
+          description: Gesetzte Verfügbarkeiten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollAvailabilitySetResponse'
+        '400':
+          description: Ungültige Option oder Verfügbarkeit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Umfrage geschlossen (`poll_closed`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/finalize:
+    post:
+      summary: Termin festlegen (Terminfindung)
+      description: >
+        Nur Ersteller/Admin, offene `appointment`-Umfrage. Setzt
+        `finalizedOptionId`, schließt die Umfrage und benachrichtigt
+        Teilnehmer via `poll_finalized`.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollFinalizeRequest'
+      responses:
+        '200':
+          description: Umfrage mit festgelegtem Termin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollDetailResponse'
+        '403':
+          description: Nur Ersteller/Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Option nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/vote-status:
+    get:
+      summary: Abstimmungsstatus abrufen
+      description: >
+        Gibt an, ob der aktuelle Nutzer bereits abgestimmt hat und welche
+        Optionen er gewählt hat. Die Zuordnung erfolgt über einen
+        HMAC-basierten `participantHash`; es wird kein `userId` gespeichert.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Abstimmungsstatus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollVoteStatusResponse'
+        '403':
+          description: Nicht sichtbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/vote:
+    post:
+      summary: Einmalig abstimmen (anonyme Abstimmung)
+      description: >
+        Nur sichtbare, offene `vote`-Umfragen. Genau eine Stimme pro Nutzer;
+        nachträgliche Änderung ist nicht möglich (`already_voted`). Die Stimmen
+        werden anonym über `participantHash` gespeichert.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PollVoteRequest'
+      responses:
+        '201':
+          description: Stimme gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [voted]
+                    properties:
+                      voted:
+                        type: boolean
+        '400':
+          description: Ungültige Option (`invalid_option`) oder Auswahl (`invalid_answer`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Bereits abgestimmt (`already_voted`) oder geschlossen (`poll_closed`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /polls/{id}/results:
+    get:
+      summary: Abstimmungsergebnis abrufen
+      description: >
+        Liefert die Stimmen pro Option. Nur nach `closed` und nur für
+        Ersteller/Admin; vorher `results_hidden` bzw. `forbidden`.
+      tags: [Polls]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Ergebnis-Zählungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PollVoteResultResponse'
+        '403':
+          description: Ergebnisse ausgeblendet (`results_hidden`) oder keine Berechtigung
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /calendar:
     get:
       summary: Kalender-Events auflisten
@@ -11305,6 +12683,114 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /admin/polls:
+    get:
+      summary: Umfragen-Übersicht (Admin-HTML)
+      description: >
+        Admin-Dashboard-Seite mit allen Umfragen, Teilnahme-Zählern und
+        Status. Erfordert eine gültige Admin-Session (AdminMiddleware).
+      tags: [Admin]
+      responses:
+        '200':
+          description: HTML-Übersichtsseite
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /admin/polls/json:
+    get:
+      summary: Umfragen als JSON-Liste (Admin)
+      description: Liefert Umfragen für Auswahllisten im Admin-Dashboard.
+      tags: [Admin]
+      responses:
+        '200':
+          description: Umfragenliste
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        type:
+                          type: string
+                          enum: [form, appointment, vote]
+                        title:
+                          type: string
+                        status:
+                          type: string
+                          enum: [open, closed]
+                        accessMode:
+                          type: string
+                          enum: [invited, all_users]
+                        closesAt:
+                          type: string
+                          nullable: true
+                        creatorDisplayName:
+                          type: string
+                          nullable: true
+                        createdAt:
+                          type: string
+
+  /admin/polls/{id}:
+    get:
+      summary: Umfrage-Detailseite (Admin-HTML)
+      description: >
+        Detailseite mit Beschreibung, Fragen, Optionen inkl. Stimmen,
+        Einladungen und Formular-Antworten.
+      tags: [Admin]
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: HTML-Detailseite
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Umfrage nicht gefunden (HTML)
+          content:
+            text/html:
+              schema:
+                type: string
+    delete:
+      summary: Umfrage löschen (Admin)
+      description: Löscht die Umfrage samt Kindern kaskadierend.
+      tags: [Admin]
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '204':
+          description: Gelöscht
+
+  /admin/polls/{id}/close:
+    post:
+      summary: Umfrage schließen (Admin)
+      description: Setzt den Status auf `closed`.
+      tags: [Admin]
+      parameters:
+        - $ref: '#/components/parameters/PollId'
+      responses:
+        '200':
+          description: Geschlossen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
 
   /admin/notifications:
     get:

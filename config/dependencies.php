@@ -85,6 +85,25 @@ use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedbackVoteRepository;
 use Sinclear\Api\Repository\FeedbackCommentRepository;
+use Sinclear\Api\Repository\PollRepository;
+use Sinclear\Api\Repository\PollQuestionRepository;
+use Sinclear\Api\Repository\PollOptionRepository;
+use Sinclear\Api\Repository\PollInviteRepository;
+use Sinclear\Api\Repository\PollResponseRepository;
+use Sinclear\Api\Repository\PollAnswerRepository;
+use Sinclear\Api\Repository\PollAvailabilityVoteRepository;
+use Sinclear\Api\Repository\PollVoteRepository;
+use Sinclear\Api\Controllers\PollController;
+use Sinclear\Api\Controllers\PollAppointmentController;
+use Sinclear\Api\Controllers\PollVoteController;
+use Sinclear\Api\Security\Policy\PollPolicy;
+use Sinclear\Api\Services\Poll\PollAnswerValidator;
+use Sinclear\Api\Services\PollService;
+use Sinclear\Api\Services\PollFormService;
+use Sinclear\Api\Services\PollAppointmentService;
+use Sinclear\Api\Services\PollVoteService;
+use Sinclear\Api\Services\PollNotificationService;
+use Sinclear\Api\Support\PollAnonymity;
 use Sinclear\Api\Repository\ModerationRequestRepository;
 use Sinclear\Api\Repository\ForumRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
@@ -287,6 +306,31 @@ return [
     ModerationRequestRepository::class => autowire(),
     ModerationRequestService::class => autowire(),
     ModerationRequestController::class => autowire(),
+
+    PollRepository::class => autowire(),
+    PollQuestionRepository::class => autowire(),
+    PollOptionRepository::class => autowire(),
+    PollInviteRepository::class => autowire(),
+    PollResponseRepository::class => autowire(),
+    PollAnswerRepository::class => autowire(),
+    PollAvailabilityVoteRepository::class => autowire(),
+    PollVoteRepository::class => autowire(),
+
+    PollAnonymity::class => function (ContainerInterface $c): PollAnonymity {
+        $settings = $c->get(Settings::class);
+        return new PollAnonymity((string) ($settings->polls['anonymity_secret'] ?? ''));
+    },
+
+    PollAnswerValidator::class => autowire(),
+    PollPolicy::class => autowire(),
+    PollNotificationService::class => autowire(),
+    PollService::class => autowire(),
+    PollFormService::class => autowire(),
+    PollAppointmentService::class => autowire(),
+    PollVoteService::class => autowire(),
+    PollController::class => autowire(),
+    PollAppointmentController::class => autowire(),
+    PollVoteController::class => autowire(),
 
     ForumRepository::class => autowire(),
     ForumMemberRepository::class => autowire(),

@@ -7,14 +7,19 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `PollOption` (
+CREATE TABLE IF NOT EXISTS `PollVote` (
   `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `questionId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `createdAt` datetime(3) NOT NULL,
-  `label` text COLLATE utf8mb4_unicode_ci,
-  `dateValue` datetime(3) DEFAULT NULL,
-  `order` tinyint NOT NULL DEFAULT '0',
-  PRIMARY KEY (`id`)
+  `pollId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `optionId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `participantHash` char(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_vote_poll_hash_option` (`pollId`,`participantHash`,`optionId`),
+  KEY `idx_vote_poll_option` (`pollId`,`optionId`),
+  KEY `idx_vote_hash` (`pollId`,`participantHash`),
+  KEY `fk_pollvote_option` (`optionId`),
+  CONSTRAINT `fk_pollvote_option` FOREIGN KEY (`optionId`) REFERENCES `PollOption` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_pollvote_poll` FOREIGN KEY (`pollId`) REFERENCES `Poll` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

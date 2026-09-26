@@ -10,11 +10,16 @@
 CREATE TABLE IF NOT EXISTS `PollQuestion` (
   `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
   `pollId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
   `title` text COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('checkbox','toggle','single_choice','multiple_choice','text','textarea','email','address','number','date') COLLATE utf8mb4_unicode_ci NOT NULL,
-  `order` tinyint NOT NULL DEFAULT '0',
-  `createdAt` datetime(3) NOT NULL,
-  PRIMARY KEY (`id`)
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `isRequired` tinyint NOT NULL DEFAULT '0',
+  `position` smallint NOT NULL DEFAULT '0',
+  `config` json DEFAULT NULL,
+  `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  KEY `idx_question_poll` (`pollId`,`position`),
+  CONSTRAINT `fk_question_poll` FOREIGN KEY (`pollId`) REFERENCES `Poll` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

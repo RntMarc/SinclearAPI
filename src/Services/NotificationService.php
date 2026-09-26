@@ -97,6 +97,22 @@ final readonly class NotificationService
             'title' => 'Neue Bewertung',
             'text' => 'Jemand hat deinen Beitrag positiv bewertet.',
         ],
+        'poll_invite' => [
+            'title' => 'Neue Umfrage-Einladung',
+            'text' => '',
+        ],
+        'poll_counter_proposal' => [
+            'title' => 'Neuer Gegenvorschlag',
+            'text' => '',
+        ],
+        'poll_finalized' => [
+            'title' => 'Umfrage aktualisiert',
+            'text' => '',
+        ],
+        'poll_deadline_reminder' => [
+            'title' => 'Erinnerung: Umfrage endet bald',
+            'text' => '',
+        ],
     ];
 
     public function __construct(
@@ -189,6 +205,10 @@ final readonly class NotificationService
             'direct_message' => $this->normalizeDirectMessageData($data),
             'forum_post' => $this->normalizeForumPostData($data),
             'forum_upvote' => $this->normalizeForumUpvoteData($data),
+            'poll_invite' => $this->normalizePollInviteData($data),
+            'poll_counter_proposal' => $this->normalizePollCounterProposalData($data),
+            'poll_finalized' => $this->normalizePollFinalizedData($data),
+            'poll_deadline_reminder' => $this->normalizePollDeadlineReminderData($data),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }
@@ -1097,6 +1117,99 @@ final readonly class NotificationService
         foreach ($requiredRelations as $relation => $_object) {
             if (!isset($normalized[$relation])) {
                 throw new \InvalidArgumentException('direct_message data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizePollInviteData(?array $data): array
+    {
+        return $this->normalizePollRelations($data, 'poll_invite', [
+            'poll' => 'Poll',
+            'inviter' => 'User',
+        ], []);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizePollCounterProposalData(?array $data): array
+    {
+        return $this->normalizePollRelations($data, 'poll_counter_proposal', [
+            'poll' => 'Poll',
+            'proposer' => 'User',
+            'option' => 'PollOption',
+        ], []);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizePollFinalizedData(?array $data): array
+    {
+        return $this->normalizePollRelations($data, 'poll_finalized', [
+            'poll' => 'Poll',
+        ], [
+            'finalized_option' => 'PollOption',
+        ]);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizePollDeadlineReminderData(?array $data): array
+    {
+        return $this->normalizePollRelations($data, 'poll_deadline_reminder', [
+            'poll' => 'Poll',
+        ], []);
+    }
+
+    /**
+     * Gemeinsame Validierung der Poll-Relationen.
+     *
+     * @param array<string, string> $required relation => object
+     * @param array<string, string> $optional relation => object
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizePollRelations(?array $data, string $typeName, array $required, array $optional): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException($typeName . ' data is required');
+        }
+
+        $normalized = [];
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException($typeName . ' data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException($typeName . ' data entries require relation, object, and identifier');
+            }
+
+            $expected = $required[$relation] ?? $optional[$relation] ?? null;
+            if ($expected === null || $expected !== $object) {
+                throw new \InvalidArgumentException($typeName . ' data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($required as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException($typeName . ' data is missing relation: ' . $relation);
             }
         }
 
