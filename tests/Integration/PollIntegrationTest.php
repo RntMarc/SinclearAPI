@@ -368,6 +368,7 @@ class PollIntegrationTest extends TestCase
             'type' => 'form',
             'title' => 'Form',
             'submissionMode' => 'single',
+            'inviteUserIds' => ['user-2'],
             'questions' => [
                 ['type' => 'text', 'title' => 'Name', 'isRequired' => true],
             ],
