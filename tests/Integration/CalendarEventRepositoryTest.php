@@ -87,8 +87,8 @@ final class CalendarEventRepositoryTest extends TestCase
 
         $this->assertEquals(0, $row['allDay']);
         $this->assertSame('Europe/Berlin', $row['timezone']);
-        $this->assertSame('2026-09-26 18:00:00', $row['startAt']);
-        $this->assertSame('2026-09-26 21:59:00', $row['endAt']);
+        $this->assertSame('2026-09-26 18:00:00.000', $row['startAt']);
+        $this->assertSame('2026-09-26 21:59:00.000', $row['endAt']);
         $this->assertNull($row['startDate']);
         $this->assertNull($row['endDate']);
         $this->assertEquals(0, $row['visibility']);
@@ -159,8 +159,8 @@ final class CalendarEventRepositoryTest extends TestCase
         $row = $this->fetchEvent($id);
 
         $this->assertEquals(0, $row['allDay']);
-        $this->assertSame('2026-12-24 17:30:00', $row['startAt']);
-        $this->assertSame('2026-12-24 19:00:00', $row['endAt']);
+        $this->assertSame('2026-12-24 17:30:00.000', $row['startAt']);
+        $this->assertSame('2026-12-24 19:00:00.000', $row['endAt']);
         $this->assertNull($row['startDate']);
         $this->assertEquals(2, $row['visibility']);
     }
