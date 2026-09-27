@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS `Poll` (
   `submissionMode` enum('single','multiple') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'single',
   `resultsVisibility` enum('creator','participants') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'creator',
   `allowCounterProposals` tinyint NOT NULL DEFAULT '0',
+  `allowMultiple` tinyint NOT NULL DEFAULT '0',
   `finalizedOptionId` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `reminderSentAt` datetime(3) DEFAULT NULL,
   `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

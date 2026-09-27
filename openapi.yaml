@@ -5466,7 +5466,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StoryFeedGroup'
-          description: Nach Nutzer gruppierte aktive Stories
+          description: Nach Nutzer gruppierte aktive Stories, Gruppen nach neuester Story (zuletzt aktive Nutzer zuerst)
 
     StoryResponse:
       type: object
@@ -18198,15 +18198,17 @@ paths:
       summary: Story-Feed abrufen
       description: >
         Gibt alle aktiven Stories der letzten 7 Tage zurück, gruppiert nach
-        Nutzer. Jede Gruppe enthält Anzeigename, Avatar und die Liste der
-        Stories des Autors (neueste zuerst). Für jede Story wird angegeben,
-        ob der aktuelle Nutzer sie bereits gesehen hat.
+        Nutzer. Die Gruppen sind nach dem Zeitpunkt der jeweils neuesten Story
+        des Autors sortiert (zuletzt aktiver Nutzer zuerst); jede Gruppe enthält
+        Anzeigename, Avatar und die Liste der Stories des Autors (neueste
+        zuerst). Für jede Story wird angegeben, ob der aktuelle Nutzer sie
+        bereits gesehen hat.
       tags: [Stories]
       security:
         - BearerAuth: []
       responses:
         '200':
-          description: Nach Nutzer gruppierte aktive Stories
+          description: Nach Nutzer gruppierte aktive Stories, Gruppen nach neuester Story (zuletzt aktive Nutzer zuerst)
           content:
             application/json:
               schema:

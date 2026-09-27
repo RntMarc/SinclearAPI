@@ -194,6 +194,12 @@ class StoryTest extends TestCase
         return $id;
     }
 
+    private function setStoryCreatedAt(string $id, string $createdAt): void
+    {
+        $stmt = $this->db->prepare('UPDATE Story SET createdAt = ? WHERE id = ?');
+        $stmt->execute([$createdAt, $id]);
+    }
+
     // ── POST /stories ─────────────────────────────────────
 
     public function testCreateStoryReturns201(): void
@@ -312,6 +318,32 @@ class StoryTest extends TestCase
         $response = $this->controller->feed($request, new Response());
         $data = json_decode((string) $response->getBody(), true);
         $this->assertFalse($data['data'][0]['stories'][0]['viewed']);
+    }
+
+    public function testFeedOrdersGroupsByMostRecentStory(): void
+    {
+        $aliceOld = $this->createStory('user-1', 'Alice alt');
+        $this->setStoryCreatedAt($aliceOld, '2026-09-01 10:00:00.000');
+        $bob = $this->createStory('user-2', 'Bob');
+        $this->setStoryCreatedAt($bob, '2026-09-01 12:00:00.000');
+
+        $request = $this->requestWithUser('GET', '/stories');
+        $response = $this->controller->feed($request, new Response());
+        $data = json_decode((string) $response->getBody(), true);
+
+        $this->assertSame('user-2', $data['data'][0]['userId']);
+        $this->assertSame('user-1', $data['data'][1]['userId']);
+
+        $aliceNew = $this->createStory('user-1', 'Alice neu');
+        $this->setStoryCreatedAt($aliceNew, '2026-09-01 13:00:00.000');
+
+        $response = $this->controller->feed($request, new Response());
+        $data = json_decode((string) $response->getBody(), true);
+
+        $this->assertSame('user-1', $data['data'][0]['userId']);
+        $this->assertSame('user-2', $data['data'][1]['userId']);
+        $this->assertSame('Alice neu', $data['data'][0]['stories'][0]['caption']);
+        $this->assertSame('Alice alt', $data['data'][0]['stories'][1]['caption']);
     }
 
     // ── GET /stories/{id} ─────────────────────────────────

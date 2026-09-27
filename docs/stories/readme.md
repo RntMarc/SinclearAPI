@@ -20,7 +20,7 @@ Migrationen: `database/migrations/create_stories_table.sql` und
 
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
-| `GET` | `/stories` | Story-Feed: aktive Stories (< 7 Tage), gruppiert nach Nutzer (Name, Avatar, Stories, Gesehen-Status) |
+| `GET` | `/stories` | Story-Feed: aktive Stories (< 7 Tage), gruppiert nach Nutzer (Name, Avatar, Stories, Gesehen-Status); Gruppen nach neuester Story, zuletzt aktive Nutzer zuerst |
 | `POST` | `/stories` | Neue Story erstellen (Body: `image` als Base64, optional `caption`) |
 | `GET` | `/stories/{id}` | Einzelne Story inkl. Autor, Gesehen-Status und `viewCount` |
 | `DELETE` | `/stories/{id}` | Eigene Story löschen (nur Ersteller oder Admin) |
@@ -45,7 +45,12 @@ Rezepten). Fehlerantworten: `invalid_image`, `invalid_image_encoding`,
 
 ### Story-Feed (`GET /stories`)
 
-Antwort (gruppiert nach Autor, neueste Story zuerst):
+Die Gruppen sind nach der jeweils **neuesten Story** des Autors sortiert: der
+zuletzt aktive Autor steht am weitesten links, danach absteigend die älteren.
+Nur die neueste Story eines Autors bestimmt dessen Position. Innerhalb einer
+Gruppe sind die Stories neueste zuerst.
+
+Antwort (gruppiert nach Autor, Gruppen nach neuester Story, Stories je Gruppe neueste zuerst):
 
 ```json
 {

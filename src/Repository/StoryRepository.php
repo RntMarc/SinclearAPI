@@ -46,8 +46,11 @@ final readonly class StoryRepository
     }
 
     /**
-     * Returns all active stories (expiresAt in the future), newest first,
-     * enriched with the author's display name and avatar.
+     * Returns all active stories (expiresAt in the future) enriched with the
+     * author's display name and avatar.
+     *
+     * Groups are ordered by the author's most recent story (most recently
+     * active author first); within a group the stories are newest first.
      */
     public function findActive(): array
     {
@@ -56,8 +59,14 @@ final readonly class StoryRepository
                     u.displayName, u.image AS userImage
              FROM Story s
              LEFT JOIN User u ON u.id = s.userId
+             JOIN (
+                 SELECT userId, MAX(createdAt) AS lastStoryAt
+                 FROM Story
+                 WHERE expiresAt > NOW(3)
+                 GROUP BY userId
+             ) newest ON newest.userId = s.userId
              WHERE s.expiresAt > NOW(3)
-             ORDER BY s.userId, s.createdAt DESC'
+             ORDER BY newest.lastStoryAt DESC, s.createdAt DESC, s.userId'
         );
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
