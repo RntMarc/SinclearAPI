@@ -82,8 +82,8 @@ final readonly class PollRepository
         $stmt = $this->pdo->prepare(
             'INSERT INTO Poll
                 (id, type, creatorId, title, description, status, closesAt, accessMode,
-                 submissionMode, resultsVisibility, allowCounterProposals, createdAt, updatedAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
+                 submissionMode, resultsVisibility, allowCounterProposals, allowMultiple, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))'
         );
         $stmt->execute([
             $id,
@@ -97,6 +97,7 @@ final readonly class PollRepository
             $data['submissionMode'] ?? 'single',
             $data['resultsVisibility'] ?? 'creator',
             (int) ($data['allowCounterProposals'] ?? 0),
+            (int) ($data['allowMultiple'] ?? 0),
         ]);
         return $id;
     }
@@ -115,7 +116,7 @@ final readonly class PollRepository
         $allowed = [
             'title', 'description', 'status', 'closesAt', 'accessMode',
             'submissionMode', 'resultsVisibility', 'allowCounterProposals',
-            'finalizedOptionId', 'reminderSentAt',
+            'allowMultiple', 'finalizedOptionId', 'reminderSentAt',
         ];
 
         $sets = [];

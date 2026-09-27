@@ -62,17 +62,21 @@ final readonly class PollAppointmentService
         return $this->pollService->formatOption($option);
     }
 
-    public function removeCounterProposal(AuthenticatedUser $user, string $pollId, string $optionId): void
+    /**
+     * Löscht eine Terminoption. Ersteller/Admin dürfen jede Option entfernen
+     * (eigene Vorschläge und Gegenvorschläge), andere Nutzer nur ihren eigenen
+     * Gegenvorschlag.
+     */
+    public function removeOption(AuthenticatedUser $user, string $pollId, string $optionId): void
     {
         $poll = $this->loadAppointment($pollId);
         $option = $this->optionRepo->findById($optionId);
         if ($option === null || $option['pollId'] !== $pollId) {
             throw new \RuntimeException('option_not_found');
         }
-        if ((int) $option['isCounterProposal'] !== 1) {
-            throw new \RuntimeException('forbidden');
-        }
-        if (!$this->policy->canManage($user, $poll) && $option['proposedBy'] !== $user->id) {
+        if (!$this->policy->canManage($user, $poll)
+            && ((int) $option['isCounterProposal'] !== 1 || $option['proposedBy'] !== $user->id)
+        ) {
             throw new \RuntimeException('forbidden');
         }
 

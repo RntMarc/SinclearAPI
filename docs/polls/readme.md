@@ -25,6 +25,7 @@ unterscheiden:
   Gegenvorschläge.
 - **Anonyme Abstimmung:** Teilnehmerkennung als HMAC-Hash statt `userId`;
   einmalig, nicht änderbar; Ergebnis erst nach `closed` sichtbar.
+  `allowMultiple` steuert, ob eine oder mehrere Optionen gewählt werden dürfen.
 - **Longtext:** Plain Text mit Zeilenumbrüchen (kein HTML/Markdown-Rendering).
 - **Realtime:** nur REST, kein Centrifugo.
 
@@ -48,6 +49,7 @@ Stimmtabellen. Migration: `database/migrations/20260927000000_polls.sql`.
 | `submissionMode` | enum(`single`,`multiple`) | Nur `form` |
 | `resultsVisibility` | enum(`creator`,`participants`) | Nur `form` |
 | `allowCounterProposals` | tinyint | Nur `appointment` |
+| `allowMultiple` | tinyint | Nur `vote`; Mehrfachauswahl erlaubt |
 | `finalizedOptionId` | varchar(191) | Nur `appointment`; bewusst ohne FK (Kreisabhängigkeit), Integrität im Service |
 | `reminderSentAt` | datetime(3) | Cron: Deadline-Reminder gesendet |
 | `createdAt`/`updatedAt` | datetime(3) | Zeitstempel (UTC) |
@@ -113,7 +115,7 @@ Controller-`ERROR_MAP`.
 | GET | `/polls/{id}/responses/me` | Eigene Antwort | Eigentümer |
 | PATCH | `/polls/{id}/responses/{responseId}` | Antwort ändern | Eigentümer, `single`, offen |
 | POST | `/polls/{id}/options` | Gegenvorschlag (Terminfindung) | sichtbar + `allowCounterProposals` |
-| DELETE | `/polls/{id}/options/{optionId}` | Eigenen Gegenvorschlag löschen | Vorschlagender/Ersteller/Admin |
+| DELETE | `/polls/{id}/options/{optionId}` | Terminoption löschen (jede Option für Ersteller/Admin, sonst eigener Gegenvorschlag) | Vorschlagender/Ersteller/Admin |
 | GET | `/polls/{id}/availability` | Alle Verfügbarkeiten | sichtbar |
 | PUT | `/polls/{id}/availability` | Eigene Verfügbarkeiten setzen (Upsert) | sichtbar + offen |
 | POST | `/polls/{id}/finalize` | Termin festlegen | Ersteller/Admin |
@@ -144,7 +146,8 @@ Controller-`ERROR_MAP`.
 ## Anonyme Abstimmung (`vote`)
 
 - `POST /vote` akzeptiert `optionIds[]` (mindestens eine gültige Option der
-  Umfrage).
+  Umfrage). Bei `allowMultiple=false` ist genau eine Option erlaubt, sonst
+  `invalid_answer`.
 - Doppelwahl wird über den `participantHash` verhindert (`already_voted`).
 - Nachträgliche Änderung ist nicht möglich.
 - `GET /results` ist erst nach `closed` und nur für Ersteller/Admin sichtbar.
@@ -187,6 +190,7 @@ sonst der `participantHash` und damit die Doppelwahl-Erkennung ändert.
 - DB-frei (lokal): `PollAnswerValidatorTest`, `PollAnonymityTest`,
   `PollPolicyTest`, `PollNotificationDataTest`.
 - Integration (Server, DB): Formular- (single/multiple, Sichtbarkeit),
-  Terminfindungs- (Upsert, Gegenvorschlag, Finalisierung) und
-  Abstimmungs-Flows (einmalig, Anonymität, Ergebnisse erst nach `closed`)
-  sowie Zugriffsmodi (`invited` vs. `all_users`).
+  Terminfindungs- (Upsert, Gegenvorschlag, Löschen, Finalisierung) und
+  Abstimmungs-Flows (einmalig, Anonymität, Einfach-/Mehrfachauswahl,
+  Ergebnisse erst nach `closed`) sowie Zugriffsmodi (`invited` vs.
+  `all_users`).

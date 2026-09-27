@@ -75,6 +75,9 @@ final readonly class PollVoteService
         if ($selected === []) {
             throw new \RuntimeException('invalid_answer');
         }
+        if ((int) ($poll['allowMultiple'] ?? 0) !== 1 && count($selected) > 1) {
+            throw new \RuntimeException('invalid_answer');
+        }
 
         $hash = $this->anonymity->participantHash($pollId, $user->id);
         if ($this->voteRepo->hasVoted($pollId, $hash)) {

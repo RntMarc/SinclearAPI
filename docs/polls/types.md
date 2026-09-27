@@ -60,4 +60,7 @@ Gegenvorschläge werden über `POST /polls/{id}/options` erzeugt und als
 ## Abstimmungsoptionen (`vote`)
 
 `vote`-Umfragen verwenden `options[]` (`{ "label": "..." }`) ohne
-`questionId`. Teilnehmer wählen eine oder mehrere Option-IDs (`optionIds[]`).
+`questionId`. Teilnehmer wählen Option-IDs (`optionIds[]`). Mit
+`allowMultiple=false` (Default) ist genau eine Option erlaubt, mit
+`allowMultiple=true` beliebig viele; ein Verstoß gegen die Einfachwahl löst
+`invalid_answer` aus.

@@ -44,7 +44,7 @@ final readonly class PollAppointmentController
         $user = $this->requireUser($request);
 
         try {
-            $this->appointmentService->removeCounterProposal($user, $args['id'], $args['optionId']);
+            $this->appointmentService->removeOption($user, $args['id'], $args['optionId']);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), $response);

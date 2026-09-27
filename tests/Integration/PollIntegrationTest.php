@@ -147,6 +147,7 @@ class PollIntegrationTest extends TestCase
             submissionMode enum('single','multiple') NOT NULL DEFAULT 'single',
             resultsVisibility enum('creator','participants') NOT NULL DEFAULT 'creator',
             allowCounterProposals tinyint NOT NULL DEFAULT 0,
+            allowMultiple tinyint NOT NULL DEFAULT 0,
             finalizedOptionId varchar(191) NULL,
             reminderSentAt datetime(3) NULL,
             createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -466,7 +467,84 @@ class PollIntegrationTest extends TestCase
         $this->assertSame($option1, $finalized['finalizedOptionId']);
     }
 
+    public function testAppointmentCreatorCanDeleteAnyOption(): void
+    {
+        $poll = $this->pollService->create($this->user('creator'), [
+            'type' => 'appointment',
+            'title' => 'Delete options',
+            'allowCounterProposals' => true,
+            'inviteUserIds' => ['user-2'],
+            'options' => [
+                ['allDay' => false, 'timezone' => 'Europe/Berlin', 'startAt' => '2026-10-01T10:00:00+02:00', 'endAt' => '2026-10-01T11:00:00+02:00'],
+                ['allDay' => false, 'timezone' => 'Europe/Berlin', 'startAt' => '2026-10-02T10:00:00+02:00', 'endAt' => '2026-10-02T11:00:00+02:00'],
+            ],
+        ]);
+        $pollId = (string) $poll['id'];
+        $option1 = (string) $poll['options'][0]['id'];
+
+        $counter = $this->appointmentService->addCounterProposal($this->user('user-2'), $pollId, [
+            'allDay' => false, 'timezone' => 'Europe/Berlin',
+            'startAt' => '2026-10-03T10:00:00+02:00', 'endAt' => '2026-10-03T11:00:00+02:00',
+        ]);
+        $counterId = (string) $counter['id'];
+
+        // Nicht-Ersteller darf fremde Vorschläge nicht löschen
+        try {
+            $this->appointmentService->removeOption($this->user('user-2'), $pollId, $option1);
+            $this->fail('forbidden expected');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('forbidden', $e->getMessage());
+        }
+
+        // Ersteller darf jede Option löschen (eigene und Gegenvorschlag)
+        $this->appointmentService->removeOption($this->user('creator'), $pollId, $option1);
+        $this->appointmentService->removeOption($this->user('creator'), $pollId, $counterId);
+
+        $detail = $this->pollService->get($this->user('creator'), $pollId);
+        $remaining = array_column($detail['options'], 'id');
+        $this->assertNotContains($option1, $remaining);
+        $this->assertNotContains($counterId, $remaining);
+    }
+
     // ── Anonyme Abstimmung ───────────────────────────────
+
+    public function testVoteSingleAndMultipleSelection(): void
+    {
+        // Default (allowMultiple=false): genau eine Option erlaubt
+        $single = $this->pollService->create($this->user('creator'), [
+            'type' => 'vote',
+            'title' => 'Single',
+            'accessMode' => 'all_users',
+            'options' => [['label' => 'A'], ['label' => 'B']],
+        ]);
+        $singleId = (string) $single['id'];
+        $singleA = (string) $single['options'][0]['id'];
+        $singleB = (string) $single['options'][1]['id'];
+
+        try {
+            $this->voteService->vote($this->user('user-2'), $singleId, [$singleA, $singleB]);
+            $this->fail('invalid_answer expected');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('invalid_answer', $e->getMessage());
+        }
+        $this->voteService->vote($this->user('user-2'), $singleId, [$singleA]);
+
+        // allowMultiple=true: mehrere Optionen erlaubt
+        $multi = $this->pollService->create($this->user('creator'), [
+            'type' => 'vote',
+            'title' => 'Multi',
+            'accessMode' => 'all_users',
+            'allowMultiple' => true,
+            'options' => [['label' => 'A'], ['label' => 'B']],
+        ]);
+        $multiId = (string) $multi['id'];
+        $multiA = (string) $multi['options'][0]['id'];
+        $multiB = (string) $multi['options'][1]['id'];
+
+        $this->voteService->vote($this->user('user-3'), $multiId, [$multiA, $multiB]);
+        $status = $this->voteService->voteStatus($this->user('user-3'), $multiId);
+        $this->assertCount(2, $status['votedOptionIds']);
+    }
 
     public function testVoteOnceAnonymouslyAndResultsAfterClose(): void
     {

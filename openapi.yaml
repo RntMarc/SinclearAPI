@@ -4413,6 +4413,7 @@ components:
         - submissionMode
         - resultsVisibility
         - allowCounterProposals
+        - allowMultiple
         - isCreator
         - createdAt
         - updatedAt
@@ -4471,6 +4472,11 @@ components:
         allowCounterProposals:
           type: boolean
           description: Nur für `appointment`; ob Gegenvorschläge erlaubt sind.
+        allowMultiple:
+          type: boolean
+          description: >
+            Nur für `vote`; ob mehrere Optionen gleichzeitig gewählt werden
+            dürfen. `false` = genau eine Option.
         finalizedOptionId:
           type: string
           nullable: true
@@ -4939,6 +4945,12 @@ components:
           type: boolean
           default: false
           description: Nur für `appointment`
+        allowMultiple:
+          type: boolean
+          default: false
+          description: >
+            Nur für `vote`; ob mehrere Optionen gleichzeitig gewählt werden
+            dürfen.
         inviteUserIds:
           type: array
           items:
@@ -4981,6 +4993,11 @@ components:
           enum: [creator, participants]
         allowCounterProposals:
           type: boolean
+        allowMultiple:
+          type: boolean
+          description: >
+            Nur für `vote`; ob mehrere Optionen gleichzeitig gewählt werden
+            dürfen.
 
     PollInviteAddRequest:
       type: object
@@ -9898,7 +9915,8 @@ paths:
         Legt atomar eine Umfrage samt Fragen/Optionen und Einladungen an. Der
         Aufbau des Payloads hängt vom `type` ab: `form` nutzt `questions`,
         `appointment` nutzt `options` mit Zeitfeldern und
-        `allowCounterProposals`, `vote` nutzt `options` (Auswahloptionen).
+        `allowCounterProposals`, `vote` nutzt `options` (Auswahloptionen) und
+        `allowMultiple`.
       tags: [Polls]
       security:
         - BearerAuth: []
@@ -9968,8 +9986,8 @@ paths:
       description: >
         Nur Ersteller/Admin. Änderbar sind Titel, Beschreibung, `closesAt`,
         `accessMode`, `status` (nicht bei `vote`), bei `form`
-        `submissionMode`/`resultsVisibility` und bei `appointment`
-        `allowCounterProposals`.
+        `submissionMode`/`resultsVisibility`, bei `appointment`
+        `allowCounterProposals` und bei `vote` `allowMultiple`.
       tags: [Polls]
       security:
         - BearerAuth: []
@@ -10301,8 +10319,10 @@ paths:
 
   /polls/{id}/options/{optionId}:
     delete:
-      summary: Eigenen Gegenvorschlag löschen
-      description: Vorschlagender, Ersteller oder Admin.
+      summary: Terminoption löschen
+      description: >
+        Ersteller/Admin dürfen jede Terminoption löschen (eigene Vorschläge und
+        Gegenvorschläge); andere Nutzer nur ihren eigenen Gegenvorschlag.
       tags: [Polls]
       security:
         - BearerAuth: []
@@ -10315,7 +10335,7 @@ paths:
             type: string
       responses:
         '204':
-          description: Gegenvorschlag gelöscht
+          description: Option gelöscht
         '403':
           description: Keine Berechtigung
           content:
@@ -10456,8 +10476,10 @@ paths:
       summary: Einmalig abstimmen (anonyme Abstimmung)
       description: >
         Nur sichtbare, offene `vote`-Umfragen. Genau eine Stimme pro Nutzer;
-        nachträgliche Änderung ist nicht möglich (`already_voted`). Die Stimmen
-        werden anonym über `participantHash` gespeichert.
+        nachträgliche Änderung ist nicht möglich (`already_voted`). Bei
+        `allowMultiple=false` ist genau eine Option erlaubt (sonst
+        `invalid_answer`). Die Stimmen werden anonym über `participantHash`
+        gespeichert.
       tags: [Polls]
       security:
         - BearerAuth: []

@@ -54,6 +54,7 @@ final readonly class PollService
         $resultsVisibility = $this->enumValue($payload['resultsVisibility'] ?? 'creator', ['creator', 'participants'], 'invalid_visibility');
         $closesAt = $this->parseClosesAt($payload['closesAt'] ?? null);
         $allowCounterProposals = $type === 'appointment' && (bool) ($payload['allowCounterProposals'] ?? false) ? 1 : 0;
+        $allowMultiple = $type === 'vote' && (bool) ($payload['allowMultiple'] ?? false) ? 1 : 0;
 
         $inviteUserIds = $this->normalizeStringList($payload['inviteUserIds'] ?? []);
 
@@ -68,6 +69,7 @@ final readonly class PollService
                 'submissionMode' => $type === 'form' ? $submissionMode : 'single',
                 'resultsVisibility' => $type === 'form' ? $resultsVisibility : 'creator',
                 'allowCounterProposals' => $allowCounterProposals,
+                'allowMultiple' => $allowMultiple,
                 'closesAt' => $closesAt,
             ]);
 
@@ -182,6 +184,9 @@ final readonly class PollService
         }
         if ($poll['type'] === 'appointment' && array_key_exists('allowCounterProposals', $payload)) {
             $fields['allowCounterProposals'] = (bool) $payload['allowCounterProposals'] ? 1 : 0;
+        }
+        if ($poll['type'] === 'vote' && array_key_exists('allowMultiple', $payload)) {
+            $fields['allowMultiple'] = (bool) $payload['allowMultiple'] ? 1 : 0;
         }
 
         $this->pollRepo->update($id, $fields);
@@ -340,6 +345,7 @@ final readonly class PollService
             'submissionMode' => $row['submissionMode'],
             'resultsVisibility' => $row['resultsVisibility'],
             'allowCounterProposals' => (bool) $row['allowCounterProposals'],
+            'allowMultiple' => (bool) $row['allowMultiple'],
             'finalizedOptionId' => $row['finalizedOptionId'],
             'isCreator' => $row['creatorId'] === $user->id,
             'createdAt' => $this->formatInstant($row['createdAt'] ?? null),

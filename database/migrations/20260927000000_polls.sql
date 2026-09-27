@@ -30,6 +30,7 @@ CREATE TABLE `Poll` (
   submissionMode enum('single','multiple') NOT NULL DEFAULT 'single',
   resultsVisibility enum('creator','participants') NOT NULL DEFAULT 'creator',
   allowCounterProposals tinyint NOT NULL DEFAULT 0,
+  allowMultiple tinyint NOT NULL DEFAULT 0,
   finalizedOptionId varchar(191) NULL,
   reminderSentAt datetime(3) NULL,
   createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
