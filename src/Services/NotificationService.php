@@ -113,6 +113,46 @@ final readonly class NotificationService
             'title' => 'Erinnerung: Umfrage endet bald',
             'text' => '',
         ],
+        'trip_leader_appointed' => [
+            'title' => 'Du bist jetzt Reiseleiter',
+            'text' => '',
+        ],
+        'trip_leader_appointed_others' => [
+            'title' => 'Neuer Reiseleiter auf der Reise',
+            'text' => '',
+        ],
+        'trip_leader_removed' => [
+            'title' => 'Du bist nicht mehr Reiseleiter',
+            'text' => '',
+        ],
+        'trip_leader_removed_others' => [
+            'title' => 'Reiseleiter geändert',
+            'text' => '',
+        ],
+        'standalone_event_leader_appointed' => [
+            'title' => 'Du bist jetzt Veranstalter',
+            'text' => '',
+        ],
+        'standalone_event_leader_appointed_others' => [
+            'title' => 'Neuer Veranstalter beim Event',
+            'text' => '',
+        ],
+        'standalone_event_leader_removed' => [
+            'title' => 'Du bist nicht mehr Veranstalter',
+            'text' => '',
+        ],
+        'standalone_event_leader_removed_others' => [
+            'title' => 'Veranstalter geändert',
+            'text' => '',
+        ],
+        'standalone_event_converted_to_trip' => [
+            'title' => 'Event wurde zu einer Reise hinzugefügt',
+            'text' => '',
+        ],
+        'trip_event_converted_to_standalone' => [
+            'title' => 'Event wurde von der Reise gelöst',
+            'text' => '',
+        ],
     ];
 
     public function __construct(
@@ -209,8 +249,86 @@ final readonly class NotificationService
             'poll_counter_proposal' => $this->normalizePollCounterProposalData($data),
             'poll_finalized' => $this->normalizePollFinalizedData($data),
             'poll_deadline_reminder' => $this->normalizePollDeadlineReminderData($data),
+            'trip_leader_appointed', 'trip_leader_appointed_others',
+            'trip_leader_removed', 'trip_leader_removed_others' => $this->normalizeTravelRoleChangedData($type, $data),
+            'standalone_event_leader_appointed', 'standalone_event_leader_appointed_others',
+            'standalone_event_leader_removed', 'standalone_event_leader_removed_others' => $this->normalizeTravelRoleChangedData($type, $data),
+            'standalone_event_converted_to_trip' => $this->normalizeTravelConvertedData($type, $data, true),
+            'trip_event_converted_to_standalone' => $this->normalizeTravelConvertedData($type, $data, false),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTravelRoleChangedData(string $type, ?array $data): array
+    {
+        $isEvent = str_starts_with($type, 'standalone_event_');
+        $required = $isEvent
+            ? ['event' => 'Event', 'changed_user' => 'User']
+            : ['trip' => 'Trip', 'changed_user' => 'User'];
+
+        return $this->normalizeSimpleRelations($type, $data, $required, ['changed_by' => 'User']);
+    }
+
+    /**
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeTravelConvertedData(string $type, ?array $data, bool $toTrip): array
+    {
+        $required = $toTrip
+            ? ['event' => 'Event', 'trip' => 'Trip']
+            : ['event' => 'Event'];
+
+        return $this->normalizeSimpleRelations($type, $data, $required, ['converted_by' => 'User']);
+    }
+
+    /**
+     * @param array<string, string> $required
+     * @param array<string, string> $optional
+     * @return array<int, array{relation: string, object: string, identifier: string}>
+     */
+    private function normalizeSimpleRelations(string $type, ?array $data, array $required, array $optional = []): array
+    {
+        if ($data === null || $data === []) {
+            throw new \InvalidArgumentException($type . ' data is required');
+        }
+
+        $allowed = $required + $optional;
+        $normalized = [];
+
+        foreach ($data as $entry) {
+            if (!is_array($entry)) {
+                throw new \InvalidArgumentException($type . ' data entries must be objects');
+            }
+
+            $relation = trim((string) ($entry['relation'] ?? ''));
+            $object = trim((string) ($entry['object'] ?? ''));
+            $identifier = trim((string) ($entry['identifier'] ?? ''));
+
+            if ($relation === '' || $object === '' || $identifier === '') {
+                throw new \InvalidArgumentException($type . ' data entries require relation, object, and identifier');
+            }
+
+            if (!isset($allowed[$relation]) || $allowed[$relation] !== $object) {
+                throw new \InvalidArgumentException($type . ' data contains an unsupported relation/object pair');
+            }
+
+            $normalized[$relation] = [
+                'relation' => $relation,
+                'object' => $object,
+                'identifier' => $identifier,
+            ];
+        }
+
+        foreach ($required as $relation => $_object) {
+            if (!isset($normalized[$relation])) {
+                throw new \InvalidArgumentException($type . ' data is missing relation: ' . $relation);
+            }
+        }
+
+        return array_values($normalized);
     }
 
     /**

@@ -19,8 +19,8 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 | `TravelEvent` | Ereignisse (Reise-Events + Standalone-Events via `trip IS NULL`, citySlug, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
 | `TravelEventTicket` | Tickets für Reisen, Events oder persönliche Nutzer-Tickets |
 | `TravelAccommodation` | Unterkünfte (Hotels, Ferienwohnungen, etc., citySlug) |
-| `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften |
-| `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone) |
+| `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften (inkl. `role` = `leader`/`participant`) |
+| `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone; inkl. `role` bei Standalone-Events) |
 | `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
 
 ## Banner-Bild (TravelEvent.image)
@@ -73,6 +73,40 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 
 Sobald die Trip-Teilnahme bestätigt ist, werden alle zugehörigen Events
 und Unterkünfte uneingeschränkt ausgegeben (nicht nur die eigenen).
+
+## Rollen & Bearbeitungsrechte
+
+Reisen und Events unterscheiden zwei Rollen pro Teilnehmer-Relation:
+
+| Rolle | Bedeutung |
+|-------|-----------|
+| `leader` | Reiseleiter (bei Reisen) bzw. Veranstalter (bei Standalone-Events). Darf das Objekt und seine Unterressourcen bearbeiten/löschen. |
+| `participant` | Einfacher Mitreisender/Teilnehmer. Nur Leserechte. |
+
+**Regeln:**
+
+- Jeder Nutzer kann über `POST /trips` eine Reise erstellen. Der Ersteller
+  wird automatisch als `leader` in `TravelRelation` (`role='leader'`)
+  eingetragen.
+- Nur `leader` einer Reise dürfen die Reise, ihre Reise-Events und ihre
+  Unterkünfte bearbeiten/löschen sowie Teilnehmer und Rollen verwalten.
+- Reiseleiter können weitere Teilnehmer über
+  `PUT /trips/{id}/participants/{userId}/role` zu `leader` ernennen oder
+  wieder degradieren.
+- **Letzter Reiseleiter:** Der letzte verbleibende `leader` kann weder entfernt
+  noch degradiert werden (`409 last_leader`).
+- **Reise-Events erben** die Bearbeitungsrechte von der zugehörigen Reise.
+- **Standalone-Events** (`trip IS NULL`) besitzen eigene Rollen in
+  `EventRelation`: Der Ersteller ist `leader` und kann weitere Teilnehmer als
+  Veranstalter (`leader`) ernennen.
+- Normale Events müssen zwingend einer Reise zugeordnet sein; ein Event ohne
+  `trip` ist immer ein Standalone-Event.
+- **Konversion:** `PATCH /trips/standaloneevents/{eventId}` mit `trip` hängt ein
+  Standalone-Event an eine Reise an; `PATCH /trips/{id}/events/{eventId}` mit
+  `trip: null` löst ein Reise-Event zu einem Standalone-Event. Erforderlich sind
+  Leader-Rechte an Quelle **und** Ziel. Beim Konvertieren werden alle
+  EventRelation-Rollen auf `participant` zurückgesetzt; beim Lösen wird der
+  handelnde Leader als Veranstalter eingetragen.
 
 ## Event-Teilnehmer (EventRelation)
 
@@ -199,16 +233,34 @@ des aktuellen Nutzers zurück.
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
 | `GET` | `/trips` | JWT | Paginierte Liste der eigenen Reisen |
-| `GET` | `/trips/{id}` | JWT | Reisedetails (inkl. `forumId`, `forum`, `subscriptionCount`) |
+| `POST` | `/trips` | JWT | Reise erstellen (Ersteller wird `leader`) |
+| `GET` | `/trips/{id}` | JWT | Reisedetails (inkl. `forumId`, `forum`, `subscriptionCount`, `role`, `canEdit`) |
+| `PATCH` | `/trips/{id}` | JWT | Reise bearbeiten (nur `leader`) |
+| `DELETE` | `/trips/{id}` | JWT | Reise löschen (nur `leader`) |
 | `GET` | `/trips/{id}/events` | JWT | Alle Events einer Reise (mit Teilnehmern) |
+| `POST` | `/trips/{id}/events` | JWT | Event einer Reise hinzufügen (nur `leader`; `trip` zwingend) |
 | `GET` | `/trips/{id}/events/{eventId}` | JWT | Event-Details (mit Teilnehmern) |
+| `PATCH` | `/trips/{id}/events/{eventId}` | JWT | Reise-Event bearbeiten/Konversion (nur `leader`) |
+| `DELETE` | `/trips/{id}/events/{eventId}` | JWT | Reise-Event löschen (nur `leader`) |
 | `GET` | `/trips/{id}/tickets` | JWT | Tickets einer Reise (Gruppen- + eigene User-Tickets) |
 | `GET` | `/trips/{id}/accommodations` | JWT | Alle Unterkünfte einer Reise (mit Nutzern) |
+| `POST` | `/trips/{id}/accommodations` | JWT | Unterkunft für die Reise erstellen (nur `leader`) |
 | `GET` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunfts-Details (mit Nutzern) |
-| `GET` | `/trips/{id}/participants` | JWT | Alle Teilnehmer einer Reise |
+| `PATCH` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunft bearbeiten (nur `leader`) |
+| `DELETE` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunft löschen (nur `leader`) |
+| `GET` | `/trips/{id}/participants` | JWT | Alle Teilnehmer einer Reise (inkl. `role`) |
+| `POST` | `/trips/{id}/participants` | JWT | Teilnehmer hinzufügen (nur `leader`) |
+| `DELETE` | `/trips/{id}/participants/{userId}` | JWT | Teilnehmer entfernen (nur `leader`; letzter `leader` geschützt) |
+| `PUT` | `/trips/{id}/participants/{userId}/role` | JWT | Rolle setzen (`leader`/`participant`, nur `leader`) |
 | `GET` | `/trips/{id}/subscriptions` | JWT | Mit Reise verknüpfte Abos (nur bei Zugriff) |
 | `GET` | `/trips/standaloneevents` | JWT | Standalone-Events des Nutzers (paginiert, mit Teilnehmern) |
+| `POST` | `/trips/standaloneevents` | JWT | Standalone-Event erstellen (Ersteller wird Veranstalter) |
 | `GET` | `/trips/standaloneevents/{eventId}` | JWT | Standalone-Event-Details (mit Teilnehmern) |
+| `PATCH` | `/trips/standaloneevents/{eventId}` | JWT | Standalone-Event bearbeiten bzw. an Reise anhängen |
+| `DELETE` | `/trips/standaloneevents/{eventId}` | JWT | Standalone-Event löschen (nur Veranstalter) |
+| `POST` | `/trips/standaloneevents/{eventId}/participants` | JWT | Teilnehmer hinzufügen (nur Veranstalter) |
+| `DELETE` | `/trips/standaloneevents/{eventId}/participants/{userId}` | JWT | Teilnehmer entfernen (nur Veranstalter) |
+| `PUT` | `/trips/standaloneevents/{eventId}/participants/{userId}/role` | JWT | Veranstalter-Rolle setzen (nur Veranstalter) |
 | `GET` | `/trips/events/{eventId}` | JWT | **Unified** Event-Details via ID (Standalone + Reise-Events) |
 | `GET` | `/trips/events/{eventId}/tickets` | JWT | Tickets eines Events (Gruppen- + eigene User-Tickets) |
 | `GET` | `/trips/tickets/user` | JWT | Eigene persönliche Tickets |
@@ -282,7 +334,9 @@ Die Tabelle `TravelEvent` referenziert den Trip über das Feld `trip`
 gesetzt.
 
 Die Tabelle `TravelAccommodation` wird über `TravelRelation.accommodation`
-mit den Nutzern und damit der Reise verknüpft.
+mit den Nutzern und damit der Reise verknüpft. Zusätzlich kann sie über die
+optionale Spalte `TravelAccommodation.tripId` direkt einer Reise zugeordnet
+sein (für Reiseleiter-erstellte Unterkünfte).
 
 Die Tabelle `EventRelation` verknüpft Nutzer mit `TravelEvent.ID` und wird
 sowohl für Reise-Events als auch für Standalone-Events genutzt.

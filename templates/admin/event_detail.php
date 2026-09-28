@@ -156,6 +156,7 @@
                 <th>Benutzer</th>
                 <th>E-Mail</th>
                 <th>Hinzugefügt am</th>
+                <th>Rolle</th>
                 <th>Aktionen</th>
             </tr>
         </thead>
@@ -485,6 +486,21 @@
             if (res.ok) { showToast('Teilnehmer entfernt'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Entfernen', 'error'); }
+    }
+
+    async function changeParticipantRole(userId, selectEl) {
+        const role = selectEl.value;
+        try {
+            const res = await fetch('/api/v2/admin/travel/events/' + eventId + '/participants/' + userId + '/role', {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Rolle aktualisiert'); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); setTimeout(() => window.location.reload(), 600); }
+        } catch (e) { showToast('Fehler beim Ändern der Rolle', 'error'); }
     }
 
     // Travel Chat

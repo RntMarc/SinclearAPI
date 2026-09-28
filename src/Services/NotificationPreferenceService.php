@@ -33,6 +33,11 @@ final readonly class NotificationPreferenceService
         'event_user_added_others',
         'event_ticket_added',
         'event_info_changed',
+        'trip_leader_changed',
+        'trip_leader_changed_others',
+        'event_leader_changed',
+        'event_leader_changed_others',
+        'event_converted',
         'poll_invite',
         'poll_counter_proposal',
         'poll_finalized',
@@ -54,6 +59,16 @@ final readonly class NotificationPreferenceService
         'trip_event_ticket_added' => 'event_ticket_added',
         'standalone_event_info_changed' => 'event_info_changed',
         'trip_event_info_changed' => 'event_info_changed',
+        'trip_leader_appointed' => 'trip_leader_changed',
+        'trip_leader_removed' => 'trip_leader_changed',
+        'trip_leader_appointed_others' => 'trip_leader_changed_others',
+        'trip_leader_removed_others' => 'trip_leader_changed_others',
+        'standalone_event_leader_appointed' => 'event_leader_changed',
+        'standalone_event_leader_removed' => 'event_leader_changed',
+        'standalone_event_leader_appointed_others' => 'event_leader_changed_others',
+        'standalone_event_leader_removed_others' => 'event_leader_changed_others',
+        'standalone_event_converted_to_trip' => 'event_converted',
+        'trip_event_converted_to_standalone' => 'event_converted',
     ];
 
     /**

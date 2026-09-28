@@ -159,7 +159,7 @@ Gibt die Präferenzen des eingeloggten Nutzers für alle vom Endpoint angebotene
 Benachrichtigungstypen zurück. Für Typen ohne gespeicherten Eintrag gilt der
 Standard `enabled`.
 
-**Hinweis:** Interne Notification-Typen (z.B. `standalone_event_user_added`, `trip_event_user_added`) werden bei den Präferenzen auf vereinheitlichte Typen gemappt (`event_user_added`, `event_ticket_added`, `event_info_changed`). Der Nutzer sieht nur die vereinheitlichten Typen, die sowohl für Reise-Events als auch für eigenständige Events gelten.
+**Hinweis:** Interne Notification-Typen (z.B. `standalone_event_user_added`, `trip_event_user_added`) werden bei den Präferenzen auf vereinheitlichte Typen gemappt (`event_user_added`, `event_ticket_added`, `event_info_changed`, `trip_leader_changed`, `event_leader_changed`, `event_converted`). Der Nutzer sieht nur die vereinheitlichten Typen, die sowohl für Reise-Events als auch für eigenständige Events gelten.
 
 Der Endpoint liefert genau einen Preference-Schlüssel je fachlicher Einstellung:
 
@@ -169,6 +169,11 @@ Der Endpoint liefert genau einen Preference-Schlüssel je fachlicher Einstellung
 | `event_user_added_others` | `standalone_event_user_added_others`, `trip_event_user_added_others` |
 | `event_ticket_added` | `standalone_event_ticket_added`, `trip_event_ticket_added` |
 | `event_info_changed` | `standalone_event_info_changed`, `trip_event_info_changed` |
+| `trip_leader_changed` | `trip_leader_appointed`, `trip_leader_removed` |
+| `trip_leader_changed_others` | `trip_leader_appointed_others`, `trip_leader_removed_others` |
+| `event_leader_changed` | `standalone_event_leader_appointed`, `standalone_event_leader_removed` |
+| `event_leader_changed_others` | `standalone_event_leader_appointed_others`, `standalone_event_leader_removed_others` |
+| `event_converted` | `standalone_event_converted_to_trip`, `trip_event_converted_to_standalone` |
 
 Die internen Typen sind beim `PUT` nicht gültig. Clients müssen die
 vereinheitlichten Preference-Schlüssel verwenden.

@@ -32,8 +32,11 @@ use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
 use Sinclear\Api\Support\DateTimeValue;
+use Sinclear\Api\Support\TravelError;
+use Sinclear\Api\Support\TravelInput;
 use PDO;
 
 final readonly class AdminController
@@ -64,6 +67,7 @@ final readonly class AdminController
         private TravelChatRepository $travelChatRepo,
         private TravelChatService $travelChatService,
         private ImageService $imageService,
+        private TravelService $travelService,
         private ExternalDataCacheRepository $externalDataCacheRepo,
         private PDO $pdo,
         private LoggerInterface $logger,
@@ -359,280 +363,97 @@ ROW;
 
     public function createTrip(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $this->requireUser($request);
-        $body = $request->getParsedBody();
-
-        $name = trim((string) ($body['name'] ?? ''));
-        if ($name === '') {
-            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
-        }
+        $user = $this->requireUser($request);
 
         try {
-            $timing = $this->timingFromBody($body, true); // trips default all-day
-        } catch (\InvalidArgumentException $e) {
-            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
+            $trip = $this->travelService->createTrip($user, $this->parsedBody($request));
+            return ResponseFactory::json(['data' => $trip], 201, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $id = $this->tripRepo->create(array_merge($timing, [
-            'name' => $name,
-            'description' => isset($body['description']) && is_string($body['description'])
-                ? trim($body['description']) : null,
-            'hastickets' => !empty($body['hastickets']) ? '1' : '0',
-            'ticket' => isset($body['ticket']) && is_string($body['ticket'])
-                ? trim($body['ticket']) : null,
-            'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
-                ? trim($body['ticketUrl']) : null,
-        ]));
-
-        $trip = $this->tripRepo->findById($id);
-        return ResponseFactory::json(['data' => $trip], 201, $response);
     }
 
     public function updateTrip(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $id = $args['id'];
-        $body = $request->getParsedBody();
+        $user = $this->requireUser($request);
 
-        $trip = $this->tripRepo->findById($id);
-        if ($trip === null) {
-            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        try {
+            $trip = $this->travelService->updateTrip($user, $args['id'], $this->parsedBody($request));
+            return ResponseFactory::json(['data' => $trip], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $data = [];
-        if (isset($body['name'])) {
-            $name = trim((string) $body['name']);
-            if ($name === '') {
-                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
-            }
-            $data['name'] = $name;
-        }
-        if (isset($body['description'])) {
-            $data['description'] = is_string($body['description'])
-                ? trim($body['description']) : null;
-        }
-        if ($this->hasTimingFields($body)) {
-            try {
-                $data = array_merge($data, $this->timingFromBody(
-                    $body,
-                    (int) ($trip['allDay'] ?? 0) === 1,
-                ));
-            } catch (\InvalidArgumentException $e) {
-                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
-            }
-        }
-        if (isset($body['hastickets'])) {
-            $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
-        }
-        if (isset($body['ticket'])) {
-            $data['ticket'] = is_string($body['ticket'])
-                ? trim($body['ticket']) : null;
-        }
-        if (isset($body['ticketUrl'])) {
-            $data['ticketUrl'] = is_string($body['ticketUrl'])
-                ? trim($body['ticketUrl']) : null;
-        }
-
-        if ($data === []) {
-            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
-        }
-
-        $changedFields = $this->detectTripChanges($trip, $data);
-
-        $this->tripRepo->update($id, $data);
-        $updated = $this->tripRepo->findById($id);
-
-        if ($changedFields !== []) {
-            $this->notifyTripInfoChanged($id, $changedFields, $request);
-        }
-
-        return ResponseFactory::json(['data' => $updated], 200, $response);
     }
 
     public function deleteTrip(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $id = $args['id'];
+        $user = $this->requireUser($request);
 
-        $trip = $this->tripRepo->findById($id);
-        if ($trip === null) {
-            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        try {
+            $this->travelService->deleteTrip($user, $args['id']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $this->travelChatService->deleteForTrip($id);
-        $this->tripRepo->delete($id);
-        return ResponseFactory::noContent($response);
     }
 
     public function createEvent(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $this->requireUser($request);
-        $body = $request->getParsedBody();
-
-        $name = trim((string) ($body['name'] ?? ''));
-        if ($name === '') {
-            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
-        }
-
-        $allDay = !empty($body['allDay']) ? (bool) $body['allDay'] : false;
-        try {
-            $timing = $this->timingFromBody($body, $allDay);
-        } catch (\InvalidArgumentException $e) {
-            return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
-        }
-
-        $tripId = isset($body['trip']) && is_string($body['trip']) && $body['trip'] !== ''
+        $user = $this->requireUser($request);
+        $body = $this->parsedBody($request);
+        $tripId = isset($body['trip']) && is_string($body['trip']) && trim($body['trip']) !== ''
             ? trim($body['trip']) : null;
 
-        $image = isset($body['image']) && $this->isValidImageData($body['image'])
-            ? $body['image'] : null;
-        if ($image !== null) {
-            try {
-                $image = $this->imageService->validate($image, 500 * 1024, 2000, 3.5);
-            } catch (\InvalidArgumentException $e) {
-                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
-            }
+        try {
+            $event = $tripId !== null
+                ? $this->travelService->createTripEvent($user, $tripId, $body)
+                : $this->travelService->createStandaloneEvent($user, $body);
+            return ResponseFactory::json(['data' => $event], 201, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $id = $this->eventRepo->create(array_merge($timing, [
-            'trip' => $tripId,
-            'name' => $name,
-            'description' => isset($body['description']) && is_string($body['description'])
-                ? trim($body['description']) : null,
-            'hastickets' => !empty($body['hastickets']) ? '1' : '0',
-            'ticket' => isset($body['ticket']) && is_string($body['ticket'])
-                ? trim($body['ticket']) : null,
-            'ticketUrl' => isset($body['ticketUrl']) && is_string($body['ticketUrl'])
-                ? trim($body['ticketUrl']) : null,
-            'url' => isset($body['url']) && is_string($body['url'])
-                ? trim($body['url']) : null,
-            'image' => $image,
-            'organizer' => isset($body['organizer']) && is_string($body['organizer'])
-                ? trim($body['organizer']) : null,
-            'address' => isset($body['address']) && is_string($body['address'])
-                ? trim($body['address']) : null,
-            'latitude' => isset($body['latitude']) && $body['latitude'] !== ''
-                ? (float) $body['latitude'] : null,
-            'longitude' => isset($body['longitude']) && $body['longitude'] !== ''
-                ? (float) $body['longitude'] : null,
-            'OSMID' => isset($body['OSMID']) && $body['OSMID'] !== ''
-                ? (int) $body['OSMID'] : null,
-            'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
-                ? trim($body['citySlug']) : null,
-        ]));
-
-        $event = $this->eventRepo->findById($id);
-
-        if ($tripId !== null) {
-            $this->notifyTripEventAdded($tripId, $event);
-        }
-
-        return ResponseFactory::json(['data' => $event], 201, $response);
     }
 
     public function updateEvent(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $id = $args['id'];
-        $body = $request->getParsedBody();
-
-        $event = $this->eventRepo->findById($id);
+        $user = $this->requireUser($request);
+        $event = $this->eventRepo->findById($args['id']);
         if ($event === null) {
             return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
         }
 
-        $data = [];
-        if (isset($body['name'])) {
-            $name = trim((string) $body['name']);
-            if ($name === '') {
-                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
-            }
-            $data['name'] = $name;
-        }
-        if (isset($body['description'])) {
-            $data['description'] = is_string($body['description'])
-                ? trim($body['description']) : null;
-        }
-        if ($this->hasTimingFields($body)) {
-            try {
-                $data = array_merge($data, $this->timingFromBody(
-                    $body,
-                    (int) ($event['allDay'] ?? 0) === 1,
-                ));
-            } catch (\InvalidArgumentException $e) {
-                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
-            }
-        }
-        $stringFields = ['ticket', 'ticketUrl', 'url', 'image', 'organizer', 'address'];
-        foreach ($stringFields as $field) {
-            if (isset($body[$field])) {
-                $data[$field] = is_string($body[$field])
-                    ? trim($body[$field]) : null;
-            }
-        }
-        if (isset($body['trip'])) {
-            $data['trip'] = is_string($body['trip']) && $body['trip'] !== ''
-                ? trim($body['trip']) : null;
-        }
-        if (isset($body['hastickets'])) {
-            $data['hastickets'] = !empty($body['hastickets']) ? '1' : '0';
-        }
-        if (isset($body['latitude'])) {
-            $data['latitude'] = $body['latitude'] !== ''
-                ? (float) $body['latitude'] : null;
-        }
-        if (isset($body['longitude'])) {
-            $data['longitude'] = $body['longitude'] !== ''
-                ? (float) $body['longitude'] : null;
-        }
-        if (isset($body['OSMID'])) {
-            $data['OSMID'] = $body['OSMID'] !== ''
-                ? (int) $body['OSMID'] : null;
-        }
-        if (isset($body['citySlug'])) {
-            $data['citySlug'] = is_string($body['citySlug'])
-                ? trim($body['citySlug']) : null;
-        }
+        $body = $this->parsedBody($request);
+        $tripId = $event['trip'] ?? null;
 
-        if (isset($data['image']) && $this->isValidImageData($data['image'])) {
-            try {
-                $data['image'] = $this->imageService->validate($data['image'], 500 * 1024, 2000, 3.5);
-            } catch (\InvalidArgumentException $e) {
-                return ResponseFactory::json(['error' => $e->getMessage()], 400, $response);
-            }
-        } elseif (isset($data['image'])) {
-            $data['image'] = null;
+        try {
+            $updated = $tripId !== null
+                ? $this->travelService->updateTripEvent($user, $tripId, $args['id'], $body)
+                : $this->travelService->updateStandaloneEvent($user, $args['id'], $body);
+            return ResponseFactory::json(['data' => $updated], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        if ($data === []) {
-            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
-        }
-
-        $changedFields = $this->detectEventChanges($event, $data);
-
-        $this->eventRepo->update($id, $data);
-        $updated = $this->eventRepo->findById($id);
-
-        if ($changedFields !== []) {
-            $this->notifyEventInfoChanged($event, $changedFields, $request);
-        }
-
-        return ResponseFactory::json(['data' => $updated], 200, $response);
     }
 
     public function deleteEvent(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $id = $args['id'];
-
-        $event = $this->eventRepo->findById($id);
+        $user = $this->requireUser($request);
+        $event = $this->eventRepo->findById($args['id']);
         if ($event === null) {
             return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
         }
 
-        $this->travelChatService->deleteForEvent($id);
-        $this->eventRepo->delete($id);
-        return ResponseFactory::noContent($response);
+        try {
+            $tripId = $event['trip'] ?? null;
+            if ($tripId !== null) {
+                $this->travelService->deleteTripEvent($user, $tripId, $args['id']);
+            } else {
+                $this->travelService->deleteStandaloneEvent($user, $args['id']);
+            }
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
     }
 
     public function createTripChat(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -914,10 +735,18 @@ ROW;
                 $selected = $aId === $currentAccId ? ' selected' : '';
                 $options .= "<option value=\"{$aId}\"{$selected}>{$aName}</option>";
             }
+            $pRole = ($p['role'] ?? 'participant') === 'leader' ? 'leader' : 'participant';
+            $roleOptions = '<option value="participant"' . ($pRole === 'participant' ? ' selected' : '') . '>Teilnehmer</option>'
+                . '<option value="leader"' . ($pRole === 'leader' ? ' selected' : '') . '>Reiseleiter</option>';
             $participantRows .= <<<ROW
             <tr>
                 <td>{$pName}</td>
                 <td>{$pEmail}</td>
+                <td>
+                    <select onchange="changeParticipantRole('{$pUserId}', this)" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.3rem;">
+                        {$roleOptions}
+                    </select>
+                </td>
                 <td>
                     <select onchange="changeAccommodation('{$pUserId}', this)" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.3rem;max-width:180px;">
                         {$options}
@@ -1140,56 +969,49 @@ HTML;
 
     public function addTripParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $tripId = $args['id'];
-        $body = $request->getParsedBody();
+        $user = $this->requireUser($request);
+        $body = $this->parsedBody($request);
 
         $userId = trim((string) ($body['userId'] ?? ''));
         if ($userId === '') {
             return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
         }
 
-        $trip = $this->tripRepo->findById($tripId);
-        if ($trip === null) {
-            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
-        }
-
-        $user = $this->userRepo->findById($userId);
-        if ($user === null) {
-            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
-        }
-
-        if ($this->travelRelationRepo->isParticipant($userId, $tripId)) {
-            return ResponseFactory::json(['error' => 'already_participant'], 409, $response);
-        }
-
         $accommodation = isset($body['accommodation']) && is_string($body['accommodation']) && $body['accommodation'] !== ''
             ? trim($body['accommodation']) : null;
 
-        $relationId = $this->travelRelationRepo->addParticipant($userId, $tripId, $accommodation);
-
-        $this->travelChatService->syncTripMembers($tripId);
-
-        $this->notifyTripUserAdded($tripId, $userId, $request);
-
-        return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
+        try {
+            $relationId = $this->travelService->addParticipant($user, $args['id'], $userId, $accommodation);
+            return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
     }
 
     public function removeTripParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $tripId = $args['id'];
-        $userId = $args['userId'];
+        $user = $this->requireUser($request);
 
-        if (!$this->travelRelationRepo->isParticipant($userId, $tripId)) {
-            return ResponseFactory::json(['error' => 'not_a_participant'], 404, $response);
+        try {
+            $this->travelService->removeParticipant($user, $args['id'], $args['userId']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
+    }
 
-        $this->travelRelationRepo->removeByUserAndTrip($userId, $tripId);
+    public function setTripParticipantRole(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $this->parsedBody($request);
+        $role = trim((string) ($body['role'] ?? ''));
 
-        $this->travelChatService->syncTripMembers($tripId);
-
-        return ResponseFactory::noContent($response);
+        try {
+            $this->travelService->setParticipantRole($user, $args['id'], $args['userId'], $role);
+            return ResponseFactory::json(['message' => 'role_updated'], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
     }
 
     public function updateParticipantAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -1217,104 +1039,38 @@ HTML;
 
     public function createTripAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $body = $request->getParsedBody();
+        $user = $this->requireUser($request);
 
-        $name = trim((string) ($body['name'] ?? ''));
-        if ($name === '') {
-            return ResponseFactory::json(['error' => 'name_required'], 400, $response);
+        try {
+            $accommodation = $this->travelService->createAccommodation($user, $args['id'], $this->parsedBody($request));
+            return ResponseFactory::json(['data' => $accommodation], 201, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $id = $this->accommodationRepo->create([
-            'name' => $name,
-            'description' => isset($body['description']) && is_string($body['description'])
-                ? trim($body['description']) : null,
-            'address' => isset($body['address']) && is_string($body['address'])
-                ? trim($body['address']) : null,
-            'OSMID' => isset($body['OSMID']) && $body['OSMID'] !== ''
-                ? (int) $body['OSMID'] : null,
-            'latitude' => isset($body['latitude']) && $body['latitude'] !== ''
-                ? (float) $body['latitude'] : null,
-            'longitude' => isset($body['longitude']) && $body['longitude'] !== ''
-                ? (float) $body['longitude'] : null,
-            'phone' => isset($body['phone']) && is_string($body['phone'])
-                ? trim($body['phone']) : null,
-            'mail' => isset($body['mail']) && is_string($body['mail'])
-                ? trim($body['mail']) : null,
-            'ishotel' => !empty($body['ishotel']) ? 1 : 0,
-            'citySlug' => isset($body['citySlug']) && is_string($body['citySlug'])
-                ? trim($body['citySlug']) : null,
-        ]);
-
-        $accommodation = $this->accommodationRepo->findById($id);
-        return ResponseFactory::json(['data' => $accommodation], 201, $response);
     }
 
     public function updateTripAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $id = $args['accId'];
-        $body = $request->getParsedBody();
+        $user = $this->requireUser($request);
 
-        $accommodation = $this->accommodationRepo->findById($id);
-        if ($accommodation === null) {
-            return ResponseFactory::json(['error' => 'accommodation_not_found'], 404, $response);
+        try {
+            $accommodation = $this->travelService->updateAccommodation($user, $args['id'], $args['accId'], $this->parsedBody($request));
+            return ResponseFactory::json(['data' => $accommodation], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $data = [];
-        if (isset($body['name'])) {
-            $name = trim((string) $body['name']);
-            if ($name === '') {
-                return ResponseFactory::json(['error' => 'name_required'], 400, $response);
-            }
-            $data['name'] = $name;
-        }
-        $stringFields = ['description', 'address', 'phone', 'mail'];
-        foreach ($stringFields as $field) {
-            if (isset($body[$field])) {
-                $data[$field] = is_string($body[$field])
-                    ? trim($body[$field]) : null;
-            }
-        }
-        if (isset($body['OSMID'])) {
-            $data['OSMID'] = $body['OSMID'] !== '' ? (int) $body['OSMID'] : null;
-        }
-        if (isset($body['latitude'])) {
-            $data['latitude'] = $body['latitude'] !== '' ? (float) $body['latitude'] : null;
-        }
-        if (isset($body['longitude'])) {
-            $data['longitude'] = $body['longitude'] !== '' ? (float) $body['longitude'] : null;
-        }
-        if (isset($body['ishotel'])) {
-            $data['ishotel'] = !empty($body['ishotel']) ? 1 : 0;
-        }
-        if (isset($body['citySlug'])) {
-            $data['citySlug'] = is_string($body['citySlug'])
-                ? trim($body['citySlug']) : null;
-        }
-
-        if ($data === []) {
-            return ResponseFactory::json(['error' => 'no_fields_to_update'], 400, $response);
-        }
-
-        $this->accommodationRepo->update($id, $data);
-        $updated = $this->accommodationRepo->findById($id);
-
-        return ResponseFactory::json(['data' => $updated], 200, $response);
     }
 
     public function deleteTripAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $id = $args['accId'];
+        $user = $this->requireUser($request);
 
-        $accommodation = $this->accommodationRepo->findById($id);
-        if ($accommodation === null) {
-            return ResponseFactory::json(['error' => 'accommodation_not_found'], 404, $response);
+        try {
+            $this->travelService->deleteAccommodation($user, $args['id'], $args['accId']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $this->accommodationRepo->delete($id);
-        return ResponseFactory::noContent($response);
     }
 
     public function eventDetail(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -1330,6 +1086,7 @@ HTML;
 
         $participants = $this->eventRelationRepo->findByEvent($id);
         $participantCount = count($participants);
+        $isStandaloneEvent = ($event['trip'] ?? null) === null;
 
         $participantRows = '';
         foreach ($participants as $p) {
@@ -1337,11 +1094,20 @@ HTML;
             $pName = htmlspecialchars($p['displayName']);
             $pEmail = htmlspecialchars($p['email']);
             $pCreatedAt = date('d.m.Y H:i', strtotime($p['createdAt']));
+            $pRole = ($p['role'] ?? 'participant') === 'leader' ? 'leader' : 'participant';
+            $roleCell = '<span style="color:#888;">–</span>';
+            if ($isStandaloneEvent) {
+                $roleCell = '<select onchange="changeParticipantRole(\'' . $pUserId . '\', this)" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.3rem;">'
+                    . '<option value="participant"' . ($pRole === 'participant' ? ' selected' : '') . '>Teilnehmer</option>'
+                    . '<option value="leader"' . ($pRole === 'leader' ? ' selected' : '') . '>Veranstalter</option>'
+                    . '</select>';
+            }
             $participantRows .= <<<ROW
             <tr>
                 <td>{$pName}</td>
                 <td>{$pEmail}</td>
                 <td>{$pCreatedAt}</td>
+                <td>{$roleCell}</td>
                 <td>
                     <button class="btn btn-sm btn-danger" onclick="removeParticipant('{$pUserId}', '{$pName}')">Entfernen</button>
                 </td>
@@ -1504,45 +1270,62 @@ HTML;
 
     public function addEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $eventId = $args['id'];
-        $body = $request->getParsedBody();
+        $user = $this->requireUser($request);
+        $body = $this->parsedBody($request);
 
         $userId = trim((string) ($body['userId'] ?? ''));
         if ($userId === '') {
             return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
         }
 
-        $event = $this->eventRepo->findById($eventId);
-        if ($event === null) {
-            return ResponseFactory::json(['error' => 'event_not_found'], 404, $response);
+        try {
+            $relationId = $this->travelService->addEventParticipant($user, $args['id'], $userId);
+            return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
         }
-
-        $user = $this->userRepo->findById($userId);
-        if ($user === null) {
-            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
-        }
-
-        $relationId = $this->eventRelationRepo->addParticipant($eventId, $userId);
-
-        $this->travelChatService->syncEventMembers($eventId);
-
-        $this->notifyEventUserAdded($event, $userId, $request);
-
-        return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
     }
 
     public function removeEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $this->requireUser($request);
-        $eventId = $args['id'];
-        $userId = $args['userId'];
+        $user = $this->requireUser($request);
 
-        $this->eventRelationRepo->removeByEventAndUser($eventId, $userId);
+        try {
+            $this->travelService->removeEventParticipant($user, $args['id'], $args['userId']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
+    }
 
-        $this->travelChatService->syncEventMembers($eventId);
+    public function setEventParticipantRole(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $this->parsedBody($request);
+        $role = trim((string) ($body['role'] ?? ''));
 
-        return ResponseFactory::noContent($response);
+        try {
+            $this->travelService->setStandaloneEventParticipantRole($user, $args['id'], $args['userId'], $role);
+            return ResponseFactory::json(['message' => 'role_updated'], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
+    }
+
+    public function convertEventTrip(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $this->parsedBody($request);
+
+        $targetTripId = isset($body['trip']) && is_string($body['trip']) && trim($body['trip']) !== ''
+            ? trim($body['trip']) : null;
+
+        try {
+            $event = $this->travelService->convertEvent($user, $args['id'], $targetTripId);
+            return ResponseFactory::json(['data' => $event], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
     }
 
     public function recipes(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -2935,96 +2718,6 @@ ROW;
     }
 
     /**
-     * Prueft, ob der Request Timing-Felder enthaelt. Reine Verknuepfungs-
-     * Updates (z. B. Event einer Reise zuordnen) duerfen die Zeit nicht
-     * anfassen.
-     *
-     * @param array<string, mixed> $body
-     */
-    private function hasTimingFields(array $body): bool
-    {
-        foreach (['allDay', 'timezone', 'startAt', 'endAt', 'startDate', 'endDate'] as $field) {
-            if (array_key_exists($field, $body)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Baut die kanonischen Timing-Felder fuer Reise-/Event-Schreiboperationen.
-     * Getaktete Werte kommen als RFC 3339 (aus dem Admin-Formular in UTC
-     * umgerechnet), ganztägige als zivile Tage.
-     *
-     * @param array<string, mixed> $body
-     * @return array<string, mixed>
-     * @throws \InvalidArgumentException mit einem API-Fehlercode als Message
-     */
-    private function timingFromBody(array $body, bool $defaultAllDay = false): array
-    {
-        $allDay = array_key_exists('allDay', $body) ? (bool) $body['allDay'] : $defaultAllDay;
-
-        try {
-            $timezone = DateTimeValue::normalizeTimeZone(
-                isset($body['timezone']) && is_string($body['timezone']) ? $body['timezone'] : null,
-            );
-        } catch (\InvalidArgumentException) {
-            throw new \InvalidArgumentException('invalid_timezone');
-        }
-
-        if ($allDay) {
-            $startDate = trim((string) ($body['startDate'] ?? ''));
-            $endDate = trim((string) ($body['endDate'] ?? ''));
-            if ($startDate === '' || $endDate === '') {
-                throw new \InvalidArgumentException('date_required');
-            }
-            try {
-                $start = DateTimeValue::parseDate($startDate);
-                $end = DateTimeValue::parseDate($endDate);
-            } catch (\InvalidArgumentException) {
-                throw new \InvalidArgumentException('invalid_date');
-            }
-            if ($end < $start) {
-                throw new \InvalidArgumentException('invalid_time_range');
-            }
-
-            return [
-                'allDay' => 1,
-                'timezone' => $timezone,
-                'startDate' => DateTimeValue::formatDate($start),
-                'endDate' => DateTimeValue::formatDate($end),
-                'startAt' => null,
-                'endAt' => null,
-            ];
-        }
-
-        $startAt = trim((string) ($body['startAt'] ?? ''));
-        $endAt = trim((string) ($body['endAt'] ?? ''));
-        if ($startAt === '' || $endAt === '') {
-            throw new \InvalidArgumentException('time_required');
-        }
-        try {
-            $start = DateTimeValue::parseInstant($startAt);
-            $end = DateTimeValue::parseInstant($endAt);
-        } catch (\InvalidArgumentException) {
-            throw new \InvalidArgumentException('invalid_datetime');
-        }
-        if ($end <= $start) {
-            throw new \InvalidArgumentException('invalid_time_range');
-        }
-
-        return [
-            'allDay' => 0,
-            'timezone' => $timezone,
-            'startAt' => DateTimeValue::toDatabase($start),
-            'endAt' => DateTimeValue::toDatabase($end),
-            'startDate' => null,
-            'endDate' => null,
-        ];
-    }
-
-    /**
      * Liefert die Zeitzonen-Auswahlliste fuer die Admin-Formulare.
      */
     private function timezoneOptions(string $selected): string
@@ -3051,115 +2744,17 @@ ROW;
         return $user;
     }
 
-    private function notifyTripUserAdded(string $tripId, string $addedUserId, ServerRequestInterface $request): void
+    /** @return array<string, mixed> */
+    private function parsedBody(ServerRequestInterface $request): array
     {
-        $trip = $this->tripRepo->findById($tripId);
-        if ($trip === null) {
-            return;
-        }
-
-        $addedUser = $this->userRepo->findById($addedUserId);
-        if ($addedUser === null) {
-            return;
-        }
-
-        $adminUser = $this->requireUser($request);
-
-        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
-        foreach ($participants as $participant) {
-            if ($participant['id'] === $addedUserId) {
-                $this->notificationService->create(
-                    userId: $addedUserId,
-                    type: 'trip_user_added',
-                    title: '',
-                    body: '',
-                    data: [
-                        ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
-                        ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
-                        ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
-                    ],
-                );
-            } else {
-                $this->notificationService->create(
-                    userId: $participant['id'],
-                    type: 'trip_user_added_others',
-                    title: '',
-                    body: '',
-                    data: [
-                        ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
-                        ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
-                        ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
-                    ],
-                );
-            }
-        }
+        $body = $request->getParsedBody();
+        return is_array($body) ? $body : [];
     }
 
-    private function notifyEventUserAdded(array $event, string $addedUserId, ServerRequestInterface $request): void
+    private function travelErrorResponse(\RuntimeException $e, ResponseInterface $response): ResponseInterface
     {
-        $addedUser = $this->userRepo->findById($addedUserId);
-        if ($addedUser === null) {
-            return;
-        }
-
-        $adminUser = $this->requireUser($request);
-        $isTripEvent = $event['trip'] !== null;
-
-        $participants = $this->eventRelationRepo->findByEvent($event['ID']);
-        foreach ($participants as $participant) {
-            if ($participant['userId'] === $addedUserId) {
-                $type = $isTripEvent ? 'trip_event_user_added' : 'standalone_event_user_added';
-                $data = [
-                    ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
-                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
-                    ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
-                ];
-                if ($isTripEvent) {
-                    $data[] = ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $event['trip']];
-                }
-                $this->notificationService->create(
-                    userId: $addedUserId,
-                    type: $type,
-                    title: '',
-                    body: '',
-                    data: $data,
-                );
-            } else {
-                $type = $isTripEvent ? 'trip_event_user_added_others' : 'standalone_event_user_added_others';
-                $data = [
-                    ['relation' => 'added_user', 'object' => 'User', 'identifier' => $addedUserId],
-                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
-                    ['relation' => 'added_by', 'object' => 'User', 'identifier' => $adminUser->id],
-                ];
-                if ($isTripEvent) {
-                    $data[] = ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $event['trip']];
-                }
-                $this->notificationService->create(
-                    userId: $participant['userId'],
-                    type: $type,
-                    title: '',
-                    body: '',
-                    data: $data,
-                );
-            }
-        }
-    }
-
-    private function notifyTripEventAdded(string $tripId, array $event): void
-    {
-        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
-        foreach ($participants as $participant) {
-            $this->notificationService->create(
-                userId: $participant['id'],
-                type: 'trip_event_added',
-                title: '',
-                body: '',
-                data: [
-                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
-                    ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
-                ],
-            );
-        }
+        [$code, $status] = TravelError::resolve($e->getMessage());
+        return ResponseFactory::json(['error' => $code], $status, $response);
     }
 
     private function notifyTicketAdded(array $ticket, ServerRequestInterface $request): void
@@ -3241,135 +2836,6 @@ ROW;
                 ['relation' => 'user', 'object' => 'User', 'identifier' => $userId],
             ],
         );
-    }
-
-    /**
-     * @param array<string, mixed> $oldTrip
-     * @param array<string, mixed> $newData
-     * @return list<string>
-     */
-    private function detectTripChanges(array $oldTrip, array $newData): array
-    {
-        $fieldLabels = [
-            'name' => 'Name',
-            'description' => 'Beschreibung',
-            'startAt' => 'Startzeitpunkt',
-            'endAt' => 'Endzeitpunkt',
-            'startDate' => 'Startdatum',
-            'endDate' => 'Enddatum',
-            'timezone' => 'Zeitzone',
-            'allDay' => 'Ganztägig',
-            'hastickets' => 'Ticket-Status',
-            'ticket' => 'Ticket-Informationen',
-            'ticketUrl' => 'Ticket-URL',
-        ];
-
-        $changed = [];
-        foreach ($newData as $field => $newValue) {
-            if (!isset($fieldLabels[$field])) {
-                continue;
-            }
-            $oldValue = $oldTrip[$field] ?? null;
-            if ($oldValue != $newValue) {
-                $changed[] = $fieldLabels[$field];
-            }
-        }
-
-        return $changed;
-    }
-
-    /**
-     * @param array<string, mixed> $oldEvent
-     * @param array<string, mixed> $newData
-     * @return list<string>
-     */
-    private function detectEventChanges(array $oldEvent, array $newData): array
-    {
-        $fieldLabels = [
-            'name' => 'Name',
-            'description' => 'Beschreibung',
-            'startAt' => 'Startzeitpunkt',
-            'endAt' => 'Endzeitpunkt',
-            'startDate' => 'Startdatum',
-            'endDate' => 'Enddatum',
-            'timezone' => 'Zeitzone',
-            'allDay' => 'Ganztägig',
-            'hastickets' => 'Ticket-Status',
-            'ticket' => 'Ticket-Informationen',
-            'ticketUrl' => 'Ticket-URL',
-            'url' => 'URL',
-            'image' => 'Bild',
-            'organizer' => 'Veranstalter',
-            'address' => 'Adresse',
-            'citySlug' => 'City-Slug',
-        ];
-
-        $changed = [];
-        foreach ($newData as $field => $newValue) {
-            if (!isset($fieldLabels[$field])) {
-                continue;
-            }
-            $oldValue = $oldEvent[$field] ?? null;
-            if ($oldValue != $newValue) {
-                $changed[] = $fieldLabels[$field];
-            }
-        }
-
-        return $changed;
-    }
-
-    /**
-     * @param list<string> $changedFields
-     */
-    private function notifyTripInfoChanged(string $tripId, array $changedFields, ServerRequestInterface $request): void
-    {
-        $changedBy = $this->requireUser($request);
-        $fieldsString = implode(', ', $changedFields);
-
-        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
-        foreach ($participants as $participant) {
-            $this->notificationService->create(
-                userId: $participant['id'],
-                type: 'trip_info_changed',
-                title: '',
-                body: '',
-                data: [
-                    ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
-                    ['relation' => 'changed_by', 'object' => 'User', 'identifier' => $changedBy->id],
-                    ['relation' => 'changed_fields', 'object' => 'FieldList', 'identifier' => $fieldsString],
-                ],
-            );
-        }
-    }
-
-    /**
-     * @param list<string> $changedFields
-     */
-    private function notifyEventInfoChanged(array $event, array $changedFields, ServerRequestInterface $request): void
-    {
-        $changedBy = $this->requireUser($request);
-        $fieldsString = implode(', ', $changedFields);
-        $isTripEvent = $event['trip'] !== null;
-
-        $participants = $this->eventRelationRepo->findByEvent($event['ID']);
-        foreach ($participants as $participant) {
-            $type = $isTripEvent ? 'trip_event_info_changed' : 'standalone_event_info_changed';
-            $data = [
-                ['relation' => 'event', 'object' => 'Event', 'identifier' => $event['ID']],
-                ['relation' => 'changed_by', 'object' => 'User', 'identifier' => $changedBy->id],
-                ['relation' => 'changed_fields', 'object' => 'FieldList', 'identifier' => $fieldsString],
-            ];
-            if ($isTripEvent) {
-                $data[] = ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $event['trip']];
-            }
-            $this->notificationService->create(
-                userId: $participant['userId'],
-                type: $type,
-                title: '',
-                body: '',
-                data: $data,
-            );
-        }
     }
 
     private function notifyTripSubscriptionAdded(string $tripId, string $subscriptionId): void

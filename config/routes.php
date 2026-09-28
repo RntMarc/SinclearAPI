@@ -160,10 +160,17 @@ return function (App $app): void {
 
     $app->group('/trips', function (RouteCollectorProxy $group) {
         $group->get('', [TravelController::class, 'listTrips']);
+        $group->post('', [TravelController::class, 'createTrip']);
 
         // Standalone-Events MUST come before /{id} to avoid route capture
         $group->get('/standaloneevents', [TravelController::class, 'listStandaloneEvents']);
+        $group->post('/standaloneevents', [TravelController::class, 'createStandaloneEvent']);
         $group->get('/standaloneevents/{eventId}', [TravelController::class, 'getStandaloneEvent']);
+        $group->patch('/standaloneevents/{eventId}', [TravelController::class, 'updateStandaloneEvent']);
+        $group->delete('/standaloneevents/{eventId}', [TravelController::class, 'deleteStandaloneEvent']);
+        $group->post('/standaloneevents/{eventId}/participants', [TravelController::class, 'addStandaloneEventParticipant']);
+        $group->delete('/standaloneevents/{eventId}/participants/{userId}', [TravelController::class, 'removeStandaloneEventParticipant']);
+        $group->put('/standaloneevents/{eventId}/participants/{userId}/role', [TravelController::class, 'setStandaloneEventParticipantRole']);
 
         // Ticket routes (static routes MUST come before parameterized routes)
         $group->get('/tickets/user', [TravelController::class, 'listUserTickets']);
@@ -177,12 +184,23 @@ return function (App $app): void {
         $group->get('/events/{eventId}/tickets', [TravelController::class, 'listEventTickets']);
 
         $group->get('/{id}', [TravelController::class, 'getTrip']);
+        $group->patch('/{id}', [TravelController::class, 'updateTrip']);
+        $group->delete('/{id}', [TravelController::class, 'deleteTrip']);
         $group->get('/{id}/events', [TravelController::class, 'listEvents']);
+        $group->post('/{id}/events', [TravelController::class, 'createTripEvent']);
         $group->get('/{id}/events/{eventId}', [TravelController::class, 'getEvent']);
+        $group->patch('/{id}/events/{eventId}', [TravelController::class, 'updateTripEvent']);
+        $group->delete('/{id}/events/{eventId}', [TravelController::class, 'deleteTripEvent']);
         $group->get('/{id}/tickets', [TravelController::class, 'listTripTickets']);
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
+        $group->post('/{id}/accommodations', [TravelController::class, 'createAccommodation']);
         $group->get('/{id}/accommodations/{accommodationId}', [TravelController::class, 'getAccommodation']);
+        $group->patch('/{id}/accommodations/{accommodationId}', [TravelController::class, 'updateAccommodation']);
+        $group->delete('/{id}/accommodations/{accommodationId}', [TravelController::class, 'deleteAccommodation']);
         $group->get('/{id}/participants', [TravelController::class, 'listParticipants']);
+        $group->post('/{id}/participants', [TravelController::class, 'addTripParticipant']);
+        $group->delete('/{id}/participants/{userId}', [TravelController::class, 'removeTripParticipant']);
+        $group->put('/{id}/participants/{userId}/role', [TravelController::class, 'setTripParticipantRole']);
         $group->get('/{id}/subscriptions', [TravelController::class, 'getTripSubscriptions']);
     })->add($container->get(AuthenticationMiddleware::class));
 
@@ -484,6 +502,7 @@ return function (App $app): void {
         $group->patch('/travel/trips/{id}/chat', [AdminController::class, 'updateTripChatImage']);
         $group->post('/travel/trips/{id}/participants', [AdminController::class, 'addTripParticipant']);
         $group->delete('/travel/trips/{id}/participants/{userId}', [AdminController::class, 'removeTripParticipant']);
+        $group->put('/travel/trips/{id}/participants/{userId}/role', [AdminController::class, 'setTripParticipantRole']);
         $group->put('/travel/trips/{id}/participants/{userId}/accommodation', [AdminController::class, 'updateParticipantAccommodation']);
         $group->put('/travel/trips/{id}/forum', [AdminController::class, 'linkTripForum']);
         $group->post('/travel/trips/{id}/subscriptions', [AdminController::class, 'linkTripSubscription']);
@@ -500,6 +519,8 @@ return function (App $app): void {
         $group->patch('/travel/events/{id}/chat', [AdminController::class, 'updateEventChatImage']);
         $group->post('/travel/events/{id}/participants', [AdminController::class, 'addEventParticipant']);
         $group->delete('/travel/events/{id}/participants/{userId}', [AdminController::class, 'removeEventParticipant']);
+        $group->put('/travel/events/{id}/participants/{userId}/role', [AdminController::class, 'setEventParticipantRole']);
+        $group->patch('/travel/events/{id}/trip', [AdminController::class, 'convertEventTrip']);
         $group->post('/travel/tickets', [AdminController::class, 'createTicket']);
         $group->put('/travel/tickets/{id}', [AdminController::class, 'updateTicket']);
         $group->delete('/travel/tickets/{id}', [AdminController::class, 'deleteTicket']);
