@@ -241,11 +241,12 @@ while IFS= read -r line; do
         continue
     fi
 
-    # Fehlerbehandlung
+    # Fehlerbehandlung (bewusst enge Muster, damit Dateinamen wie
+    # "TravelError.php" oder git-Stat-Zeilen nicht als Fehler gelten)
     if [[ "$line" == "ERROR: "* ]]; then
         print_error "${line#"ERROR: "}"
         HAS_ERRORS=1
-    elif [[ "$line" == *"error:"* ]] || [[ "$line" == *"fatal:"* ]] || [[ "$line" == *"Error"* ]] || [[ "$line" == *"Exception"* ]]; then
+    elif [[ "$line" =~ ([Ee]rror:|[Ff]atal:|[Ff]atal[[:space:]]error|[Pp]arse[[:space:]]error|[Uu]ncaught|[Ss]tack[[:space:]]trace) ]]; then
         if [ $IN_GIT -eq 1 ]; then
             print_error "[git pull] $line"
         elif [ $IN_COMPOSER -eq 1 ]; then
