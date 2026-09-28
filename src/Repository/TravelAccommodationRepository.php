@@ -23,11 +23,11 @@ final readonly class TravelAccommodationRepository
         $stmt = $this->pdo->prepare(
             'SELECT DISTINCT a.*
              FROM TravelAccommodation a
-             JOIN TravelRelation r ON r.accommodation = a.ID
-             WHERE r.tripid = ?
+             LEFT JOIN TravelRelation r ON r.accommodation = a.ID
+             WHERE a.tripId = ? OR r.tripid = ?
              ORDER BY a.name ASC'
         );
-        $stmt->execute([$tripId]);
+        $stmt->execute([$tripId, $tripId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -42,13 +42,13 @@ final readonly class TravelAccommodationRepository
     public function findByIdAndTrip(string $id, string $tripId): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT a.*
+            'SELECT DISTINCT a.*
              FROM TravelAccommodation a
-             JOIN TravelRelation r ON r.accommodation = a.ID
-             WHERE a.ID = ? AND r.tripid = ?
+             LEFT JOIN TravelRelation r ON r.accommodation = a.ID
+             WHERE a.ID = ? AND (a.tripId = ? OR r.tripid = ?)
              LIMIT 1'
         );
-        $stmt->execute([$id, $tripId]);
+        $stmt->execute([$id, $tripId, $tripId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
@@ -70,8 +70,8 @@ final readonly class TravelAccommodationRepository
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelAccommodation (ID, name, description, address, OSMID, latitude, longitude, phone, mail, ishotel, citySlug)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelAccommodation (ID, name, description, address, OSMID, latitude, longitude, phone, mail, ishotel, citySlug, tripId)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -85,6 +85,7 @@ final readonly class TravelAccommodationRepository
             $data['mail'] ?? null,
             $data['ishotel'] ?? 0,
             $data['citySlug'] ?? null,
+            $data['tripId'] ?? null,
         ]);
         return $id;
     }

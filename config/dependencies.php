@@ -113,6 +113,7 @@ use Sinclear\Api\Repository\FeedPostCommentRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Repository\UserPreferenceRepository;
 use Sinclear\Api\Repository\UserWeatherLocationRepository;
+use Sinclear\Api\Services\UserWeatherLocationService;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
@@ -136,6 +137,8 @@ use Sinclear\Api\Services\DirectMessageService;
 use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Services\TravelChatService;
+use Sinclear\Api\Services\TravelNotificationService;
+use Sinclear\Api\Security\Policy\TravelPolicy;
 use Sinclear\Api\Services\PtService;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Services\SubscriptionService;
@@ -468,6 +471,8 @@ return [
 
     TravelService::class => autowire(),
     TravelChatService::class => autowire(),
+    TravelPolicy::class => autowire(),
+    TravelNotificationService::class => autowire(),
     TravelController::class => autowire(),
 
     PtStationRepository::class => autowire(),

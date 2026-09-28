@@ -164,7 +164,7 @@ final readonly class TravelEventRepository
     public function findParticipantsByEvent(string $eventId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT u.id, u.displayName, u.image
+            'SELECT u.id, u.displayName, u.image, r.role
              FROM EventRelation r
              JOIN User u ON u.id = r.userId
              WHERE r.eventId = ?

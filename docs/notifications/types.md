@@ -84,6 +84,36 @@ Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihr
 |------|---------|-----------|--------------------|-----------------------|----------------------|
 | `trip_subscription_added` | Abo wird mit einer Reise verknüpft | Alle Reise-Teilnehmer | `subscription` (Subscription), `trip` (Trip) | `Neues Abo verknüpft` | Dynamisch: `Das Abo "{subscription.name}" wurde mit der Reise "{trip.name}" verknüpft.` |
 
+## Reise-Rollen (Reiseleiter)
+
+| Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
+|------|---------|-----------|--------------------|-----------------------|----------------------|
+| `trip_leader_appointed` | Ein Reise-Teilnehmer wird zum Reiseleiter ernannt | Der ernannte Nutzer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Du bist jetzt Reiseleiter` | `''` |
+| `trip_leader_appointed_others` | Ein Reise-Teilnehmer wird zum Reiseleiter ernannt | Alle anderen Reise-Teilnehmer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Neuer Reiseleiter auf der Reise` | `''` |
+| `trip_leader_removed` | Die Reiseleiter-Rolle eines Teilnehmers wird entzogen | Der betroffene Nutzer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Du bist nicht mehr Reiseleiter` | `''` |
+| `trip_leader_removed_others` | Die Reiseleiter-Rolle eines Teilnehmers wird entzogen | Alle anderen Reise-Teilnehmer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Reiseleiter geändert` | `''` |
+
+## Event-Rollen (Veranstalter, nur Standalone-Events)
+
+| Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
+|------|---------|-----------|--------------------|-----------------------|----------------------|
+| `standalone_event_leader_appointed` | Ein Event-Teilnehmer wird zum Veranstalter ernannt | Der ernannte Nutzer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Du bist jetzt Veranstalter` | `''` |
+| `standalone_event_leader_appointed_others` | Ein Event-Teilnehmer wird zum Veranstalter ernannt | Alle anderen Event-Teilnehmer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Neuer Veranstalter beim Event` | `''` |
+| `standalone_event_leader_removed` | Die Veranstalter-Rolle eines Teilnehmers wird entzogen | Der betroffene Nutzer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Du bist nicht mehr Veranstalter` | `''` |
+| `standalone_event_leader_removed_others` | Die Veranstalter-Rolle eines Teilnehmers wird entzogen | Alle anderen Event-Teilnehmer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Veranstalter geändert` | `''` |
+
+## Event-Konversion (Reise ⇄ Standalone)
+
+| Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
+|------|---------|-----------|--------------------|-----------------------|----------------------|
+| `standalone_event_converted_to_trip` | Ein Standalone-Event wird an eine Reise angehängt | Event-Teilnehmer und Teilnehmer der Ziel-Reise (außer Auslöser) | `event` (Event), `trip` (Trip), `converted_by` (User) | `Event wurde zu einer Reise hinzugefügt` | `''` |
+| `trip_event_converted_to_standalone` | Ein Reise-Event wird zu einem Standalone-Event gelöst | Event-Teilnehmer und Teilnehmer der bisherigen Reise (außer Auslöser) | `event` (Event), `converted_by` (User) | `Event wurde von der Reise gelöst` | `''` |
+
+**Präferenzen:** Diese Typen werden auf die vereinheitlichten Schlüssel
+`trip_leader_changed`, `trip_leader_changed_others`, `event_leader_changed`,
+`event_leader_changed_others` und `event_converted` gemappt. Sie unterstützen
+kein `custom` (keine Denylist).
+
 ## Umfragen (Polls)
 
 Ausgelöst vom `PollService` bzw. `PollNotificationService`. Der Aufbau der

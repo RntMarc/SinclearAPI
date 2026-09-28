@@ -49,6 +49,7 @@ Nicht-Admins erhalten einen 403-Fehler.
 ### Reisedetail (`/travel/trips/{id}`) – **voll implementiert**
 - Zeigt Reiseinformationen, Teilnehmer, Unterkünfte und zugehörige Events
 - Teilnehmer können hinzugefügt und entfernt werden
+- Rolle pro Teilnehmer setzbar (**Reiseleiter** / Teilnehmer); der letzte Reiseleiter ist geschützt
 - Unterkunftszuweisung pro Teilnehmer änderbar
 - Unterkünfte können erstellt, bearbeitet und gelöscht werden
 - Dropdown mit allen registrierten Nutzern zum Hinzufügen
@@ -61,6 +62,8 @@ Nicht-Admins erhalten einen 403-Fehler.
 ### Eventdetail (`/travel/events/{id}`) – **voll implementiert**
 - Zeigt Eventinformationen und Teilnehmer
 - Teilnehmer können hinzugefügt und entfernt werden
+- Bei Standalone-Events: Veranstalter-Rolle pro Teilnehmer setzbar (letzter Veranstalter geschützt)
+- Reise-Zuordnung (Konversion Standalone ⇄ Reise) über das Bearbeiten-Formular
 - Dropdown mit allen registrierten Nutzern zum Hinzufügen
 
 ### Moderations-Anfragen (`/moderation-requests`) – **voll implementiert**
@@ -117,7 +120,8 @@ Nicht-Admins erhalten einen 403-Fehler.
 | DELETE | `/admin/travel/events/{id}` | Event löschen (geschützt) |
 | GET | `/admin/travel/trips/{id}` | Reisedetail-Seite mit Teilnehmern, Unterkünften, Events (geschützt) |
 | POST | `/admin/travel/trips/{id}/participants` | Teilnehmer zu Reise hinzufügen (geschützt) |
-| DELETE | `/admin/travel/trips/{id}/participants/{userId}` | Teilnehmer von Reise entfernen (geschützt) |
+| DELETE | `/admin/travel/trips/{id}/participants/{userId}` | Teilnehmer von Reise entfernen (geschützt; letzter Reiseleiter geschützt) |
+| PUT | `/admin/travel/trips/{id}/participants/{userId}/role` | Reiseleiter-Rolle setzen (geschützt) |
 | PUT | `/admin/travel/trips/{id}/participants/{userId}/accommodation` | Unterkunftszuweisung ändern (geschützt) |
 | PUT | `/admin/travel/trips/{id}/forum` | Forum mit Reise verknüpfen/trennen (geschützt) |
 | POST | `/admin/travel/trips/{id}/subscriptions` | Abo mit Reise verknüpfen (geschützt) |
@@ -128,6 +132,8 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/travel/events/{id}` | Eventdetail-Seite mit Teilnehmern (geschützt) |
 | POST | `/admin/travel/events/{id}/participants` | Teilnehmer zu Event hinzufügen (geschützt) |
 | DELETE | `/admin/travel/events/{id}/participants/{userId}` | Teilnehmer von Event entfernen (geschützt) |
+| PUT | `/admin/travel/events/{id}/participants/{userId}/role` | Veranstalter-Rolle bei Standalone-Events setzen (geschützt) |
+| PATCH | `/admin/travel/events/{id}/trip` | Event zwischen Reise und Standalone konvertieren (geschützt) |
 | POST | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise erstellen (geschützt) |
 | DELETE | `/admin/travel/trips/{id}/chat` | Gruppenchat für Reise löschen (geschützt) |
 | PATCH | `/admin/travel/trips/{id}/chat` | Gruppenchat-Icon für Reise setzen/entfernen (geschützt) |

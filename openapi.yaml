@@ -1082,6 +1082,17 @@ components:
           format: uuid
           nullable: true
           description: ID des zugehörigen Gruppenchats (falls vorhanden)
+        role:
+          type: string
+          enum: [leader, participant]
+          nullable: true
+          description: >
+            Rolle des anfragenden Nutzers in dieser Reise (`leader` =
+            Reiseleiter mit Bearbeitungsrecht, `participant` = einfacher
+            Mitreisender). `null`, wenn der Aufrufer kein Teilnehmer ist.
+        canEdit:
+          type: boolean
+          description: Ob der anfragende Nutzer die Reise bearbeiten darf (Leader oder Admin)
 
     TravelTripListResponse:
       type: object
@@ -1100,6 +1111,67 @@ components:
       properties:
         data:
           $ref: '#/components/schemas/TravelTrip'
+
+    TravelTripWriteRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: Sommerurlaub 2026 }
+        description: { type: string, nullable: true }
+        allDay: { type: boolean, default: true, description: 'Standard bei Reisen ist ganztägig' }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true, description: 'RFC 3339 mit Offset (nur bei allDay=false)' }
+        endAt: { type: string, format: date-time, nullable: true, description: 'RFC 3339 mit Offset (nur bei allDay=false)' }
+        startDate: { type: string, format: date, nullable: true, description: 'Ziviler Tag YYYY-MM-DD (nur bei allDay=true)' }
+        endDate: { type: string, format: date, nullable: true, description: 'Ziviler Tag YYYY-MM-DD, inklusiv (nur bei allDay=true)' }
+        hastickets: { type: string, enum: ['0', '1'] }
+        ticket: { type: string, nullable: true }
+        ticketUrl: { type: string, format: uri, nullable: true }
+
+    TravelEventWriteRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: Konzert Berlin }
+        description: { type: string, nullable: true }
+        allDay: { type: boolean, default: false }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true }
+        endAt: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        hastickets: { type: string, enum: ['0', '1'] }
+        ticket: { type: string, nullable: true }
+        ticketUrl: { type: string, format: uri, nullable: true }
+        url: { type: string, format: uri, nullable: true }
+        image: { type: string, nullable: true, description: Base64-Banner (JPEG/PNG/WebP, 3.5:1, max. 500 KB, max. 2000px) }
+        organizer: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        latitude: { type: number, format: float, nullable: true }
+        longitude: { type: number, format: float, nullable: true }
+        OSMID: { type: integer, nullable: true }
+        citySlug: { type: string, nullable: true }
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Reise-Zuordnung. Beim PATCH dient `trip` der Konversion:
+            eine Reise-ID hängt das Event an diese Reise an, `null` löst es zu
+            einem Standalone-Event. Erfordert Leader-Rechte an Quelle und Ziel.
+
+    TravelParticipantAddRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string, format: uuid }
+        accommodation: { type: string, format: uuid, nullable: true, description: Nur bei Reisen, optionale Unterkunfts-Zuordnung }
+
+    TravelRoleUpdateRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [leader, participant] }
 
     TravelEvent:
       type: object
@@ -1190,7 +1262,7 @@ components:
           nullable: true
         participants:
           type: array
-          description: Teilnehmer des Events (über EventRelation)
+          description: Teilnehmer des Events (über EventRelation, inkl. `role`)
           items:
             $ref: '#/components/schemas/TravelParticipantBrief'
         conversationId:
@@ -1204,6 +1276,20 @@ components:
           description: >
             InfraNode-Stadt-Slug für externe Datenabfragen (z.B. "berlin",
             "muenchen"). NULL = kein unterstützter Slug (Ausland, unbekannte Stadt).
+        role:
+          type: string
+          enum: [leader, participant]
+          nullable: true
+          description: >
+            Bearbeitungsrolle des anfragenden Nutzers. Bei Reise-Events ist
+            dies die Rolle in der zugehörigen Reise, bei Standalone-Events die
+            EventRelation-Rolle.
+        canEdit:
+          type: boolean
+          description: >
+            Ob der anfragende Nutzer das Event bearbeiten darf. Reise-Events
+            erben die Rechte von der Reise, Standalone-Events besitzen eigene
+            Leader.
 
     TravelParticipantBrief:
       type: object
@@ -1216,6 +1302,10 @@ components:
         image:
           type: string
           nullable: true
+        role:
+          type: string
+          enum: [leader, participant]
+          description: Rolle des Teilnehmers
 
     TravelEventListResponse:
       type: object
@@ -1287,6 +1377,14 @@ components:
             InfraNode-Stadt-Slug für externe Datenabfragen (z.B. "berlin",
             "muenchen"). NULL = kein unterstützter Slug (Ausland, unbekannte Stadt).
             Clients können diesen Wert direkt für `/external-data/weather` etc. nutzen.
+        tripId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Direkte Zuordnung zu einer Reise. Kann null sein, wenn die
+            Unterkunft nur über `TravelRelation.accommodation` Teilnehmenden
+            zugewiesen ist.
         users:
           type: array
           description: Nutzer, die dieser Unterkunft zugeordnet sind (über TravelRelation)
@@ -1323,6 +1421,10 @@ components:
         image:
           type: string
           nullable: true
+        role:
+          type: string
+          enum: [leader, participant]
+          description: '`leader` = Reiseleiter mit Bearbeitungsrecht, `participant` = einfacher Mitreisender'
 
     TravelParticipantListResponse:
       type: object
@@ -5113,6 +5215,16 @@ components:
             - standalone_event_info_changed
             - trip_event_info_changed
             - trip_subscription_added
+            - trip_leader_appointed
+            - trip_leader_appointed_others
+            - trip_leader_removed
+            - trip_leader_removed_others
+            - standalone_event_leader_appointed
+            - standalone_event_leader_appointed_others
+            - standalone_event_leader_removed
+            - standalone_event_leader_removed_others
+            - standalone_event_converted_to_trip
+            - trip_event_converted_to_standalone
             - poll_invite
             - poll_counter_proposal
             - poll_finalized
@@ -5121,7 +5233,8 @@ components:
             Strukturierter Benachrichtigungstyp. Interne Typen
             (standalone_event_*, trip_event_*) werden bei den
             Präferenzen auf vereinheitlichte Typen gemappt
-            (event_user_added, event_ticket_added, event_info_changed).
+            (event_user_added, event_ticket_added, event_info_changed,
+            trip_leader_changed, event_leader_changed, event_converted).
             Umfrage-Typen (`poll_*`) referenzieren die Umfrage über die
             Relation `poll` (Poll).
         title:
@@ -5240,6 +5353,11 @@ components:
             - event_user_added_others
             - event_ticket_added
             - event_info_changed
+            - trip_leader_changed
+            - trip_leader_changed_others
+            - event_leader_changed
+            - event_leader_changed_others
+            - event_converted
             - poll_invite
             - poll_counter_proposal
             - poll_finalized
@@ -5280,6 +5398,16 @@ components:
               $ref: '#/components/schemas/NotificationPreferenceItem'
             event_info_changed:
               $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_leader_changed:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            trip_leader_changed_others:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_leader_changed:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_leader_changed_others:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
+            event_converted:
+              $ref: '#/components/schemas/NotificationPreferenceItem'
             poll_invite:
               $ref: '#/components/schemas/NotificationPreferenceItem'
             poll_counter_proposal:
@@ -5313,6 +5441,11 @@ components:
             - event_user_added_others
             - event_ticket_added
             - event_info_changed
+            - trip_leader_changed
+            - trip_leader_changed_others
+            - event_leader_changed
+            - event_leader_changed_others
+            - event_converted
             - poll_invite
             - poll_counter_proposal
             - poll_finalized
@@ -5320,8 +5453,9 @@ components:
           description: >
             Vereinheitlichter Benachrichtigungstyp. Interne Typen
             (standalone_event_*, trip_event_*) werden automatisch
-            auf `event_user_added`, `event_ticket_added` bzw.
-            `event_info_changed` gemappt.
+            auf `event_user_added`, `event_ticket_added`,
+            `event_info_changed`, `trip_leader_changed`,
+            `event_leader_changed` bzw. `event_converted` gemappt.
         state:
           type: string
           enum: [enabled, disabled, custom]
@@ -13510,6 +13644,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    post:
+      summary: Reise erstellen
+      description: >
+        Jeder authentifizierte Nutzer kann eine Reise erstellen. Der
+        erstellende Nutzer wird automatisch als `leader` in die TravelRelation
+        eingetragen und darf die Reise (und ihre Events) bearbeiten.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelTripWriteRequest'
+      responses:
+        '201':
+          description: Reise erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelTripDetailResponse'
+        '400':
+          description: Ungültige Eingabe (z. B. `name_required`, `invalid_time_range`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /trips/standaloneevents:
     get:
       summary: Standalone-Events des Nutzers auflisten
@@ -13550,6 +13719,41 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    post:
+      summary: Standalone-Event erstellen
+      description: >
+        Erstellt ein Standalone-Event (TravelEvent ohne Reise-Bezug). Der
+        erstellende Nutzer wird als `leader` in die EventRelation eingetragen
+        und darf das Event bearbeiten sowie weitere Veranstalter ernennen.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelEventWriteRequest'
+      responses:
+        '201':
+          description: Standalone-Event erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /trips/standaloneevents/{eventId}:
     get:
       summary: Standalone-Event-Details abrufen
@@ -13582,6 +13786,84 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Standalone-Event bearbeiten (inkl. Konversion)
+      description: >
+        Aktualisiert ein Standalone-Event. Nur der Veranstalter (EventRelation
+        `leader`) oder Admin darf bearbeiten. Wird `trip` gesetzt, wird das
+        Event an die angegebene Reise angehängt (Konversion); erfordert
+        Leader-Rechte an Reise und Event.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelEventWriteRequest'
+      responses:
+        '200':
+          description: Event aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Veranstalter (`forbidden`) oder Konversion nicht erlaubt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Standalone-Event löschen
+      description: Nur der Veranstalter (EventRelation `leader`) oder Admin darf löschen.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Kein Veranstalter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event nicht gefunden
           content:
             application/json:
               schema:
@@ -14150,6 +14432,80 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    patch:
+      summary: Reise bearbeiten
+      description: Nur Reiseleiter (TravelRelation `leader`) oder Admin dürfen bearbeiten.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelTripWriteRequest'
+      responses:
+        '200':
+          description: Reise aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelTripDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Reise löschen
+      description: Nur Reiseleiter oder Admin dürfen löschen.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /trips/{id}/events:
     get:
       summary: Events einer Reise auflisten
@@ -14181,6 +14537,54 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Kein Teilnehmer dieser Reise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: Event zu einer Reise hinzufügen
+      description: >
+        Erstellt ein Event, das obligatorisch zu dieser Reise gehört
+        (`trip` = Reise-ID). Nur Reiseleiter oder Admin dürfen das.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelEventWriteRequest'
+      responses:
+        '201':
+          description: Event erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter
           content:
             application/json:
               schema:
@@ -14237,6 +14641,101 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Vorschlag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Reise-Event bearbeiten (inkl. Konversion)
+      description: >
+        Aktualisiert ein Event innerhalb einer Reise. Nur Reiseleiter oder
+        Admin dürfen bearbeiten. `trip: null` löst das Event zu einem
+        Standalone-Event (der handelnde Leader wird Veranstalter); eine andere
+        `trip`-ID verschiebt es in eine andere Reise (Leader-Rechte an Quelle
+        und Ziel nötig).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Event-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelEventWriteRequest'
+      responses:
+        '200':
+          description: Event aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter oder Konversion nicht erlaubt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Reise-Event löschen
+      description: Nur Reiseleiter oder Admin dürfen löschen.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Event-ID
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Event nicht gefunden
           content:
             application/json:
               schema:
@@ -16400,6 +16899,66 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    post:
+      summary: Unterkunft für eine Reise erstellen
+      description: >
+        Erstellt eine Unterkunft und ordnet sie direkt der Reise zu. Nur
+        Reiseleiter oder Admin dürfen das.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+                address: { type: string, nullable: true }
+                OSMID: { type: integer, nullable: true }
+                latitude: { type: number, format: float, nullable: true }
+                longitude: { type: number, format: float, nullable: true }
+                phone: { type: string, nullable: true }
+                mail: { type: string, format: email, nullable: true }
+                ishotel: { type: integer, description: '1 = Hotel, 0 = andere' }
+                citySlug: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Unterkunft erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelAccommodationDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /trips/{id}/accommodations/{accommodationId}:
     get:
       summary: Unterkunfts-Details abrufen
@@ -16445,6 +17004,107 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      summary: Unterkunft bearbeiten
+      description: Nur Reiseleiter oder Admin dürfen Unterkünfte der Reise bearbeiten.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: accommodationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unterkunfts-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string, nullable: true }
+                address: { type: string, nullable: true }
+                OSMID: { type: integer, nullable: true }
+                latitude: { type: number, format: float, nullable: true }
+                longitude: { type: number, format: float, nullable: true }
+                phone: { type: string, nullable: true }
+                mail: { type: string, format: email, nullable: true }
+                ishotel: { type: integer }
+                citySlug: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Unterkunft aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelAccommodationDetailResponse'
+        '400':
+          description: Ungültige Eingabe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Unterkunft löschen
+      description: Nur Reiseleiter oder Admin dürfen Unterkünfte der Reise löschen.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: accommodationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unterkunfts-ID
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Unterkunft nicht gefunden
           content:
             application/json:
               schema:
@@ -17906,6 +18566,347 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+    post:
+      summary: Teilnehmer zu einer Reise hinzufügen
+      description: >
+        Fügt einen registrierten Nutzer als `participant` hinzu. Nur
+        Reiseleiter oder Admin dürfen das. Benachrichtigt die Teilnehmer und
+        synchronisiert den Reise-Gruppenchat.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelParticipantAddRequest'
+      responses:
+        '201':
+          description: Teilnehmer hinzugefügt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid, description: ID der TravelRelation }
+        '400':
+          description: userId fehlt (`userId_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Nutzer ist bereits Teilnehmer (`already_participant`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/participants/{userId}:
+    delete:
+      summary: Teilnehmer von einer Reise entfernen
+      description: >
+        Entfernt einen Teilnehmer. Nur Reiseleiter oder Admin. Der letzte
+        Reiseleiter kann nicht entfernt werden (`last_leader`, 409).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Entfernt
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzter Reiseleiter kann nicht entfernt werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/participants/{userId}/role:
+    put:
+      summary: Reiseleiter-Rolle eines Teilnehmers ändern
+      description: >
+        Ernennt einen Teilnehmer zum Reiseleiter (`leader`) oder stuft ihn zum
+        einfachen Teilnehmer (`participant`) zurück. Nur Reiseleiter oder
+        Admin. Der letzte Reiseleiter kann nicht degradiert werden
+        (`last_leader`, 409).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelRoleUpdateRequest'
+      responses:
+        '200':
+          description: Rolle aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: role_updated }
+        '400':
+          description: Ungültige Rolle (`invalid_role`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzter Reiseleiter kann nicht degradiert werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/standaloneevents/{eventId}/participants:
+    post:
+      summary: Teilnehmer zu einem Standalone-Event hinzufügen
+      description: >
+        Fügt einen registrierten Nutzer als `participant` zum Standalone-Event
+        hinzu. Nur der Veranstalter (EventRelation `leader`) oder Admin.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Teilnehmer hinzugefügt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid, description: ID der EventRelation }
+        '400':
+          description: userId fehlt (`userId_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Veranstalter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event oder Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Nutzer ist bereits Teilnehmer (`already_participant`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/standaloneevents/{eventId}/participants/{userId}:
+    delete:
+      summary: Teilnehmer von einem Standalone-Event entfernen
+      description: >
+        Nur der Veranstalter oder Admin. Der letzte Veranstalter kann nicht
+        entfernt werden (`last_leader`, 409).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Entfernt
+        '403':
+          description: Kein Veranstalter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzter Veranstalter kann nicht entfernt werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/standaloneevents/{eventId}/participants/{userId}/role:
+    put:
+      summary: Veranstalter-Rolle eines Standalone-Event-Teilnehmers ändern
+      description: >
+        Ernennt einen Teilnehmer zum Veranstalter (`leader`) oder stuft ihn zum
+        einfachen Teilnehmer (`participant`) zurück. Nur der Veranstalter oder
+        Admin. Der letzte Veranstalter kann nicht degradiert werden.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelRoleUpdateRequest'
+      responses:
+        '200':
+          description: Rolle aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: role_updated }
+        '400':
+          description: Ungültige Rolle (`invalid_role`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Veranstalter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzter Veranstalter kann nicht degradiert werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /trips/{id}/tickets:
     get:
       summary: Tickets einer Reise auflisten
@@ -18744,6 +19745,153 @@ paths:
                       $ref: '#/components/schemas/ExternalDataInfraNodeCity'
         '401':
           description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/trips/{id}/participants/{userId}/role:
+    put:
+      summary: Reiseleiter-Rolle eines Teilnehmers ändern (Admin)
+      description: 'Admin-Endpunkt für das Dashboard: `leader` oder `participant`. Der letzte Reiseleiter kann nicht degradiert werden.'
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: Reise-ID
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelRoleUpdateRequest'
+      responses:
+        '200':
+          description: Rolle aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: role_updated }
+        '400':
+          description: Ungültige Rolle (`invalid_role`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzter Reiseleiter kann nicht degradiert werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}/participants/{userId}/role:
+    put:
+      summary: Veranstalter-Rolle eines Standalone-Event-Teilnehmers ändern (Admin)
+      description: 'Admin-Endpunkt für das Dashboard. Nur für Standalone-Events. Der letzte Veranstalter kann nicht degradiert werden.'
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: Event-ID
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelRoleUpdateRequest'
+      responses:
+        '200':
+          description: Rolle aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: role_updated }
+        '400':
+          description: Ungültige Rolle (`invalid_role`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzter Veranstalter kann nicht degradiert werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/events/{id}/trip:
+    patch:
+      summary: Event-Konversion zwischen Reise und Standalone (Admin)
+      description: >
+        Hängt ein Event an eine Reise (`trip` = Reise-ID) oder löst es zu einem
+        Standalone-Event (`trip: null`). Beim Lösen wird der handelnde Admin als
+        Veranstalter in der EventRelation eingetragen; bestehende Event-Rollen
+        werden auf `participant` zurückgesetzt.
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: Event-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trip: { type: string, format: uuid, nullable: true }
+      responses:
+        '200':
+          description: Event konvertiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelEventDetailResponse'
+        '400':
+          description: Ungültige Konversion (`invalid_conversion`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Event oder Reise nicht gefunden
           content:
             application/json:
               schema:

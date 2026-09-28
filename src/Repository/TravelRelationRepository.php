@@ -20,10 +20,34 @@ final readonly class TravelRelationRepository
         return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
+    public function getRole(string $userId, string $tripId): ?string
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT role FROM TravelRelation WHERE userid = ? AND tripid = ? LIMIT 1'
+        );
+        $stmt->execute([$userId, $tripId]);
+        $role = $stmt->fetchColumn();
+        return $role === false ? null : (string) $role;
+    }
+
+    public function isLeader(string $userId, string $tripId): bool
+    {
+        return $this->getRole($userId, $tripId) === 'leader';
+    }
+
+    public function countLeaders(string $tripId): int
+    {
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM TravelRelation WHERE tripid = ? AND role = 'leader'"
+        );
+        $stmt->execute([$tripId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function findParticipantsByTrip(string $tripId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT u.id, u.email, u.displayName, u.image
+            'SELECT u.id, u.email, u.displayName, u.image, r.role
              FROM TravelRelation r
              JOIN User u ON u.id = r.userid
              WHERE r.tripid = ?
@@ -36,7 +60,7 @@ final readonly class TravelRelationRepository
     public function findParticipantRelationsByTrip(string $tripId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT r.ID AS relationId, r.userid, r.tripid, r.accommodation,
+            'SELECT r.ID AS relationId, r.userid, r.tripid, r.accommodation, r.role,
                     u.email, u.displayName, u.image,
                     a.name AS accommodationName
              FROM TravelRelation r
@@ -49,15 +73,32 @@ final readonly class TravelRelationRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function addParticipant(string $userId, string $tripId, ?string $accommodationId): string
-    {
+    public function addParticipant(
+        string $userId,
+        string $tripId,
+        ?string $accommodationId,
+        string $role = 'participant',
+    ): string {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelRelation (ID, userid, tripid, accommodation)
-             VALUES (?, ?, ?, ?)'
+            'INSERT INTO TravelRelation (ID, userid, tripid, accommodation, role)
+             VALUES (?, ?, ?, ?, ?)'
         );
-        $stmt->execute([$id, $userId, $tripId, $accommodationId]);
+        $stmt->execute([$id, $userId, $tripId, $accommodationId, self::normalizeRole($role)]);
         return $id;
+    }
+
+    public function updateRole(string $userId, string $tripId, string $role): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE TravelRelation SET role = ? WHERE userid = ? AND tripid = ?'
+        );
+        $stmt->execute([self::normalizeRole($role), $userId, $tripId]);
+    }
+
+    private static function normalizeRole(string $role): string
+    {
+        return $role === 'leader' ? 'leader' : 'participant';
     }
 
     public function removeByUserAndTrip(string $userId, string $tripId): void
