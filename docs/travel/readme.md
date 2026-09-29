@@ -23,7 +23,7 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 | `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften (inkl. `role` = `leader`/`participant` und `accommodation` = zugewiesene Unterkunft) |
 | `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone; inkl. `role` bei Standalone-Events) |
 | `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
-| `TravelPlanMember` | Planungsteilnehmer (getrennt von `TravelRelation`, `status` = `invited`/`accepted`/`declined`/`inactive`) |
+| `TravelPlanMember` | Planungsteilnehmer (getrennt von `TravelRelation`, `status` = `invited`/`accepted`/`declined`/`inactive`, `role` = `leader`/`member`) |
 | `TravelPlanTopic` | Phasenstatus je Planungsreise (`topic` = `participants`/`travel`/`program`, `status` = `pending`/`in_progress`/`completed`/`skipped`) |
 | `TravelPlanDateOption` | Terminoptionen einer Planungsreise (zeitbewusst; `isFinal` = von der Leitung festgelegt) |
 | `TravelPlanDateResponse` | Verfügbarkeits-Rückmeldung je Terminoption und Mitglied (`yes`/`maybe`/`no`) |
@@ -438,8 +438,97 @@ globale Katalog `TravelAccommodation` bleibt preisfrei.
 
 > Das Schema wurde mit der Migration
 > `database/migrations/20260930000000_travel_planning.sql` ergänzt (Phase 1,
-> additiv/rückbaubar). API-Endpunkte, Policies und Aktivierungslogik folgen in
-> separaten Phasen.
+> additiv/rückbaubar) und um `TravelPlanMember.role` erweitert
+> (`database/migrations/20261001000000_travel_planning_leader.sql`).
+
+### Leitung der Planung
+
+Die Leitung einer Planungsreise wird ausschließlich in
+`TravelPlanMember.role` (`leader`/`member`) geführt – bewusst **nicht** über
+`TravelRelation`, damit mitplanende Personen keinen Zugriff auf operative
+Reise-Objekte (Events, Tickets, Unterkünfte) erhalten. Der Ersteller ist
+`leader`; die letzte Leitung kann nicht deaktiviert werden
+(`409 last_leader`).
+
+### API-Endpunkte (Phase 2)
+
+Alle Endpunkte liegen unter `/trips/planning` und benötigen einen gültigen JWT.
+
+| Methode | Pfad | Berechtigung | Beschreibung |
+|---------|------|--------------|--------------|
+| `GET` | `/trips/planning` | aktives Planungsmitglied | Paginierte Liste eigener Planungsreisen (`state='planning'`) |
+| `POST` | `/trips/planning` | JWT (Ersteller wird Leitung) | Planungsreise anlegen (Datum optional, `skippedTopics` möglich) |
+| `GET` | `/trips/planning/{id}` | aktives Planungsmitglied | Vollständige Planungsdetails |
+| `PATCH` | `/trips/planning/{id}` | Leitung | Name/Beschreibung (kein Zustand/Timing) |
+| `POST` | `/trips/planning/{id}/activate` | Leitung | Planung abschließen und Reise aktivieren (transaktional/idempotent) |
+| `GET` | `/trips/planning/{id}/members` | aktives Planungsmitglied | Mitglieder inkl. Status/Rolle |
+| `POST` | `/trips/planning/{id}/members` | Leitung | Nutzer einladen (`userId`) |
+| `PUT` | `/trips/planning/{id}/members/me` | aktives Planungsmitglied | Eigene Rückmeldung (`accepted`/`declined`) |
+| `PATCH` | `/trips/planning/{id}/members/{userId}` | Leitung | Mitglied aktiv/inaktiv setzen (`accepted`/`inactive`) |
+| `DELETE` | `/trips/planning/{id}/members/{userId}` | Leitung oder self | Mitglied entfernen / Teilnahme zurückziehen |
+| `PATCH` | `/trips/planning/{id}/topics/{topic}` | Leitung | Phasenstatus ändern (`pending`/`in_progress`/`completed`/`skipped`) |
+| `GET` | `/trips/planning/{id}/dates` | aktives Planungsmitglied | Terminoptionen inkl. Rückmeldungen |
+| `POST` | `/trips/planning/{id}/dates` | aktives Planungsmitglied | Terminoption vorschlagen |
+| `PATCH` | `/trips/planning/{id}/dates/{dateOptionId}` | Leitung oder Ersteller | Terminoption bearbeiten |
+| `DELETE` | `/trips/planning/{id}/dates/{dateOptionId}` | Leitung oder Ersteller | Terminoption löschen |
+| `PUT` | `/trips/planning/{id}/dates/{dateOptionId}/responses` | aktives Planungsmitglied | Eigene Verfügbarkeit (`yes`/`maybe`/`no`) |
+| `POST` | `/trips/planning/{id}/dates/{dateOptionId}/finalize` | Leitung | Terminoption verbindlich festlegen |
+| `GET` | `/trips/planning/{id}/transport` | aktives Planungsmitglied | Transportpräferenzen |
+| `PUT` | `/trips/planning/{id}/transport` | aktives Planungsmitglied | Eigene Präferenz (`outbound`/`return`) |
+| `GET` | `/trips/planning/{id}/accommodations` | aktives Planungsmitglied | Unterkunftsoptionen inkl. Preis |
+| `POST` | `/trips/planning/{id}/accommodations` | aktives Planungsmitglied | Unterkunftsoption vorschlagen |
+| `PATCH` | `/trips/planning/{id}/accommodations/{optionId}` | Leitung oder Ersteller | Unterkunftsoption bearbeiten |
+| `DELETE` | `/trips/planning/{id}/accommodations/{optionId}` | Leitung oder Ersteller | Unterkunftsoption löschen |
+| `POST` | `/trips/planning/{id}/accommodations/{optionId}/select` | Leitung | Unterkunft verbindlich auswählen |
+| `GET` | `/trips/planning/{id}/events` | aktives Planungsmitglied | Tagesprogramm-Vorschläge inkl. Interesse |
+| `POST` | `/trips/planning/{id}/events` | aktives Planungsmitglied | Eventvorschlag einreichen |
+| `PATCH` | `/trips/planning/{id}/events/{suggestionId}` | Leitung oder Ersteller | Eventvorschlag bearbeiten |
+| `DELETE` | `/trips/planning/{id}/events/{suggestionId}` | Leitung oder Ersteller | Eventvorschlag löschen |
+| `PUT` | `/trips/planning/{id}/events/{suggestionId}/interest` | aktives Planungsmitglied | Eigenes Interesse (`yes`/`maybe`/`no`) |
+| `POST` | `/trips/planning/{id}/events/{suggestionId}/confirm` | Leitung | Eventvorschlag bestätigen/zurücknehmen |
+
+**Zugriffsregeln:** Nur aktive Planungsmitglieder (Status ungleich `inactive`)
+sehen die Planungsreise; inaktive oder nicht eingeladene Konten erhalten
+`403`. Die bestehenden Reise-Endpunkte (`/trips/{id}`, Events, Tickets,
+Unterkünfte) bleiben an `TravelRelation` gebunden und sind daher für
+Planungsreisen nicht zugänglich. Der Reisezustand (`state`) ist ausschließlich
+über `POST /trips/planning` (Anlage) und `POST /trips/planning/{id}/activate`
+änderbar – nie über `PATCH /trips/{id}`.
+
+### Chat der Planung
+
+Der Gruppenchat entsteht bereits beim Anlegen der Planungsreise. Seine
+Mitgliedschaft wird bis zur Aktivierung aus den **aktiven
+Planungsmitgliedern** gespiegelt (`TravelChatService::syncPlanningMembers`).
+Bei der Aktivierung wird dieselbe Unterhaltung auf die bestätigten
+Reiseteilnehmenden (`TravelRelation`) synchronisiert und weiterverwendet;
+inaktive Mitglieder werden aus dem Chat entfernt, ihre Beiträge bleiben
+erhalten.
+
+### Aktivierung
+
+`POST /trips/planning/{id}/activate` (nur Leitung) arbeitet transaktional und
+idempotent:
+
+1. Finale Terminoption (`isFinal`) → Zeitfelder der `TravelTrip`.
+2. `TravelTrip.state` → `active`.
+3. Leitung → `TravelRelation` (`leader`); Mitglieder mit Status `accepted` →
+   `participant`. `invited`/`declined`/`inactive` werden nicht übernommen.
+4. Gewählte Unterkunftsoption (`isSelected`) → `TravelAccommodationTrip` inkl.
+   `pricePerPersonPerNight`/`currency` (Katalogeintrag wird bei Bedarf angelegt).
+5. Bestätigte Eventvorschläge (`isConfirmed`) → `TravelEvent`; die Referenz
+   wird in `TravelPlanEvent.confirmedEventId` festgehalten.
+6. Chat-Abgleich aus `TravelRelation`.
+
+Ein wiederholter Aufruf erzeugt keine Duplikate (bereits `active` → No-op).
+
+### Benachrichtigungen
+
+Die Planung löst folgende Benachrichtigungstypen aus (Details:
+`docs/notifications/types.md`): `trip_planning_invite` (Einladung),
+`trip_planning_response` (Rückmeldung an die Leitung),
+`trip_planning_finalized` (Festlegung) und `trip_planning_activated`
+(Aktivierung).
 
 ## Moderation
 

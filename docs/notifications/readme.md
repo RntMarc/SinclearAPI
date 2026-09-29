@@ -175,6 +175,10 @@ Der Endpoint liefert genau einen Preference-Schlüssel je fachlicher Einstellung
 | `event_leader_changed_others` | `standalone_event_leader_appointed_others`, `standalone_event_leader_removed_others` |
 | `event_converted` | `standalone_event_converted_to_trip`, `trip_event_converted_to_standalone` |
 
+Die Reiseplanungs-Typen `trip_planning_invite`, `trip_planning_response`,
+`trip_planning_finalized` und `trip_planning_activated` werden direkt (ohne
+Mapping) angeboten und unterstützen kein `custom`.
+
 Die internen Typen sind beim `PUT` nicht gültig. Clients müssen die
 vereinheitlichten Preference-Schlüssel verwenden.
 

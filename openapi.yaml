@@ -1005,6 +1005,15 @@ components:
         id:
           type: string
           format: uuid
+        state:
+          type: string
+          enum: [planning, active, cancelled]
+          description: >
+            Reisezustand. `planning` = Planungsreise (nur über die
+            Planungs-Endpunkte sichtbar), `active` = operative Reise
+            (Standard), `cancelled` = reserviert für eine spätere
+            Storno-/Archivlogik. Nur über dedizierte Planungsaktionen änderbar.
+          example: active
         name:
           type: string
           example: Sommerurlaub 2025
@@ -6625,6 +6634,374 @@ components:
         coverage:
           type: string
           description: Abdeckungsstatus (full, auto)
+
+    # ── Reiseplanung (Trip Planning) ──────────────────────────────────────
+
+    TravelPlanTopic:
+      type: object
+      description: Persistierter Status einer der drei festen Planungsphasen.
+      required: [id, tripId, topic, status]
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        topic: { type: string, enum: [participants, travel, program] }
+        status: { type: string, enum: [pending, in_progress, completed, skipped] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    TravelPlanMember:
+      type: object
+      description: >
+        Planungsteilnehmer. Bewusst getrennt von TravelRelation; `inactive`
+        entzieht den Zugriff auf Planung und Chat, die Historie bleibt.
+      required: [memberId, tripId, userId, status, role]
+      properties:
+        memberId: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status: { type: string, enum: [invited, accepted, declined, inactive] }
+        role: { type: string, enum: [leader, member] }
+        origin: { type: string, nullable: true, description: 'Herkunft der Mitgliedschaft (creator, invite)' }
+        email: { type: string, nullable: true }
+        displayName: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deactivatedAt: { type: string, format: date-time, nullable: true }
+
+    TravelPlanDateResponse:
+      type: object
+      required: [userId, availability]
+      properties:
+        userId: { type: string, format: uuid }
+        availability: { type: string, enum: [yes, maybe, no] }
+
+    TravelPlanDateOption:
+      type: object
+      description: Terminoption einer Planungsreise (zeitzonenbewusst).
+      required: [id, tripId, allDay, timezone, isFinal]
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        label: { type: string, nullable: true }
+        allDay: { type: boolean }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true }
+        endAt: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        isFinal: { type: boolean, description: Von der Leitung festgelegte Option }
+        proposedBy: { type: string, format: uuid, nullable: true }
+        position: { type: integer }
+        responses:
+          type: array
+          items: { $ref: '#/components/schemas/TravelPlanDateResponse' }
+
+    TravelPlanTransport:
+      type: object
+      description: Transportpräferenz je Mitglied und Richtung.
+      required: [id, tripId, userId, direction, offersRide]
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        direction: { type: string, enum: [outbound, return] }
+        mode: { type: string, nullable: true }
+        offersRide: { type: boolean }
+        availableSeats: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+        displayName: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+
+    TravelPlanAccommodationOption:
+      type: object
+      description: Unterkunftsoption inkl. Preis pro Person und Nacht.
+      required: [id, tripId, isSelected]
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        accommodationId: { type: string, format: uuid, nullable: true }
+        name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        OSMID: { type: integer, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        citySlug: { type: string, nullable: true }
+        pricePerPersonPerNight: { type: string, nullable: true, description: "Dezimalwert als String, z. B. '42.50'" }
+        currency: { type: string, nullable: true, description: 'ISO-4217, z. B. EUR' }
+        isSelected: { type: boolean, description: Von der Leitung gewählte Option }
+        proposedBy: { type: string, format: uuid, nullable: true }
+
+    TravelPlanEventInterest:
+      type: object
+      required: [userId, interest]
+      properties:
+        userId: { type: string, format: uuid }
+        interest: { type: string, enum: [yes, maybe, no] }
+
+    TravelPlanEventSuggestion:
+      type: object
+      description: Tagesprogramm-Vorschlag (Planungs-Event).
+      required: [id, tripId, name, allDay, timezone, isConfirmed]
+      properties:
+        id: { type: string, format: uuid }
+        tripId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        dayIndex: { type: integer }
+        allDay: { type: boolean }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true }
+        endAt: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        address: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        OSMID: { type: integer, nullable: true }
+        citySlug: { type: string, nullable: true }
+        isConfirmed: { type: boolean, description: Von der Leitung bestätigt }
+        confirmedEventId: { type: string, format: uuid, nullable: true, description: Nach Aktivierung erzeugtes TravelEvent }
+        proposedBy: { type: string, format: uuid, nullable: true }
+        interests:
+          type: array
+          items: { $ref: '#/components/schemas/TravelPlanEventInterest' }
+
+    TravelPlanningTrip:
+      type: object
+      description: Planungsreise (TravelTrip mit state=planning).
+      required: [id, name, state]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        state: { type: string, enum: [planning, active, cancelled] }
+        allDay: { type: boolean }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true }
+        endAt: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        role: { type: string, enum: [leader, member], nullable: true }
+        memberStatus: { type: string, enum: [invited, accepted, declined, inactive], nullable: true }
+        canManage: { type: boolean }
+        memberCount: { type: integer }
+        topicStatus:
+          type: object
+          additionalProperties: { type: string, enum: [pending, in_progress, completed, skipped] }
+        conversationId: { type: string, format: uuid, nullable: true }
+
+    TravelPlanningTripDetail:
+      allOf:
+        - $ref: '#/components/schemas/TravelPlanningTrip'
+        - type: object
+          properties:
+            topics: { type: array, items: { $ref: '#/components/schemas/TravelPlanTopic' } }
+            members: { type: array, items: { $ref: '#/components/schemas/TravelPlanMember' } }
+            dateOptions: { type: array, items: { $ref: '#/components/schemas/TravelPlanDateOption' } }
+            transport: { type: array, items: { $ref: '#/components/schemas/TravelPlanTransport' } }
+            accommodationOptions: { type: array, items: { $ref: '#/components/schemas/TravelPlanAccommodationOption' } }
+            eventSuggestions: { type: array, items: { $ref: '#/components/schemas/TravelPlanEventSuggestion' } }
+
+    TravelPlanningTripListResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanningTrip' } }
+        meta: { $ref: '#/components/schemas/PaginationMeta' }
+
+    TravelPlanningTripDetailResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TravelPlanningTripDetail' }
+
+    TravelPlanMemberListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanMember' } }
+
+    TravelPlanTopicListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanTopic' } }
+
+    TravelPlanDateOptionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanDateOption' } }
+
+    TravelPlanDateOptionResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TravelPlanDateOption' }
+
+    TravelPlanTransportListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanTransport' } }
+
+    TravelPlanTransportResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TravelPlanTransport' }
+
+    TravelPlanAccommodationOptionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanAccommodationOption' } }
+
+    TravelPlanAccommodationOptionResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TravelPlanAccommodationOption' }
+
+    TravelPlanEventSuggestionListResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { type: array, items: { $ref: '#/components/schemas/TravelPlanEventSuggestion' } }
+
+    TravelPlanEventSuggestionResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TravelPlanEventSuggestion' }
+
+    TravelPlanIdResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [id]
+          properties:
+            id: { type: string, format: uuid }
+
+    TravelPlanMessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, example: member_updated }
+
+    TravelPlanningTripCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: Sommerurlaub 2026 }
+        description: { type: string, nullable: true }
+        skippedTopics:
+          type: array
+          description: Beim Erstellen zu überspringende Phasen (werden als skipped angelegt).
+          items: { type: string, enum: [participants, travel, program] }
+
+    TravelPlanningTripUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    TravelPlanInviteRequest:
+      type: object
+      required: [userId]
+      properties:
+        userId: { type: string, format: uuid }
+
+    TravelPlanMemberStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [accepted, inactive] }
+
+    TravelPlanResponseRequest:
+      type: object
+      required: [response]
+      properties:
+        response: { type: string, enum: [accepted, declined] }
+
+    TravelPlanTopicStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [pending, in_progress, completed, skipped] }
+
+    TravelPlanDateOptionWriteRequest:
+      type: object
+      properties:
+        label: { type: string, nullable: true }
+        allDay: { type: boolean, default: true }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true, description: 'RFC 3339 mit Offset (nur bei allDay=false)' }
+        endAt: { type: string, format: date-time, nullable: true, description: 'RFC 3339 mit Offset (nur bei allDay=false)' }
+        startDate: { type: string, format: date, nullable: true, description: 'YYYY-MM-DD (nur bei allDay=true)' }
+        endDate: { type: string, format: date, nullable: true, description: 'YYYY-MM-DD, inklusiv (nur bei allDay=true)' }
+
+    TravelPlanAvailabilityRequest:
+      type: object
+      required: [availability]
+      properties:
+        availability: { type: string, enum: [yes, maybe, no] }
+
+    TravelPlanTransportWriteRequest:
+      type: object
+      properties:
+        direction: { type: string, enum: [outbound, return], default: outbound }
+        mode: { type: string, nullable: true, description: Freies Verkehrsmittel }
+        offersRide: { type: boolean }
+        availableSeats: { type: integer, nullable: true }
+        notes: { type: string, nullable: true }
+
+    TravelPlanAccommodationOptionWriteRequest:
+      type: object
+      properties:
+        accommodationId: { type: string, format: uuid, nullable: true, description: Verweis auf den globalen Unterkunfts-Katalog }
+        name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        OSMID: { type: integer, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        citySlug: { type: string, nullable: true }
+        pricePerPersonPerNight: { type: number, nullable: true }
+        currency: { type: string, nullable: true, description: 'ISO-4217' }
+
+    TravelPlanEventSuggestionWriteRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        dayIndex: { type: integer }
+        allDay: { type: boolean, default: false }
+        timezone: { type: string, example: Europe/Berlin }
+        startAt: { type: string, format: date-time, nullable: true }
+        endAt: { type: string, format: date-time, nullable: true }
+        startDate: { type: string, format: date, nullable: true }
+        endDate: { type: string, format: date, nullable: true }
+        address: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        OSMID: { type: integer, nullable: true }
+        citySlug: { type: string, nullable: true }
+
+    TravelPlanInterestRequest:
+      type: object
+      required: [interest]
+      properties:
+        interest: { type: string, enum: [yes, maybe, no] }
+
+    TravelPlanConfirmRequest:
+      type: object
+      properties:
+        confirmed: { type: boolean, default: true }
 
 paths:
   /lametric/token:
@@ -13649,6 +14026,1061 @@ paths:
           description: Nicht autorisiert
         '403':
           description: Kein Teilnehmer
+
+  /trips/planning:
+    get:
+      summary: Eigene Planungsreisen auflisten
+      description: >
+        Listet alle Reisen im Zustand `planning`, bei denen der Nutzer als
+        aktives Planungsmitglied (Status ungleich `inactive`) eingetragen ist.
+        Paginiert. Bewusst getrennt von `GET /trips` (operative Reisen über
+        TravelRelation).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, default: 1, minimum: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: Paginierte Liste der Planungsreisen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanningTripListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Planungsreise anlegen
+      description: >
+        Legt eine Reise im Zustand `planning` an (Datum optional). Der
+        Ersteller wird Leitung (`role=leader`). Die drei Phasenthemen werden
+        angelegt; `skippedTopics` markiert sie als `skipped`. Ein Gruppenchat
+        wird idempotent erstellt.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanningTripCreateRequest'
+      responses:
+        '201':
+          description: Planungsreise erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanningTripDetailResponse'
+        '400':
+          description: Ungültige Eingabe (`name_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Planungsdetails abrufen
+      description: >
+        Liefert Trip-Metadaten, Phasenstatus, Mitglieder, Terminoptionen
+        (inkl. Rückmeldungen), Transportpräferenzen, Unterkunftsoptionen und
+        Tagesprogramm-Vorschläge (inkl. Interesse). Nur für aktive
+        Planungsmitglieder.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Planungsdetails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanningTripDetailResponse'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Planungsreise nicht gefunden (`planning_trip_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist keine Planungsreise (`invalid_planning_trip`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      summary: Planungsreise-Metadaten bearbeiten
+      description: >
+        Ändert Name/Beschreibung. Nur Leitung. Der Zustand ist hierüber NICHT
+        änderbar (nur über Aktivierung).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanningTripUpdateRequest'
+      responses:
+        '200':
+          description: Aktualisierte Planungsreise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanningTripDetailResponse'
+        '400':
+          description: Ungültige Eingabe (`name_required`, `no_fields_to_update`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/activate:
+    post:
+      summary: Planung abschließen und Reise aktivieren
+      description: >
+        Transaktional und idempotent: validiert die finalen Reisedaten,
+        übernimmt bestätigte Mitglieder in TravelRelation, verknüpft die
+        gewählte Unterkunft inkl. Preis, wandelt bestätigte Vorschläge in
+        TravelEvent um und gleicht die Chat-Mitgliedschaft ab. Ein wiederholter
+        Aufruf erzeugt keine Duplikate. Nur Leitung.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Aktivierte Reise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelTripDetailResponse'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Planungsreise nicht gefunden (`planning_trip_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Keine Planungsreise (`invalid_planning_trip`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/members:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Planungsmitglieder auflisten
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Mitglieder inkl. Status und Rolle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanMemberListResponse'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Nutzer zur Planung einladen
+      description: Nur Leitung. Erzeugt/erneuert ein Mitglied mit Status `invited`.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanInviteRequest'
+      responses:
+        '201':
+          description: Einladung erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanIdResponse'
+        '400':
+          description: Ungültige Eingabe (`user_id_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden (`user_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Bereits Mitglied (`already_member`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/members/me:
+    put:
+      summary: Eigene Rückmeldung zur Planung abgeben
+      description: >
+        Aktives Planungsmitglied meldet sich mit `accepted` oder `declined`
+        zurück. Löst eine Benachrichtigung an die Leitung aus.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanResponseRequest'
+      responses:
+        '200':
+          description: Rückmeldung gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanMessageResponse'
+        '400':
+          description: Ungültige Rückmeldung (`invalid_response`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/members/{userId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: userId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: Planungsmitglied aktiv/inaktiv setzen
+      description: >
+        Nur Leitung. `accepted` reaktiviert, `inactive` entzieht den Zugriff
+        (Historie bleibt). Die letzte Leitung kann nicht deaktiviert werden.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanMemberStatusRequest'
+      responses:
+        '200':
+          description: Mitglied aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanMessageResponse'
+        '400':
+          description: Ungültiger Status (`invalid_member_status`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Mitglied nicht gefunden (`member_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzte Leitung (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Planungsmitglied entfernen / Teilnahme zurückziehen
+      description: >
+        Leitung kann jedes Mitglied entfernen; eine Person kann sich selbst
+        zurückziehen. Deaktiviert das Mitglied (Status `inactive`).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Mitglied deaktiviert
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Letzte Leitung (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/topics/{topic}:
+    patch:
+      summary: Status eines Planungsthemas ändern
+      description: Nur Leitung. `topic` ist einer der festen Phasenschlüssel.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: topic
+          in: path
+          required: true
+          schema: { type: string, enum: [participants, travel, program] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanTopicStatusRequest'
+      responses:
+        '200':
+          description: Aktualisierte Themenliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanTopicListResponse'
+        '400':
+          description: Ungültiges Thema/Status (`invalid_topic`, `invalid_topic_status`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/dates:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Terminoptionen auflisten
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Terminoptionen inkl. Rückmeldungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanDateOptionListResponse'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Terminoption vorschlagen
+      description: Aktives Planungsmitglied. Zeitangaben zeitzonenbewusst.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanDateOptionWriteRequest'
+      responses:
+        '201':
+          description: Terminoption erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanDateOptionResponse'
+        '400':
+          description: Ungültige Zeitangabe (`date_required`, `time_required`, `invalid_time_range`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/dates/{dateOptionId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: dateOptionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: Terminoption bearbeiten
+      description: Leitung oder Ersteller des Vorschlags.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanDateOptionWriteRequest'
+      responses:
+        '200':
+          description: Aktualisierte Terminoption
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanDateOptionResponse'
+        '400':
+          description: Ungültige Eingabe (`no_fields_to_update`, Zeitfehler)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Terminoption nicht gefunden (`date_option_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Terminoption löschen
+      description: Leitung oder Ersteller des Vorschlags.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Terminoption nicht gefunden (`date_option_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/dates/{dateOptionId}/responses:
+    put:
+      summary: Eigene Verfügbarkeit zu einer Terminoption abgeben
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: dateOptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanAvailabilityRequest'
+      responses:
+        '200':
+          description: Terminoption inkl. aktualisierter Rückmeldungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanDateOptionResponse'
+        '400':
+          description: Ungültige Verfügbarkeit (`invalid_availability`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/dates/{dateOptionId}/finalize:
+    post:
+      summary: Terminoption verbindlich festlegen
+      description: Nur Leitung. Setzt genau diese Option als final.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: dateOptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Finale Terminoption
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanDateOptionResponse'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Terminoption nicht gefunden (`date_option_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/transport:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Transportpräferenzen auflisten
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Transportpräferenzen aller aktiven Mitglieder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanTransportListResponse'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Eigene Transportpräferenz erfassen
+      description: >
+        Aktives Planungsmitglied. Upsert je Richtung (`outbound`/`return`).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanTransportWriteRequest'
+      responses:
+        '200':
+          description: Gespeicherte Transportpräferenz
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanTransportResponse'
+        '400':
+          description: Ungültige Richtung (`invalid_direction`) oder keine Felder (`no_fields_to_update`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/accommodations:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Unterkunftsoptionen auflisten
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Unterkunftsoptionen inkl. Preis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanAccommodationOptionListResponse'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Unterkunftsoption vorschlagen
+      description: >
+        Aktives Planungsmitglied. Entweder Verweis auf den globalen Katalog
+        (`accommodationId`) oder Inline-Daten; Preis pro Person und Nacht
+        optional.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanAccommodationOptionWriteRequest'
+      responses:
+        '201':
+          description: Unterkunftsoption erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanAccommodationOptionResponse'
+        '400':
+          description: Ungültige Eingabe (`name_required`, `invalid_price`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Katalog-Unterkunft nicht gefunden (`accommodation_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/accommodations/{optionId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: optionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: Unterkunftsoption bearbeiten
+      description: Leitung oder Ersteller des Vorschlags.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanAccommodationOptionWriteRequest'
+      responses:
+        '200':
+          description: Aktualisierte Unterkunftsoption
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanAccommodationOptionResponse'
+        '400':
+          description: Ungültige Eingabe (`name_required`, `no_fields_to_update`, `invalid_price`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunftsoption nicht gefunden (`accommodation_option_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Unterkunftsoption löschen
+      description: Leitung oder Ersteller des Vorschlags.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunftsoption nicht gefunden (`accommodation_option_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/accommodations/{optionId}/select:
+    post:
+      summary: Unterkunftsoption verbindlich auswählen
+      description: Nur Leitung. Markiert genau diese Option als ausgewählt.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: optionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Ausgewählte Unterkunftsoption
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanAccommodationOptionResponse'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunftsoption nicht gefunden (`accommodation_option_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/events:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      summary: Tagesprogramm-Vorschläge auflisten
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Eventvorschläge inkl. Interesse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanEventSuggestionListResponse'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Tagesprogramm-Vorschlag einreichen
+      description: Aktives Planungsmitglied.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanEventSuggestionWriteRequest'
+      responses:
+        '201':
+          description: Vorschlag erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanEventSuggestionResponse'
+        '400':
+          description: Ungültige Eingabe (`name_required`, Zeitfehler)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/events/{suggestionId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - name: suggestionId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      summary: Tagesprogramm-Vorschlag bearbeiten
+      description: Leitung oder Ersteller des Vorschlags.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanEventSuggestionWriteRequest'
+      responses:
+        '200':
+          description: Aktualisierter Vorschlag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanEventSuggestionResponse'
+        '400':
+          description: Ungültige Eingabe (`name_required`, `no_fields_to_update`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden (`event_suggestion_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Tagesprogramm-Vorschlag löschen
+      description: Leitung oder Ersteller des Vorschlags.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Nicht erlaubt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden (`event_suggestion_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/events/{suggestionId}/interest:
+    put:
+      summary: Eigenes Interesse an einem Vorschlag erfassen
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: suggestionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanInterestRequest'
+      responses:
+        '200':
+          description: Vorschlag inkl. aktualisiertem Interesse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanEventSuggestionResponse'
+        '400':
+          description: Ungültiges Interesse (`invalid_interest`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein aktives Planungsmitglied (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/planning/{id}/events/{suggestionId}/confirm:
+    post:
+      summary: Tagesprogramm-Vorschlag verbindlich festlegen
+      description: >
+        Nur Leitung. Setzt `isConfirmed` (mit `{"confirmed": false}` wieder
+        zurücknehmbar).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: suggestionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TravelPlanConfirmRequest'
+      responses:
+        '200':
+          description: Vorschlag inkl. Bestätigungsstatus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelPlanEventSuggestionResponse'
+        '403':
+          description: Keine Leitung (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Vorschlag nicht gefunden (`event_suggestion_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /trips:
     get:

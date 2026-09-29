@@ -153,6 +153,22 @@ final readonly class NotificationService
             'title' => 'Event wurde von der Reise gelöst',
             'text' => '',
         ],
+        'trip_planning_invite' => [
+            'title' => 'Einladung zur Reiseplanung',
+            'text' => '',
+        ],
+        'trip_planning_response' => [
+            'title' => 'Rückmeldung zur Reiseplanung',
+            'text' => '',
+        ],
+        'trip_planning_finalized' => [
+            'title' => 'Festlegung in der Reiseplanung',
+            'text' => '',
+        ],
+        'trip_planning_activated' => [
+            'title' => 'Reiseplanung abgeschlossen',
+            'text' => '',
+        ],
     ];
 
     public function __construct(
@@ -255,6 +271,31 @@ final readonly class NotificationService
             'standalone_event_leader_removed', 'standalone_event_leader_removed_others' => $this->normalizeTravelRoleChangedData($type, $data),
             'standalone_event_converted_to_trip' => $this->normalizeTravelConvertedData($type, $data, true),
             'trip_event_converted_to_standalone' => $this->normalizeTravelConvertedData($type, $data, false),
+            'trip_planning_invite' => $this->normalizeSimpleRelations(
+                $type,
+                $data,
+                ['trip' => 'Trip', 'inviter' => 'User'],
+            ),
+            'trip_planning_response' => $this->normalizeSimpleRelations(
+                $type,
+                $data,
+                ['trip' => 'Trip', 'responder' => 'User'],
+            ),
+            'trip_planning_finalized' => $this->normalizeSimpleRelations(
+                $type,
+                $data,
+                ['trip' => 'Trip'],
+                [
+                    'date_option' => 'TravelPlanDateOption',
+                    'accommodation_option' => 'TravelPlanAccommodationOption',
+                    'event' => 'TravelPlanEvent',
+                ],
+            ),
+            'trip_planning_activated' => $this->normalizeSimpleRelations(
+                $type,
+                $data,
+                ['trip' => 'Trip'],
+            ),
             default => throw new \InvalidArgumentException('unsupported notification type'),
         };
     }

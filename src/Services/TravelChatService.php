@@ -7,6 +7,7 @@ use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
+use Sinclear\Api\Repository\TravelPlanMemberRepository;
 use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Services\Centrifugo\CentrifugoClientInterface;
@@ -18,6 +19,7 @@ final readonly class TravelChatService
         private TravelTripRepository $tripRepo,
         private TravelEventRepository $eventRepo,
         private TravelRelationRepository $travelRelationRepo,
+        private TravelPlanMemberRepository $planMemberRepo,
         private EventRelationRepository $eventRelationRepo,
         private ChatConversationRepository $conversationRepo,
         private ChatParticipantRepository $participantRepo,
@@ -44,7 +46,36 @@ final readonly class TravelChatService
 
         $id = $this->travelChatRepo->create($conversationId, $tripId, null);
 
-        $this->syncTripMembersInternal($conversationId, $tripId);
+        if (($trip['state'] ?? 'active') === 'planning') {
+            $this->syncPlanningMembersInternal($conversationId, $tripId);
+        } else {
+            $this->syncTripMembersInternal($conversationId, $tripId);
+        }
+
+        return $this->travelChatRepo->findById($id);
+    }
+
+    /**
+     * Create a group chat for a planning trip. Idempotent — returns existing
+     * if present. Mitglieder werden aus den aktiven Planungsmitgliedern
+     * gespiegelt (nicht aus TravelRelation).
+     */
+    public function createForPlanningTrip(string $tripId): array
+    {
+        $existing = $this->travelChatRepo->findByTripId($tripId);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            throw new \RuntimeException('Trip not found');
+        }
+
+        $conversationId = $this->conversationRepo->create('group', $trip['name']);
+        $id = $this->travelChatRepo->create($conversationId, $tripId, null);
+
+        $this->syncPlanningMembersInternal($conversationId, $tripId);
 
         return $this->travelChatRepo->findById($id);
     }
@@ -116,10 +147,29 @@ final readonly class TravelChatService
         $this->syncEventMembersInternal($travelChat['conversationId'], $eventId);
     }
 
+    /**
+     * Sync chat participants with the active members of a planning trip.
+     */
+    public function syncPlanningMembers(string $tripId): void
+    {
+        $travelChat = $this->travelChatRepo->findByTripId($tripId);
+        if ($travelChat === null) {
+            return;
+        }
+
+        $this->syncPlanningMembersInternal($travelChat['conversationId'], $tripId);
+    }
+
     private function syncTripMembersInternal(string $conversationId, string $tripId): void
     {
         $currentParticipants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
         $this->reconcileParticipants($conversationId, $currentParticipants, 'id');
+    }
+
+    private function syncPlanningMembersInternal(string $conversationId, string $tripId): void
+    {
+        $currentParticipants = $this->planMemberRepo->findActiveByTrip($tripId);
+        $this->reconcileParticipants($conversationId, $currentParticipants, 'userId');
     }
 
     private function syncEventMembersInternal(string $conversationId, string $eventId): void

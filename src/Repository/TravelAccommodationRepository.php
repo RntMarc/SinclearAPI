@@ -105,6 +105,34 @@ final readonly class TravelAccommodationRepository
         $stmt->execute([Uuid::uuid7()->toString(), $tripId, $accommodationId]);
     }
 
+    /**
+     * Verknuepft eine Katalog-Unterkunft mit einer Reise und hinterlegt den
+     * reise-spezifischen Preis (wird bei der Aktivierung aus der gewaehlten
+     * Planungsoption uebernommen). Bestehende Verknuepfungen werden
+     * aktualisiert (idempotent).
+     */
+    public function linkToTripWithPrice(
+        string $tripId,
+        string $accommodationId,
+        ?string $pricePerPersonPerNight,
+        ?string $currency,
+    ): void {
+        $stmt = $this->pdo->prepare(
+            'INSERT INTO TravelAccommodationTrip (ID, tripid, accommodationId, pricePerPersonPerNight, currency)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                pricePerPersonPerNight = VALUES(pricePerPersonPerNight),
+                currency = VALUES(currency)'
+        );
+        $stmt->execute([
+            Uuid::uuid7()->toString(),
+            $tripId,
+            $accommodationId,
+            $pricePerPersonPerNight,
+            $currency,
+        ]);
+    }
+
     public function unlinkFromTrip(string $tripId, string $accommodationId): void
     {
         $stmt = $this->pdo->prepare(

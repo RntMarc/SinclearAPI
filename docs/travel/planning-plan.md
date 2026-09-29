@@ -1,8 +1,9 @@
 # Implementation Plan – Reiseplanung (Trip Planning)
 
-> **Status:** Phase 1 (Datenbank & Migration) implementiert (2026-09-29).
+> **Status:** Phase 1 (Datenbank & Migration) implementiert (2026-09-29);
+> Phase 2 (API & Rechte) implementiert (2026-09-29).
 > **Bereich:** `travel` – mehrstufige Reiseplanung
-> **API-Prefix:** noch nicht festgelegt (folgt in Phase 2)
+> **API-Prefix:** `/trips/planning` (Phase 2)
 
 ## WICHTIGE REGELN FÜR DEN AUSFÜHRENDEN AGENTEN
 
@@ -155,3 +156,98 @@ Planung ↔ operatives Event; Integrität im Service).
 - **Phasenthemen:** Anlage der drei `TravelPlanTopic`-Einträge (inkl.
   Überspringen beim Erstellen) erfolgt im Service/Controller (Phase 2), nicht per
   DB-Trigger.
+
+---
+
+## Phase 2 – API und Rechte (umgesetzt)
+
+> **Status:** Phase 2 abgeschlossen (API, Rechte, Chat, Benachrichtigungen,
+> Aktivierung). **Datum:** 2026-09-29
+
+### Fixierte Entscheidungen (Phase 2)
+
+| Thema | Entscheidung |
+|---|---|
+| Leitung | Neue additive Spalte `TravelPlanMember.role` (`leader`/`member`); Leitung bewusst nicht über `TravelRelation` |
+| API-Prefix | `/trips/planning` (nested, registriert vor `/trips/{id}`) |
+| Aktives Planungsmitglied | `status != 'inactive'` (`invited`/`accepted`/`declined` behalten Zugriff) |
+| `state`-Änderung | Nur `POST /trips/planning` und `POST /trips/planning/{id}/activate`; nie per `PATCH /trips/{id}` |
+| Aktivierung übernimmt | Leader(s) → `TravelRelation.leader`; `accepted` → `participant`; `invited`/`declined`/`inactive` nicht |
+| Benachrichtigungen | `trip_planning_invite`, `trip_planning_response`, `trip_planning_finalized`, `trip_planning_activated` (kein `custom`) |
+
+### Neue/geänderte Dateien
+
+- **Migration:** `database/migrations/20261001000000_travel_planning_leader.sql`
+  (`TravelPlanMember.role`, additiv/rerun-sicher).
+- **Policy:** `src/Security/Policy/TravelPlanningPolicy.php`
+- **Service:** `src/Services/TravelPlanningService.php`,
+  `src/Services/TravelPlanningNotificationService.php`
+- **Controller:** `src/Controllers/TravelPlanningController.php`
+- **Repositories:** `TravelPlanMemberRepository`, `TravelPlanTopicRepository`,
+  `TravelPlanDateOptionRepository`, `TravelPlanDateResponseRepository`,
+  `TravelPlanTransportRepository`, `TravelPlanAccommodationOptionRepository`,
+  `TravelPlanEventRepository`, `TravelPlanEventInterestRepository`
+- **Erweitert:** `TravelTripRepository` (`setState`, `state` in `create`,
+  `findPlanningByParticipant`), `TravelAccommodationRepository`
+  (`linkToTripWithPrice`), `TravelChatService` (`createForPlanningTrip`,
+  `syncPlanningMembers`), `NotificationService`,
+  `NotificationPreferenceService`, `config/routes.php`,
+  `config/dependencies.php`, `openapi.yaml`, `docs/travel/readme.md`,
+  `docs/notifications/{types,readme}.md`
+- **Tests:** `tests/Unit/TravelPlanningPolicyTest.php`,
+  `tests/Unit/TravelPlanningErrorTest.php`,
+  `tests/Unit/TravelPlanNotificationDataTest.php`
+
+### Aktivierung (Algorithmus)
+
+`POST /trips/planning/{id}/activate` (Leitung), transaktional über die
+gemeinsame `PDO`-Instanz, idempotent (`state=active` → No-op):
+
+1. finale Terminoption (`isFinal`) → `TravelTrip`-Zeitfelder;
+2. `TravelTrip.state = 'active'`;
+3. Mitglieder → `TravelRelation` (Leader als `leader`, `accepted` als
+   `participant`; idempotent via `isParticipant`);
+4. gewählte Unterkunft → `TravelAccommodationTrip` inkl.
+   `pricePerPersonPerNight`/`currency` (Katalogeintrag bei Bedarf angelegt);
+5. bestätigte `TravelPlanEvent` → `TravelEvent` + `confirmedEventId`;
+6. Chat-Abgleich aus `TravelRelation`; danach Benachrichtigung.
+
+### Verifikation
+
+- `php -l` auf allen neuen/geänderten PHP-Dateien: fehlerfrei.
+- `vendor/bin/phpstan --level=5` auf allen neuen/geänderten Dateien:
+  fehlerfrei. Vorbestehende Hinweise in `NotificationService` /
+  `NotificationPreferenceService` sowie `closure.unusedUse` in `config/routes.php`
+  (nicht angefasste Zeilen) bleiben unverändert.
+- `vendor/bin/phpunit --testsuite Unit`: die neuen Tests (30 Tests, 55
+  Assertions) sind grün. Die übrigen Fehler der Unit-Suite sind ausschließlich
+  `Class "PDO" not found` in vorbestehenden, DB-abhängigen Tests
+  (`NotificationServiceTest`, `NotificationPreferenceServiceTest`,
+  `AuthControllerTest`, `CalendarFeedServiceTest`) – lokal nicht ausführbar
+  (kein PDO/MySQL), laufen erst auf dem Server.
+- `openapi.yaml`: YAML valide, alle `$ref` (außer dem vorbestehenden
+  `ReviewResponse/properties/data`) auflösbar, keine neuen doppelten Keys.
+- `.htaccess`: keine Änderung erforderlich (alle Routen über `/api/v2`,
+  keine neuen statischen Pfade/Geheimnisse).
+- Admin-Dashboard: keine neue Bearbeitungsanforderung (Planung ist
+  nutzergetrieben); Konsistenz geprüft, keine Formulare ergänzt.
+
+### Abweichungen / Hinweise (Phase 2)
+
+- **`TravelPlanMember.role`:** In Phase 1 nicht enthalten; als additive
+  Migration in Phase 2 ergänzt, da die Leitung autorisiert werden muss.
+- **Letzter-Leader-Invariante:** im Service über
+  `TravelPlanningPolicy::canRemoveLeader` durchgesetzt (kein DB-Trigger).
+- **Budget:** Phase 1 hat kein dediziertes Budget-Feld im Schema fixiert.
+  Budgetangaben werden daher über den Unterkunftspreis
+  (`TravelPlanAccommodationOption.pricePerPersonPerNight`/`currency`, für alle
+  aktiven Mitglieder sichtbar) und das freie `TravelPlanTransport.notes`-Feld
+  abgebildet; ein eigenes Budget-Feld wird bewusst nicht nachgezogen.
+- **Chat im Transaktionsscope:** der Chat-Abgleich läuft innerhalb der
+  Aktivierungstransaktion; die Centrifugo-Unsubscribe-Nebenwirkung ist
+  bewusst in Kauf genommen.
+- **Betreiber-Folgeaufgaben:** Migration
+  `20261001000000_travel_planning_leader.sql` am Server anwenden;
+  Schema-Snapshot (`database/status_*`) neu generieren. `update.sh` NICHT
+  ungefragt ausführen.
+
