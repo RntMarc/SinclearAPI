@@ -7,12 +7,23 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `TravelRelation` (
+CREATE TABLE IF NOT EXISTS `TravelAccommodation` (
   `ID` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `userid` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `tripid` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `accommodation` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`ID`)
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `address` text COLLATE utf8mb4_unicode_ci,
+  `OSMID` bigint unsigned DEFAULT NULL,
+  `latitude` double DEFAULT NULL,
+  `longitude` double DEFAULT NULL,
+  `phone` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `mail` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ishotel` tinyint NOT NULL,
+  `citySlug` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tripId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `createdBy` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`ID`),
+  KEY `idx_travelaccommodation_trip` (`tripId`),
+  KEY `idx_travelaccommodation_createdby` (`createdBy`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

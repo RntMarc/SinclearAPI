@@ -7,12 +7,14 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `EventRelation` (
-  `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `eventId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `createdAt` datetime(3) NOT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE IF NOT EXISTS `TravelRelation` (
+  `ID` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `userid` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tripid` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `accommodation` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` enum('leader','participant') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'participant',
+  PRIMARY KEY (`ID`),
+  KEY `idx_travelrelation_trip_role` (`tripid`,`role`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

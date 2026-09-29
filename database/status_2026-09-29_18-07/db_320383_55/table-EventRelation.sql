@@ -7,19 +7,14 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
-CREATE TABLE IF NOT EXISTS `TravelAccommodation` (
-  `ID` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `description` text COLLATE utf8mb4_unicode_ci,
-  `address` text COLLATE utf8mb4_unicode_ci,
-  `OSMID` bigint unsigned DEFAULT NULL,
-  `latitude` double DEFAULT NULL,
-  `longitude` double DEFAULT NULL,
-  `phone` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `mail` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `ishotel` tinyint NOT NULL,
-  `citySlug` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`ID`)
+CREATE TABLE IF NOT EXISTS `EventRelation` (
+  `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `eventId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `role` enum('leader','participant') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'participant',
+  `createdAt` datetime(3) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_eventrelation_event_role` (`eventId`,`role`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
