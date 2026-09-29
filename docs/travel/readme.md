@@ -15,14 +15,22 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 
 | Tabelle | Beschreibung |
 |---------|-------------|
-| `TravelTrip` | Reisedaten (Name, Beschreibung, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
+| `TravelTrip` | Reisedaten (Name, Beschreibung, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`, `state` = `planning`/`active`/`cancelled`) |
 | `TravelEvent` | Ereignisse (Reise-Events + Standalone-Events via `trip IS NULL`, citySlug, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
 | `TravelEventTicket` | Tickets für Reisen, Events oder persönliche Nutzer-Tickets |
 | `TravelAccommodation` | Globaler Katalog wiederverwendbarer Unterkünfte (Hotels, Ferienwohnungen, etc., citySlug, `createdBy`) |
-| `TravelAccommodationTrip` | n:m-Verknüpfung einer Katalog-Unterkunft mit Reisen (`tripid`, `accommodationId`) |
+| `TravelAccommodationTrip` | n:m-Verknüpfung einer Katalog-Unterkunft mit Reisen (`tripid`, `accommodationId`, optional `pricePerPersonPerNight`/`currency`) |
 | `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften (inkl. `role` = `leader`/`participant` und `accommodation` = zugewiesene Unterkunft) |
 | `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone; inkl. `role` bei Standalone-Events) |
 | `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
+| `TravelPlanMember` | Planungsteilnehmer (getrennt von `TravelRelation`, `status` = `invited`/`accepted`/`declined`/`inactive`) |
+| `TravelPlanTopic` | Phasenstatus je Planungsreise (`topic` = `participants`/`travel`/`program`, `status` = `pending`/`in_progress`/`completed`/`skipped`) |
+| `TravelPlanDateOption` | Terminoptionen einer Planungsreise (zeitbewusst; `isFinal` = von der Leitung festgelegt) |
+| `TravelPlanDateResponse` | Verfügbarkeits-Rückmeldung je Terminoption und Mitglied (`yes`/`maybe`/`no`) |
+| `TravelPlanTransport` | Transportpräferenz je Mitglied und Richtung (`direction` = `outbound`/`return`, Mitfahrangebot `offersRide`/`availableSeats`) |
+| `TravelPlanAccommodationOption` | Unterkunftsoptionen inkl. Preis pro Person und Nacht + Währung (`isSelected` = gewählt) |
+| `TravelPlanEvent` | Tagesprogramm-Vorschläge ("Planungs-Events"; `isConfirmed`, `confirmedEventId` nach Aktivierung) |
+| `TravelPlanEventInterest` | Teilnahmeinteresse an Tagesprogramm-Vorschlägen (`yes`/`maybe`/`no`) |
 
 ## Banner-Bild (TravelEvent.image)
 
@@ -392,6 +400,46 @@ Bestandsunterkünfte erhalten.
 
 Die Tabelle `EventRelation` verknüpft Nutzer mit `TravelEvent.ID` und wird
 sowohl für Reise-Events als auch für Standalone-Events genutzt.
+
+## Planungsreisen (Vorbereitung)
+
+Eine Reise kann als **Planungsreise** angelegt werden (`TravelTrip.state =
+'planning'`). Sie durchläuft drei feste Kernphasen, die serverseitig als
+Planungsthemen (`TravelPlanTopic.topic`) abgebildet werden:
+
+| Topic | Phase |
+|-------|-------|
+| `participants` | Wann und wer? (Datum und Teilnehmende) |
+| `travel` | Wo und wie? (Anreise, Abreise und Unterkunft) |
+| `program` | Was machen wir? (Tagesprogramm und Events) |
+
+Jedes Thema besitzt einen persistierten Status (`pending`, `in_progress`,
+`completed`, `skipped`). Das Überspringen einer Phase setzt das Thema auf
+`skipped`. Bestehende Reisen erhalten per Default den Zustand `active` und
+bleiben unverändert.
+
+**Wichtige Trennung:** Planungsteilnehmer (`TravelPlanMember`) sind unabhängig
+von der operativen Teilnehmerliste (`TravelRelation`). Wer nur mitplant, erhält
+dadurch keinen Zugriff auf aktive Reise-Events, Tickets oder Unterkünfte.
+Planungsvorschläge werden getrennt von den endgültigen Reise-Objekten
+gespeichert und erst bei der Aktivierung übernommen:
+
+| Planungsdaten | Tabelle(n) | Überführung bei Aktivierung |
+|---------------|-----------|------------------------------|
+| Terminoptionen + Rückmeldungen | `TravelPlanDateOption`, `TravelPlanDateResponse` | `isFinal`-Option → `TravelTrip`-Zeitfelder |
+| Transportpräferenzen | `TravelPlanTransport` | keine operative Entsprechung (nur Planungshistorie) |
+| Unterkunftsoptionen | `TravelPlanAccommodationOption` | `isSelected`-Option → `TravelAccommodationTrip` inkl. `pricePerPersonPerNight`/`currency` |
+| Tagesprogramm-Vorschläge | `TravelPlanEvent`, `TravelPlanEventInterest` | `isConfirmed`-Vorschläge → `TravelEvent` (Referenz in `confirmedEventId`) |
+
+Der Unterkunftspreis ist reise-spezifisch: Er wird in der Planungsoption
+festgehalten und bei der Aktivierung in `TravelAccommodationTrip` übernommen,
+damit er dauerhaft in der operativen Reisedarstellung erhalten bleibt. Der
+globale Katalog `TravelAccommodation` bleibt preisfrei.
+
+> Das Schema wurde mit der Migration
+> `database/migrations/20260930000000_travel_planning.sql` ergänzt (Phase 1,
+> additiv/rückbaubar). API-Endpunkte, Policies und Aktivierungslogik folgen in
+> separaten Phasen.
 
 ## Moderation
 
