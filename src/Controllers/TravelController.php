@@ -113,6 +113,16 @@ final readonly class TravelController
         }
     }
 
+    public function listAccommodationCatalog(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+        $params = $request->getQueryParams();
+        $query = isset($params['q']) && is_string($params['q']) ? $params['q'] : null;
+
+        $catalog = $this->travelService->listAccommodationCatalog($query);
+        return ResponseFactory::json(['data' => $catalog], 200, $response);
+    }
+
     public function getEventById(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
         $user = $this->requireUser($request);
@@ -325,6 +335,46 @@ final readonly class TravelController
         }
     }
 
+    public function addTripEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $this->body($request);
+
+        $targetUserId = trim((string) ($body['userId'] ?? ''));
+        if ($targetUserId === '') {
+            return ResponseFactory::json(['error' => 'userId_required'], 400, $response);
+        }
+
+        try {
+            $relationId = $this->travelService->addTripEventParticipant(
+                $user,
+                $args['id'],
+                $args['eventId'],
+                $targetUserId,
+            );
+            return ResponseFactory::json(['data' => ['id' => $relationId]], 201, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
+    public function removeTripEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $this->travelService->removeTripEventParticipant(
+                $user,
+                $args['id'],
+                $args['eventId'],
+                $args['userId'],
+            );
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
     // ──────────────────────────── Standalone-Events schreiben ────────────────────────────
 
     public function createStandaloneEvent(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -412,6 +462,27 @@ final readonly class TravelController
         }
     }
 
+    public function setParticipantAccommodation(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $body = $this->body($request);
+
+        $accommodation = isset($body['accommodation']) && is_string($body['accommodation']) && $body['accommodation'] !== ''
+            ? trim($body['accommodation']) : null;
+
+        try {
+            $this->travelService->setParticipantAccommodation(
+                $user,
+                $args['id'],
+                $args['userId'],
+                $accommodation,
+            );
+            return ResponseFactory::json(['message' => 'accommodation_updated'], 200, $response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
     // ──────────────────────────── Teilnehmer & Rollen (Standalone-Event) ────────────────────────────
 
     public function addStandaloneEventParticipant(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -490,6 +561,18 @@ final readonly class TravelController
 
         try {
             $this->travelService->deleteAccommodation($user, $args['id'], $args['accommodationId']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e, $response);
+        }
+    }
+
+    public function deleteAccommodationGlobally(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $this->travelService->deleteAccommodationGlobally($user, $args['accommodationId']);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e, $response);

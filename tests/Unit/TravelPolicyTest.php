@@ -141,4 +141,58 @@ class TravelPolicyTest extends TestCase
     {
         $this->assertTrue($this->policy->canRemoveLeader(false));
     }
+
+    // ── Unterkuenfte ─────────────────────────────────────
+
+    public function testParticipantCanCreateAccommodation(): void
+    {
+        $this->assertTrue($this->policy->canCreateAccommodation($this->user(), true));
+    }
+
+    public function testStrangerCannotCreateAccommodation(): void
+    {
+        $this->assertFalse($this->policy->canCreateAccommodation($this->user(), false));
+    }
+
+    public function testAdminCanCreateAccommodation(): void
+    {
+        $this->assertTrue($this->policy->canCreateAccommodation($this->user('admin', true), false));
+    }
+
+    public function testLeaderCanAssignAccommodationToOther(): void
+    {
+        $this->assertTrue($this->policy->canAssignAccommodationToOther($this->user(), 'leader'));
+    }
+
+    public function testParticipantCannotAssignAccommodationToOther(): void
+    {
+        $this->assertFalse($this->policy->canAssignAccommodationToOther($this->user(), 'participant'));
+    }
+
+    public function testParticipantCanAssignOwnAccommodation(): void
+    {
+        $this->assertTrue($this->policy->canAssignOwnAccommodation($this->user(), true));
+    }
+
+    public function testStrangerCannotAssignOwnAccommodation(): void
+    {
+        $this->assertFalse($this->policy->canAssignOwnAccommodation($this->user(), false));
+    }
+
+    public function testCreatorCanEditAndDeleteAccommodation(): void
+    {
+        $this->assertTrue($this->policy->canEditAccommodation($this->user(), null, 'user-1'));
+        $this->assertTrue($this->policy->canDeleteAccommodationGlobally($this->user(), 'user-1'));
+    }
+
+    public function testNonCreatorCannotDeleteAccommodationGlobally(): void
+    {
+        $this->assertFalse($this->policy->canDeleteAccommodationGlobally($this->user(), 'other-user'));
+        $this->assertFalse($this->policy->canDeleteAccommodationGlobally($this->user(), null));
+    }
+
+    public function testLeaderCanEditAccommodationWithoutBeingCreator(): void
+    {
+        $this->assertTrue($this->policy->canEditAccommodation($this->user(), 'leader', 'other-user'));
+    }
 }

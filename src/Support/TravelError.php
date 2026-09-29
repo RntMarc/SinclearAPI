@@ -13,6 +13,7 @@ final class TravelError
         'Not a participant' => ['forbidden', 403],
         'Not a leader' => ['forbidden', 403],
         'Conversion not allowed' => ['conversion_not_allowed', 403],
+        'Accommodation delete not allowed' => ['forbidden', 403],
         'Not a member' => ['forbidden', 403],
         'Trip not found' => ['trip_not_found', 404],
         'Event not found' => ['event_not_found', 404],

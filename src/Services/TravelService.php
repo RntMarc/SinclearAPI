@@ -709,16 +709,63 @@ final readonly class TravelService
         }
     }
 
+    /**
+     * Fuegt einen Nutzer einem Reise-Event hinzu (nur Reiseleiter).
+     */
+    public function addTripEventParticipant(AuthenticatedUser $user, string $tripId, string $eventId, string $targetUserId): string
+    {
+        if ($this->eventRepo->findByIdAndTrip($eventId, $tripId) === null) {
+            throw new \RuntimeException('Event not found');
+        }
+
+        return $this->addEventParticipant($user, $eventId, $targetUserId);
+    }
+
+    /**
+     * Entfernt einen Nutzer aus einem Reise-Event (nur Reiseleiter).
+     */
+    public function removeTripEventParticipant(AuthenticatedUser $user, string $tripId, string $eventId, string $targetUserId): void
+    {
+        if ($this->eventRepo->findByIdAndTrip($eventId, $tripId) === null) {
+            throw new \RuntimeException('Event not found');
+        }
+
+        $this->removeEventParticipant($user, $eventId, $targetUserId);
+    }
+
     public function setParticipantAccommodation(AuthenticatedUser $user, string $tripId, string $targetUserId, ?string $accommodationId): void
     {
         if ($this->tripRepo->findById($tripId) === null) {
             throw new \RuntimeException('Trip not found');
         }
 
-        $this->assertCanManageTrip($user, $tripId);
-
         if ($this->relationRepo->getRole($targetUserId, $tripId) === null) {
             throw new \RuntimeException('Not a participant');
+        }
+
+        // Reiseleiter duerfen jedem Teilnehmer eine Unterkunft zuweisen,
+        // Mitreisende nur sich selbst.
+        $isSelf = $targetUserId === $user->id;
+        $allowed = $isSelf
+            ? $this->policy->canAssignOwnAccommodation(
+                $user,
+                $this->relationRepo->isParticipant($user->id, $tripId),
+            )
+            : $this->policy->canAssignAccommodationToOther(
+                $user,
+                $this->relationRepo->getRole($user->id, $tripId),
+            );
+
+        if (!$allowed) {
+            throw new \RuntimeException('Not a leader');
+        }
+
+        if ($accommodationId !== null) {
+            if ($this->accommodationRepo->findById($accommodationId) === null) {
+                throw new \RuntimeException('Accommodation not found');
+            }
+            // Wiederverwendbare Unterkunft bei Bedarf mit der Reise verknuepfen.
+            $this->accommodationRepo->linkToTrip($tripId, $accommodationId);
         }
 
         $this->relationRepo->updateAccommodation($targetUserId, $tripId, $accommodationId);
@@ -730,14 +777,43 @@ final readonly class TravelService
 
     // ──────────────────────────── Unterkünfte ────────────────────────────
 
-    /** @param array<string, mixed> $body */
+    /**
+     * Globaler Katalog wiederverwendbarer Unterkuenfte. Optional nach Name
+     * gefiltert.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listAccommodationCatalog(?string $query): array
+    {
+        return $this->accommodationRepo->findCatalog($query);
+    }
+
+    /**
+     * Legt eine Unterkunft an oder verknuepft eine bereits vorhandene
+     * (Katalog-)Unterkunft mit der Reise.
+     *
+     * @param array<string, mixed> $body
+     */
     public function createAccommodation(AuthenticatedUser $user, string $tripId, array $body): array
     {
         if ($this->tripRepo->findById($tripId) === null) {
             throw new \RuntimeException('Trip not found');
         }
 
-        $this->assertCanManageTrip($user, $tripId);
+        if (!$this->policy->canCreateAccommodation($user, $this->relationRepo->isParticipant($user->id, $tripId))) {
+            throw new \RuntimeException('Not a participant');
+        }
+
+        // Vorhandene Unterkunft nur verknuepfen (Wiederverwendung).
+        $existingId = TravelInput::nullableString($body, 'accommodationId');
+        if ($existingId !== null) {
+            $existing = $this->accommodationRepo->findById($existingId);
+            if ($existing === null) {
+                throw new \RuntimeException('Accommodation not found');
+            }
+            $this->accommodationRepo->linkToTrip($tripId, $existingId);
+            return $this->enrichAccommodation($existing, $tripId);
+        }
 
         $name = trim((string) ($body['name'] ?? ''));
         if ($name === '') {
@@ -745,7 +821,6 @@ final readonly class TravelService
         }
 
         $id = $this->accommodationRepo->create([
-            'tripId' => $tripId,
             'name' => $name,
             'description' => TravelInput::nullableString($body, 'description'),
             'address' => TravelInput::nullableString($body, 'address'),
@@ -756,7 +831,10 @@ final readonly class TravelService
             'mail' => TravelInput::nullableString($body, 'mail'),
             'ishotel' => !empty($body['ishotel']) ? 1 : 0,
             'citySlug' => TravelInput::nullableString($body, 'citySlug'),
+            'createdBy' => $user->id,
         ]);
+
+        $this->accommodationRepo->linkToTrip($tripId, $id);
 
         $accommodation = $this->accommodationRepo->findById($id)
             ?? throw new \RuntimeException('Accommodation not found');
@@ -771,10 +849,17 @@ final readonly class TravelService
             throw new \RuntimeException('Trip not found');
         }
 
-        $this->assertCanManageTrip($user, $tripId);
-
-        if ($this->accommodationRepo->findByIdAndTrip($accommodationId, $tripId) === null) {
+        $accommodation = $this->accommodationRepo->findByIdAndTrip($accommodationId, $tripId);
+        if ($accommodation === null) {
             throw new \RuntimeException('Accommodation not found');
+        }
+
+        if (!$this->policy->canEditAccommodation(
+            $user,
+            $this->relationRepo->getRole($user->id, $tripId),
+            $accommodation['createdBy'] ?? null,
+        )) {
+            throw new \RuntimeException('Not a leader');
         }
 
         $data = [];
@@ -809,12 +894,16 @@ final readonly class TravelService
 
         $this->accommodationRepo->update($accommodationId, $data);
 
-        $accommodation = $this->accommodationRepo->findById($accommodationId)
+        $updated = $this->accommodationRepo->findById($accommodationId)
             ?? throw new \RuntimeException('Accommodation not found');
 
-        return $this->enrichAccommodation($accommodation, $tripId);
+        return $this->enrichAccommodation($updated, $tripId);
     }
 
+    /**
+     * Loest eine Unterkunft von einer Reise (Loeschen der Verknuepfung),
+     * ohne den globalen Katalogeintrag zu entfernen.
+     */
     public function deleteAccommodation(AuthenticatedUser $user, string $tripId, string $accommodationId): void
     {
         if ($this->tripRepo->findById($tripId) === null) {
@@ -827,6 +916,27 @@ final readonly class TravelService
             throw new \RuntimeException('Accommodation not found');
         }
 
+        $this->accommodationRepo->unlinkFromTrip($tripId, $accommodationId);
+        $this->relationRepo->clearAccommodationForTrip($tripId, $accommodationId);
+    }
+
+    /**
+     * Entfernt eine Unterkunft endgueltig aus dem globalen Katalog. Nur der
+     * Ersteller (oder Admin) darf das.
+     */
+    public function deleteAccommodationGlobally(AuthenticatedUser $user, string $accommodationId): void
+    {
+        $accommodation = $this->accommodationRepo->findById($accommodationId);
+        if ($accommodation === null) {
+            throw new \RuntimeException('Accommodation not found');
+        }
+
+        if (!$this->policy->canDeleteAccommodationGlobally($user, $accommodation['createdBy'] ?? null)) {
+            throw new \RuntimeException('Accommodation delete not allowed');
+        }
+
+        $this->accommodationRepo->deleteAllLinks($accommodationId);
+        $this->relationRepo->clearAccommodationEverywhere($accommodationId);
         $this->accommodationRepo->delete($accommodationId);
     }
 

@@ -18,8 +18,9 @@ bei denen er über die `TravelRelation`-Tabelle als Teilnehmer eingetragen ist.
 | `TravelTrip` | Reisedaten (Name, Beschreibung, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
 | `TravelEvent` | Ereignisse (Reise-Events + Standalone-Events via `trip IS NULL`, citySlug, `allDay`, `timezone`, `startAt`/`endAt` bzw. `startDate`/`endDate`) |
 | `TravelEventTicket` | Tickets für Reisen, Events oder persönliche Nutzer-Tickets |
-| `TravelAccommodation` | Unterkünfte (Hotels, Ferienwohnungen, etc., citySlug) |
-| `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften (inkl. `role` = `leader`/`participant`) |
+| `TravelAccommodation` | Globaler Katalog wiederverwendbarer Unterkünfte (Hotels, Ferienwohnungen, etc., citySlug, `createdBy`) |
+| `TravelAccommodationTrip` | n:m-Verknüpfung einer Katalog-Unterkunft mit Reisen (`tripid`, `accommodationId`) |
+| `TravelRelation` | Verknüpfung von Nutzern mit Reisen und Unterkünften (inkl. `role` = `leader`/`participant` und `accommodation` = zugewiesene Unterkunft) |
 | `EventRelation` | Teilnehmer an Events (sowohl Reise- als auch Standalone; inkl. `role` bei Standalone-Events) |
 | `TravelChat` | Verknüpfung von Gruppenchats mit Reisen oder Events |
 
@@ -60,8 +61,16 @@ Alle Endpunkte benötigen einen gültigen JWT (Bearer Token).
 | `GET /trips/{id}/events/{eventId}` | Nutzer muss Teilnehmer der Reise sein |
 | `GET /trips/{id}/tickets` | Nutzer muss Teilnehmer der Reise sein |
 | `GET /trips/{id}/accommodations` | Nutzer muss Teilnehmer der Reise sein |
+| `POST /trips/{id}/accommodations` | Nutzer muss Teilnehmer der Reise sein (Reiseleiter und Mitreisende) |
 | `GET /trips/{id}/accommodations/{accommodationId}` | Nutzer muss Teilnehmer der Reise sein |
+| `PATCH /trips/{id}/accommodations/{accommodationId}` | Reiseleiter der Reise, Ersteller der Katalog-Unterkunft oder Admin |
+| `DELETE /trips/{id}/accommodations/{accommodationId}` | Nur Reiseleiter (löst die Verknüpfung, löscht nicht den Katalog) |
+| `GET /trips/accommodations` | Authentifizierter Nutzer (globaler Katalog) |
+| `DELETE /trips/accommodations/{accommodationId}` | Nur Ersteller der Unterkunft oder Admin (endgültiges Löschen) |
 | `GET /trips/{id}/participants` | Nutzer muss Teilnehmer der Reise sein |
+| `PUT /trips/{id}/participants/{userId}/accommodation` | Reiseleiter für alle Teilnehmer; Mitreisende nur für sich selbst |
+| `POST /trips/{id}/events/{eventId}/participants` | Nur Reiseleiter der zugehörigen Reise |
+| `DELETE /trips/{id}/events/{eventId}/participants/{userId}` | Nur Reiseleiter der zugehörigen Reise |
 | `GET /trips/standaloneevents` | Nur Events, bei denen Nutzer in `EventRelation` steht |
 | `GET /trips/standaloneevents/{eventId}` | Nutzer muss in `EventRelation` sein → sonst `404` |
 | `GET /trips/events/{eventId}` | Nutzer muss Teilnehmer des Events oder der zugehörigen Reise sein |
@@ -90,6 +99,17 @@ Reisen und Events unterscheiden zwei Rollen pro Teilnehmer-Relation:
   eingetragen.
 - Nur `leader` einer Reise dürfen die Reise, ihre Reise-Events und ihre
   Unterkünfte bearbeiten/löschen sowie Teilnehmer und Rollen verwalten.
+- **Unterkünfte:** Jeder Reiseteilnehmer (auch Mitreisende) darf Unterkünfte
+  anlegen bzw. vorhandene Katalog-Unterkünfte mit der Reise verknüpfen. Einem
+  anderen Teilnehmer eine Unterkunft zuweisen darf nur ein Reiseleiter; sich
+  selbst darf jeder Teilnehmer eine Unterkunft zuweisen. Katalog-Details
+  bearbeiten/endgültig löschen darf der jeweilige Ersteller (oder Admin).
+- **Reise-Event-Teilnehmer:** Reise-Events besitzen eine eigene
+  Teilnehmerliste (`EventRelation`). Reiseleiter können jederzeit Nutzer über
+  `POST`/`DELETE /trips/{id}/events/{eventId}/participants[/{userId}]`
+  hinzufügen oder entfernen. Die Teilnehmer werden nicht automatisch aus der
+  Reise übernommen (kein „automatisch dabei“). Rollen werden bei Reise-Events
+  nicht pro Event vergeben – es gelten die Reise-Rollen.
 - Reiseleiter können weitere Teilnehmer über
   `PUT /trips/{id}/participants/{userId}/role` zu `leader` ernennen oder
   wieder degradieren.
@@ -126,17 +146,43 @@ Die Teilnehmer werden als `participants`-Array im Response mitgeliefert:
 }
 ```
 
-## Unterkunft-Zuordnung (TravelRelation)
+## Wiederverwendbare Unterkünfte (Katalog + Zuordnung)
 
-Jede `TravelAccommodation` kann mehreren Nutzern zugeordnet sein (über
-`TravelRelation.accommodation`). Die zugeordneten Nutzer werden als
-`users`-Array im Response mitgeliefert:
+Unterkünfte sind **global und wiederverwendbar**: Sie werden einmal angelegt
+und können anschließend in beliebig vielen Reisen verwendet werden. Dafür
+gilt ein zweistufiges Modell:
+
+* **Katalog:** `TravelAccommodation` ist der globale Bestand. Über
+  `GET /trips/accommodations` (optional `?q=<name>`) listet jeder
+  authentifizierte Nutzer alle Unterkünfte. `createdBy` hält den Ersteller
+  fest.
+* **Reise-Verknüpfung:** `TravelAccommodationTrip` verknüpft eine
+  Katalog-Unterkunft mit einer Reise. `POST /trips/{id}/accommodations`
+  legt entweder eine neue Unterkunft an (Feld `name` …) oder verknüpft eine
+  vorhandene (`{ "accommodationId": "..." }`). `DELETE
+  /trips/{id}/accommodations/{accommodationId}` löst die Verknüpfung wieder
+  (Katalogeintrag bleibt erhalten); `DELETE
+  /trips/accommodations/{accommodationId}` entfernt ihn endgültig (nur
+  Ersteller/Admin).
+* **Teilnehmer-Zuordnung:** `TravelRelation.accommodation` ordnet einem
+  Teilnehmer innerhalb einer Reise eine Unterkunft zu. Die Zuordnung erfolgt
+  über `PUT /trips/{id}/participants/{userId}/accommodation` mit
+  `{ "accommodation": "<id>" | null }`. Wird eine noch nicht verknüpfte
+  Katalog-Unterkunft zugewiesen, wird sie automatisch mit der Reise
+  verknüpft.
+
+Bestandsunterkünfte mit gesetzter `TravelAccommodation.tripId` bleiben
+sichtbar; neu angelegte Unterkünfte werden ausschließlich über
+`TravelAccommodationTrip` verknüpft.
+
+Die zugeordneten Nutzer werden als `users`-Array im Response mitgeliefert:
 
 ```json
 {
   "data": {
     "ID": "...",
     "name": "Hotel Sonnenschein",
+    "createdBy": "...",
     "users": [
       { "id": "...", "displayName": "Max", "image": null }
     ]
@@ -242,16 +288,21 @@ des aktuellen Nutzers zurück.
 | `GET` | `/trips/{id}/events/{eventId}` | JWT | Event-Details (mit Teilnehmern) |
 | `PATCH` | `/trips/{id}/events/{eventId}` | JWT | Reise-Event bearbeiten/Konversion (nur `leader`) |
 | `DELETE` | `/trips/{id}/events/{eventId}` | JWT | Reise-Event löschen (nur `leader`) |
+| `POST` | `/trips/{id}/events/{eventId}/participants` | JWT | Teilnehmer zu einem Reise-Event hinzufügen (nur `leader`) |
+| `DELETE` | `/trips/{id}/events/{eventId}/participants/{userId}` | JWT | Teilnehmer aus einem Reise-Event entfernen (nur `leader`) |
 | `GET` | `/trips/{id}/tickets` | JWT | Tickets einer Reise (Gruppen- + eigene User-Tickets) |
 | `GET` | `/trips/{id}/accommodations` | JWT | Alle Unterkünfte einer Reise (mit Nutzern) |
-| `POST` | `/trips/{id}/accommodations` | JWT | Unterkunft für die Reise erstellen (nur `leader`) |
+| `POST` | `/trips/{id}/accommodations` | JWT | Unterkunft anlegen oder vorhandene verknüpfen (`accommodationId`), jeder Teilnehmer |
 | `GET` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunfts-Details (mit Nutzern) |
-| `PATCH` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunft bearbeiten (nur `leader`) |
-| `DELETE` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunft löschen (nur `leader`) |
+| `PATCH` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunft bearbeiten (`leader`, Ersteller oder Admin) |
+| `DELETE` | `/trips/{id}/accommodations/{accommodationId}` | JWT | Unterkunft von der Reise lösen (nur `leader`) |
+| `GET` | `/trips/accommodations` | JWT | Globaler Katalog (optional `?q=<name>`) |
+| `DELETE` | `/trips/accommodations/{accommodationId}` | JWT | Unterkunft endgültig aus dem Katalog löschen (Ersteller/Admin) |
 | `GET` | `/trips/{id}/participants` | JWT | Alle Teilnehmer einer Reise (inkl. `role`) |
 | `POST` | `/trips/{id}/participants` | JWT | Teilnehmer hinzufügen (nur `leader`) |
 | `DELETE` | `/trips/{id}/participants/{userId}` | JWT | Teilnehmer entfernen (nur `leader`; letzter `leader` geschützt) |
 | `PUT` | `/trips/{id}/participants/{userId}/role` | JWT | Rolle setzen (`leader`/`participant`, nur `leader`) |
+| `PUT` | `/trips/{id}/participants/{userId}/accommodation` | JWT | Unterkunft zuweisen/aufheben (`leader` für alle, Mitreisende nur sich selbst) |
 | `GET` | `/trips/{id}/subscriptions` | JWT | Mit Reise verknüpfte Abos (nur bei Zugriff) |
 | `GET` | `/trips/standaloneevents` | JWT | Standalone-Events des Nutzers (paginiert, mit Teilnehmern) |
 | `POST` | `/trips/standaloneevents` | JWT | Standalone-Event erstellen (Ersteller wird Veranstalter) |
@@ -333,10 +384,11 @@ Die Tabelle `TravelEvent` referenziert den Trip über das Feld `trip`
 (entspricht `TravelTrip.id`). Bei Standalone-Events ist `trip` auf `NULL`
 gesetzt.
 
-Die Tabelle `TravelAccommodation` wird über `TravelRelation.accommodation`
-mit den Nutzern und damit der Reise verknüpft. Zusätzlich kann sie über die
-optionale Spalte `TravelAccommodation.tripId` direkt einer Reise zugeordnet
-sein (für Reiseleiter-erstellte Unterkünfte).
+Die Tabelle `TravelAccommodation` ist der globale Katalog. Sie wird über die
+Junction-Tabelle `TravelAccommodationTrip` (`tripid`, `accommodationId`) mit
+Reisen verknüpft und über `TravelRelation.accommodation` einzelnen Nutzern
+zugeordnet. Die optionale Spalte `TravelAccommodation.tripId` bleibt nur für
+Bestandsunterkünfte erhalten.
 
 Die Tabelle `EventRelation` verknüpft Nutzer mit `TravelEvent.ID` und wird
 sowohl für Reise-Events als auch für Standalone-Events genutzt.

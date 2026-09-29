@@ -788,7 +788,8 @@ ROW;
                 <td>{$aContact}</td>
                 <td class="flex" style="gap:0.4rem;">
                     <button class="btn btn-sm btn-primary" onclick="editAccommodation('{$aId}', `{$aName}`, `{$a['description']}`, `{$aAddress}`, '{$aPhone}', '{$aMail}', '{$a['latitude']}', '{$a['longitude']}', '{$a['OSMID']}', '{$a['ishotel']}', `{$a['citySlug']}`)">Bearbeiten</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteAccommodation('{$aId}', '{$aName}')">Löschen</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteAccommodation('{$aId}', '{$aName}')">Entfernen</button>
+                    <button class="btn btn-sm" onclick="deleteAccommodationGlobal('{$aId}', '{$aName}')">Katalog löschen</button>
                 </td>
             </tr>
 ROW;
@@ -1067,6 +1068,18 @@ HTML;
 
         try {
             $this->travelService->deleteAccommodation($user, $args['id'], $args['accId']);
+            return ResponseFactory::noContent($response);
+        } catch (\RuntimeException $e) {
+            return $this->travelErrorResponse($e, $response);
+        }
+    }
+
+    public function deleteAccommodationGlobally(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        try {
+            $this->travelService->deleteAccommodationGlobally($user, $args['id']);
             return ResponseFactory::noContent($response);
         } catch (\RuntimeException $e) {
             return $this->travelErrorResponse($e, $response);

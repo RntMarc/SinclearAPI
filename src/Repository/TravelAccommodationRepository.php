@@ -18,16 +18,37 @@ final readonly class TravelAccommodationRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Globaler Katalog wiederverwendbarer Unterkuenfte. Optional nach Name
+     * gefiltert.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findCatalog(?string $query = null): array
+    {
+        $query = $query !== null ? trim($query) : '';
+        if ($query === '') {
+            return $this->findAll();
+        }
+
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM TravelAccommodation WHERE name LIKE ? ORDER BY name ASC LIMIT 200'
+        );
+        $stmt->execute(['%' . $query . '%']);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     public function findByTrip(string $tripId): array
     {
         $stmt = $this->pdo->prepare(
             'SELECT DISTINCT a.*
              FROM TravelAccommodation a
-             LEFT JOIN TravelRelation r ON r.accommodation = a.ID
-             WHERE a.tripId = ? OR r.tripid = ?
+             LEFT JOIN TravelRelation r ON r.accommodation = a.ID AND r.tripid = ?
+             LEFT JOIN TravelAccommodationTrip t ON t.accommodationId = a.ID AND t.tripid = ?
+             WHERE a.tripId = ? OR r.ID IS NOT NULL OR t.ID IS NOT NULL
              ORDER BY a.name ASC'
         );
-        $stmt->execute([$tripId, $tripId]);
+        $stmt->execute([$tripId, $tripId, $tripId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -44,11 +65,12 @@ final readonly class TravelAccommodationRepository
         $stmt = $this->pdo->prepare(
             'SELECT DISTINCT a.*
              FROM TravelAccommodation a
-             LEFT JOIN TravelRelation r ON r.accommodation = a.ID
-             WHERE a.ID = ? AND (a.tripId = ? OR r.tripid = ?)
+             LEFT JOIN TravelRelation r ON r.accommodation = a.ID AND r.tripid = ?
+             LEFT JOIN TravelAccommodationTrip t ON t.accommodationId = a.ID AND t.tripid = ?
+             WHERE a.ID = ? AND (a.tripId = ? OR r.ID IS NOT NULL OR t.ID IS NOT NULL)
              LIMIT 1'
         );
-        $stmt->execute([$id, $tripId, $tripId]);
+        $stmt->execute([$tripId, $tripId, $id, $tripId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
     }
@@ -66,12 +88,45 @@ final readonly class TravelAccommodationRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function isLinkedToTrip(string $tripId, string $accommodationId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT 1 FROM TravelAccommodationTrip WHERE tripid = ? AND accommodationId = ? LIMIT 1'
+        );
+        $stmt->execute([$tripId, $accommodationId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    }
+
+    public function linkToTrip(string $tripId, string $accommodationId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'INSERT IGNORE INTO TravelAccommodationTrip (ID, tripid, accommodationId) VALUES (?, ?, ?)'
+        );
+        $stmt->execute([Uuid::uuid7()->toString(), $tripId, $accommodationId]);
+    }
+
+    public function unlinkFromTrip(string $tripId, string $accommodationId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM TravelAccommodationTrip WHERE tripid = ? AND accommodationId = ?'
+        );
+        $stmt->execute([$tripId, $accommodationId]);
+    }
+
+    public function deleteAllLinks(string $accommodationId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE FROM TravelAccommodationTrip WHERE accommodationId = ?'
+        );
+        $stmt->execute([$accommodationId]);
+    }
+
     public function create(array $data): string
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelAccommodation (ID, name, description, address, OSMID, latitude, longitude, phone, mail, ishotel, citySlug, tripId)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelAccommodation (ID, name, description, address, OSMID, latitude, longitude, phone, mail, ishotel, citySlug, tripId, createdBy)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -86,6 +141,7 @@ final readonly class TravelAccommodationRepository
             $data['ishotel'] ?? 0,
             $data['citySlug'] ?? null,
             $data['tripId'] ?? null,
+            $data['createdBy'] ?? null,
         ]);
         return $id;
     }

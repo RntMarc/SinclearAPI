@@ -183,6 +183,10 @@ return function (App $app): void {
         // Event tickets
         $group->get('/events/{eventId}/tickets', [TravelController::class, 'listEventTickets']);
 
+        // Globaler Unterkunfts-Katalog (MUST come before /{id})
+        $group->get('/accommodations', [TravelController::class, 'listAccommodationCatalog']);
+        $group->delete('/accommodations/{accommodationId}', [TravelController::class, 'deleteAccommodationGlobally']);
+
         $group->get('/{id}', [TravelController::class, 'getTrip']);
         $group->patch('/{id}', [TravelController::class, 'updateTrip']);
         $group->delete('/{id}', [TravelController::class, 'deleteTrip']);
@@ -191,6 +195,8 @@ return function (App $app): void {
         $group->get('/{id}/events/{eventId}', [TravelController::class, 'getEvent']);
         $group->patch('/{id}/events/{eventId}', [TravelController::class, 'updateTripEvent']);
         $group->delete('/{id}/events/{eventId}', [TravelController::class, 'deleteTripEvent']);
+        $group->post('/{id}/events/{eventId}/participants', [TravelController::class, 'addTripEventParticipant']);
+        $group->delete('/{id}/events/{eventId}/participants/{userId}', [TravelController::class, 'removeTripEventParticipant']);
         $group->get('/{id}/tickets', [TravelController::class, 'listTripTickets']);
         $group->get('/{id}/accommodations', [TravelController::class, 'listAccommodations']);
         $group->post('/{id}/accommodations', [TravelController::class, 'createAccommodation']);
@@ -201,6 +207,7 @@ return function (App $app): void {
         $group->post('/{id}/participants', [TravelController::class, 'addTripParticipant']);
         $group->delete('/{id}/participants/{userId}', [TravelController::class, 'removeTripParticipant']);
         $group->put('/{id}/participants/{userId}/role', [TravelController::class, 'setTripParticipantRole']);
+        $group->put('/{id}/participants/{userId}/accommodation', [TravelController::class, 'setParticipantAccommodation']);
         $group->get('/{id}/subscriptions', [TravelController::class, 'getTripSubscriptions']);
     })->add($container->get(AuthenticationMiddleware::class));
 
@@ -510,6 +517,7 @@ return function (App $app): void {
         $group->post('/travel/trips/{id}/accommodations', [AdminController::class, 'createTripAccommodation']);
         $group->put('/travel/trips/{id}/accommodations/{accId}', [AdminController::class, 'updateTripAccommodation']);
         $group->delete('/travel/trips/{id}/accommodations/{accId}', [AdminController::class, 'deleteTripAccommodation']);
+        $group->delete('/travel/accommodations/{id}', [AdminController::class, 'deleteAccommodationGlobally']);
         $group->post('/travel/events', [AdminController::class, 'createEvent']);
         $group->put('/travel/events/{id}', [AdminController::class, 'updateEvent']);
         $group->delete('/travel/events/{id}', [AdminController::class, 'deleteEvent']);

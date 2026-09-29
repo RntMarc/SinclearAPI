@@ -1382,9 +1382,16 @@ components:
           format: uuid
           nullable: true
           description: >
-            Direkte Zuordnung zu einer Reise. Kann null sein, wenn die
-            Unterkunft nur über `TravelRelation.accommodation` Teilnehmenden
-            zugewiesen ist.
+            Veraltete direkte Reisezuordnung (nur Bestandsunterkünfte). Neue
+            Unterkünfte werden über `TravelAccommodationTrip` mit Reisen
+            verknüpft.
+        createdBy:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Ersteller der Katalog-Unterkunft. Nur dieser (oder ein Admin) darf
+            sie endgültig aus dem Katalog löschen.
         users:
           type: array
           description: Nutzer, die dieser Unterkunft zugeordnet sind (über TravelRelation)
@@ -12156,9 +12163,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
     delete:
-      summary: Admin-Unterkunft löschen
+      summary: Admin-Unterkunft von der Reise lösen
       description: >
-        Löscht eine Unterkunft.
+        Löst die Verknüpfung der Unterkunft mit der Reise (der Katalog-Eintrag
+        bleibt erhalten).
       tags: [Admin]
       parameters:
         - name: id
@@ -12175,7 +12183,7 @@ paths:
             format: uuid
       responses:
         '204':
-          description: Unterkunft gelöscht (kein Inhalt)
+          description: Verknüpfung entfernt (kein Inhalt)
         '401':
           description: Nicht autorisiert
           content:
@@ -12226,6 +12234,43 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/travel/accommodations/{id}:
+    delete:
+      summary: Admin-Unterkunft endgültig aus dem Katalog löschen
+      description: >
+        Entfernt die Unterkunft endgültig aus dem globalen Katalog und löst
+        alle Reise- und Teilnehmer-Verknüpfungen. Nur Admin.
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            description: Unterkunfts-ID
+      responses:
+        '204':
+          description: Unterkunft gelöscht (kein Inhalt)
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunft nicht gefunden
           content:
             application/json:
               schema:
@@ -16900,10 +16945,11 @@ paths:
                 $ref: '#/components/schemas/Error'
 
     post:
-      summary: Unterkunft für eine Reise erstellen
+      summary: Unterkunft anlegen oder vorhandene verknüpfen
       description: >
-        Erstellt eine Unterkunft und ordnet sie direkt der Reise zu. Nur
-        Reiseleiter oder Admin dürfen das.
+        Legt eine neue Katalog-Unterkunft an und verknüpft sie mit der Reise,
+        ODER verknüpft eine bereits vorhandene (`accommodationId`) mit der
+        Reise. Jeder Teilnehmer der Reise (auch Mitreisende) darf das.
       tags: [Travel]
       security:
         - BearerAuth: []
@@ -16921,8 +16967,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
               properties:
+                accommodationId:
+                  type: string
+                  format: uuid
+                  description: >
+                    ID einer vorhandenen Katalog-Unterkunft. Ist sie gesetzt,
+                    wird keine neue Unterkunft angelegt, sondern nur verknüpft
+                    (alle anderen Felder werden ignoriert).
                 name: { type: string }
                 description: { type: string, nullable: true }
                 address: { type: string, nullable: true }
@@ -16933,9 +16985,12 @@ paths:
                 mail: { type: string, format: email, nullable: true }
                 ishotel: { type: integer, description: '1 = Hotel, 0 = andere' }
                 citySlug: { type: string, nullable: true }
+              oneOf:
+                - required: [accommodationId]
+                - required: [name]
       responses:
         '201':
-          description: Unterkunft erstellt
+          description: Unterkunft erstellt oder verknüpft
           content:
             application/json:
               schema:
@@ -16947,13 +17002,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '403':
-          description: Kein Reiseleiter
+          description: Kein Teilnehmer der Reise
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
         '404':
-          description: Reise nicht gefunden
+          description: Reise oder Unterkunft nicht gefunden
           content:
             application/json:
               schema:
@@ -17011,7 +17066,9 @@ paths:
 
     patch:
       summary: Unterkunft bearbeiten
-      description: Nur Reiseleiter oder Admin dürfen Unterkünfte der Reise bearbeiten.
+      description: >
+        Bearbeitet die Katalog-Details. Erlaubt für Reiseleiter der Reise, den
+        Ersteller der Unterkunft oder Admin.
       tags: [Travel]
       security:
         - BearerAuth: []
@@ -17074,8 +17131,10 @@ paths:
                 $ref: '#/components/schemas/Error'
 
     delete:
-      summary: Unterkunft löschen
-      description: Nur Reiseleiter oder Admin dürfen Unterkünfte der Reise löschen.
+      summary: Unterkunft von der Reise lösen
+      description: >
+        Löst die Verknüpfung der Unterkunft mit der Reise (der Katalog-Eintrag
+        bleibt erhalten). Nur Reiseleiter oder Admin.
       tags: [Travel]
       security:
         - BearerAuth: []
@@ -17105,6 +17164,71 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise oder Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/accommodations:
+    get:
+      summary: Globalen Unterkunfts-Katalog auflisten
+      description: >
+        Gibt den globalen Katalog wiederverwendbarer Unterkünfte zurück.
+        Optional nach Name gefiltert (`?q=`). Jeder authentifizierte Nutzer
+        darf den Katalog lesen.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optionaler Namensfilter (Teilstring).
+      responses:
+        '200':
+          description: Katalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TravelAccommodationListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/accommodations/{accommodationId}:
+    delete:
+      summary: Unterkunft endgültig aus dem Katalog löschen
+      description: >
+        Entfernt die Unterkunft endgültig aus dem globalen Katalog und löst
+        alle Reise- und Teilnehmer-Verknüpfungen. Nur der Ersteller der
+        Unterkunft oder ein Admin.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: accommodationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unterkunfts-ID
+      responses:
+        '204':
+          description: Gelöscht
+        '403':
+          description: Nicht Ersteller und kein Admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unterkunft nicht gefunden
           content:
             application/json:
               schema:
@@ -18732,6 +18856,182 @@ paths:
                 $ref: '#/components/schemas/Error'
         '409':
           description: Letzter Reiseleiter kann nicht degradiert werden (`last_leader`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/participants/{userId}/accommodation:
+    put:
+      summary: Unterkunft eines Teilnehmers zuweisen oder aufheben
+      description: >
+        Weist einem Teilnehmer eine Unterkunft zu oder hebt die Zuordnung auf
+        (`accommodation: null`). Reiseleiter dürfen das für jeden Teilnehmer;
+        Mitreisende nur für sich selbst. Eine noch nicht verknüpfte
+        Katalog-Unterkunft wird automatisch mit der Reise verknüpft.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Teilnehmer-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accommodation:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Unterkunfts-ID oder null zum Aufheben.
+      responses:
+        '200':
+          description: Unterkunft zugewiesen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: accommodation_updated }
+        '403':
+          description: Nicht berechtigt (`forbidden`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise, Teilnehmer oder Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/events/{eventId}/participants:
+    post:
+      summary: Teilnehmer zu einem Reise-Event hinzufügen
+      description: >
+        Fügt einen registrierten Nutzer als Teilnehmer zum Reise-Event hinzu.
+        Nur Reiseleiter der zugehörigen Reise oder Admin. Reise-Events besitzen
+        eine eigene Teilnehmerliste (EventRelation).
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Event-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Teilnehmer hinzugefügt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid, description: ID der EventRelation }
+        '400':
+          description: userId fehlt (`userId_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise, Event oder Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Nutzer ist bereits Teilnehmer (`already_participant`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /trips/{id}/events/{eventId}/participants/{userId}:
+    delete:
+      summary: Teilnehmer von einem Reise-Event entfernen
+      description: Nur Reiseleiter der zugehörigen Reise oder Admin.
+      tags: [Travel]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Reise-ID
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Event-ID
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Entfernt
+        '403':
+          description: Kein Reiseleiter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reise, Event oder Teilnehmer nicht gefunden
           content:
             application/json:
               schema:

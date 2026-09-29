@@ -62,7 +62,14 @@
 <div class="card" style="margin-bottom:1rem;">
     <div class="flex-between" style="margin-bottom:1rem;">
         <h2 style="font-size:1.1rem;color:#aaa;">Unterkünfte</h2>
-        <button class="btn btn-primary" onclick="showCreateAccommodationForm()">+ Unterkunft erstellen</button>
+        <div class="flex" style="gap:0.5rem;align-items:center;">
+            <select id="linkAccommodationSelect" style="background:#1a1a2e;color:#fff;border:1px solid #0f3460;border-radius:6px;padding:0.4rem;">
+                <option value="">– Vorhandene verknüpfen –</option>
+                {{accommodationOptions}}
+            </select>
+            <button class="btn btn-sm btn-success" onclick="linkAccommodation()">Verknüpfen</button>
+            <button class="btn btn-primary" onclick="showCreateAccommodationForm()">+ Unterkunft erstellen</button>
+        </div>
     </div>
     <table>
         <thead>
@@ -501,16 +508,46 @@
     }
 
     async function deleteAccommodation(id, name) {
-        if (!confirm('Unterkunft "' + name + '" wirklich löschen?')) return;
+        if (!confirm('Unterkunft "' + name + '" von der Reise entfernen? Der Katalogeintrag bleibt erhalten.')) return;
         try {
             const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/accommodations/' + id, {
                 method: 'DELETE',
                 credentials: 'same-origin',
             });
             if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
-            if (res.ok) { showToast('Unterkunft gelöscht'); setTimeout(() => window.location.reload(), 500); }
+            if (res.ok) { showToast('Unterkunft entfernt'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Entfernen', 'error'); }
+    }
+
+    async function deleteAccommodationGlobal(id, name) {
+        if (!confirm('Unterkunft "' + name + '" endgültig aus dem Katalog löschen? Sie wird aus allen Reisen entfernt.')) return;
+        try {
+            const res = await fetch('/api/v2/admin/travel/accommodations/' + id, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Unterkunft aus Katalog gelöscht'); setTimeout(() => window.location.reload(), 500); }
             else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
         } catch (e) { showToast('Fehler beim Löschen', 'error'); }
+    }
+
+    async function linkAccommodation() {
+        const select = document.getElementById('linkAccommodationSelect');
+        const accommodationId = select.value;
+        if (!accommodationId) { showToast('Bitte eine Unterkunft wählen.', 'error'); return; }
+        try {
+            const res = await fetch('/api/v2/admin/travel/trips/' + tripId + '/accommodations', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accommodationId: accommodationId }),
+            });
+            if (res.status === 401 || res.status === 403) { window.location.href = '/api/v2/admin/login'; return; }
+            if (res.ok) { showToast('Unterkunft verknüpft'); setTimeout(() => window.location.reload(), 500); }
+            else { const err = await res.json(); showToast('Fehler: ' + (err.error || 'unbekannt'), 'error'); }
+        } catch (e) { showToast('Fehler beim Verknüpfen', 'error'); }
     }
 
     // Event link/unlink

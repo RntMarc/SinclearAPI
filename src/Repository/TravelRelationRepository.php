@@ -130,4 +130,20 @@ final readonly class TravelRelationRepository
         );
         $stmt->execute([$accommodationId, $userId, $tripId]);
     }
+
+    public function clearAccommodationForTrip(string $tripId, string $accommodationId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE TravelRelation SET accommodation = NULL WHERE tripid = ? AND accommodation = ?'
+        );
+        $stmt->execute([$tripId, $accommodationId]);
+    }
+
+    public function clearAccommodationEverywhere(string $accommodationId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE TravelRelation SET accommodation = NULL WHERE accommodation = ?'
+        );
+        $stmt->execute([$accommodationId]);
+    }
 }

@@ -90,4 +90,54 @@ final readonly class TravelPolicy
     {
         return !$isLastLeader;
     }
+
+    /**
+     * Unterkuenfte anlegen/verknuepfen duerfen alle Teilnehmer der Reise
+     * (Reiseleiter und Mitreisende), damit sich Mitreisende selbst versorgen
+     * koennen. Admins immer.
+     */
+    public function canCreateAccommodation(AuthenticatedUser $user, bool $isParticipant): bool
+    {
+        return $user->isAdmin || $isParticipant;
+    }
+
+    /**
+     * Einem anderen Teilnehmer eine Unterkunft zuweisen duerfen nur
+     * Reiseleiter (oder Admin).
+     */
+    public function canAssignAccommodationToOther(AuthenticatedUser $user, ?string $tripRole): bool
+    {
+        return $this->canManageTrip($user, $tripRole);
+    }
+
+    /**
+     * Sich selbst eine Unterkunft zuweisen darf jeder Teilnehmer.
+     */
+    public function canAssignOwnAccommodation(AuthenticatedUser $user, bool $isParticipant): bool
+    {
+        return $user->isAdmin || $isParticipant;
+    }
+
+    /**
+     * Endgueltiges Loeschen einer Katalog-Unterkunft nur fuer den Ersteller
+     * (oder Admin); das Loesen von einer Reise bleibt Reiseleitern
+     * vorbehalten.
+     */
+    public function canDeleteAccommodationGlobally(AuthenticatedUser $user, ?string $createdBy): bool
+    {
+        return $user->isAdmin || ($createdBy !== null && $createdBy === $user->id);
+    }
+
+    /**
+     * Details einer Unterkunft bearbeiten darf der Reiseleiter der
+     * verknuepften Reise, der Ersteller der Katalog-Unterkunft (oder Admin).
+     */
+    public function canEditAccommodation(
+        AuthenticatedUser $user,
+        ?string $tripRole,
+        ?string $createdBy,
+    ): bool {
+        return $this->canManageTrip($user, $tripRole)
+            || $this->canDeleteAccommodationGlobally($user, $createdBy);
+    }
 }
