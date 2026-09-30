@@ -462,7 +462,7 @@ Alle Endpunkte liegen unter `/trips/planning` und benötigen einen gültigen JWT
 | `PATCH` | `/trips/planning/{id}` | Leitung | Name/Beschreibung (kein Zustand/Timing) |
 | `POST` | `/trips/planning/{id}/activate` | Leitung | Planung abschließen und Reise aktivieren (transaktional/idempotent) |
 | `GET` | `/trips/planning/{id}/members` | aktives Planungsmitglied | Mitglieder inkl. Status/Rolle |
-| `POST` | `/trips/planning/{id}/members` | Leitung | Nutzer einladen (`userId`) |
+| `POST` | `/trips/planning/{id}/members` | Leitung | Nutzer einladen (`userId`, idempotent; `409 already_member` nur bei Status `accepted`) |
 | `PUT` | `/trips/planning/{id}/members/me` | aktives Planungsmitglied | Eigene Rückmeldung (`accepted`/`declined`) |
 | `PATCH` | `/trips/planning/{id}/members/{userId}` | Leitung | Mitglied aktiv/inaktiv setzen (`accepted`/`inactive`) |
 | `DELETE` | `/trips/planning/{id}/members/{userId}` | Leitung oder self | Mitglied entfernen / Teilnahme zurückziehen |

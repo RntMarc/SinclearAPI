@@ -14242,7 +14242,12 @@ paths:
                 $ref: '#/components/schemas/Error'
     post:
       summary: Nutzer zur Planung einladen
-      description: Nur Leitung. Erzeugt/erneuert ein Mitglied mit Status `invited`.
+      description: >
+        Nur Leitung. Erzeugt/erneuert ein Mitglied mit Status `invited` und ist
+        idempotent: eine erneute Einladung eines bereits eingeladenen,
+        abgelehnten oder deaktivierten Nutzers ändert nur den Status zurück auf
+        `invited` und erhält die bestehende Rolle (auch `leader`). Nur bereits
+        `accepted` Mitglieder führen zu `already_member`.
       tags: [Travel]
       security:
         - BearerAuth: []
@@ -14278,7 +14283,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Bereits Mitglied (`already_member`)
+          description: 'Bereits akzeptiertes Mitglied (`already_member`)'
           content:
             application/json:
               schema:

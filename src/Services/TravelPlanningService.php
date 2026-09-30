@@ -213,8 +213,11 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('User not found');
         }
 
+        // Nur bereits bestaetigte Mitglieder sind ein harter Konflikt.
+        // Eine erneute Einladung von 'invited'/'declined'/'inactive' ist
+        // idempotent und erhaelt die bestehende Rolle (auch 'leader').
         $existing = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
-        if ($existing !== null && $existing['status'] !== 'inactive') {
+        if ($existing !== null && $existing['status'] === 'accepted') {
             throw new \RuntimeException('Already a member');
         }
 

@@ -88,7 +88,7 @@ final readonly class TravelPlanMemberRepository
         $stmt = $this->pdo->prepare(
             "INSERT INTO TravelPlanMember (id, tripId, userId, status, role, origin)
              VALUES (?, ?, ?, 'invited', 'member', 'invite')
-             ON DUPLICATE KEY UPDATE status = 'invited'"
+             ON DUPLICATE KEY UPDATE status = 'invited', deactivatedAt = NULL"
         );
         $stmt->execute([Uuid::uuid7()->toString(), $tripId, $userId]);
     }

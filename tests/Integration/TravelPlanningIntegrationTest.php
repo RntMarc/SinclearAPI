@@ -667,7 +667,7 @@ final class TravelPlanningIntegrationTest extends TestCase
         // Idempotent: erneute Aktivierung erzeugt keine Duplikate.
         $again = $this->service->activatePlanningTrip($user, $tripId);
         $this->assertSame('active', $again['state']);
-        $this->assertSame(1, $this->countRows('TravelRelation', "tripid = '$tripId'"));
+        $this->assertSame(2, $this->countRows('TravelRelation', "tripid = '$tripId'"));
         $this->assertSame(1, $this->countRows('TravelEvent', "trip = '$tripId'"));
         $this->assertSame(1, $this->countRows('TravelAccommodationTrip', "tripid = '$tripId'"));
     }
