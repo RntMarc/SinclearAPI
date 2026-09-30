@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Services;
 
 use PDO;
+use Psr\Log\LoggerInterface;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Repository\TravelEventRepository;
@@ -57,6 +58,7 @@ final readonly class TravelPlanningService
         private TravelPlanningPolicy $policy,
         private TravelPlanningNotificationService $notificationService,
         private PDO $pdo,
+        private LoggerInterface $logger,
     ) {}
 
     // ──────────────────────────── Lesen ────────────────────────────
@@ -142,8 +144,9 @@ final readonly class TravelPlanningService
 
         $skipped = $this->normalizeSkippedTopics($body['skippedTopics'] ?? null);
 
-        $this->pdo->beginTransaction();
         try {
+            $this->pdo->beginTransaction();
+
             $id = $this->tripRepo->create([
                 'name' => $name,
                 'description' => TravelInput::nullableString($body, 'description'),
@@ -164,7 +167,7 @@ final readonly class TravelPlanningService
 
             $this->pdo->commit();
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
+            $this->rollBackQuietly();
             throw $e;
         }
 
@@ -203,7 +206,6 @@ final readonly class TravelPlanningService
     public function inviteMember(AuthenticatedUser $user, string $tripId, string $targetUserId): string
     {
         $this->requirePlanningTrip($tripId);
-        $this->assertLeader($tripId, $user);
 
         $targetUserId = trim($targetUserId);
         if ($targetUserId === '') {
@@ -213,17 +215,24 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('User not found');
         }
 
-        // Nur bereits bestaetigte Mitglieder sind ein harter Konflikt.
-        // Eine erneute Einladung von 'invited'/'declined'/'inactive' ist
-        // idempotent und erhaelt die bestehende Rolle (auch 'leader').
-        $existing = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
-        if ($existing !== null && $existing['status'] === 'accepted') {
-            throw new \RuntimeException('Already a member');
-        }
+        // Die Reisezeile wird gesperrt, damit die Mitgliederaenderung nicht mit
+        // der Aktivierung verschraenkt (siehe withPlanningLock).
+        $id = $this->withPlanningLock($tripId, function () use ($user, $tripId, $targetUserId): string {
+            $this->assertLeader($tripId, $user);
 
-        $this->memberRepo->invite($tripId, $targetUserId);
-        $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
-        $id = $member['id'] ?? '';
+            // Nur bereits bestaetigte Mitglieder sind ein harter Konflikt.
+            // Eine erneute Einladung von 'invited'/'declined'/'inactive' ist
+            // idempotent und erhaelt die bestehende Rolle (auch 'leader').
+            $existing = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
+            if ($existing !== null && $existing['status'] === 'accepted') {
+                throw new \RuntimeException('Already a member');
+            }
+
+            $this->memberRepo->invite($tripId, $targetUserId);
+            $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
+
+            return $member['id'] ?? '';
+        });
 
         $this->chatService->syncPlanningMembers($tripId);
         $this->notificationService->notifyInvite($tripId, $targetUserId, $user->id);
@@ -234,61 +243,73 @@ final readonly class TravelPlanningService
     public function setMemberStatus(AuthenticatedUser $user, string $tripId, string $targetUserId, string $status): void
     {
         $this->requirePlanningTrip($tripId);
-        $this->assertLeader($tripId, $user);
 
         if (!in_array($status, self::MEMBER_STATUSES, true)) {
             throw new \RuntimeException('Invalid member status');
         }
 
-        $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
-        if ($member === null) {
-            throw new \RuntimeException('Member not found');
-        }
+        $this->withPlanningLock($tripId, function () use ($user, $tripId, $targetUserId, $status): void {
+            $this->assertLeader($tripId, $user);
 
-        $this->assertNotLastLeader($tripId, $member, $status === 'inactive');
+            $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
+            if ($member === null) {
+                throw new \RuntimeException('Member not found');
+            }
 
-        $this->memberRepo->updateStatus($tripId, $targetUserId, $status);
+            $this->assertNotLastLeader($tripId, $member, $status === 'inactive');
+            $this->memberRepo->updateStatus($tripId, $targetUserId, $status);
+        });
+
         $this->chatService->syncPlanningMembers($tripId);
     }
 
     public function respondToInvitation(AuthenticatedUser $user, string $tripId, string $status): void
     {
         $this->requirePlanningTrip($tripId);
-        $member = $this->assertActiveMember($tripId, $user, true);
 
         if (!in_array($status, self::RESPONSES, true)) {
             throw new \RuntimeException('Invalid response');
         }
 
-        if ($member['status'] === $status) {
-            return;
-        }
+        $changed = false;
+        $this->withPlanningLock($tripId, function () use ($user, $tripId, $status, &$changed): void {
+            $member = $this->assertActiveMember($tripId, $user, true);
+            if ($member['status'] === $status) {
+                return;
+            }
 
-        $this->memberRepo->updateStatus($tripId, $user->id, $status);
-        $this->notificationService->notifyResponse($tripId, $user->id, $user->id);
+            $this->memberRepo->updateStatus($tripId, $user->id, $status);
+            $changed = true;
+        });
+
+        if ($changed) {
+            $this->notificationService->notifyResponse($tripId, $user->id, $user->id);
+        }
     }
 
     public function removeMember(AuthenticatedUser $user, string $tripId, string $targetUserId): void
     {
         $this->requirePlanningTrip($tripId);
 
-        if ($targetUserId === $user->id) {
-            $member = $this->assertActiveMember($tripId, $user, true);
-        } else {
-            $this->assertLeader($tripId, $user);
-            $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
-            if ($member === null) {
-                throw new \RuntimeException('Member not found');
+        $this->withPlanningLock($tripId, function () use ($user, $tripId, $targetUserId): void {
+            if ($targetUserId === $user->id) {
+                $member = $this->assertActiveMember($tripId, $user, true);
+            } else {
+                $this->assertLeader($tripId, $user);
+                $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
+                if ($member === null) {
+                    throw new \RuntimeException('Member not found');
+                }
             }
-        }
 
-        if ($member['status'] === 'inactive') {
-            return;
-        }
+            if ($member['status'] === 'inactive') {
+                return;
+            }
 
-        $this->assertNotLastLeader($tripId, $member, true);
+            $this->assertNotLastLeader($tripId, $member, true);
+            $this->memberRepo->updateStatus($tripId, $targetUserId, 'inactive');
+        });
 
-        $this->memberRepo->updateStatus($tripId, $targetUserId, 'inactive');
         $this->chatService->syncPlanningMembers($tripId);
     }
 
@@ -720,8 +741,9 @@ final readonly class TravelPlanningService
         // die Aktivierungsroute beliebige Reisedaten (Ticket, URL, ...) abrufen.
         $this->assertLeader($tripId, $user);
 
-        $this->pdo->beginTransaction();
         try {
+            $this->pdo->beginTransaction();
+
             // Zeilensperre serialisiert konkurrierende Aktivierungen: der
             // zweite Aufruf sieht den Zustand 'active' und wird zum No-op.
             $locked = $this->tripRepo->findByIdForUpdate($tripId);
@@ -741,6 +763,10 @@ final readonly class TravelPlanningService
 
             // Autorisierung gegen eine parallele Rollenaenderung absichern.
             $this->assertLeader($tripId, $user);
+
+            // Vor jedem Write: die Planungsdaten muessen konsistent sein. So
+            // scheitert die Aktivierung frueh und ohne Teil-Schreibvorgaenge.
+            $this->assertPlanningConsistent($tripId);
 
             $final = $this->dateOptionRepo->findFinalByTrip($tripId);
             if ($final !== null) {
@@ -762,17 +788,64 @@ final readonly class TravelPlanningService
 
             $this->chatService->syncTripMembers($tripId);
 
+            // Invariante: die operative Reise braucht mindestens eine Leitung.
+            if ($this->relationRepo->countLeaders($tripId) < 1) {
+                throw new \RuntimeException('Inconsistent planning data');
+            }
+
+            // Innerhalb der Transaktion lesen: die Antwort enthaelt den
+            // committeten (aktiven) Zustand, ohne nach dem Commit erneut lesen
+            // zu muessen.
+            $result = $this->tripRepo->findById($tripId) ?? $locked;
+
             $this->pdo->commit();
         } catch (\Throwable $e) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
+            $this->rollBackQuietly();
             throw $e;
         }
 
-        $this->notificationService->notifyActivated($tripId, $user->id);
+        // Best-effort: eine fehlgeschlagene Benachrichtigung darf eine
+        // erfolgreiche Aktivierung nicht als Fehler erscheinen lassen.
+        $this->notifyActivatedSafely($tripId, $user->id);
 
-        return $this->tripRepo->findById($tripId) ?? [];
+        return $result;
+    }
+
+    /**
+     * Prueft die Planungsdaten vor der Uebernahme. Wirft bei Inkonsistenz eine
+     * RuntimeException, damit die Transaktion ohne Teil-Schreibvorgaenge endet.
+     */
+    private function assertPlanningConsistent(string $tripId): void
+    {
+        if ($this->memberRepo->countLeaders($tripId) < 1) {
+            throw new \RuntimeException('Inconsistent planning data');
+        }
+
+        $final = $this->dateOptionRepo->findFinalByTrip($tripId);
+        if ($final !== null && !$this->hasConsistentTiming($final)) {
+            throw new \RuntimeException('Inconsistent planning data');
+        }
+
+        $selected = $this->accommodationOptionRepo->findSelectedByTrip($tripId);
+        if ($selected !== null && trim((string) ($selected['name'] ?? '')) === '') {
+            throw new \RuntimeException('Inconsistent planning data');
+        }
+
+        foreach ($this->planEventRepo->findConfirmedByTrip($tripId) as $event) {
+            if (trim((string) ($event['name'] ?? '')) === '' || !$this->hasConsistentTiming($event)) {
+                throw new \RuntimeException('Inconsistent planning data');
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $row */
+    private function hasConsistentTiming(array $row): bool
+    {
+        if ((int) ($row['allDay'] ?? 0) === 1) {
+            return ($row['startDate'] ?? null) !== null && ($row['endDate'] ?? null) !== null;
+        }
+
+        return ($row['startAt'] ?? null) !== null && ($row['endAt'] ?? null) !== null;
     }
 
     private function transferMembers(string $tripId): void
@@ -917,6 +990,72 @@ final readonly class TravelPlanningService
         }
         if (!$this->policy->canRemoveLeader($this->memberRepo->countLeaders($tripId) <= 1)) {
             throw new \RuntimeException('Last leader remains');
+        }
+    }
+
+    /**
+     * Fuehrt eine Planungs-Schreiboperation unter der Zeilensperre der Reise
+     * aus. Serialisiert die Operation gegen die Aktivierung, die dieselbe
+     * Sperre haelt (keine verschraenkten Mitglieder-/Zustandsaenderungen).
+     *
+     * @template T
+     * @param callable(): T $callback
+     * @return T
+     */
+    private function withPlanningLock(string $tripId, callable $callback): mixed
+    {
+        try {
+            $this->pdo->beginTransaction();
+
+            $locked = $this->tripRepo->findByIdForUpdate($tripId);
+            if ($locked === null) {
+                throw new \RuntimeException('Planning trip not found');
+            }
+            if (($locked['state'] ?? 'active') !== 'planning') {
+                throw new \RuntimeException('Not a planning trip');
+            }
+
+            $result = $callback();
+
+            $this->pdo->commit();
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->rollBackQuietly();
+            throw $e;
+        }
+    }
+
+    /**
+     * Rollback, der den urspruenglichen Fehler nicht maskiert: ein Fehler beim
+     * Rollback wird nur geloggt.
+     */
+    private function rollBackQuietly(): void
+    {
+        try {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Travel planning rollback failed', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Best-effort-Benachrichtigung nach dem Commit: darf den Erfolg der
+     * Aktivierung nicht als Fehler erscheinen lassen.
+     */
+    private function notifyActivatedSafely(string $tripId, string $actorUserId): void
+    {
+        try {
+            $this->notificationService->notifyActivated($tripId, $actorUserId);
+        } catch (\Throwable $e) {
+            $this->logger->error('Travel planning activation notification failed', [
+                'tripId' => $tripId,
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 

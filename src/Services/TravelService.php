@@ -517,6 +517,7 @@ final readonly class TravelService
             if ($this->tripRepo->findById($targetTripId) === null) {
                 throw new \RuntimeException('Trip not found');
             }
+            $this->assertTripIsActive($targetTripId);
             $destRole = $this->relationRepo->getRole($user->id, $targetTripId);
         } else {
             // Ziel ist ein Standalone-Event: der Handelnde wird dessen Leader.
@@ -739,6 +740,8 @@ final readonly class TravelService
             throw new \RuntimeException('Trip not found');
         }
 
+        $this->assertTripIsActive($tripId);
+
         if ($this->relationRepo->getRole($targetUserId, $tripId) === null) {
             throw new \RuntimeException('Not a participant');
         }
@@ -800,6 +803,8 @@ final readonly class TravelService
             throw new \RuntimeException('Trip not found');
         }
 
+        $this->assertTripIsActive($tripId);
+
         if (!$this->policy->canCreateAccommodation($user, $this->relationRepo->isParticipant($user->id, $tripId))) {
             throw new \RuntimeException('Not a participant');
         }
@@ -848,6 +853,8 @@ final readonly class TravelService
         if ($this->tripRepo->findById($tripId) === null) {
             throw new \RuntimeException('Trip not found');
         }
+
+        $this->assertTripIsActive($tripId);
 
         $accommodation = $this->accommodationRepo->findByIdAndTrip($accommodationId, $tripId);
         if ($accommodation === null) {
@@ -1051,6 +1058,21 @@ final readonly class TravelService
     {
         if (!$this->policy->canManageTrip($user, $this->relationRepo->getRole($user->id, $tripId))) {
             throw new \RuntimeException('Not a leader');
+        }
+
+        $this->assertTripIsActive($tripId);
+    }
+
+    /**
+     * Operative Reise-Objekte duerfen nur an aktiven Reisen veraendert werden.
+     * Planungsreisen (state 'planning') werden ausschliesslich ueber
+     * /trips/planning bearbeitet und erst durch die Aktivierung operativ.
+     */
+    private function assertTripIsActive(string $tripId): void
+    {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip !== null && ($trip['state'] ?? 'active') !== 'active') {
+            throw new \RuntimeException('Trip not active');
         }
     }
 

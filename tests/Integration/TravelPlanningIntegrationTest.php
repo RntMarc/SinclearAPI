@@ -4,6 +4,8 @@ namespace Sinclear\Api\Tests\Integration;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Ramsey\Uuid\Uuid;
 use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\EventRelationRepository;
@@ -283,7 +285,8 @@ final class TravelPlanningIntegrationTest extends TestCase
             userid varchar(191) NOT NULL,
             tripid varchar(191) NOT NULL,
             accommodation varchar(191) DEFAULT NULL,
-            role varchar(16) NOT NULL DEFAULT 'participant'
+            role varchar(16) NOT NULL DEFAULT 'participant',
+            UNIQUE KEY uniq_travelrelation_user_trip (userid,tripid)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
         $this->db->exec("CREATE TABLE TravelEvent (
@@ -423,6 +426,7 @@ final class TravelPlanningIntegrationTest extends TestCase
                 userRepo: $userRepo,
             ),
             pdo: $this->db,
+            logger: new NullLogger(),
         );
     }
 
@@ -670,5 +674,84 @@ final class TravelPlanningIntegrationTest extends TestCase
         $this->assertSame(2, $this->countRows('TravelRelation', "tripid = '$tripId'"));
         $this->assertSame(1, $this->countRows('TravelEvent', "trip = '$tripId'"));
         $this->assertSame(1, $this->countRows('TravelAccommodationTrip', "tripid = '$tripId'"));
+    }
+
+    public function testActivationRollsBackCompletelyOnTransferFailure(): void
+    {
+        $user = $this->auth('leader');
+        $detail = $this->service->createPlanningTrip($user, ['name' => 'Rollback']);
+        $tripId = $detail['id'];
+
+        $this->service->inviteMember($user, $tripId, 'member');
+        $this->service->respondToInvitation($this->auth('member'), $tripId, 'accepted');
+
+        $optionId = $this->service->createAccommodationOption($user, $tripId, [
+            'name' => 'Hotel Alpen',
+        ])['id'];
+        $this->service->selectAccommodationOption($user, $tripId, $optionId);
+
+        // Der Chat-Sync am Ende der Aktivierung schlaegt fehl, nachdem
+        // Mitglieder und Unterkunft bereits uebernommen wurden. Damit wird der
+        // vollstaendige Rollback aller Teil-Schreibvorgaenge geprueft.
+        $this->db->exec('DROP TABLE ChatParticipant');
+
+        try {
+            $this->service->activatePlanningTrip($user, $tripId);
+            $this->fail('Activation should have failed');
+        } catch (\Throwable) {
+            // erwartet
+        }
+
+        // Die Reise bleibt vollstaendig in der Planung, keine Teil-Uebernahme.
+        $trip = $this->tripRepo->findById($tripId);
+        $this->assertSame('planning', $trip['state']);
+        $this->assertSame(0, $this->countRows('TravelRelation', "tripid = '$tripId'"));
+        $this->assertSame(0, $this->countRows('TravelAccommodationTrip', "tripid = '$tripId'"));
+        $this->assertSame(0, $this->countRows('TravelEvent', "trip = '$tripId'"));
+        $this->assertSame(1, $this->countRows('TravelPlanAccommodationOption', "id = '$optionId'"));
+        $this->assertSame(2, $this->countRows('TravelPlanMember', "tripId = '$tripId'"));
+    }
+
+    public function testActivationSucceedsWhenPostCommitNotificationFails(): void
+    {
+        $user = $this->auth('leader');
+        $detail = $this->service->createPlanningTrip($user, ['name' => 'Notify']);
+        $tripId = $detail['id'];
+        $this->service->inviteMember($user, $tripId, 'member');
+        $this->service->respondToInvitation($this->auth('member'), $tripId, 'accepted');
+
+        // Benachrichtigungen nach dem Commit zum Scheitern bringen.
+        $this->db->exec('DROP TABLE Notification');
+
+        $activated = $this->service->activatePlanningTrip($user, $tripId);
+
+        $this->assertSame('active', $activated['state']);
+        $this->assertSame(2, $this->countRows('TravelRelation', "tripid = '$tripId'"));
+    }
+
+    public function testActivationFailsPreflightOnInconsistentEvent(): void
+    {
+        $user = $this->auth('leader');
+        $detail = $this->service->createPlanningTrip($user, ['name' => 'Preflight']);
+        $tripId = $detail['id'];
+
+        // Bestaetigter Vorschlag ohne Timing (allDay = 1, aber kein Datum).
+        $eventId = Uuid::uuid7()->toString();
+        $this->db->exec(
+            "INSERT INTO TravelPlanEvent (id, tripId, name, allDay, isConfirmed)
+             VALUES ('$eventId', '$tripId', 'Kaputt', 1, 1)"
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Inconsistent planning data');
+
+        try {
+            $this->service->activatePlanningTrip($user, $tripId);
+        } finally {
+            $trip = $this->tripRepo->findById($tripId);
+            $this->assertSame('planning', $trip['state']);
+            $this->assertSame(0, $this->countRows('TravelRelation', "tripid = '$tripId'"));
+            $this->assertSame(0, $this->countRows('TravelEvent', "trip = '$tripId'"));
+        }
     }
 }

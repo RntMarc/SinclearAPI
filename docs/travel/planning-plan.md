@@ -280,3 +280,58 @@ SQL-Statements umgesetzt (kein Lesen-dann-Schreiben im Anwendungscode):
   Schema-Snapshot (`database/status_*`) neu generieren. `update.sh` NICHT
   ungefragt ausführen.
 
+
+---
+
+## Phase 2 – Härtung der Aktivierung (Nachtrag)
+
+> **Status:** umgesetzt (2026-09-30). Ziel: Die Übernahme `planning → active`
+> darf unter keinen Umständen zu Datenverlust führen; im Fehlerfall bleibt die
+> Reise vollständig in der Planung.
+
+### Umgesetzte Maßnahmen
+
+1. **Preflight-Asserts (`assertPlanningConsistent`)** vor dem ersten Write:
+   mindestens eine aktive Planungsleitung, konsistentes Timing der finalen
+   Terminoption und aller bestätigten Eventvorschläge, gesetzter Name der
+   gewählten Unterkunft. Fehlercode `inconsistent_planning_data` (409) in
+   `TravelPlanningError`.
+2. **Robuster Rollback** (`rollBackQuietly`): Ein Fehler beim Rollback maskiert
+   nicht mehr den ursprünglichen Fehler (wird nur geloggt). `beginTransaction()`
+   liegt innerhalb des `try`.
+3. **Invariantenprüfung vor dem Commit:** die aktive Reise muss mindestens eine
+   `TravelRelation`-Leitung besitzen, sonst Rollback.
+4. **Lesen innerhalb der Transaktion:** die Antwort wird vor dem Commit gelesen;
+   kein fehleranfälliger zweiter Read nach dem Commit.
+5. **Best-Effort-Benachrichtigung** (`notifyActivatedSafely`): Fehler nach dem
+   Commit werden geloggt, machen die erfolgreiche Aktivierung aber nicht zum
+   Fehler. Dafür wurde `LoggerInterface` in `TravelPlanningService` injiziert.
+6. **Member-Sperren:** `inviteMember`, `setMemberStatus`, `respondToInvitation`
+   und `removeMember` laufen unter `withPlanningLock` (Reisezeile per
+   `SELECT ... FOR UPDATE`), serialisiert gegen die Aktivierung. Seiteneffekte
+   (Chat-Sync, Benachrichtigungen) laufen erst nach dem Commit.
+7. **UNIQUE `TravelRelation(userid, tripid)`:** neue additive, rerun-sichere
+   Migration `database/migrations/20261002000000_travel_relation_unique.sql`
+   mit verlustfreier Duplikat-Zusammenführung; `addParticipant` nutzt
+   `INSERT ... ON DUPLICATE KEY UPDATE` und gibt die persistierte ID zurück.
+8. **Operative Schranke:** `TravelService` lehnt Mutationen an Reisen mit
+   `state != 'active'` mit `Trip not active` (`409 trip_not_active`) ab
+   (`assertTripIsActive`), u. a. in `assertCanManageTrip`,
+   `setParticipantAccommodation`, `createAccommodation`,
+   `updateAccommodation` und beim Event-Konversionsziel.
+
+### Tests
+
+- `tests/Integration/TravelPlanningIntegrationTest.php`: vollständiger Rollback
+  bei Transferfehler, Erfolg trotz Post-Commit-Benachrichtigungsfehler,
+  Preflight-Abbruch bei inkonsistentem Event; Test-Schema mit
+  `UNIQUE (userid, tripid)`.
+- `tests/Unit/TravelPlanningErrorTest.php`: neuer Code
+  `inconsistent_planning_data`.
+- `tests/Unit/TravelErrorTest.php`: neuer Code `trip_not_active`.
+
+### Offene Betreiber-Folgeaufgaben
+
+- Migration `20261002000000_travel_relation_unique.sql` am Server anwenden
+  (vorher/als Teil des Deployments) und Schema-Snapshot (`database/status_*`)
+  neu generieren. `update.sh` NICHT ungefragt ausführen.

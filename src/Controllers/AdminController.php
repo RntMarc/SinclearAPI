@@ -465,6 +465,9 @@ ROW;
         if ($trip === null) {
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
         }
+        if (!$this->tripIsOperational($trip)) {
+            return $this->tripNotActiveResponse($response);
+        }
 
         $existing = $this->travelChatRepo->findByTripId($tripId);
         if ($existing !== null) {
@@ -484,6 +487,9 @@ ROW;
         $trip = $this->tripRepo->findById($tripId);
         if ($trip === null) {
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+        if (!$this->tripIsOperational($trip)) {
+            return $this->tripNotActiveResponse($response);
         }
 
         $existing = $this->travelChatRepo->findByTripId($tripId);
@@ -545,6 +551,9 @@ ROW;
         $trip = $this->tripRepo->findById($tripId);
         if ($trip === null) {
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+        if (!$this->tripIsOperational($trip)) {
+            return $this->tripNotActiveResponse($response);
         }
 
         try {
@@ -629,6 +638,9 @@ ROW;
         if ($trip === null) {
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
         }
+        if (!$this->tripIsOperational($trip)) {
+            return $this->tripNotActiveResponse($response);
+        }
 
         if ($forumId !== null) {
             $forum = $this->forumRepo->findById($forumId);
@@ -674,6 +686,9 @@ ROW;
         if ($trip === null) {
             return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
         }
+        if (!$this->tripIsOperational($trip)) {
+            return $this->tripNotActiveResponse($response);
+        }
 
         $subscription = $this->subscriptionRepo->findById($subscriptionId);
         if ($subscription === null) {
@@ -692,6 +707,14 @@ ROW;
         $this->requireUser($request);
         $tripId = $args['id'];
         $subscriptionId = $args['subscriptionId'];
+
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
+            return ResponseFactory::json(['error' => 'trip_not_found'], 404, $response);
+        }
+        if (!$this->tripIsOperational($trip)) {
+            return $this->tripNotActiveResponse($response);
+        }
 
         $this->tripSubscriptionRepo->remove($tripId, $subscriptionId);
 
@@ -2768,6 +2791,23 @@ ROW;
     {
         [$code, $status] = TravelError::resolve($e->getMessage());
         return ResponseFactory::json(['error' => $code], $status, $response);
+    }
+
+    /**
+     * Operative Admin-Schreibpfade (Chat, Forum, Abo) duerfen nur aktive Reisen
+     * betreffen; Planungsreisen werden ausschliesslich ueber /trips/planning
+     * verwaltet.
+     *
+     * @param array<string, mixed> $trip
+     */
+    private function tripIsOperational(array $trip): bool
+    {
+        return ($trip['state'] ?? 'active') === 'active';
+    }
+
+    private function tripNotActiveResponse(ResponseInterface $response): ResponseInterface
+    {
+        return ResponseFactory::json(['error' => 'trip_not_active'], 409, $response);
     }
 
     private function notifyTicketAdded(array $ticket, ServerRequestInterface $request): void

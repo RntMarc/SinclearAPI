@@ -81,11 +81,23 @@ final readonly class TravelRelationRepository
     ): string {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelRelation (ID, userid, tripid, accommodation, role)
-             VALUES (?, ?, ?, ?, ?)'
+            "INSERT INTO TravelRelation (ID, userid, tripid, accommodation, role)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                role = CASE WHEN VALUES(role) = 'leader' THEN 'leader' ELSE role END,
+                accommodation = COALESCE(VALUES(accommodation), accommodation)"
         );
         $stmt->execute([$id, $userId, $tripId, $accommodationId, self::normalizeRole($role)]);
-        return $id;
+
+        // Bei bestehendem Eintrag die tatsaechlich persistierte ID zurueckgeben
+        // (ON DUPLICATE KEY UPDATE legt keine neue Zeile an).
+        $select = $this->pdo->prepare(
+            'SELECT ID FROM TravelRelation WHERE userid = ? AND tripid = ? LIMIT 1'
+        );
+        $select->execute([$userId, $tripId]);
+        $existingId = $select->fetchColumn();
+
+        return $existingId !== false ? (string) $existingId : $id;
     }
 
     public function updateRole(string $userId, string $tripId, string $role): void

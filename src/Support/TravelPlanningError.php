@@ -18,6 +18,7 @@ final class TravelPlanningError
         'Not a planning member' => ['forbidden', 403],
         'Not a planning leader' => ['forbidden', 403],
         'Not a planning trip' => ['invalid_planning_trip', 409],
+        'Inconsistent planning data' => ['inconsistent_planning_data', 409],
         'Not a member' => ['forbidden', 403],
         'Not allowed' => ['forbidden', 403],
         'Last leader remains' => ['last_leader', 409],

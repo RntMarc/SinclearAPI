@@ -11944,6 +11944,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen werden über `/trips/planning` verwaltet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       summary: Admin-Gruppenchat für Reise löschen
       description: >
@@ -11961,6 +11967,12 @@ paths:
           description: Chat gelöscht (kein Inhalt)
         '404':
           description: Reise oder Chat nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen werden über `/trips/planning` verwaltet
           content:
             application/json:
               schema:
@@ -12016,6 +12028,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise oder Chat nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen werden über `/trips/planning` verwaltet
           content:
             application/json:
               schema:
@@ -14210,7 +14228,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Keine Planungsreise (`invalid_planning_trip`)
+          description: >
+            Keine Planungsreise (`invalid_planning_trip`) oder inkonsistente
+            Planungsdaten (`inconsistent_planning_data`); im Fehlerfall bleibt
+            die Reise vollständig in der Planung.
           content:
             application/json:
               schema:
@@ -15323,6 +15344,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Ziel-Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` erreichbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     delete:
       summary: Standalone-Event löschen
@@ -15960,6 +15987,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     delete:
       summary: Reise löschen
@@ -15985,6 +16018,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
           content:
             application/json:
               schema:
@@ -16075,6 +16114,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
           content:
             application/json:
               schema:
@@ -16187,6 +16232,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     delete:
       summary: Reise-Event löschen
@@ -16220,6 +16271,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise oder Event nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
           content:
             application/json:
               schema:
@@ -18452,6 +18509,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /trips/{id}/accommodations/{accommodationId}:
     get:
@@ -18568,6 +18631,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     delete:
       summary: Unterkunft von der Reise lösen
@@ -18603,6 +18672,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise oder Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
           content:
             application/json:
               schema:
@@ -20184,7 +20259,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Nutzer ist bereits Teilnehmer (`already_participant`)
+          description: >
+            Nutzer ist bereits Teilnehmer (`already_participant`) oder Reise ist
+            nicht aktiv (`trip_not_active`).
           content:
             application/json:
               schema:
@@ -20229,7 +20306,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Letzter Reiseleiter kann nicht entfernt werden (`last_leader`)
+          description: >
+            Letzter Reiseleiter kann nicht entfernt werden (`last_leader`) oder
+            Reise ist nicht aktiv (`trip_not_active`).
           content:
             application/json:
               schema:
@@ -20294,7 +20373,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Letzter Reiseleiter kann nicht degradiert werden (`last_leader`)
+          description: >
+            Letzter Reiseleiter kann nicht degradiert werden (`last_leader`) oder
+            Reise ist nicht aktiv (`trip_not_active`).
           content:
             application/json:
               schema:
@@ -20355,6 +20436,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise, Teilnehmer oder Unterkunft nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
           content:
             application/json:
               schema:
@@ -20426,7 +20513,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '409':
-          description: Nutzer ist bereits Teilnehmer (`already_participant`)
+          description: >
+            Nutzer ist bereits Teilnehmer (`already_participant`) oder Reise ist
+            nicht aktiv (`trip_not_active`).
           content:
             application/json:
               schema:
@@ -20471,6 +20560,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Reise, Event oder Teilnehmer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Reise ist nicht aktiv (`trip_not_active`); Planungsreisen sind nur über `/trips/planning` änderbar
           content:
             application/json:
               schema:

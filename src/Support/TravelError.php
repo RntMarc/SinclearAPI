@@ -24,6 +24,7 @@ final class TravelError
         'Ticket creation failed' => ['ticket_creation_failed', 500],
         'Already a participant' => ['already_participant', 409],
         'Last leader remains' => ['last_leader', 409],
+        'Trip not active' => ['trip_not_active', 409],
         'Name required' => ['name_required', 400],
         'Trip required' => ['trip_required', 400],
         'Invalid role' => ['invalid_role', 400],

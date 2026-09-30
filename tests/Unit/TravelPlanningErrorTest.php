@@ -26,6 +26,10 @@ class TravelPlanningErrorTest extends TestCase
         $this->assertSame(['already_member', 409], TravelPlanningError::resolve('Already a member'));
         $this->assertSame(['last_leader', 409], TravelPlanningError::resolve('Last leader remains'));
         $this->assertSame(['trip_already_active', 409], TravelPlanningError::resolve('Trip already active'));
+        $this->assertSame(
+            ['inconsistent_planning_data', 409],
+            TravelPlanningError::resolve('Inconsistent planning data'),
+        );
     }
 
     public function testValidationCodes(): void

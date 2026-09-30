@@ -439,7 +439,10 @@ globale Katalog `TravelAccommodation` bleibt preisfrei.
 > Das Schema wurde mit der Migration
 > `database/migrations/20260930000000_travel_planning.sql` ergänzt (Phase 1,
 > additiv/rückbaubar) und um `TravelPlanMember.role` erweitert
-> (`database/migrations/20261001000000_travel_planning_leader.sql`).
+> (`database/migrations/20261001000000_travel_planning_leader.sql`). Die
+> Migration `database/migrations/20261002000000_travel_relation_unique.sql`
+> erzwingt zusätzlich `UNIQUE (userid, tripid)` auf `TravelRelation` und führt
+> etwaige Bestandsduplikate verlustfrei zusammen.
 
 ### Leitung der Planung
 
@@ -495,6 +498,12 @@ Planungsreisen nicht zugänglich. Der Reisezustand (`state`) ist ausschließlich
 über `POST /trips/planning` (Anlage) und `POST /trips/planning/{id}/activate`
 änderbar – nie über `PATCH /trips/{id}`.
 
+**Operative Schranke:** Alle mutierenden operativen Reise-Endpunkte (Reise,
+Reise-Events, Teilnehmer/Rollen, Unterkünfte, Event-Konversion) sowie die
+Admin-Verknüpfungen (Chat, Forum, Abo) lehnen Reisen mit `state != 'active'`
+mit `409 trip_not_active` ab. Planungsreisen sind damit ausschließlich über
+`/trips/planning` bearbeitbar.
+
 ### Chat der Planung
 
 Der Gruppenchat entsteht bereits beim Anlegen der Planungsreise. Seine
@@ -513,21 +522,42 @@ idempotent:
 0. Die Leitungsrolle wird **vor** dem idempotenten `active`-Kurzschluss
    geprüft; innerhalb der Transaktion sperrt `SELECT ... FOR UPDATE` die
    Reisezeile, sodass gleichzeitige Aktivierungen serialisiert werden.
-1. Finale Terminoption (`isFinal`) → Zeitfelder der `TravelTrip`.
-2. `TravelTrip.state` → `active`.
-3. Leitung → `TravelRelation` (`leader`); Mitglieder mit Status `accepted` →
+1. **Preflight-Asserts** vor jedem Write: mindestens eine aktive Leitung,
+   konsistentes Timing der finalen Terminoption und aller bestätigten
+   Eventvorschläge, gesetzter Name der gewählten Unterkunft. Bei Inkonsistenz
+   `409 inconsistent_planning_data` – noch bevor eine Zeile geschrieben wird.
+2. Finale Terminoption (`isFinal`) → Zeitfelder der `TravelTrip`.
+3. `TravelTrip.state` → `active`.
+4. Leitung → `TravelRelation` (`leader`); Mitglieder mit Status `accepted` →
    `participant`. `invited`/`declined`/`inactive` werden nicht übernommen.
-4. Gewählte Unterkunftsoption (`isSelected`) → `TravelAccommodationTrip` inkl.
+5. Gewählte Unterkunftsoption (`isSelected`) → `TravelAccommodationTrip` inkl.
    `pricePerPersonPerNight`/`currency` (Katalogeintrag wird bei Bedarf angelegt).
-5. Bestätigte Eventvorschläge (`isConfirmed`) → `TravelEvent`; die Referenz
+6. Bestätigte Eventvorschläge (`isConfirmed`) → `TravelEvent`; die Referenz
    wird in `TravelPlanEvent.confirmedEventId` festgehalten.
-6. Chat-Abgleich aus `TravelRelation`.
+7. Invariantenprüfung: die operative Reise besitzt mindestens eine Leitung.
+8. Chat-Abgleich aus `TravelRelation`.
 
-Ein wiederholter Aufruf erzeugt keine Duplikate (bereits `active` → No-op);
-die Leitungsprüfung greift dennoch. Die konkurrenzkritischen
+**Fehlerverhalten (kein Datenverlust):** Alle Schritte liegen in einer einzigen
+Transaktion. Bricht ein Schritt ab, wird vollständig zurückgerollt; die Reise
+verbleibt als `planning` mit unveränderten Planungsdaten. Der Rollback ist so
+gebaut, dass er den ursprünglichen Fehler nicht maskiert. Die Aktivierung liest
+die aktive Reise noch innerhalb der Transaktion ein, damit die Antwort keinen
+zweiten (fehleranfälligen) Lesevorgang nach dem Commit benötigt. Die
+Aktivierungsbenachrichtigung läuft **nach** dem Commit als Best-Effort: ihr
+Scheitern macht eine erfolgreiche Aktivierung nicht zu einem Fehler (es wird
+nur geloggt).
+
+**Serialisierung:** Die Mitglieder-Schreibpfade der Planung (Einladen,
+Status/Rückmeldung, Entfernen) laufen ebenfalls unter der Zeilensperre der
+Reise (`SELECT ... FOR UPDATE`). Dadurch kann sich die Mitgliederübernahme
+nicht mit gleichzeitigen Änderungen verschränken. Die konkurrenzkritischen
 Planungs-Schreibpfade sind als atomare SQL-Statements umgesetzt
 (`setFinalExclusive`/`setSelectedExclusive` sowie `INSERT ... ON DUPLICATE KEY
-UPDATE`-Upserts).
+UPDATE`-Upserts). `TravelRelation` besitzt `UNIQUE (userid, tripid)`, wodurch
+die Übernahme zusätzlich DB-seitig idempotent ist.
+
+Ein wiederholter Aufruf erzeugt keine Duplikate (bereits `active` → No-op);
+die Leitungsprüfung greift dennoch.
 
 ### Benachrichtigungen
 
