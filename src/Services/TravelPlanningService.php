@@ -153,7 +153,7 @@ final readonly class TravelPlanningService
             $this->memberRepo->create($id, $user->id, 'accepted', 'leader', 'creator');
 
             foreach (TravelPlanningPolicy::TOPICS as $topic) {
-                $this->topicRepo->createForTrip(
+                $this->topicRepo->upsert(
                     $id,
                     $topic,
                     in_array($topic, $skipped, true) ? 'skipped' : 'pending',
@@ -218,12 +218,9 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('Already a member');
         }
 
-        if ($existing !== null) {
-            $this->memberRepo->updateStatus($tripId, $targetUserId, 'invited');
-            $id = $existing['id'];
-        } else {
-            $id = $this->memberRepo->create($tripId, $targetUserId, 'invited', 'member', 'invite');
-        }
+        $this->memberRepo->invite($tripId, $targetUserId);
+        $member = $this->memberRepo->findByTripAndUser($tripId, $targetUserId);
+        $id = $member['id'] ?? '';
 
         $this->chatService->syncPlanningMembers($tripId);
         $this->notificationService->notifyInvite($tripId, $targetUserId, $user->id);
@@ -307,11 +304,7 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('Invalid topic status');
         }
 
-        if ($this->topicRepo->findByTripAndTopic($tripId, $topic) === null) {
-            $this->topicRepo->createForTrip($tripId, $topic, $status);
-        } else {
-            $this->topicRepo->updateStatus($tripId, $topic, $status);
-        }
+        $this->topicRepo->upsert($tripId, $topic, $status);
 
         return $this->topicRepo->findByTrip($tripId);
     }
@@ -401,8 +394,7 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('Date option not found');
         }
 
-        $this->dateOptionRepo->clearFinal($tripId);
-        $this->dateOptionRepo->setFinal($dateOptionId);
+        $this->dateOptionRepo->setFinalExclusive($tripId, $dateOptionId);
 
         $this->notificationService->notifyFinalized($tripId, [
             'relation' => 'date_option',
@@ -559,8 +551,7 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('Accommodation option not found');
         }
 
-        $this->accommodationOptionRepo->clearSelected($tripId);
-        $this->accommodationOptionRepo->setSelected($optionId);
+        $this->accommodationOptionRepo->setSelectedExclusive($tripId, $optionId);
 
         $this->notificationService->notifyFinalized($tripId, [
             'relation' => 'accommodation_option',
@@ -721,19 +712,33 @@ final readonly class TravelPlanningService
             throw new \RuntimeException('Planning trip not found');
         }
 
-        $state = $trip['state'] ?? 'active';
-        if ($state === 'active') {
-            // Idempotent: wiederholter Aufruf erzeugt keine Duplikate.
-            return $trip;
-        }
-        if ($state !== 'planning') {
-            throw new \RuntimeException('Not a planning trip');
-        }
-
+        // Rechte IMMER pruefen – auch beim idempotenten Wiederholen einer
+        // bereits aktiven Reise. Sonst koennte jedes eingeloggte Konto ueber
+        // die Aktivierungsroute beliebige Reisedaten (Ticket, URL, ...) abrufen.
         $this->assertLeader($tripId, $user);
 
         $this->pdo->beginTransaction();
         try {
+            // Zeilensperre serialisiert konkurrierende Aktivierungen: der
+            // zweite Aufruf sieht den Zustand 'active' und wird zum No-op.
+            $locked = $this->tripRepo->findByIdForUpdate($tripId);
+            if ($locked === null) {
+                throw new \RuntimeException('Planning trip not found');
+            }
+
+            $state = $locked['state'] ?? 'active';
+            if ($state === 'active') {
+                // Idempotent: wiederholter Aufruf erzeugt keine Duplikate.
+                $this->pdo->commit();
+                return $locked;
+            }
+            if ($state !== 'planning') {
+                throw new \RuntimeException('Not a planning trip');
+            }
+
+            // Autorisierung gegen eine parallele Rollenaenderung absichern.
+            $this->assertLeader($tripId, $user);
+
             $final = $this->dateOptionRepo->findFinalByTrip($tripId);
             if ($final !== null) {
                 $this->tripRepo->update($tripId, [
@@ -756,7 +761,9 @@ final readonly class TravelPlanningService
 
             $this->pdo->commit();
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
             throw $e;
         }
 

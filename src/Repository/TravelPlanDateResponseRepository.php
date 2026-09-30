@@ -38,30 +38,12 @@ final readonly class TravelPlanDateResponseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function findByOptionAndUser(string $dateOptionId, string $userId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT * FROM TravelPlanDateResponse WHERE dateOptionId = ? AND userId = ? LIMIT 1'
-        );
-        $stmt->execute([$dateOptionId, $userId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
-    }
-
     public function upsert(string $dateOptionId, string $userId, string $availability): void
     {
-        $existing = $this->findByOptionAndUser($dateOptionId, $userId);
-        if ($existing !== null) {
-            $stmt = $this->pdo->prepare(
-                'UPDATE TravelPlanDateResponse SET availability = ? WHERE id = ?'
-            );
-            $stmt->execute([$availability, $existing['id']]);
-            return;
-        }
-
         $stmt = $this->pdo->prepare(
             'INSERT INTO TravelPlanDateResponse (id, dateOptionId, userId, availability)
-             VALUES (?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE availability = VALUES(availability)'
         );
         $stmt->execute([Uuid::uuid7()->toString(), $dateOptionId, $userId, $availability]);
     }

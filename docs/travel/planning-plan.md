@@ -196,21 +196,46 @@ Planung ↔ operatives Event; Integrität im Service).
   `docs/notifications/{types,readme}.md`
 - **Tests:** `tests/Unit/TravelPlanningPolicyTest.php`,
   `tests/Unit/TravelPlanningErrorTest.php`,
-  `tests/Unit/TravelPlanNotificationDataTest.php`
+  `tests/Unit/TravelPlanNotificationDataTest.php`,
+  `tests/Integration/TravelPlanningIntegrationTest.php` (Aktivierungs-Rechte,
+  Idempotenz und rennsichere Schreibpfade; läuft DB-abhängig nur auf dem Server).
 
 ### Aktivierung (Algorithmus)
 
 `POST /trips/planning/{id}/activate` (Leitung), transaktional über die
 gemeinsame `PDO`-Instanz, idempotent (`state=active` → No-op):
 
-1. finale Terminoption (`isFinal`) → `TravelTrip`-Zeitfelder;
-2. `TravelTrip.state = 'active'`;
-3. Mitglieder → `TravelRelation` (Leader als `leader`, `accepted` als
+0. **Autorisierung zuerst:** Die Leitungsrolle wird geprüft, **bevor** der
+   idempotente `state=active`-Kurzschluss greift. Sonst könnte jedes
+   eingeloggte Konto über die Aktivierungsroute beliebige Reisedaten
+   (Ticket, Ticket-URL, Foren-ID) abrufen.
+1. **Zeilensperre:** Innerhalb der Transaktion wird die Reisezeile mit
+   `SELECT ... FOR UPDATE` (`TravelTripRepository::findByIdForUpdate`)
+   gesperrt. Konkurrierende Aktivierungen derselben Reise werden dadurch
+   serialisiert; der zweite Aufruf sieht `state='active'` und wird zum No-op
+   (keine Doppel-Teilnehmer, -Events oder -Unterkünfte).
+2. finale Terminoption (`isFinal`) → `TravelTrip`-Zeitfelder;
+3. `TravelTrip.state = 'active'`;
+4. Mitglieder → `TravelRelation` (Leader als `leader`, `accepted` als
    `participant`; idempotent via `isParticipant`);
-4. gewählte Unterkunft → `TravelAccommodationTrip` inkl.
+5. gewählte Unterkunft → `TravelAccommodationTrip` inkl.
    `pricePerPersonPerNight`/`currency` (Katalogeintrag bei Bedarf angelegt);
-5. bestätigte `TravelPlanEvent` → `TravelEvent` + `confirmedEventId`;
-6. Chat-Abgleich aus `TravelRelation`; danach Benachrichtigung.
+6. bestätigte `TravelPlanEvent` → `TravelEvent` + `confirmedEventId`;
+7. Chat-Abgleich aus `TravelRelation`; danach Benachrichtigung.
+
+### Rennsicherheit der Planungs-Schreibpfade
+
+Alle konkurrenzkritischen Schreibpfade sind als einzelne, atomare
+SQL-Statements umgesetzt (kein Lesen-dann-Schreiben im Anwendungscode):
+
+- `TravelPlanDateOptionRepository::setFinalExclusive` /
+  `TravelPlanAccommodationOptionRepository::setSelectedExclusive` setzen in
+  **einem** `UPDATE` genau eine Option und alle übrigen zurück
+  (`SET flag = (id = ?) WHERE tripId = ?`).
+- `upsert` in `TravelPlanDateResponse` / `-EventInterest` / `-Transport`,
+  `TravelPlanMemberRepository::invite` und
+  `TravelPlanTopicRepository::upsert` nutzen `INSERT ... ON DUPLICATE KEY
+  UPDATE` auf dem jeweiligen Unique-Key statt find-then-insert.
 
 ### Verifikation
 
@@ -234,6 +259,10 @@ gemeinsame `PDO`-Instanz, idempotent (`state=active` → No-op):
 
 ### Abweichungen / Hinweise (Phase 2)
 
+- **Aktivierungs-Reihenfolge (Bugfix):** Die Leitungsprüfung erfolgt nun
+  **vor** dem idempotenten `state=active`-Kurzschluss und zusätzlich innerhalb
+  der Zeilensperre. Zuvor gab die Aktivierungsroute bei bereits aktiven Reisen
+  den Roh-Datensatz an jedes eingeloggte Konto zurück.
 - **`TravelPlanMember.role`:** In Phase 1 nicht enthalten; als additive
   Migration in Phase 2 ergänzt, da die Leitung autorisiert werden muss.
 - **Letzter-Leader-Invariante:** im Service über

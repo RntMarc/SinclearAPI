@@ -105,15 +105,15 @@ final readonly class TravelPlanAccommodationOptionRepository
         $stmt->execute([$id]);
     }
 
-    public function clearSelected(string $tripId): void
+    /**
+     * Markiert atomar genau eine Unterkunftsoption der Reise als gewaehlt und
+     * setzt alle uebrigen auf nicht-gewaehlt (Rennsicherheit: ein Statement).
+     */
+    public function setSelectedExclusive(string $tripId, string $id): void
     {
-        $stmt = $this->pdo->prepare('UPDATE TravelPlanAccommodationOption SET isSelected = 0 WHERE tripId = ?');
-        $stmt->execute([$tripId]);
-    }
-
-    public function setSelected(string $id): void
-    {
-        $stmt = $this->pdo->prepare('UPDATE TravelPlanAccommodationOption SET isSelected = 1 WHERE id = ?');
-        $stmt->execute([$id]);
+        $stmt = $this->pdo->prepare(
+            'UPDATE TravelPlanAccommodationOption SET isSelected = (id = ?) WHERE tripId = ?'
+        );
+        $stmt->execute([$id, $tripId]);
     }
 }

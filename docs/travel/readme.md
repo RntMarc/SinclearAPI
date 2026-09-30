@@ -510,6 +510,9 @@ erhalten.
 `POST /trips/planning/{id}/activate` (nur Leitung) arbeitet transaktional und
 idempotent:
 
+0. Die Leitungsrolle wird **vor** dem idempotenten `active`-Kurzschluss
+   geprüft; innerhalb der Transaktion sperrt `SELECT ... FOR UPDATE` die
+   Reisezeile, sodass gleichzeitige Aktivierungen serialisiert werden.
 1. Finale Terminoption (`isFinal`) → Zeitfelder der `TravelTrip`.
 2. `TravelTrip.state` → `active`.
 3. Leitung → `TravelRelation` (`leader`); Mitglieder mit Status `accepted` →
@@ -520,7 +523,11 @@ idempotent:
    wird in `TravelPlanEvent.confirmedEventId` festgehalten.
 6. Chat-Abgleich aus `TravelRelation`.
 
-Ein wiederholter Aufruf erzeugt keine Duplikate (bereits `active` → No-op).
+Ein wiederholter Aufruf erzeugt keine Duplikate (bereits `active` → No-op);
+die Leitungsprüfung greift dennoch. Die konkurrenzkritischen
+Planungs-Schreibpfade sind als atomare SQL-Statements umgesetzt
+(`setFinalExclusive`/`setSelectedExclusive` sowie `INSERT ... ON DUPLICATE KEY
+UPDATE`-Upserts).
 
 ### Benachrichtigungen
 

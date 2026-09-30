@@ -77,6 +77,22 @@ final readonly class TravelPlanMemberRepository
         return $id;
     }
 
+    /**
+     * Rennsichere Einladung: legt die Mitgliedschaft an oder setzt eine
+     * bestehende (z. B. zuvor inaktive) auf 'invited' zurueck. Die Rolle bleibt
+     * erhalten, damit eine erneut eingeladene Leitung nicht zur einfachen
+     * Mitgliedschaft degradiert wird.
+     */
+    public function invite(string $tripId, string $userId): void
+    {
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO TravelPlanMember (id, tripId, userId, status, role, origin)
+             VALUES (?, ?, ?, 'invited', 'member', 'invite')
+             ON DUPLICATE KEY UPDATE status = 'invited'"
+        );
+        $stmt->execute([Uuid::uuid7()->toString(), $tripId, $userId]);
+    }
+
     public function updateStatus(string $tripId, string $userId, string $status): void
     {
         $deactivatedAt = $status === 'inactive' ? 'NOW(3)' : 'NULL';

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `DirectMessage` (
   CONSTRAINT `fk_dm_conversation` FOREIGN KEY (`conversationId`) REFERENCES `ChatConversation` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_dm_reply_to` FOREIGN KEY (`replyToMessageId`) REFERENCES `DirectMessage` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_dm_sender` FOREIGN KEY (`senderId`) REFERENCES `User` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=233 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

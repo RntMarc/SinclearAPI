@@ -106,15 +106,15 @@ final readonly class TravelPlanDateOptionRepository
         $stmt->execute([$id]);
     }
 
-    public function clearFinal(string $tripId): void
+    /**
+     * Markiert atomar genau eine Terminoption der Reise als final und setzt
+     * alle uebrigen auf nicht-final (Rennsicherheit: in einem Statement).
+     */
+    public function setFinalExclusive(string $tripId, string $id): void
     {
-        $stmt = $this->pdo->prepare('UPDATE TravelPlanDateOption SET isFinal = 0 WHERE tripId = ?');
-        $stmt->execute([$tripId]);
-    }
-
-    public function setFinal(string $id): void
-    {
-        $stmt = $this->pdo->prepare('UPDATE TravelPlanDateOption SET isFinal = 1 WHERE id = ?');
-        $stmt->execute([$id]);
+        $stmt = $this->pdo->prepare(
+            'UPDATE TravelPlanDateOption SET isFinal = (id = ?) WHERE tripId = ?'
+        );
+        $stmt->execute([$id, $tripId]);
     }
 }

@@ -32,32 +32,17 @@ final readonly class TravelPlanTopicRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function findByTripAndTopic(string $tripId, string $topic): ?array
+    /**
+     * Legt das Thema an oder aktualisiert seinen Status (rennsicher: ein
+     * Statement, Unique-Key tripId+topic).
+     */
+    public function upsert(string $tripId, string $topic, string $status = 'pending'): void
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT * FROM TravelPlanTopic WHERE tripId = ? AND topic = ? LIMIT 1'
-        );
-        $stmt->execute([$tripId, $topic]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
-    }
-
-    public function createForTrip(string $tripId, string $topic, string $status = 'pending'): string
-    {
-        $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
             'INSERT INTO TravelPlanTopic (id, tripId, topic, status)
-             VALUES (?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE status = VALUES(status)'
         );
-        $stmt->execute([$id, $tripId, $topic, $status]);
-        return $id;
-    }
-
-    public function updateStatus(string $tripId, string $topic, string $status): void
-    {
-        $stmt = $this->pdo->prepare(
-            'UPDATE TravelPlanTopic SET status = ? WHERE tripId = ? AND topic = ?'
-        );
-        $stmt->execute([$status, $tripId, $topic]);
+        $stmt->execute([Uuid::uuid7()->toString(), $tripId, $topic, $status]);
     }
 }

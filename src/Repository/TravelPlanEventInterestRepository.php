@@ -38,30 +38,12 @@ final readonly class TravelPlanEventInterestRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function findBySuggestionAndUser(string $eventSuggestionId, string $userId): ?array
-    {
-        $stmt = $this->pdo->prepare(
-            'SELECT * FROM TravelPlanEventInterest WHERE eventSuggestionId = ? AND userId = ? LIMIT 1'
-        );
-        $stmt->execute([$eventSuggestionId, $userId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
-    }
-
     public function upsert(string $eventSuggestionId, string $userId, string $interest): void
     {
-        $existing = $this->findBySuggestionAndUser($eventSuggestionId, $userId);
-        if ($existing !== null) {
-            $stmt = $this->pdo->prepare(
-                'UPDATE TravelPlanEventInterest SET interest = ? WHERE id = ?'
-            );
-            $stmt->execute([$interest, $existing['id']]);
-            return;
-        }
-
         $stmt = $this->pdo->prepare(
             'INSERT INTO TravelPlanEventInterest (id, eventSuggestionId, userId, interest)
-             VALUES (?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE interest = VALUES(interest)'
         );
         $stmt->execute([Uuid::uuid7()->toString(), $eventSuggestionId, $userId, $interest]);
     }

@@ -14179,7 +14179,9 @@ paths:
         übernimmt bestätigte Mitglieder in TravelRelation, verknüpft die
         gewählte Unterkunft inkl. Preis, wandelt bestätigte Vorschläge in
         TravelEvent um und gleicht die Chat-Mitgliedschaft ab. Ein wiederholter
-        Aufruf erzeugt keine Duplikate. Nur Leitung.
+        Aufruf erzeugt keine Duplikate. Nur Leitung – die Leitungsrolle wird
+        auch bei einer bereits aktiven Reise geprüft (kein Datenabruf über den
+        idempotenten Pfad).
       tags: [Travel]
       security:
         - BearerAuth: []

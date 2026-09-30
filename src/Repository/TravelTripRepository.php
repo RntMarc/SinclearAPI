@@ -21,6 +21,19 @@ final readonly class TravelTripRepository
         return $result ?: null;
     }
 
+    /**
+     * Wie findById, sperrt die Zeile aber bis zum Transaktionsende
+     * (`SELECT ... FOR UPDATE`). Serialisiert konkurrierende Aktivierungen
+     * derselben Reise. Nur innerhalb einer laufenden Transaktion sinnvoll.
+     */
+    public function findByIdForUpdate(string $id): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM TravelTrip WHERE id = ? FOR UPDATE');
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
     /** @return list<array<string, mixed>> */
     public function findAll(): array
     {

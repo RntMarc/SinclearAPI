@@ -42,33 +42,24 @@ final readonly class TravelPlanTransportRepository
     /** @param array<string, mixed> $data */
     public function upsert(string $tripId, string $userId, string $direction, array $data): void
     {
-        $existing = $this->findByTripAndUserAndDirection($tripId, $userId, $direction);
-        if ($existing !== null) {
-            $sets = [];
-            $values = [];
-            foreach (['mode', 'offersRide', 'availableSeats', 'notes'] as $field) {
-                if (!array_key_exists($field, $data)) {
-                    continue;
-                }
-                $sets[] = "`$field` = ?";
-                $values[] = match ($field) {
-                    'offersRide' => (int) $data[$field],
-                    'availableSeats' => $data[$field] === null ? null : (int) $data[$field],
-                    default => $data[$field],
-                };
-            }
-            if ($sets === []) {
-                return;
-            }
-            $values[] = $existing['id'];
-            $stmt = $this->pdo->prepare('UPDATE TravelPlanTransport SET ' . implode(', ', $sets) . ' WHERE id = ?');
-            $stmt->execute($values);
+        $columns = ['mode', 'offersRide', 'availableSeats', 'notes'];
+        $provided = array_values(array_filter(
+            $columns,
+            static fn(string $field): bool => array_key_exists($field, $data),
+        ));
+        if ($provided === []) {
             return;
         }
 
+        $updates = implode(', ', array_map(
+            static fn(string $field): string => "`$field` = VALUES(`$field`)",
+            $provided,
+        ));
+
         $stmt = $this->pdo->prepare(
             'INSERT INTO TravelPlanTransport (id, tripId, userId, direction, mode, offersRide, availableSeats, notes)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE ' . $updates
         );
         $stmt->execute([
             Uuid::uuid7()->toString(),
