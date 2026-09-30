@@ -29,6 +29,7 @@ use Sinclear\Api\Controllers\StoryController;
 use Sinclear\Api\Controllers\PhotoController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
+use Sinclear\Api\Controllers\TravelPlanningController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Controllers\UserActivityController;
@@ -186,6 +187,54 @@ return function (App $app): void {
         // Globaler Unterkunfts-Katalog (MUST come before /{id})
         $group->get('/accommodations', [TravelController::class, 'listAccommodationCatalog']);
         $group->delete('/accommodations/{accommodationId}', [TravelController::class, 'deleteAccommodationGlobally']);
+
+        // Reiseplanung (MUST come before /{id}). Statische Untersegmente
+        // (members/me) vor parametrisierten (members/{userId}).
+        $group->group('/planning', function (RouteCollectorProxy $planning) {
+            $planning->get('', [TravelPlanningController::class, 'listTrips']);
+            $planning->post('', [TravelPlanningController::class, 'createTrip']);
+
+            $planning->get('/{id}', [TravelPlanningController::class, 'getTrip']);
+            $planning->patch('/{id}', [TravelPlanningController::class, 'updateTrip']);
+            $planning->post('/{id}/activate', [TravelPlanningController::class, 'activateTrip']);
+
+            // Mitglieder
+            $planning->get('/{id}/members', [TravelPlanningController::class, 'listMembers']);
+            $planning->post('/{id}/members', [TravelPlanningController::class, 'inviteMember']);
+            $planning->put('/{id}/members/me', [TravelPlanningController::class, 'respondToInvitation']);
+            $planning->patch('/{id}/members/{userId}', [TravelPlanningController::class, 'setMemberStatus']);
+            $planning->delete('/{id}/members/{userId}', [TravelPlanningController::class, 'removeMember']);
+
+            // Phasenthemen
+            $planning->patch('/{id}/topics/{topic}', [TravelPlanningController::class, 'setTopicStatus']);
+
+            // Terminoptionen
+            $planning->get('/{id}/dates', [TravelPlanningController::class, 'listDateOptions']);
+            $planning->post('/{id}/dates', [TravelPlanningController::class, 'createDateOption']);
+            $planning->patch('/{id}/dates/{dateOptionId}', [TravelPlanningController::class, 'updateDateOption']);
+            $planning->delete('/{id}/dates/{dateOptionId}', [TravelPlanningController::class, 'deleteDateOption']);
+            $planning->put('/{id}/dates/{dateOptionId}/responses', [TravelPlanningController::class, 'setDateResponse']);
+            $planning->post('/{id}/dates/{dateOptionId}/finalize', [TravelPlanningController::class, 'finalizeDateOption']);
+
+            // Transport
+            $planning->get('/{id}/transport', [TravelPlanningController::class, 'listTransport']);
+            $planning->put('/{id}/transport', [TravelPlanningController::class, 'setTransport']);
+
+            // Unterkunftsoptionen
+            $planning->get('/{id}/accommodations', [TravelPlanningController::class, 'listAccommodationOptions']);
+            $planning->post('/{id}/accommodations', [TravelPlanningController::class, 'createAccommodationOption']);
+            $planning->patch('/{id}/accommodations/{optionId}', [TravelPlanningController::class, 'updateAccommodationOption']);
+            $planning->delete('/{id}/accommodations/{optionId}', [TravelPlanningController::class, 'deleteAccommodationOption']);
+            $planning->post('/{id}/accommodations/{optionId}/select', [TravelPlanningController::class, 'selectAccommodationOption']);
+
+            // Tagesprogramm-Vorschlaege
+            $planning->get('/{id}/events', [TravelPlanningController::class, 'listEventSuggestions']);
+            $planning->post('/{id}/events', [TravelPlanningController::class, 'createEventSuggestion']);
+            $planning->patch('/{id}/events/{suggestionId}', [TravelPlanningController::class, 'updateEventSuggestion']);
+            $planning->delete('/{id}/events/{suggestionId}', [TravelPlanningController::class, 'deleteEventSuggestion']);
+            $planning->put('/{id}/events/{suggestionId}/interest', [TravelPlanningController::class, 'setEventInterest']);
+            $planning->post('/{id}/events/{suggestionId}/confirm', [TravelPlanningController::class, 'confirmEventSuggestion']);
+        });
 
         $group->get('/{id}', [TravelController::class, 'getTrip']);
         $group->patch('/{id}', [TravelController::class, 'updateTrip']);

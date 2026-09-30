@@ -33,6 +33,7 @@ use Sinclear\Api\Controllers\StoryController;
 use Sinclear\Api\Controllers\PhotoController;
 use Sinclear\Api\Controllers\SubscriptionController;
 use Sinclear\Api\Controllers\TravelController;
+use Sinclear\Api\Controllers\TravelPlanningController;
 use Sinclear\Api\Controllers\UserController;
 use Sinclear\Api\Controllers\UserPreferenceController;
 use Sinclear\Api\Controllers\UserWeatherLocationController;
@@ -126,6 +127,14 @@ use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Repository\StoryRepository;
 use Sinclear\Api\Repository\PhotoRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
+use Sinclear\Api\Repository\TravelPlanMemberRepository;
+use Sinclear\Api\Repository\TravelPlanTopicRepository;
+use Sinclear\Api\Repository\TravelPlanDateOptionRepository;
+use Sinclear\Api\Repository\TravelPlanDateResponseRepository;
+use Sinclear\Api\Repository\TravelPlanTransportRepository;
+use Sinclear\Api\Repository\TravelPlanAccommodationOptionRepository;
+use Sinclear\Api\Repository\TravelPlanEventRepository;
+use Sinclear\Api\Repository\TravelPlanEventInterestRepository;
 use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Repository\LaMetricTokenRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
@@ -138,7 +147,10 @@ use Sinclear\Api\Services\LocationSharingService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\TravelNotificationService;
+use Sinclear\Api\Services\TravelPlanningService;
+use Sinclear\Api\Services\TravelPlanningNotificationService;
 use Sinclear\Api\Security\Policy\TravelPolicy;
+use Sinclear\Api\Security\Policy\TravelPlanningPolicy;
 use Sinclear\Api\Services\PtService;
 use Sinclear\Api\Controllers\PtController;
 use Sinclear\Api\Services\SubscriptionService;
@@ -474,6 +486,19 @@ return [
     TravelPolicy::class => autowire(),
     TravelNotificationService::class => autowire(),
     TravelController::class => autowire(),
+
+    TravelPlanMemberRepository::class => autowire(),
+    TravelPlanTopicRepository::class => autowire(),
+    TravelPlanDateOptionRepository::class => autowire(),
+    TravelPlanDateResponseRepository::class => autowire(),
+    TravelPlanTransportRepository::class => autowire(),
+    TravelPlanAccommodationOptionRepository::class => autowire(),
+    TravelPlanEventRepository::class => autowire(),
+    TravelPlanEventInterestRepository::class => autowire(),
+    TravelPlanningPolicy::class => autowire(),
+    TravelPlanningNotificationService::class => autowire(),
+    TravelPlanningService::class => autowire(),
+    TravelPlanningController::class => autowire(),
 
     PtStationRepository::class => autowire(),
     PtJourneyRepository::class => autowire(),

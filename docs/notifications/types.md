@@ -133,3 +133,27 @@ dedupliziert (`dedupeKey = "poll:<pollId>:deadline"`). Bei anonymen
 Abstimmungen bleibt die Anonymität gewahrt: Die bereits erfolgte Teilnahme
 wird serverseitig über den HMAC-Hash `participantHash` geprüft, ohne
 `userId` in der Stimmtabelle zu speichern.
+
+## Reiseplanung (Trip Planning)
+
+Ausgelöst vom `TravelPlanningNotificationService`. Betrifft Planungsreisen
+(`TravelTrip.state = 'planning'`, siehe [../travel/readme.md](../travel/readme.md)).
+Die Empfängerlogik liegt zentral in `TravelPlanningNotificationService`.
+Die Typen werden für die Präferenzen 1:1 angeboten (kein Type-Mapping) und
+unterstützen kein `custom` (keine Denylist).
+
+| Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
+|------|---------|-----------|--------------------|-----------------------|----------------------|
+| `trip_planning_invite` | Ein Nutzer wird zu einer Planungsreise eingeladen | Der eingeladene Nutzer | `trip` (Trip), `inviter` (User) | `Einladung zur Reiseplanung` | `''` |
+| `trip_planning_response` | Ein Planungsmitglied meldet sich zurück (`accepted`/`declined`) | Die Leitung der Planung (außer der antwortenden Person) | `trip` (Trip), `responder` (User) | `Rückmeldung zur Reiseplanung` | `''` |
+| `trip_planning_finalized` | Die Leitung legt einen Termin, eine Unterkunft oder ein Event verbindlich fest | Alle aktiven Planungsmitglieder (außer Auslöser) | `trip` (Trip), optional `date_option` (TravelPlanDateOption) **oder** `accommodation_option` (TravelPlanAccommodationOption) **oder** `event` (TravelPlanEvent) | `Festlegung in der Reiseplanung` | `''` |
+| `trip_planning_activated` | Die Planung wird abgeschlossen und die Reise aktiviert | Alle aktiven Planungsmitglieder (außer Auslöser) | `trip` (Trip) | `Reiseplanung abgeschlossen` | `''` |
+
+**Data-Format (Beispiel `trip_planning_finalized`):**
+```json
+[
+  { "relation": "trip", "object": "Trip", "identifier": "trip-uuid" },
+  { "relation": "date_option", "object": "TravelPlanDateOption", "identifier": "option-uuid" }
+]
+```
+

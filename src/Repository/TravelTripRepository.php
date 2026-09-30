@@ -21,6 +21,19 @@ final readonly class TravelTripRepository
         return $result ?: null;
     }
 
+    /**
+     * Wie findById, sperrt die Zeile aber bis zum Transaktionsende
+     * (`SELECT ... FOR UPDATE`). Serialisiert konkurrierende Aktivierungen
+     * derselben Reise. Nur innerhalb einer laufenden Transaktion sinnvoll.
+     */
+    public function findByIdForUpdate(string $id): ?array
+    {
+        $stmt = $this->pdo->prepare('SELECT * FROM TravelTrip WHERE id = ? FOR UPDATE');
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
     /** @return list<array<string, mixed>> */
     public function findAll(): array
     {
@@ -72,12 +85,50 @@ final readonly class TravelTripRepository
         ];
     }
 
+    /**
+     * Planungsreisen des Nutzers: Reisen im Zustand 'planning', bei denen der
+     * Nutzer als aktives Planungsmitglied (status != 'inactive') eingetragen
+     * ist. Bewusst getrennt von findByParticipant (TravelRelation).
+     */
+    public function findPlanningByParticipant(string $userId, int $page, int $limit): array
+    {
+        $countStmt = $this->pdo->prepare(
+            "SELECT COUNT(DISTINCT t.id)
+             FROM TravelTrip t
+             JOIN TravelPlanMember m ON m.tripId = t.id
+             WHERE m.userId = ? AND m.status <> 'inactive' AND t.state = 'planning'"
+        );
+        $countStmt->execute([$userId]);
+        $total = (int) $countStmt->fetchColumn();
+
+        $offset = ($page - 1) * $limit;
+        $dataStmt = $this->pdo->prepare(
+            "SELECT DISTINCT t.*
+             FROM TravelTrip t
+             JOIN TravelPlanMember m ON m.tripId = t.id
+             WHERE m.userId = ? AND m.status <> 'inactive' AND t.state = 'planning'
+             ORDER BY t.name ASC, t.id ASC
+             LIMIT ? OFFSET ?"
+        );
+        $dataStmt->execute([$userId, $limit, $offset]);
+
+        return [
+            'data' => $dataStmt->fetchAll(PDO::FETCH_ASSOC),
+            'meta' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function create(array $data): string
     {
         $id = Uuid::uuid7()->toString();
         $stmt = $this->pdo->prepare(
-            'INSERT INTO TravelTrip (id, name, description, allDay, timezone, startAt, endAt, startDate, endDate, hastickets, ticket, ticketUrl, forumId)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO TravelTrip (id, name, description, allDay, timezone, startAt, endAt, startDate, endDate, hastickets, ticket, ticketUrl, forumId, state)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute([
             $id,
@@ -93,8 +144,20 @@ final readonly class TravelTripRepository
             $data['ticket'] ?? null,
             $data['ticketUrl'] ?? null,
             $data['forumId'] ?? null,
+            self::normalizeState($data['state'] ?? null),
         ]);
         return $id;
+    }
+
+    /**
+     * Setzt den Reisezustand. Bewusst ein eigener, dedizierter Schreibpfad:
+     * der Zustand darf nicht ueber einen beliebigen Reise-PATCH geaendert
+     * werden (siehe `update()`, das `state` nicht kennt).
+     */
+    public function setState(string $id, string $state): void
+    {
+        $stmt = $this->pdo->prepare('UPDATE TravelTrip SET state = ? WHERE id = ?');
+        $stmt->execute([self::normalizeState($state), $id]);
     }
 
     public function update(string $id, array $data): void
@@ -208,5 +271,10 @@ final readonly class TravelTripRepository
         return DateTimeValue::formatDate(
             $value instanceof DateTimeImmutable ? $value : DateTimeValue::parseDate($value),
         );
+    }
+
+    private static function normalizeState(?string $state): string
+    {
+        return in_array($state, ['planning', 'active', 'cancelled'], true) ? $state : 'active';
     }
 }
