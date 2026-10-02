@@ -78,7 +78,7 @@ final readonly class LaMetricTokenService
         $token = strtolower($token);
         $tokenData = $this->repo->findByToken($token);
 
-        if ($tokenData === null) {
+        if ($tokenData === null || !hash_equals((string) $tokenData['token'], $token)) {
             return null;
         }
 
