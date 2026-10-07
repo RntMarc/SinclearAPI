@@ -87,7 +87,7 @@ ssh -t -i "$SSH_KEY" -o StrictHostKeyChecking=no -o LogLevel=QUIET "$SERVER" "
 
     # git pull (GIT_TERMINAL_PROMPT=1 stellt sicher, dass nach der Passphrase gefragt werden darf)
     echo '---GIT_START---'
-    GIT_TERMINAL_PROMPT=1 git -c color.ui=never pull origin main 2>&1
+    GIT_TERMINAL_PROMPT=1 git -c color.ui=never pull home main 2>&1
     GIT_EXIT=\$?
     echo '---GIT_END---'
     if [ \$GIT_EXIT -ne 0 ]; then
@@ -285,7 +285,7 @@ fi
 # ✅ Erfolgsmeldungen (nur wenn keine Fehler aufgetreten sind)
 if [ $HAS_ERRORS -eq 0 ]; then
     print_success "Branch-Check (main) erfolgreich"
-    print_success "'git pull origin main' erfolgreich"
+    print_success "'git pull home main' erfolgreich"
     print_success "'composer install' (mit Dev-Dependencies) erfolgreich"
     print_success "'composer install --no-dev' erfolgreich"
 fi
