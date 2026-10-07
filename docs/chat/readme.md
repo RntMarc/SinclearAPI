@@ -85,6 +85,7 @@ Gruppenchats werden aktuell nur admin-seitig für Reisen und Events erstellt. Ma
 - Teilnehmer werden bei Entfernung automatisch vom Centrifugo-Channel abgemeldet (`unsubscribe`)
 - `otherUser` ist `null` bei Gruppen; `otherLastReadSeq` ist `null` bei Gruppen
 - `memberCount` enthält die Anzahl der aktiven Teilnehmer
+- Beim Löschen der Reise bzw. des Events (`DELETE /trips/{id}`, `DELETE /trips/{id}/events/{eventId}`, `DELETE /trips/standaloneevents/{eventId}`) wird der zugehörige Gruppenchat vollständig entfernt (Konversation inkl. Teilnehmer, Nachrichten und Reaktionen).
 
 ## DTO-Schemas
 
@@ -245,7 +246,7 @@ Wird von `GET /chat/conversations` (Liste) und `GET/POST /chat/conversations/{id
 - `TravelChat`-Eintrag verknüpft den Chat mit Reise oder Event
 - `ChatParticipant` wird aus den aktuellen Reise-/Event-Teilnehmern gespiegelt (via `TravelRelation`/`EventRelation`)
 - Idempotent: GET oder POST gibt den bestehenden Chat zurück
-- Bei Löschung werden `TravelChat`, `ChatConversation` und assoziierte `ChatParticipant`/`DirectMessage` gelöscht (FK-Cascade)
+- Bei Löschung werden `TravelChat`, `ChatConversation` und assoziierte `ChatParticipant`/`DirectMessage` (inkl. `MessageReaction`) gelöscht (FK-Cascade). Dasselbe gilt beim Löschen der Reise bzw. des Events selbst.
 - Automatischer Sync: `AdminController` ruft `syncTripMembers`/`syncEventMembers` bei Hinzufügen/Entfernen von Teilnehmern auf
 - **Entfernte Teilnehmer werden automatisch vom Centrifugo-Channel abgemeldet** (`CentrifugoClient->unsubscribe`)
 

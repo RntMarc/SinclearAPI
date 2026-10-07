@@ -15353,7 +15353,11 @@ paths:
 
     delete:
       summary: Standalone-Event löschen
-      description: Nur der Veranstalter (EventRelation `leader`) oder Admin darf löschen.
+      description: >
+        Nur der Veranstalter (EventRelation `leader`) oder Admin darf löschen.
+        Kaskadierend werden die Event-Teilnehmer (EventRelation), der
+        Event-Chat (Konversation, Nachrichten, Reaktionen) und die
+        Event-Tickets mitgelöscht.
       tags: [Travel]
       security:
         - BearerAuth: []
@@ -15996,7 +16000,14 @@ paths:
 
     delete:
       summary: Reise löschen
-      description: Nur Reiseleiter oder Admin dürfen löschen.
+      description: >
+        Nur Reiseleiter oder Admin dürfen löschen. Kaskadierend werden die
+        zugehörigen Reise-Events (inkl. Teilnehmer und Tickets), der
+        Reise-Chat (Konversation, Nachrichten, Reaktionen), die
+        Teilnehmer-Verknüpfungen (TravelRelation), Reise-Tickets,
+        Unterkunft-Verknüpfungen, verknüpfte ÖPNV-Fahrten sowie das
+        verknüpfte Forum (inkl. Inhalten) mitgelöscht. Katalog-Unterkünfte
+        bleiben erhalten (nur die Verknüpfung wird gelöst).
       tags: [Travel]
       security:
         - BearerAuth: []
@@ -16241,7 +16252,10 @@ paths:
 
     delete:
       summary: Reise-Event löschen
-      description: Nur Reiseleiter oder Admin dürfen löschen.
+      description: >
+        Nur Reiseleiter oder Admin dürfen löschen. Kaskadierend werden die
+        Event-Teilnehmer (EventRelation), der Event-Chat (Konversation,
+        Nachrichten, Reaktionen) und die Event-Tickets mitgelöscht.
       tags: [Travel]
       security:
         - BearerAuth: []

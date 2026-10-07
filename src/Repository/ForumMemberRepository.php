@@ -117,6 +117,12 @@ final readonly class ForumMemberRepository
         $stmt->execute([$forumId, $userId]);
     }
 
+    public function deleteByForum(string $forumId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM ForumMember WHERE forumId = ?');
+        $stmt->execute([$forumId]);
+    }
+
     /**
      * @deprecated Seit Einführung der Notification-Präferenzen. Siehe
      *             `NotificationPreference` (State `custom` mit `forumIds`).

@@ -39,4 +39,14 @@ final readonly class FeedPostVoteRepository
         );
         $stmt->execute([$postId, $userId]);
     }
+
+    public function deleteByForum(string $forumId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE v FROM FeedPostVote v
+             JOIN FeedPosts p ON p.id = v.postId
+             WHERE p.forumId = ?'
+        );
+        $stmt->execute([$forumId]);
+    }
 }

@@ -47,4 +47,14 @@ final readonly class TravelPlanDateResponseRepository
         );
         $stmt->execute([Uuid::uuid7()->toString(), $dateOptionId, $userId, $availability]);
     }
+
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE r FROM TravelPlanDateResponse r
+             JOIN TravelPlanDateOption o ON o.id = r.dateOptionId
+             WHERE o.tripId = ?'
+        );
+        $stmt->execute([$tripId]);
+    }
 }

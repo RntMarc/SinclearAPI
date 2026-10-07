@@ -94,4 +94,14 @@ final readonly class FeedPostCommentRepository
         $stmt = $this->pdo->prepare('DELETE FROM FeedPostComment WHERE postId = ?');
         $stmt->execute([$postId]);
     }
+
+    public function deleteByForum(string $forumId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE c FROM FeedPostComment c
+             JOIN FeedPosts p ON p.id = c.postId
+             WHERE p.forumId = ?'
+        );
+        $stmt->execute([$forumId]);
+    }
 }

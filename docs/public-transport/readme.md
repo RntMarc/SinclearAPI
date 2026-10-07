@@ -146,6 +146,13 @@ Teilnehmer-Verknüpfung.
 Alle 5 Minuten aktualisiert der Cron-Task `pt_refresh_stale_legs` automatisch
 veraltete Legs mit aktuellen Daten von Transitious. Details siehe `docs/CRON.md`.
 
+### Reise-Löschung
+ÖPNV-Verbindungen (`PtJourney`) sind über `PtJourney.tripId` mit einer Reise
+verknüpft. Beim Löschen der Reise (`DELETE /trips/{id}`) werden verknüpfte
+Verbindungen inkl. ihrer `PtLeg`- und `PtParticipant`-Einträge kaskadierend
+gelöscht (`ON DELETE CASCADE`, Migration
+`database/migrations/20261007000000_travel_cascade_delete.sql`).
+
 ### Transitious API
 - **Kein API-Key** nötig
 - **User-Agent Header** erforderlich: `SinclearBeyondAPI/2.0 (https://sinclear.app)`

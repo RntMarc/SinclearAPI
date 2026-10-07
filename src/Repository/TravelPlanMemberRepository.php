@@ -121,6 +121,12 @@ final readonly class TravelPlanMemberRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelPlanMember WHERE tripId = ?');
+        $stmt->execute([$tripId]);
+    }
+
     private static function normalizeRole(string $role): string
     {
         return $role === 'leader' ? 'leader' : 'member';

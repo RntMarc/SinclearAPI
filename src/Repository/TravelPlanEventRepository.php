@@ -116,6 +116,12 @@ final readonly class TravelPlanEventRepository
         $stmt->execute([$id]);
     }
 
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelPlanEvent WHERE tripId = ?');
+        $stmt->execute([$tripId]);
+    }
+
     public function setConfirmed(string $id, string $eventId): void
     {
         $stmt = $this->pdo->prepare(

@@ -72,4 +72,10 @@ final readonly class TravelPlanTransportRepository
             $data['notes'] ?? null,
         ]);
     }
+
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelPlanTransport WHERE tripId = ?');
+        $stmt->execute([$tripId]);
+    }
 }

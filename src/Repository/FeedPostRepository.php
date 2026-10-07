@@ -198,6 +198,12 @@ final readonly class FeedPostRepository
         $stmt->execute([$id]);
     }
 
+    public function deleteByForum(string $forumId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM FeedPosts WHERE forumId = ?');
+        $stmt->execute([$forumId]);
+    }
+
     public function getUpvoteCount(string $postId): int
     {
         $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM FeedPostVote WHERE postId = ?');

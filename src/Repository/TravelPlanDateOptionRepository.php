@@ -106,6 +106,12 @@ final readonly class TravelPlanDateOptionRepository
         $stmt->execute([$id]);
     }
 
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelPlanDateOption WHERE tripId = ?');
+        $stmt->execute([$tripId]);
+    }
+
     /**
      * Markiert atomar genau eine Terminoption der Reise als final und setzt
      * alle uebrigen auf nicht-final (Rennsicherheit: in einem Statement).

@@ -45,4 +45,10 @@ final readonly class TravelPlanTopicRepository
         );
         $stmt->execute([Uuid::uuid7()->toString(), $tripId, $topic, $status]);
     }
+
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelPlanTopic WHERE tripId = ?');
+        $stmt->execute([$tripId]);
+    }
 }

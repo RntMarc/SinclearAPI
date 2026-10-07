@@ -105,6 +105,10 @@ Foren können mit einer Reise verknüpft werden (über `TravelTrip.forumId`).
 - Die Reise-Detail-API (`GET /trips/{id}`) gibt `forumId` und `forum`-Objekt
   zurück, damit der Client den Forum-Tab anzeigen kann.
 
+**Löschung:** Beim Löschen der Reise (`DELETE /trips/{id}`) wird das
+verknüpfte Forum vollständig mitgelöscht (inkl. Posts, Votes, Kommentare und
+Mitgliedschaften).
+
 ## Foren verwalten
 
 ### Foren auflisten

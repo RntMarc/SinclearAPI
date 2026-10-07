@@ -47,4 +47,14 @@ final readonly class TravelPlanEventInterestRepository
         );
         $stmt->execute([Uuid::uuid7()->toString(), $eventSuggestionId, $userId, $interest]);
     }
+
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare(
+            'DELETE i FROM TravelPlanEventInterest i
+             JOIN TravelPlanEvent e ON e.id = i.eventSuggestionId
+             WHERE e.tripId = ?'
+        );
+        $stmt->execute([$tripId]);
+    }
 }

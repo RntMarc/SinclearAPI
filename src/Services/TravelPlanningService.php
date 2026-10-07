@@ -680,6 +680,25 @@ final readonly class TravelPlanningService
         $this->planEventRepo->delete($suggestionId);
     }
 
+    /**
+     * Loescht alle Planungsdaten einer Reise. Wird beim Loeschen einer
+     * operativen Reise aufgerufen, um auch nach einer Aktivierung
+     * zurueckgebliebene Planungsobjekte vollstaendig zu entfernen.
+     */
+    public function deletePlanningData(string $tripId): void
+    {
+        // Abhaengige Tabellen zuerst (per JOIN ueber die jeweilige Parent-Tabelle).
+        $this->dateResponseRepo->deleteByTrip($tripId);
+        $this->eventInterestRepo->deleteByTrip($tripId);
+
+        $this->memberRepo->deleteByTrip($tripId);
+        $this->topicRepo->deleteByTrip($tripId);
+        $this->dateOptionRepo->deleteByTrip($tripId);
+        $this->transportRepo->deleteByTrip($tripId);
+        $this->accommodationOptionRepo->deleteByTrip($tripId);
+        $this->planEventRepo->deleteByTrip($tripId);
+    }
+
     public function setEventInterest(AuthenticatedUser $user, string $tripId, string $suggestionId, string $interest): array
     {
         $this->requirePlanningTrip($tripId);

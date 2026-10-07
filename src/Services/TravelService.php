@@ -2,6 +2,7 @@
 
 namespace Sinclear\Api\Services;
 
+use PDO;
 use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\TravelAccommodationRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
@@ -34,6 +35,9 @@ final readonly class TravelService
         private TravelChatService $travelChatService,
         private TravelNotificationService $notificationService,
         private ImageService $imageService,
+        private ForumService $forumService,
+        private TravelPlanningService $travelPlanningService,
+        private PDO $pdo,
     ) {}
 
     // ──────────────────────────── Lesen ────────────────────────────
@@ -400,8 +404,24 @@ final readonly class TravelService
 
         $this->assertCanManageTrip($user, $id);
 
-        $this->travelChatService->deleteForTrip($id);
-        $this->tripRepo->delete($id);
+        $forumId = $trip['forumId'] ?? null;
+
+        $this->pdo->beginTransaction();
+
+        try {
+            if ($forumId !== null && $this->forumRepo->findById($forumId) !== null) {
+                $this->forumService->deleteForum($forumId);
+            }
+
+            $this->travelChatService->deleteForTrip($id);
+            $this->travelPlanningService->deletePlanningData($id);
+            $this->tripRepo->delete($id);
+
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
     }
 
     // ──────────────────────────── Events schreiben ────────────────────────────
@@ -456,8 +476,16 @@ final readonly class TravelService
 
         $this->assertCanManageTrip($user, $tripId);
 
-        $this->travelChatService->deleteForEvent($eventId);
-        $this->eventRepo->delete($eventId);
+        $this->pdo->beginTransaction();
+
+        try {
+            $this->travelChatService->deleteForEvent($eventId);
+            $this->eventRepo->delete($eventId);
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
     }
 
     /** @param array<string, mixed> $body */
@@ -487,8 +515,16 @@ final readonly class TravelService
         $this->findStandaloneEvent($eventId);
         $this->assertCanManageStandaloneEvent($user, $eventId);
 
-        $this->travelChatService->deleteForEvent($eventId);
-        $this->eventRepo->delete($eventId);
+        $this->pdo->beginTransaction();
+
+        try {
+            $this->travelChatService->deleteForEvent($eventId);
+            $this->eventRepo->delete($eventId);
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
     }
 
     /**

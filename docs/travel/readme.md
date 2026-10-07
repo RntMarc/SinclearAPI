@@ -382,6 +382,44 @@ Abonnements können mit einer Reise verknüpft werden (über
 Standalone-Events sind `TravelEvent`-Einträge ohne Reise-Bezug (`trip IS NULL`).
 Sie werden unter `/trips/standaloneevents` abgerufen.
 
+## Löschverhalten (Kaskade)
+
+Das Löschen einer Reise oder eines Events entfernt verknüpfte Daten
+vollständig. Die Kaskade wird teils über Datenbank-Fremdschlüssel
+(`ON DELETE CASCADE`, Migration
+`database/migrations/20261007000000_travel_cascade_delete.sql`), teils auf
+Anwendungsebene umgesetzt.
+
+### Reise löschen (`DELETE /trips/{id}`)
+
+Beim Löschen einer Reise werden zusätzlich gelöscht:
+
+| Verknüpfte Daten | Mechanismus |
+|------------------|-------------|
+| Reise-Events (`TravelEvent.trip`) inkl. deren `EventRelation` und `TravelEventTicket` | FK `ON DELETE CASCADE` |
+| Reise-Teilnehmer (`TravelRelation`) | FK `ON DELETE CASCADE` |
+| Reise-/Event-Tickets (`TravelEventTicket`) | FK `ON DELETE CASCADE` |
+| Unterkunft-Verknüpfungen (`TravelAccommodationTrip`) | FK `ON DELETE CASCADE` |
+| ÖPNV-Fahrten (`PtJourney.tripId`; `PtLeg`/`PtParticipant` folgen über FK) | FK `ON DELETE CASCADE` |
+| Reise-Abo-Verknüpfungen (`TravelTripSubscription`) | FK `ON DELETE CASCADE` |
+| Reise-Chat (Konversation inkl. Nachrichten, Teilnehmer, Reaktionen) | Anwendungsebene |
+| Verknüpftes Forum inkl. Posts, Votes, Kommentaren, Mitgliedern | Anwendungsebene |
+| Planungsdaten (`TravelPlan*`) | Anwendungsebene |
+
+Der globale Unterkunfts-Katalog (`TravelAccommodation`) bleibt erhalten;
+lediglich die Verknüpfung wird entfernt.
+
+### Event löschen
+
+`DELETE /trips/{id}/events/{eventId}` und `DELETE /trips/standaloneevents/{eventId}`
+löschen zusätzlich:
+
+| Verknüpfte Daten | Mechanismus |
+|------------------|-------------|
+| Event-Teilnehmer (`EventRelation`) | FK `ON DELETE CASCADE` |
+| Event-Tickets (`TravelEventTicket.event`) | FK `ON DELETE CASCADE` |
+| Event-Chat (Konversation inkl. Nachrichten, Teilnehmer, Reaktionen) | Anwendungsebene |
+
 ## Datenbank-Kompatibilität
 
 Die Tabelle `TravelRelation` nutzt abweichende Spaltennamen:

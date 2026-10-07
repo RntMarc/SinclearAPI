@@ -106,19 +106,27 @@ final readonly class TravelChatService
     }
 
     /**
-     * Delete a travel chat for a trip.
+     * Delete a travel chat for a trip, including the underlying conversation
+     * (participants, messages and reactions cascade via foreign keys).
      */
     public function deleteForTrip(string $tripId): void
     {
-        $this->travelChatRepo->deleteByTripId($tripId);
+        $travelChat = $this->travelChatRepo->findByTripId($tripId);
+        if ($travelChat !== null) {
+            $this->conversationRepo->delete($travelChat['conversationId']);
+        }
     }
 
     /**
-     * Delete a travel chat for an event.
+     * Delete a travel chat for an event, including the underlying conversation
+     * (participants, messages and reactions cascade via foreign keys).
      */
     public function deleteForEvent(string $eventId): void
     {
-        $this->travelChatRepo->deleteByEventId($eventId);
+        $travelChat = $this->travelChatRepo->findByEventId($eventId);
+        if ($travelChat !== null) {
+            $this->conversationRepo->delete($travelChat['conversationId']);
+        }
     }
 
     /**

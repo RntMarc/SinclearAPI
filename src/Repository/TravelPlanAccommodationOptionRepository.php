@@ -105,6 +105,12 @@ final readonly class TravelPlanAccommodationOptionRepository
         $stmt->execute([$id]);
     }
 
+    public function deleteByTrip(string $tripId): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM TravelPlanAccommodationOption WHERE tripId = ?');
+        $stmt->execute([$tripId]);
+    }
+
     /**
      * Markiert atomar genau eine Unterkunftsoption der Reise als gewaehlt und
      * setzt alle uebrigen auf nicht-gewaehlt (Rennsicherheit: ein Statement).

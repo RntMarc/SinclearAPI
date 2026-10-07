@@ -131,6 +131,12 @@ final readonly class ChatConversationRepository
         return (int) $stmt->fetchColumn();
     }
 
+    public function delete(string $id): void
+    {
+        $stmt = $this->pdo->prepare('DELETE FROM ChatConversation WHERE id = ?');
+        $stmt->execute([$id]);
+    }
+
     /**
      * Delete conversations that have no messages and are older than a threshold.
      */

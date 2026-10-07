@@ -91,11 +91,10 @@ final readonly class ForumService
             throw new \RuntimeException('forum_not_found');
         }
 
-        $posts = $this->postRepo->listByForum($id, 1, 99999, null);
-        foreach ($posts['data'] as $post) {
-            $this->commentRepo->deleteByPost($post['id']);
-        }
-
+        $this->voteRepo->deleteByForum($id);
+        $this->commentRepo->deleteByForum($id);
+        $this->postRepo->deleteByForum($id);
+        $this->memberRepo->deleteByForum($id);
         $this->forumRepo->delete($id);
     }
 
