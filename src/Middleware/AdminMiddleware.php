@@ -14,7 +14,10 @@ final readonly class AdminMiddleware implements MiddlewareInterface
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            session_start([
+                'cookie_httponly' => true,
+                'cookie_samesite' => 'Lax',
+            ]);
         }
 
         if (isset($_SESSION['admin_id'], $_SESSION['admin_email'])) {

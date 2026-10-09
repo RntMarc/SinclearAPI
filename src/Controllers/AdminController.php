@@ -76,7 +76,10 @@ final readonly class AdminController
     public function loginPage(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            session_start([
+                'cookie_httponly' => true,
+                'cookie_samesite' => 'Lax',
+            ]);
         }
 
         if (isset($_SESSION['admin_id'], $_SESSION['admin_email'])) {
@@ -141,8 +144,12 @@ final readonly class AdminController
         $this->otpTokenRepo->markUsed($otpToken['id']);
 
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            session_start([
+                'cookie_httponly' => true,
+                'cookie_samesite' => 'Lax',
+            ]);
         }
+        session_regenerate_id(true);
         $_SESSION['admin_id'] = $user['id'];
         $_SESSION['admin_email'] = $user['email'];
 
@@ -152,7 +159,10 @@ final readonly class AdminController
     public function logout(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+            session_start([
+                'cookie_httponly' => true,
+                'cookie_samesite' => 'Lax',
+            ]);
         }
         session_destroy();
 
