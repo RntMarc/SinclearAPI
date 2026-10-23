@@ -2682,7 +2682,7 @@ components:
           description: Art der Anfrage
         objectType:
           type: string
-          enum: [user, forum_post, recipe, explore_place, recipe_review, forum_comment, explore_comment, feedback_suggestion, feedback_comment, travel_trip, travel_event, travel_accommodation, travel_ticket, subscription, calendar_event, story]
+          enum: [user, forum_post, recipe, explore_place, recipe_review, forum_comment, explore_comment, feedback_suggestion, feedback_comment, travel_trip, travel_event, travel_accommodation, travel_ticket, subscription, calendar_event, story, chat_message]
           description: Art des referenzierten Objekts
         objectId:
           type: string
@@ -2729,17 +2729,20 @@ components:
             die Löschung eigener Inhalte, `other` ist für sonstige Anliegen.
         objectType:
           type: string
-          enum: [user, forum_post, recipe, explore_place, recipe_review, forum_comment, explore_comment, feedback_suggestion, feedback_comment, travel_trip, travel_event, travel_accommodation, travel_ticket, subscription, calendar_event, story]
+          enum: [user, forum_post, recipe, explore_place, recipe_review, forum_comment, explore_comment, feedback_suggestion, feedback_comment, travel_trip, travel_event, travel_accommodation, travel_ticket, subscription, calendar_event, story, chat_message]
           description: >
             Art des Objekts. Einzelobjekte: `user` (Nutzerprofil), `forum_post`
             (Forumsbeitrag), `recipe` (Rezept), `explore_place` (Entdecken-Ort),
             `recipe_review` (Rezept-Bewertung), `forum_comment` (Forums-Kommentar),
             `explore_comment` (Ort-Kommentar), `feedback_suggestion` (Funktionsvorschlag),
             `feedback_comment` (Kommentar zum Vorschlag), `travel_ticket` (Reise-Ticket),
-            `calendar_event` (Kalender-Event), `story` (7-Tage-Story). Kollaborative
+            `calendar_event` (Kalender-Event), `story` (7-Tage-Story),
+            `chat_message` (Chat-Nachricht, `DirectMessage`). Kollaborative
             Objekte (Teilnehmer über Join-Tabelle): `travel_trip` (Reise),
             `travel_event` (Reise-Event), `travel_accommodation` (Unterkunft),
-            `subscription` (Abo/Zahlung).
+            `subscription` (Abo/Zahlung). Bei `chat_message` entspricht `objectId`
+            der `DirectMessage.id`; gelöschte Nachrichten werden wie nicht
+            existierende behandelt (`object_not_found`).
         objectId:
           type: string
           format: uuid
@@ -10289,7 +10292,10 @@ paths:
         gemeldet werden, fremde Inhalte dürfen nicht zum Löschen beantragt
         werden. Für Stories (`objectType: story`) sind keine Löschwünsche
         vorgesehen (`deletion_not_supported`) – fremde Stories können gemeldet
-        oder angemerkt, eigene Stories nur angemerkt werden.
+        oder angemerkt, eigene Stories nur angemerkt werden. Chat-Nachrichten
+        (`objectType: chat_message`) referenzieren eine `DirectMessage.id`;
+        gelöschte Nachrichten werden wie nicht existierende behandelt
+        (`object_not_found`).
       tags: [Moderation]
       security:
         - BearerAuth: []
@@ -13194,7 +13200,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [user, forum_post, recipe, explore_place, recipe_review, forum_comment, explore_comment, feedback_suggestion, feedback_comment, travel_trip, travel_event, travel_accommodation, travel_ticket, subscription, calendar_event, story]
+            enum: [user, forum_post, recipe, explore_place, recipe_review, forum_comment, explore_comment, feedback_suggestion, feedback_comment, travel_trip, travel_event, travel_accommodation, travel_ticket, subscription, calendar_event, story, chat_message]
           description: Art des referenzierten Objekts
         - name: requestType
           in: query
@@ -13220,6 +13226,9 @@ paths:
       summary: Detailseite einer Moderations-Anfrage
       description: >
         Gibt die HTML-Detailseite einer einzelnen Moderations-Anfrage zurück.
+        Bei `objectType: chat_message` wird eine nach dem 90-Tage-Cleanup nicht
+        mehr vorhandene Nachricht tolerant als gelöscht/nicht verfügbar
+        dargestellt.
       tags: [Admin]
       parameters:
         - name: id

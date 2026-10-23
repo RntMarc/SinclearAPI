@@ -12,6 +12,7 @@ use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
+use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\FeedbackCommentRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\FeedPostCommentRepository;
@@ -127,6 +128,7 @@ class ModerationRequestStoryTest extends TestCase
             subscriptionRepo: new SubscriptionRepository($this->db),
             calendarEventRepo: new CalendarEventRepository($this->db),
             storyRepo: $this->storyRepo,
+            directMessageRepo: new DirectMessageRepository($this->db),
         );
 
         $this->controller = new ModerationRequestController($service);

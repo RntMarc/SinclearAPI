@@ -402,6 +402,9 @@ return [
                     'privateKey' => $vapid['private_key'],
                 ],
             ],
+            client: new \GuzzleHttp\Client(['timeout' => 30]),
+            requestFactory: new \GuzzleHttp\Psr7\HttpFactory(),
+            streamFactory: new \GuzzleHttp\Psr7\HttpFactory(),
         );
     },
 

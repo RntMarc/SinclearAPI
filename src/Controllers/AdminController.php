@@ -29,6 +29,7 @@ use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\FeedbackSuggestionRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
+use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\ImageService;
@@ -64,6 +65,7 @@ final readonly class AdminController
         private CalendarEventRepository $calendarEventRepo,
         private FeedbackSuggestionRepository $feedbackSuggestionRepo,
         private ChatConversationRepository $conversationRepo,
+        private DirectMessageRepository $directMessageRepo,
         private TravelChatRepository $travelChatRepo,
         private TravelChatService $travelChatService,
         private ImageService $imageService,
@@ -2308,7 +2310,19 @@ ROW;
             'forum_post' => 'Forumsbeitrag',
             'recipe' => 'Rezept',
             'explore_place' => 'Entdecken-Ort',
+            'recipe_review' => 'Rezept-Bewertung',
+            'forum_comment' => 'Forums-Kommentar',
+            'explore_comment' => 'Orts-Kommentar',
+            'feedback_suggestion' => 'Funktionsvorschlag',
+            'feedback_comment' => 'Feedback-Kommentar',
+            'travel_trip' => 'Reise',
+            'travel_event' => 'Reise-Event',
+            'travel_accommodation' => 'Unterkunft',
+            'travel_ticket' => 'Reise-Ticket',
+            'subscription' => 'Abo',
+            'calendar_event' => 'Kalender-Event',
             'story' => 'Story',
+            'chat_message' => 'Chat-Nachricht',
         ];
         $statusLabels = [
             'unread' => 'Ungelesen',
@@ -2412,7 +2426,19 @@ ROW;
             'forum_post' => 'Forumsbeitrag',
             'recipe' => 'Rezept',
             'explore_place' => 'Entdecken-Ort',
+            'recipe_review' => 'Rezept-Bewertung',
+            'forum_comment' => 'Forums-Kommentar',
+            'explore_comment' => 'Orts-Kommentar',
+            'feedback_suggestion' => 'Funktionsvorschlag',
+            'feedback_comment' => 'Feedback-Kommentar',
+            'travel_trip' => 'Reise',
+            'travel_event' => 'Reise-Event',
+            'travel_accommodation' => 'Unterkunft',
+            'travel_ticket' => 'Reise-Ticket',
+            'subscription' => 'Abo',
+            'calendar_event' => 'Kalender-Event',
             'story' => 'Story',
+            'chat_message' => 'Chat-Nachricht',
         ];
         $statusLabels = [
             'unread' => 'Ungelesen',
@@ -2433,6 +2459,7 @@ ROW;
 
         $objectLink = match ($r['objectType']) {
             'recipe' => '<a href="/api/v2/recipes/' . htmlspecialchars($r['objectId']) . '" target="_blank">Rezept ansehen</a>',
+            'chat_message' => $this->renderChatMessageReference($r['objectId']),
             default => '<code>' . htmlspecialchars($r['objectId']) . '</code>',
         };
 
@@ -2453,6 +2480,24 @@ ROW;
         $html = $this->renderLayout('Anfrage: ' . $requestTypeLabels[$r['requestType']] . ' (' . $objectTypeLabels[$r['objectType']] . ')', $content, $user->email);
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    /**
+     * Chat-Nachrichten koennen nach 90 Tagen hart geloescht sein. Das
+     * Admin-Detail bleibt dadurch tolerant und zeigt statt eines Fehlers
+     * lediglich einen Hinweis auf die nicht mehr verfuegbare Nachricht.
+     */
+    private function renderChatMessageReference(string $messageId): string
+    {
+        $escapedId = htmlspecialchars($messageId);
+        $message = $this->directMessageRepo->findById($messageId);
+
+        if ($message === null || ($message['deletedAt'] ?? null) !== null) {
+            return '<code>' . $escapedId . '</code>'
+                . ' <span style="color:#f59e0b;">(Nachricht gelöscht oder nicht mehr verfügbar)</span>';
+        }
+
+        return '<code>' . $escapedId . '</code>';
     }
 
     public function moderationRequestUpdate(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface

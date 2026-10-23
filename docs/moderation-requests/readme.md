@@ -13,14 +13,14 @@ Entdecken-Orten und Forumsbeiträgen nach Ablauf des 30-Minuten-Fensters.
 |---------|-------------|
 | `ModerationRequest` | Anfragen/Meldungen mit Typ, Objekt-Referenz, Status und Admin-Kommentar |
 
-Schema: `events/moderation_request_schema.sql`
+Schema-Erweiterung für Chat-Nachrichten: `database/migrations/20261023000000_moderation_chat_message.sql`
 
 | Spalte | Typ | Beschreibung |
 |--------|-----|-------------|
 | `id` | varchar(191) | Eindeutige ID (UUIDv7) |
 | `userId` | varchar(191) | ID des Nutzers, der die Anfrage abgeschickt hat |
 | `requestType` | enum | `report`, `deletion`, `other` |
-| `objectType` | enum | `user`, `forum_post`, `recipe`, `explore_place`, `recipe_review`, `forum_comment`, `explore_comment`, `feedback_suggestion`, `feedback_comment`, `travel_trip`, `travel_event`, `travel_accommodation`, `travel_ticket`, `subscription`, `calendar_event`, `story` |
+| `objectType` | enum | `user`, `forum_post`, `recipe`, `explore_place`, `recipe_review`, `forum_comment`, `explore_comment`, `feedback_suggestion`, `feedback_comment`, `travel_trip`, `travel_event`, `travel_accommodation`, `travel_ticket`, `subscription`, `calendar_event`, `story`, `chat_message` |
 | `objectId` | varchar(191) | ID des Objekts, auf das sich die Anfrage bezieht |
 | `message` | text | Ausführliche Beschreibung des Anliegens |
 | `status` | enum | Bearbeitungsstatus (siehe unten) |
@@ -57,6 +57,7 @@ Schema: `events/moderation_request_schema.sql`
 | `subscription` | Abo/Zahlung | Erster Teilnehmer (Join-Tabelle `SubscriptionRelation`) |
 | `calendar_event` | Kalender-Event | `creatorId` des Events |
 | `story` | Story (7-Tage-Story) | `userId` der Story |
+| `chat_message` | Chat-Nachricht (`DirectMessage`) | `senderId` der Nachricht |
 
 **`status` (Bearbeitungsstatus):**
 
@@ -90,11 +91,19 @@ Schema: `events/moderation_request_schema.sql`
 ### Eigentümer-Ermittlung
 
 Für Einzelobjekte (Rezepte, Beiträge, Bewertungen, Kommentare, Vorschläge,
-Kalender-Events, Tickets) wird der Eigentümer direkt aus der Tabelle gelesen
-(`userId` oder `creatorId`). Für kollaborative Objekte (Reisen, Events,
-Unterkünfte, Abos) wird der erste Teilnehmer aus der jeweiligen Join-Tabelle
-als Eigentümer verwendet. Dies betrifft die Besitzprüfung bei `report` und
-`deletion`.
+Kalender-Events, Tickets, Chat-Nachrichten) wird der Eigentümer direkt aus der
+Tabelle gelesen (`userId`, `creatorId` oder `senderId`). Für kollaborative
+Objekte (Reisen, Events, Unterkünfte, Abos) wird der erste Teilnehmer aus der
+jeweiligen Join-Tabelle als Eigentümer verwendet. Dies betrifft die
+Besitzprüfung bei `report` und `deletion`.
+
+Bei `chat_message` wird `DirectMessage.senderId` verwendet. Soft-gelöschte
+Nachrichten (`deletedAt` gesetzt) gelten wie nicht existierende Nachrichten und
+werden mit `object_not_found` (404) abgelehnt. Nach 90 Tagen werden
+Chat-Nachrichten durch den `CleanupOldDirectMessagesTask` hart gelöscht; offene
+Moderations-Anfragen auf solche IDs bleiben bestehen und werden im
+Admin-Detail tolerant als „Nachricht gelöscht oder nicht mehr verfügbar“
+dargestellt.
 
 ## Endpunkte
 

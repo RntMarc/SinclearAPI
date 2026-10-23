@@ -71,6 +71,8 @@ Nicht-Admins erhalten einen 403-Fehler.
 - Filter nach Bearbeitungsstatus, Art des Objekts und Art der Anfrage
 - Status-Zähler als Schnellzugriff (ungelesen, in Arbeit, …)
 - Detailseite pro Anfrage mit Anliegen des Nutzers
+- Chat-Nachrichten-Referenzen (`chat_message`) werden tolerant dargestellt; nach
+  dem 90-Tage-Cleanup erscheint statt der Nachricht ein Hinweis
 - Bearbeitungsstatus und Admin-Kommentar setzen (Rückmeldung an den Nutzer)
 - Statistik-Karte auf dem Dashboard (offene Anfragen)
 

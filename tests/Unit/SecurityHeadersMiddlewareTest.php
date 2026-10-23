@@ -15,7 +15,7 @@ final class SecurityHeadersMiddlewareTest extends TestCase
     {
         $middleware = new SecurityHeadersMiddleware();
 
-        $request = $this->createMock(ServerRequestInterface::class);
+        $request = $this->createStub(ServerRequestInterface::class);
         $handler = $this->createMock(RequestHandlerInterface::class);
 
         $initialResponse = new Response();

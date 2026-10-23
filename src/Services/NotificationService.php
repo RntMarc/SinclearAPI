@@ -3,7 +3,7 @@
 namespace Sinclear\Api\Services;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\ResponseException;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 use Psr\Log\LoggerInterface;
@@ -1471,8 +1471,8 @@ final readonly class NotificationService
                     'timeout' => 10,
                 ]);
                 $this->pushSubRepo->markSuccess($sub['id']);
-            } catch (RequestException $e) {
-                $statusCode = $e->getResponse()?->getStatusCode();
+            } catch (ResponseException $e) {
+                $statusCode = $e->getResponse()->getStatusCode();
 
                 if ($statusCode === 410 || $statusCode === 404) {
                     // RFC 8030: subscription gone (app uninstalled, distributor
@@ -1483,7 +1483,7 @@ final readonly class NotificationService
 
                 $this->pushSubRepo->markFailure(
                     $sub['id'],
-                    'HTTP ' . ($statusCode ?? 'unknown') . ': ' . $e->getMessage()
+                    'HTTP ' . $statusCode . ': ' . $e->getMessage()
                 );
                 $this->logger?->warning('UnifiedPush delivery failed', [
                     'userId' => $userId,

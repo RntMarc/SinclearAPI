@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Services;
 
 use Sinclear\Api\Repository\CalendarEventRepository;
+use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\DiscoverPlaceRepository;
 use Sinclear\Api\Repository\DiscoverReviewRepository;
 use Sinclear\Api\Repository\FeedbackCommentRepository;
@@ -28,7 +29,7 @@ final readonly class ModerationRequestService
         'recipe_review', 'forum_comment', 'explore_comment',
         'feedback_suggestion', 'feedback_comment',
         'travel_trip', 'travel_event', 'travel_accommodation', 'travel_ticket',
-        'subscription', 'calendar_event', 'story',
+        'subscription', 'calendar_event', 'story', 'chat_message',
     ];
 
     public const array VALID_STATUSES = [
@@ -53,6 +54,7 @@ final readonly class ModerationRequestService
         private SubscriptionRepository $subscriptionRepo,
         private CalendarEventRepository $calendarEventRepo,
         private StoryRepository $storyRepo,
+        private DirectMessageRepository $directMessageRepo,
     ) {}
 
     public function createRequest(
@@ -169,7 +171,7 @@ final readonly class ModerationRequestService
         return $this->requestRepo->getStatusCounts();
     }
 
-private function resolveOwner(string $objectType, string $objectId): ?string
+    private function resolveOwner(string $objectType, string $objectId): ?string
     {
         return match ($objectType) {
             'recipe' => $this->safeGet($this->recipeRepo->findById($objectId), 'creatorId'),
@@ -201,9 +203,25 @@ private function resolveOwner(string $objectType, string $objectId): ?string
             ),
 
             'story' => $this->safeGet($this->storyRepo->findById($objectId), 'userId'),
+            'chat_message' => $this->resolveChatMessageOwner($objectId),
 
             default => null,
         };
+    }
+
+    /**
+     * Chat-Nachrichten werden nach 90 Tagen hart geloescht; soft-deleted
+     * Nachrichten (deletedAt gesetzt) gelten ebenfalls als nicht vorhanden,
+     * damit kein Report auf einen leeren Platzhalter entsteht.
+     */
+    private function resolveChatMessageOwner(string $objectId): ?string
+    {
+        $message = $this->directMessageRepo->findById($objectId);
+        if ($message === null || ($message['deletedAt'] ?? null) !== null) {
+            return null;
+        }
+
+        return $message['senderId'] ?? null;
     }
 
     private function safeGet(?array $row, string $key): ?string

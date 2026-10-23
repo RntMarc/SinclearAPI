@@ -555,13 +555,26 @@ aggregierte Reaktions-Summary der betroffenen Nachricht. Wird mit
 
 ## Moderation
 
-Chat-Nachrichten haben aktuell **keinen** `ModerationObjectType`. Das `ModerationRequest.objectType`-ENUM enthält (produktiv, verifiziert):
+Chat-Nachrichten können über das allgemeine Moderations-System gemeldet bzw.
+zur Löschung beantragt werden:
 
-```
-user, forum_post, recipe, explore_place
-```
+- `objectType`: `chat_message`
+- `objectId`: `DirectMessage.id`
+- Eigentümer: `DirectMessage.senderId`
 
-`chat_message` fehlt. Laut AGENTS.md muss jeder User-Content einen Report-Flag haben. **TODO:** `chat_message` zum ENUM + `VALID_OBJECT_TYPES` hinzufügen und `resolveOwner` für Chat-Nachrichten implementieren. Der Report-Button für Chat kann ggf. auf die nächste Iteration verschoben werden.
+Damit gelten die allgemeinen Regeln: eigene Nachrichten können nicht gemeldet
+werden (`cannot_report_own`), fremde Nachrichten können nicht zur Löschung
+beantragt werden (`cannot_request_deletion_foreign`). `other` ist für eigene
+und fremde Nachrichten erlaubt.
+
+Gelöschte Nachrichten (`deletedAt` gesetzt) sowie unbekannte IDs werden wie
+nicht existierende Nachrichten behandelt (`object_not_found`, 404). Nach 90
+Tagen löscht der `CleanupOldDirectMessagesTask` Nachrichten hart; offene
+Moderations-Anfragen auf solche IDs bleiben bestehen und werden im
+Admin-Detail tolerant als „Nachricht gelöscht oder nicht mehr verfügbar“
+angezeigt.
+
+Details siehe `docs/moderation-requests/readme.md`.
 
 ## Cron
 

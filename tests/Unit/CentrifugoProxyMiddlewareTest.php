@@ -60,7 +60,7 @@ class CentrifugoProxyMiddlewareTest extends TestCase
 
     private function createRequest(string $proxyKey): ServerRequestInterface
     {
-        $request = $this->createMock(ServerRequestInterface::class);
+        $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getHeaderLine')
             ->willReturnCallback(function (string $name) use ($proxyKey) {
                 return $name === 'X-Centrifugo-Proxy-Key' ? $proxyKey : '';
@@ -71,7 +71,7 @@ class CentrifugoProxyMiddlewareTest extends TestCase
 
     private function createResponse(int $statusCode): ResponseInterface
     {
-        $response = $this->createMock(ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn($statusCode);
         $response->method('getBody')->willReturn(\GuzzleHttp\Psr7\Utils::streamFor('{}'));
         return $response;
