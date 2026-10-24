@@ -1,7 +1,7 @@
 <div class="page-header">
     <div>
         <h1>Externe Daten – Cache</h1>
-        <div class="subtitle">Cached API-Antworten von InfraNode und Open-Meteo</div>
+        <div class="subtitle">Cached API-Antworten von InfraNode, Open-Meteo und BrightSky</div>
     </div>
     <div class="header-actions">
         <button class="btn btn-danger" onclick="clearAll()">Allen Cache leeren</button>

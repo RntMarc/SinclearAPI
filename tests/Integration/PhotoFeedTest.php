@@ -100,7 +100,7 @@ class PhotoFeedTest extends TestCase
                 id varchar(191) NOT NULL,
                 data_type varchar(64) NOT NULL,
                 location_key varchar(191) NOT NULL,
-                source enum('infranode','open-meteo','mixed','unsplash') NOT NULL,
+                source enum('infranode','open-meteo','mixed','unsplash','brightsky') NOT NULL,
                 payload json NOT NULL,
                 expires_at datetime(3) NOT NULL,
                 created_at datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

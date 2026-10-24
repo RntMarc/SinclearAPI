@@ -34,7 +34,7 @@ Mindestens eines von beiden muss angegeben werden.
 Sucht nach Orten für Wetterdaten. Kombiniert InfraNode-gestützte deutsche Städte mit weltweiten Orten über Nominatim-Geocoding.
 
 **Parameter:**
-- `q` (required) — Suchbigriff, mindestens 2 Zeichen
+- `q` (required) — Suchbegriff, mindestens 2 Zeichen
 
 **Antwort:**
 ```json
@@ -128,12 +128,29 @@ TTLs können über Umgebungsvariablen `EXTERNAL_DATA_CACHE_<TYP>` konfiguriert w
 
 Cache-Einträge laufen nach Ablauf automatisch ab und werden durch den Cron-Job `cleanup_external_data_cache` (alle 24h) bereinigt.
 
+### Cache-Quellen (`source`)
+
+Die Spalte `ExternalDataCache.source` ist ein ENUM und akzeptiert derzeit
+`infranode`, `open-meteo`, `mixed`, `unsplash` und `brightsky`. **Jede neue
+Quelle erfordert eine eigene DB-Migration** unter `database/migrations/`
+(siehe `20261024000000_add_brightsky_cache_source.sql`); die Migration wird
+vom Betreiber auf dem Server angewendet.
+
+Schlägt ein Cache-Schreibvorgang fehl, wird die erfolgreiche Upstream-Antwort
+trotzdem ausgeliefert: Der Fehler wird geloggt (`[EXTERNAL_DATA] Failed to
+cache …`), der Request antwortet weiterhin mit HTTP 200. Ein fehlendes
+ENUM-Mitglied darf also nie zu einem 500er führen.
+
+Fallback-Quellen (`open-meteo`, `brightsky`) werden unter einem `city_slug`-Key
+nur mit einer verkürzten TTL von 60 Sekunden gecached, damit die Primärquelle
+(InfraNode) zeitnah erneut abgefragt wird.
+
 ## Quellen
 
 | Quelle | Nutzung | Lizenz |
 |--------|---------|--------|
 | InfraNode.dev | Deutsche Städte (Wetter, Warnungen, Pollen, UV, Luftqualität) | Open Data |
-| BrightSky.dev | Wetterwarnungen全球 (Fallback für nicht-DE Standorte) | Open Data (DWD GeoNutzV) |
+| BrightSky.dev | Wetterwarnungen weltweit (Fallback für Orte ohne InfraNode-Slug) | Open Data (DWD GeoNutzV) |
 | Open-Meteo.com | Globaler Wetter- und Luftqualitäts-Fallback | Non-commercial |
 
 ## Lückenhafte Daten
@@ -148,7 +165,7 @@ Jede Antwort enthält in `meta.source` die Information, welche Quelle die Daten 
 |---------------|--------------|
 | `infranode` | Daten ausschließlich von InfraNode (deutsche Städte) |
 | `open-meteo` | Daten ausschließlich von Open-Meteo (global) |
-| `brightsky` | Daten ausschließlich von BrightSky (Warnungen全球) |
+| `brightsky` | Daten ausschließlich von BrightSky (Warnungen weltweit) |
 | `mixed` | InfraNode + Open-Meteo kombiniert |
 | `cache` | Gecachte Antwort aus der Datenbank |
 

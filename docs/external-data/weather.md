@@ -203,10 +203,10 @@ Array von Spezialwarnungen (Hitze, UV) - gleiche Struktur wie `warnings`:
 ## Quellen
 
 - **InfraNode**: Liefert Warnungen für deutsche Städte (mit `city_slug`)
-- **BrightSky**: Liefert Warnungen全球 (mit `lat`+`lon`)
-- Fällt InfraNode bei einem `city_slug`-Request aus, wird BrightSky als Fallback verwendet
-- BrightSky-Fallback nur mit reduzierter TTL (60 s) gecached, sodass InfraNode zeitnah erneut abgefragt wird
-- Die Datenquelle ist in `meta.source` angegeben
+- **BrightSky**: Liefert Warnungen weltweit (mit `lat`+`lon`, optional zusätzlich zu `city_slug`)
+- Fällt InfraNode aus und sind `lat`+`lon` vorhanden, wird BrightSky als Fallback verwendet
+- BrightSky-Fallback wird unter einem `city_slug`-Key nur mit reduzierter TTL (60 s) gecached, sodass InfraNode zeitnah erneut abgefragt wird
+- Die Datenquelle ist in `meta.source` angegeben (`infranode`, `brightsky` oder `cache`)
 
 ## Beispiel
 

@@ -15,8 +15,14 @@ final readonly class ExternalDataService
     private Client $httpClient;
 
     private const int HTTP_TIMEOUT = 10;
-    /** Short TTL for Open-Meteo fallback results cached under a slug key, so InfraNode is retried quickly after transient failures. */
+    /** Short TTL for fallback results cached under a slug key, so the primary source is retried quickly after transient failures. */
     private const int FALLBACK_CACHE_TTL = 60;
+    /**
+     * Sources only used when the primary source (InfraNode) fails. Must match
+     * the values allowed by the ExternalDataCache.source enum; a new source
+     * requires a migration (see database/migrations/).
+     */
+    private const array FALLBACK_SOURCES = ['open-meteo', 'brightsky'];
     private const string USER_AGENT = 'SinclearBeyondAPI/2.0 (https://sinclear.app)';
 
     public function __construct(
@@ -63,7 +69,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('weather', $locationKey);
         }
 
-        $this->cacheRepo->save('weather', $locationKey, $source, $data, $this->getCacheTtl('weather', $source, $locationKey));
+        $this->saveToCache('weather', $locationKey, $source, $data);
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -88,7 +94,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('weather_warnings', $locationKey, ['warnings' => [], 'special_warnings' => [], 'max_level' => 0, 'count' => 0]);
         }
 
-        $this->cacheRepo->save('weather_warnings', $locationKey, $source, $data, $this->getCacheTtl('weather_warnings', $source, $locationKey));
+        $this->saveToCache('weather_warnings', $locationKey, $source, $data);
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -122,7 +128,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('pollen_uv', $locationKey, ['pollen' => [], 'uv_index' => null]);
         }
 
-        $this->cacheRepo->save('pollen_uv', $locationKey, $source, $data, $this->getCacheTtl('pollen_uv', $source, $locationKey));
+        $this->saveToCache('pollen_uv', $locationKey, $source, $data);
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -147,7 +153,7 @@ final readonly class ExternalDataService
             return $this->emptyResponse('air_quality', $locationKey);
         }
 
-        $this->cacheRepo->save('air_quality', $locationKey, $source, $data, $this->getCacheTtl('air_quality', $source, $locationKey));
+        $this->saveToCache('air_quality', $locationKey, $source, $data);
 
         return $this->buildFreshResponse($data, $source, $locationKey);
     }
@@ -169,9 +175,9 @@ final readonly class ExternalDataService
             'weather_warnings' => [
                 'label' => 'Wetterwarnungen',
                 'label_en' => 'Weather warnings',
-                'sections' => ['warnings'],
-                'sources' => ['infranode'],
-                'requires' => 'city_slug',
+                'sections' => ['warnings', 'special_warnings'],
+                'sources' => ['infranode', 'brightsky'],
+                'requires' => 'city_slug oder lat+lon',
             ],
             'pollen_uv' => [
                 'label' => 'Pollenbelastung & UV-Index',
@@ -755,12 +761,33 @@ final readonly class ExternalDataService
         return null;
     }
 
+    /**
+     * Persist an upstream result in the external data cache.
+     *
+     * A cache write failure must never turn a successful upstream response
+     * into a server error (e.g. when the ExternalDataCache.source enum is
+     * missing a newly introduced source), so errors are only logged.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function saveToCache(string $dataType, string $locationKey, string $source, array $data): void
+    {
+        try {
+            $this->cacheRepo->save($dataType, $locationKey, $source, $data, $this->getCacheTtl($dataType, $source, $locationKey));
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                '[EXTERNAL_DATA] Failed to cache ' . $dataType . ' (' . $source . '): ' . $e->getMessage()
+            );
+        }
+    }
+
     private function getCacheTtl(string $dataType, ?string $source = null, ?string $locationKey = null): int
     {
-        // An Open-Meteo fallback must never take over a slug key for the full TTL,
+        // A fallback result must never take over a slug key for the full TTL,
         // otherwise a transient InfraNode failure poisons the cache and the
         // InfraNode data is not retried until the cached entry expires.
-        if ($source === 'open-meteo' && $locationKey !== null && !str_contains($locationKey, ',')) {
+        if ($source !== null && in_array($source, self::FALLBACK_SOURCES, true)
+            && $locationKey !== null && !str_contains($locationKey, ',')) {
             return self::FALLBACK_CACHE_TTL;
         }
 
