@@ -41,8 +41,8 @@ final class CalendarEventControllerTest extends TestCase
             $this->markTestSkipped('ext-pdo ist in dieser Umgebung nicht verfuegbar');
         }
 
-        $this->pdo = $this->createMock(PDO::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->pdo = $this->createStub(PDO::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
     }
 
     public function testCreateMapsForeignKeyViolationToInvalidReference(): void
@@ -57,7 +57,7 @@ final class CalendarEventControllerTest extends TestCase
         ];
 
         $this->pdo->method('prepare')->willThrowException($exception);
-        $this->logger->expects($this->once())->method('warning');
+        $this->expectLog('warning');
 
         $result = $this->createController()->create(
             $this->createRequest(self::VALID_BODY),
@@ -94,7 +94,7 @@ final class CalendarEventControllerTest extends TestCase
         $exception->errorInfo = ['23000', 1062, "Duplicate entry 'x' for key 'PRIMARY'"];
 
         $this->pdo->method('prepare')->willThrowException($exception);
-        $this->logger->expects($this->once())->method('warning');
+        $this->expectLog('warning');
 
         $result = $this->createController()->create(
             $this->createRequest(self::VALID_BODY),
@@ -112,7 +112,7 @@ final class CalendarEventControllerTest extends TestCase
         $exception->errorInfo = ['HY000', 1366, "Incorrect integer value: '' for column 'allDay'"];
 
         $this->pdo->method('prepare')->willThrowException($exception);
-        $this->logger->expects($this->once())->method('warning');
+        $this->expectLog('warning');
 
         $result = $this->createController()->create(
             $this->createRequest(self::VALID_BODY),
@@ -127,7 +127,7 @@ final class CalendarEventControllerTest extends TestCase
     public function testCreateFallsBackToInternalErrorAndLogsError(): void
     {
         $this->pdo->method('prepare')->willThrowException(new \RuntimeException('unexpected failure'));
-        $this->logger->expects($this->once())->method('error');
+        $this->expectLog('error');
 
         $result = $this->createController()->create(
             $this->createRequest(self::VALID_BODY),
@@ -141,10 +141,10 @@ final class CalendarEventControllerTest extends TestCase
 
     public function testDeleteUnknownEventReturns404EventNotFound(): void
     {
-        $stmt = $this->createMock(PDOStatement::class);
+        $stmt = $this->createStub(PDOStatement::class);
         $stmt->method('fetch')->willReturn(false);
         $this->pdo->method('prepare')->willReturn($stmt);
-        $this->logger->expects($this->once())->method('warning');
+        $this->expectLog('warning');
 
         $result = $this->createController()->delete(
             $this->createRequest([]),
@@ -246,6 +246,13 @@ final class CalendarEventControllerTest extends TestCase
         $this->assertSame(500, $result->getStatusCode());
     }
 
+    private function expectLog(string $level): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method($level);
+        $this->logger = $logger;
+    }
+
     private function createController(bool $debug = false): CalendarEventController
     {
         $eventService = new CalendarEventService(
@@ -279,10 +286,12 @@ final class CalendarEventControllerTest extends TestCase
 
     private function createRequest(array $body): ServerRequestInterface
     {
-        $request = $this->createMock(ServerRequestInterface::class);
-        $request->method('getAttribute')
-            ->with(AuthenticatedUser::class)
-            ->willReturn(new AuthenticatedUser('user-1', 'user@example.com', false, 'jti-1'));
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getAttribute')->willReturnCallback(
+            static fn (string $attribute): ?AuthenticatedUser => $attribute === AuthenticatedUser::class
+                ? new AuthenticatedUser('user-1', 'user@example.com', false, 'jti-1')
+                : null,
+        );
         $request->method('getParsedBody')->willReturn($body);
 
         return $request;

@@ -31,7 +31,7 @@ final class AuthControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = $this->createMock(PDO::class);
+        $this->pdo = $this->createStub(PDO::class);
         $this->otpTokenRepo = new OtpTokenRepository($this->pdo);
         $this->userRepo = new UserRepository($this->pdo);
 
@@ -61,7 +61,7 @@ final class AuthControllerTest extends TestCase
         $jtiRepo = new JtiBlacklistRepository($this->pdo);
         $this->tokenService = new TokenService($settings, $refreshTokenRepo, $jtiRepo);
 
-        $mailer = $this->createMock(MailerInterface::class);
+        $mailer = $this->createStub(MailerInterface::class);
         $otpService = new OtpService($this->otpTokenRepo, $mailer, 'noreply@example.com');
 
         $userPrefRepo = new UserPreferenceRepository($this->pdo);
@@ -88,7 +88,7 @@ final class AuthControllerTest extends TestCase
 
     public function testLoginOtpVerifyWithInvalidEmailFormatReturns400(): void
     {
-        $request = $this->createMock(ServerRequestInterface::class);
+        $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn([
             'email' => 'invalid-email-format',
             'code' => '123456',
@@ -104,7 +104,7 @@ final class AuthControllerTest extends TestCase
 
     public function testLoginOtpVerifyRejectsEmailOtpWhenEmailOmitted(): void
     {
-        $request = $this->createMock(ServerRequestInterface::class);
+        $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn([
             'code' => '123456',
         ]);
@@ -130,7 +130,7 @@ final class AuthControllerTest extends TestCase
 
     public function testLoginOtpVerifyAllowsDiscordPairingCodeWhenEmailOmitted(): void
     {
-        $request = $this->createMock(ServerRequestInterface::class);
+        $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn([
             'code' => '123456',
         ]);
@@ -149,16 +149,16 @@ final class AuthControllerTest extends TestCase
             ->method('execute')
             ->with([OtpTokenRepository::TYPE_DISCORD_PAIRING, '123456']);
 
-        $stmt2 = $this->createMock(PDOStatement::class);
+        $stmt2 = $this->createStub(PDOStatement::class);
         $stmt2->method('fetch')->willReturn([
             'id' => 'user-123',
             'email' => 'user@example.com',
             'isAdmin' => 0,
         ]);
 
-        $stmt3 = $this->createMock(PDOStatement::class); // markUsed
-        $stmt4 = $this->createMock(PDOStatement::class); // createFamily
-        $stmt5 = $this->createMock(PDOStatement::class); // createToken
+        $stmt3 = $this->createStub(PDOStatement::class); // markUsed
+        $stmt4 = $this->createStub(PDOStatement::class); // createFamily
+        $stmt5 = $this->createStub(PDOStatement::class); // createToken
 
         $this->pdo->method('prepare')
             ->willReturnOnConsecutiveCalls($stmt1, $stmt2, $stmt3, $stmt4, $stmt5);
@@ -173,7 +173,7 @@ final class AuthControllerTest extends TestCase
 
     public function testLoginOtpVerifyWithValidEmailAndCodeSucceeds(): void
     {
-        $request = $this->createMock(ServerRequestInterface::class);
+        $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn([
             'email' => 'user@example.com',
             'code' => '123456',
@@ -193,16 +193,16 @@ final class AuthControllerTest extends TestCase
             ->method('execute')
             ->with([OtpTokenRepository::TYPE_EMAIL_OTP, '123456', 'user@example.com']);
 
-        $stmt2 = $this->createMock(PDOStatement::class);
+        $stmt2 = $this->createStub(PDOStatement::class);
         $stmt2->method('fetch')->willReturn([
             'id' => 'user-123',
             'email' => 'user@example.com',
             'isAdmin' => 0,
         ]);
 
-        $stmt3 = $this->createMock(PDOStatement::class);
-        $stmt4 = $this->createMock(PDOStatement::class);
-        $stmt5 = $this->createMock(PDOStatement::class);
+        $stmt3 = $this->createStub(PDOStatement::class);
+        $stmt4 = $this->createStub(PDOStatement::class);
+        $stmt5 = $this->createStub(PDOStatement::class);
 
         $this->pdo->method('prepare')
             ->willReturnOnConsecutiveCalls($stmt1, $stmt2, $stmt3, $stmt4, $stmt5);

@@ -2,7 +2,7 @@
 
 # ⚙️  KONFIGURATION (hier anpassen)
 SERVER="mmrtk@mmrtk.lima-ssh.de"
-SSH_KEY="$HOME/.ssh/id_rsa"    # Pfad zu deinem privaten SSH-Key
+SSH_KEY="$HOME/.ssh/id_ed25519"    # Pfad zu deinem privaten SSH-Key
 TARGET_DIR="sinclear.de/api"   # Zielverzeichnis auf dem Server
 
 # 🎨 Farben
