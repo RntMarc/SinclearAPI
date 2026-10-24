@@ -90,7 +90,9 @@ final class ExternalDataCacheRepositoryTest extends TestCase
         self::assertNotNull($cached);
         self::assertSame('brightsky', $cached['source']);
         self::assertSame('weather_warnings', $cached['data_type']);
-        self::assertSame($payload, $cached['payload']);
+        // MySQL speichert JSON normalisiert und ordnet Objekt-Keys neu, daher
+        // assertEquals statt assertSame (Key-Reihenfolge ist irrelevant).
+        self::assertEquals($payload, $cached['payload']);
     }
 
     public function testSavingTwiceOverwritesSourceAndPayload(): void
