@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `ExternalDataCache` (
   `id` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `data_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'weather, weather_warnings, pollen_uv, air_quality, traffic, holidays, demographics, events, etc.',
   `location_key` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'City slug (e.g. berlin) or "lat,lon" for coordinates. No validation — caller must provide correct slug.',
-  `source` enum('infranode','open-meteo','mixed','unsplash') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `source` enum('infranode','open-meteo','mixed','unsplash','brightsky') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `payload` json NOT NULL COMMENT 'Cached response data from external API',
   `expires_at` datetime(3) NOT NULL COMMENT 'When this cache entry becomes stale',
   `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
