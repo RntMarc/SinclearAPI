@@ -12,6 +12,7 @@ use Sinclear\Api\Services\Cron\Tasks\CleanupExternalDataCacheTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupStalePushSubscriptionsTask;
 use Sinclear\Api\Services\Cron\Tasks\PtRefreshStaleLegsTask;
 use Sinclear\Api\Services\Cron\Tasks\PollDeadlineTask;
+use Sinclear\Api\Services\Cron\Tasks\GameStatsRefreshTask;
 
 
 require_once __DIR__ . '/../vendor/autoload.php';
@@ -33,6 +34,7 @@ if (!isset($_ENV['APP_DEBUG']) || !filter_var($_ENV['APP_DEBUG'] ?? false, FILTE
 $container = $containerBuilder->build();
 
 $scheduler = $container->get(CronScheduler::class);
+$settings = $container->get(\Sinclear\Api\Application\Settings::class);
 
 // Tasks registrieren
 $scheduler->register(new CleanupExpiredOtpTokensTask());
@@ -42,6 +44,7 @@ $scheduler->register(new CleanupExternalDataCacheTask());
 $scheduler->register(new CleanupStalePushSubscriptionsTask());
 $scheduler->register(new PtRefreshStaleLegsTask());
 $scheduler->register(new PollDeadlineTask());
+$scheduler->register(new GameStatsRefreshTask((int) ($settings->games['cache_ttl'] ?? 3600)));
 
 
 // Ausstehende Tasks ausführen

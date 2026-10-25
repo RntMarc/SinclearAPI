@@ -81,13 +81,13 @@ CREATE TABLE GameAccount (
 src/Services/Games/
   GameStatsIntegrationInterface.php   // Vertrag für Spiele-Integrationen
   GameRegistry.php                    // game-Slug → Integration
-  GameStatsService.php                // Orchestrierung (Cache lesen, Meta, Koordination)
   Deadlock/
     DeadlockClient.php                // schlanker Guzzle-8-HTTP-Client
     DeadlockIntegration.php           // implementiert GameStatsIntegrationInterface
 
 src/Repository/GameAccountRepository.php
 src/Services/GameAccountService.php
+src/Services/GameStatsService.php     // Orchestrierung (Cache lesen, Meta, Koordination)
 src/Security/Policy/GameAccountPolicy.php
 src/Controllers/GameAccountController.php
 src/Controllers/GameStatsController.php

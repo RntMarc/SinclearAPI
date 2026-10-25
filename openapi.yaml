@@ -7006,6 +7006,265 @@ components:
       properties:
         confirmed: { type: boolean, default: true }
 
+    GameAccount:
+      type: object
+      required: [id, userId, game, accountId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        game:
+          type: string
+          description: Spiel-Slug aus der GameRegistry
+          example: deadlock
+        accountId:
+          type: string
+          description: Primärer Identifier der Spiele-API (Deadlock SteamID3)
+          example: '179673173'
+        displayName:
+          type: string
+          nullable: true
+          description: Anzeigename aus dem Spiele-Profil (z.B. Steam-Persona)
+        avatarUrl:
+          type: string
+          nullable: true
+          description: Avatar-URL aus dem Spiele-Profil
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Zeitpunkt der letzten erfolgreichen Statistik-Synchronisierung
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GameAccountLinkRequest:
+      type: object
+      required: [accountId]
+      properties:
+        accountId:
+          type: string
+          pattern: '^[0-9]{1,10}$'
+          description: SteamID3/Account-ID (z.B. 179673173)
+          example: '179673173'
+
+    GameStatsCacheMeta:
+      type: object
+      required: [game, lastRefreshedAt, nextRefreshAt, intervalSeconds]
+      properties:
+        game:
+          type: string
+          example: deadlock
+        lastRefreshedAt:
+          type: string
+          format: date-time
+          nullable: true
+        nextRefreshAt:
+          type: string
+          format: date-time
+          nullable: true
+        intervalSeconds:
+          type: integer
+          example: 3600
+
+    GameRankLastMatch:
+      type: object
+      properties:
+        matchId:
+          type: string
+          nullable: true
+          description: Match-ID als String (int64)
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+
+    GameRank:
+      type: object
+      properties:
+        badge:
+          type: integer
+          description: Rang-Badge (tier * 10 + subrank)
+        rank:
+          type: integer
+          description: Rang-Tier
+        subrank:
+          type: integer
+          description: Sub-Rang innerhalb des Tiers
+        lastMatch:
+          oneOf:
+            - $ref: '#/components/schemas/GameRankLastMatch'
+            - type: 'null'
+
+    GameHeroStats:
+      type: object
+      properties:
+        heroId:
+          type: integer
+        matchesPlayed:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        winRate:
+          type: number
+          format: double
+          description: Siegquote zwischen 0 und 1
+        lastPlayed:
+          type: string
+          format: date-time
+          nullable: true
+        timePlayedSeconds:
+          type: integer
+        endingLevel:
+          type: number
+          format: double
+          nullable: true
+        kills:
+          type: integer
+        deaths:
+          type: integer
+        assists:
+          type: integer
+        killsPerMin:
+          type: number
+          format: double
+          nullable: true
+        deathsPerMin:
+          type: number
+          format: double
+          nullable: true
+        assistsPerMin:
+          type: number
+          format: double
+          nullable: true
+        networthPerMin:
+          type: number
+          format: double
+          nullable: true
+        lastHitsPerMin:
+          type: number
+          format: double
+          nullable: true
+        deniesPerMin:
+          type: number
+          format: double
+          nullable: true
+        damagePerMin:
+          type: number
+          format: double
+          nullable: true
+        damageTakenPerMin:
+          type: number
+          format: double
+          nullable: true
+        accuracy:
+          type: number
+          format: double
+          nullable: true
+
+    GameMatch:
+      type: object
+      properties:
+        matchId:
+          type: string
+          nullable: true
+          description: Match-ID als String (int64)
+        heroId:
+          type: integer
+        heroLevel:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+          nullable: true
+        gameMode:
+          type: integer
+        matchMode:
+          type: integer
+        playerTeam:
+          type: integer
+        kills:
+          type: integer
+        deaths:
+          type: integer
+        assists:
+          type: integer
+        netWorth:
+          type: integer
+        lastHits:
+          type: integer
+        denies:
+          type: integer
+        matchDurationSeconds:
+          type: integer
+        matchResult:
+          type: integer
+        playerMatchOutcome:
+          type: integer
+          description: '0 = invalid, 1 = win, 2 = loss, 3 = penalized, 4 = penalized party, 5 = not scored'
+        abandonedTimeSeconds:
+          type: integer
+
+    GameStats:
+      type: object
+      description: Normalisierte Statistiken aus dem Dateisystem-Cache
+      properties:
+        accountId:
+          type: string
+        rank:
+          oneOf:
+            - $ref: '#/components/schemas/GameRank'
+            - type: 'null'
+        heroStats:
+          type: array
+          items:
+            $ref: '#/components/schemas/GameHeroStats'
+        matchHistory:
+          type: array
+          description: Letzte Matches (max. 20, absteigend nach startTime)
+          items:
+            $ref: '#/components/schemas/GameMatch'
+        syncedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    GameStatsEntry:
+      type: object
+      required: [game, userId, accountId]
+      properties:
+        game:
+          type: string
+          example: deadlock
+        userId:
+          type: string
+          format: uuid
+          description: Beyond-Nutzer-ID
+        accountId:
+          type: string
+          description: Verknüpfte Account-ID des Spiels
+        stats:
+          description: Normalisierte Statistiken; null, wenn der Cache noch nicht gefüllt ist
+          oneOf:
+            - $ref: '#/components/schemas/GameStats'
+            - type: 'null'
+        lastRefreshedAt:
+          type: string
+          format: date-time
+          nullable: true
+        nextRefreshAt:
+          type: string
+          format: date-time
+          nullable: true
+
 paths:
   /lametric/token:
     get:
@@ -21749,6 +22008,312 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Event oder Reise nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/games:
+    get:
+      summary: Eigene verknüpfte Spiele-Accounts auflisten
+      description: >
+        Gibt alle Spiele-Accounts des angemeldeten Nutzers zurück. In der DB
+        liegen ausschließlich Profil-/Identitätsdaten; Statistiken werden über
+        die Statistik-Endpunkte aus dem Cache gelesen.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Verknüpfte Spiele-Accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GameAccount'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/games/{game}:
+    put:
+      summary: Spiele-Account verknüpfen oder ersetzen
+      description: >
+        Validiert die Account-ID, löst das Profil (Name/Avatar) über die
+        Spiele-API auf und speichert es in `GameAccount`. Eine ungültige oder
+        nicht auflösbare ID wird abgelehnt. Die Statistiken werden beim
+        nächsten Cron-Lauf in den Cache geschrieben.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: game
+          in: path
+          required: true
+          description: Spiel-Slug aus der GameRegistry
+          schema:
+            type: string
+            enum: [deadlock]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GameAccountLinkRequest'
+      responses:
+        '200':
+          description: Account verknüpft
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/GameAccount'
+        '400':
+          description: Ungültige oder nicht auflösbare Account-ID (`invalid_account_id`, `account_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Spiele-API vorübergehend nicht verfügbar (`game_api_unavailable`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Spiele-Account-Verknüpfung lösen
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: game
+          in: path
+          required: true
+          description: Spiel-Slug aus der GameRegistry
+          schema:
+            type: string
+            enum: [deadlock]
+      responses:
+        '204':
+          description: Verknüpfung gelöst
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes Spiel oder keine Verknüpfung (`unknown_game`, `game_account_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/{userId}/games:
+    get:
+      summary: Verknüpfte Spiele-Accounts eines Beyond-Nutzers
+      description: >
+        Öffentliche Liste der verknüpften Accounts eines anderen Beyond-Nutzers
+        inklusive Account-ID, Anzeigename und Avatar. Statistiken sind über die
+        Statistik-Endpunkte abrufbar.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Verknüpfte Spiele-Accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GameAccount'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{game}/cache-meta:
+    get:
+      summary: Cache-Metadaten eines Spiels
+      description: >
+        Liefert den Zeitpunkt der letzten und der nächsten Cache-Erneuerung
+        sowie das Aktualisierungsintervall.
+      tags: [Games]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: game
+          in: path
+          required: true
+          description: Spiel-Slug aus der GameRegistry
+          schema:
+            type: string
+            enum: [deadlock]
+      responses:
+        '200':
+          description: Cache-Metadaten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameStatsCacheMeta'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{game}/stats:
+    get:
+      summary: Statistiken mehrerer Beyond-Nutzer (Batch)
+      description: >
+        Liefert Statistiken für eine kommaseparierte Liste von Beyond-Nutzer-IDs.
+        Es werden ausschließlich Nutzer zurückgegeben, die in der DB existieren
+        und einen verknüpften Account für das Spiel besitzen. Fremde
+        Steam-Nutzer oder Match-Teilnehmer werden nicht aufgelöst.
+      tags: [Games]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: game
+          in: path
+          required: true
+          description: Spiel-Slug aus der GameRegistry
+          schema:
+            type: string
+            enum: [deadlock]
+        - name: userIds
+          in: query
+          required: true
+          description: Kommaseparierte Liste von Beyond-Nutzer-IDs (max. 100)
+          schema:
+            type: string
+            example: 'uuid-1,uuid-2'
+      responses:
+        '200':
+          description: Statistiken der gefundenen Nutzer
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GameStatsEntry'
+        '400':
+          description: Fehlende oder zu viele Nutzer-IDs (`missing_user_ids`, `too_many_user_ids`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /games/{game}/stats/{userId}:
+    get:
+      summary: Statistiken eines Beyond-Nutzers
+      description: >
+        Liest die normalisierten Statistiken aus dem Dateisystem-Cache. Die
+        Antwort enthält die Account-ID und die Statistiken; Anzeigename und
+        Avatar kommen aus `/user/{userId}/games`.
+      tags: [Games]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: game
+          in: path
+          required: true
+          description: Spiel-Slug aus der GameRegistry
+          schema:
+            type: string
+            enum: [deadlock]
+        - name: userId
+          in: path
+          required: true
+          description: Beyond-Nutzer-ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statistiken des Nutzers
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/GameStatsEntry'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes Spiel oder kein verknüpfter Account (`unknown_game`, `game_account_not_found`)
           content:
             application/json:
               schema:

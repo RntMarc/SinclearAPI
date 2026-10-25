@@ -88,6 +88,17 @@ Gibt ein flaches Objekt mit allen Preferences zurück:
 }
 ```
 
+### Verknüpfte Spiele-Accounts (`/me/games`)
+
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| `GET` | `/user/me/games` | Eigene verknüpfte Spiele-Accounts auflisten |
+| `PUT` | `/user/me/games/{game}` | Account verknüpfen/ersetzen (`{ "accountId": "179673173" }`) |
+| `DELETE` | `/user/me/games/{game}` | Verknüpfung lösen |
+| `GET` | `/user/{userId}/games` | Verknüpfte Accounts eines anderen Nutzers (öffentlich) |
+
+Details, Statistiken und Cache-Verhalten siehe [Spiele-Statistiken](../games/readme.md).
+
 ### Fremde Profildaten (`/{userId}`)
 
 | Methode | Pfad | Beschreibung |

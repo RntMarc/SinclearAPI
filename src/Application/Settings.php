@@ -19,5 +19,6 @@ final readonly class Settings
         public array $unsplash = [],
         public array $centrifugo = [],
         public array $polls = [],
+        public array $games = [],
     ) {}
 }

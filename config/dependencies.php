@@ -40,6 +40,8 @@ use Sinclear\Api\Controllers\UserWeatherLocationController;
 use Sinclear\Api\Controllers\UserActivityController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
+use Sinclear\Api\Controllers\GameAccountController;
+use Sinclear\Api\Controllers\GameStatsController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
@@ -139,6 +141,7 @@ use Sinclear\Api\Repository\McpApiKeyRepository;
 use Sinclear\Api\Repository\LaMetricTokenRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
+use Sinclear\Api\Repository\GameAccountRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
@@ -185,6 +188,13 @@ use Sinclear\Api\Services\RecipeService;
 use Sinclear\Api\Services\ExternalDataService;
 use Sinclear\Api\Services\UnsplashService;
 use Sinclear\Api\Services\ExternalDataLocationService;
+use Sinclear\Api\Services\GameAccountService;
+use Sinclear\Api\Services\GameStatsService;
+use Sinclear\Api\Services\Games\Deadlock\DeadlockClient;
+use Sinclear\Api\Services\Games\Deadlock\DeadlockIntegration;
+use Sinclear\Api\Services\Games\GameRegistry;
+use Sinclear\Api\Services\Games\GameStatsCache;
+use Sinclear\Api\Security\Policy\GameAccountPolicy;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
@@ -645,6 +655,36 @@ return [
     ExternalDataService::class => autowire(),
     ExternalDataLocationService::class => autowire(),
     ExternalDataController::class => autowire(),
+
+    GameAccountRepository::class => autowire(),
+    GameAccountService::class => autowire(),
+    GameAccountPolicy::class => autowire(),
+    GameAccountController::class => autowire(),
+
+    GameStatsCache::class => function (ContainerInterface $c): GameStatsCache {
+        $settings = $c->get(Settings::class);
+        return new GameStatsCache(
+            cacheDir: __DIR__ . '/../var/cache/game-stats',
+            ttl: (int) ($settings->games['cache_ttl'] ?? 3600),
+        );
+    },
+
+    DeadlockClient::class => function (ContainerInterface $c): DeadlockClient {
+        return new DeadlockClient(
+            settings: $c->get(Settings::class),
+            logger: $c->get(LoggerInterface::class),
+        );
+    },
+    DeadlockIntegration::class => autowire(),
+
+    GameRegistry::class => function (ContainerInterface $c): GameRegistry {
+        return new GameRegistry([
+            DeadlockIntegration::SLUG => $c->get(DeadlockIntegration::class),
+        ]);
+    },
+
+    GameStatsService::class => autowire(),
+    GameStatsController::class => autowire(),
 
     \Sinclear\Api\Dav\IcsFactory::class => autowire(),
     \Sinclear\Api\Dav\VcardFactory::class => autowire(),

@@ -92,6 +92,12 @@ $settings['polls'] = [
     'anonymity_secret' => $_ENV['POLL_ANONYMITY_SECRET'] ?? '',
 ];
 
+$settings['games'] = [
+    'deadlock_base_url' => $_ENV['DEADLOCK_BASE_URL'] ?? 'https://api.deadlock-api.com',
+    'deadlock_api_key' => $_ENV['DEADLOCK_API_KEY'] ?? '',
+    'cache_ttl' => (int)($_ENV['GAMES_CACHE_TTL'] ?? 3600),
+];
+
 $settings['external_data'] = [
     'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://infranode.dev/api/v1',
     'open_meteo_base_url' => $_ENV['OPEN_METEO_BASE_URL'] ?? 'https://api.open-meteo.com/v1',

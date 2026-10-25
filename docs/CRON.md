@@ -33,6 +33,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 5 | `cleanup_external_data_cache` | 24 Stunden | Entfernt abgelaufene Cache-Einträge (ExternalDataCache) |
 | 6 | `cleanup_stale_push_subscriptions` | 24 Stunden | Löscht tote Push-Subscriptions (10+ Fehlversuche oder 90 Tage ohne Lebenszeichen) |
 | 7 | `polls_deadline` | 1 Stunde | Schließt abgelaufene Umfragen und erinnert Teilnehmer vor der Deadline |
+| 8 | `refresh_game_stats` | `GAMES_CACHE_TTL` (Default 1 Stunde) | Aktualisiert den Cache der Spiele-Statistiken (Deadlock) |
 
 ## Details
 
@@ -83,6 +84,21 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
   2. Offene Umfragen, deren `closesAt` innerhalb der nächsten 24 Stunden liegt und für die noch kein Reminder gesendet wurde (`reminderSentAt IS NULL`), benachrichtigen Teilnehmer ohne Antwort/Verfügbarkeit/Stimme via `poll_deadline_reminder` (dedupliziert pro Umfrage) und setzen `reminderSentAt`.
 - **Datei:** `src/Services/Cron/Tasks/PollDeadlineTask.php`
 - **Hintergrund:** Siehe [polls/readme.md](./polls/readme.md) und [notifications/types.md](./notifications/types.md).
+
+### Game Stats Refresh
+- **Task-Name:** `refresh_game_stats`
+- **Intervall:** `GAMES_CACHE_TTL` (Default 3600 Sekunden / 1 Stunde) — das Intervall folgt der Cache-TTL, damit `nextRefreshAt` in `_meta.json` und der tatsächliche Cron-Takt übereinstimmen.
+- **Aktion:**
+  1. Alle `GameAccount`-Einträge je Spiel laden.
+  2. Für Deadlock: Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
+  3. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
+     schreiben; `_meta.json` mit `lastRefreshedAt`, `nextRefreshAt` und
+     `intervalSeconds` aktualisieren.
+  4. Bei `503` (Load Shedding) der Spiele-API abbrechen und beim nächsten Lauf
+     wiederholen. Andere Fehler der Rang-/Helden-Batches werden protokolliert,
+     ohne die übrigen Daten (Match-History, Cache-Write) zu verhindern.
+- **Datei:** `src/Services/Cron/Tasks/GameStatsRefreshTask.php`
+- **Hintergrund:** Siehe [games/readme.md](./games/readme.md).
 
 ## CronSchedule-Tabelle
 

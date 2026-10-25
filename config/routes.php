@@ -36,6 +36,8 @@ use Sinclear\Api\Controllers\UserActivityController;
 use Sinclear\Api\Controllers\UserWeatherLocationController;
 use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
+use Sinclear\Api\Controllers\GameAccountController;
+use Sinclear\Api\Controllers\GameStatsController;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
@@ -144,6 +146,9 @@ return function (App $app): void {
         $group->put('/me/onboarding/complete', [ProfileController::class, 'completeOnboarding']);
         $group->get('/me/preferences', [UserPreferenceController::class, 'getPreferences']);
         $group->put('/me/preferences', [UserPreferenceController::class, 'updatePreferences']);
+        $group->get('/me/games', [GameAccountController::class, 'listOwn']);
+        $group->put('/me/games/{game}', [GameAccountController::class, 'link']);
+        $group->delete('/me/games/{game}', [GameAccountController::class, 'unlink']);
         $group->get('/me/weather-locations', [UserWeatherLocationController::class, 'list']);
         $group->post('/me/weather-locations', [UserWeatherLocationController::class, 'create']);
         $group->put('/me/weather-locations', [UserWeatherLocationController::class, 'replaceAll']);
@@ -153,6 +158,7 @@ return function (App $app): void {
         $group->get('/me/dav-tokens', [DavTokenController::class, 'listTokens']);
         $group->delete('/me/dav-tokens/{id}', [DavTokenController::class, 'deleteToken']);
         $group->get('/activity', [UserActivityController::class, 'getBulk']);
+        $group->get('/{userId}/games', [GameAccountController::class, 'listForUser']);
         $group->get('/{userId}', [UserController::class, 'get']);
         $group->get('/{userId}/base', [UserController::class, 'getBase']);
         $group->get('/{userId}/social', [UserController::class, 'getSocial']);
@@ -524,6 +530,14 @@ return function (App $app): void {
     })
         ->add($container->get(CentrifugoProxyMiddleware::class))
         ->add($container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class));
+
+    // Spiele-Statistiken (authenticated). Statische Route cache-meta vor den
+    // parametrisierten Stats-Routen registrieren.
+    $app->group('/games', function (RouteCollectorProxy $group) {
+        $group->get('/{game}/cache-meta', [GameStatsController::class, 'cacheMeta']);
+        $group->get('/{game}/stats', [GameStatsController::class, 'batch']);
+        $group->get('/{game}/stats/{userId}', [GameStatsController::class, 'single']);
+    })->add($container->get(AuthenticationMiddleware::class));
 
     // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);
