@@ -62,6 +62,16 @@ After every change to the API (routes, controllers, DTOs, services, or repositor
 - Follow the established, explicit layering for resources: routes in `config/routes.php`, controllers in `src/Controllers/`, services in `src/Services/`, repositories in `src/Repository/`, DI wiring via `autowire()` in `config/dependencies.php`.
 - Ensure all endpoints are secured with the appropriate Policy classes.
 
+## Commit Messages
+Nach jeder abgeschlossenen Änderung am Repository (Code, Konfiguration, Dokumentation) MUSS eine passende Commit Message ausgegeben werden.
+
+**Requirement:**
+- Format: Conventional Commits (`type(scope): subject`), z. B. `fix(cron): store cycle start time as lastRunAt`.
+- Erlaubte Typen: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`.
+- Subject in Englisch, Imperativ, klein geschrieben, ohne Punkt am Ende, max. ~72 Zeichen.
+- Optional ein Body mit kurzen Stichpunkten, wenn die Änderung mehrere Bereiche betrifft (z. B. Code + `docs/`).
+- Die Commit Message wird nur ausgegeben, niemals ungefragt committet oder gepusht.
+
 ## Admin Dashboard Consistency
 Das Admin Dashboard (`templates/admin/`) muss immer den aktuellen Zustand der API und des Clients widerspiegeln.
 

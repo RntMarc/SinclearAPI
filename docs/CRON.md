@@ -5,14 +5,15 @@
 ## Architektur
 
 Das Projekt verwendet eine zentrale `bin/cron.php`, die als Taktgeber dient:
-- Wird über **System-Cron** regelmäßig aufgerufen (z.B. alle 5 Minuten)
+- Wird über **System-Cron** regelmäßig aufgerufen (z.B. alle 10 Minuten)
 - Prüft selbstständig, welche Tasks ausstehend sind
 - Führt nur die notwendigen Tasks aus (basierend auf `CronSchedule`-Tabelle)
+- Die Fälligkeit orientiert sich am **Startzeitpunkt des Zyklus**, nicht am Laufende (siehe [CronSchedule-Tabelle](#cronschedule-tabelle))
 - Keine direkte HTTP-Erreichbarkeit (nicht im `public/`-Verzeichnis)
 
 ```cron
-# System-Cron: Alle 5 Minuten aufrufen
-*/5 * * * * php /path/to/project/bin/cron.php >> /path/to/project/var/log/cron.log 2>&1
+# System-Cron: Alle 10 Minuten aufrufen
+*/10 * * * * php /path/to/project/bin/cron.php >> /path/to/project/var/log/cron.log 2>&1
 ```
 
 ## Task-Registrierung
@@ -117,6 +118,35 @@ CREATE TABLE CronSchedule (
   createdAt DATETIME(3) NOT NULL
 );
 ```
+
+### Fälligkeit: Start- statt Endzeitpunkt
+
+`lastRunAt` enthält den **Startzeitpunkt des Cron-Zyklus** (UTC, Millisekunden),
+nicht den Zeitpunkt des Abschlusses. Die Fälligkeit wird berechnet als
+`jetzt - lastRunAt >= intervalSeconds - 2 s Toleranz` (`CronScheduler::getDueTasksAt()`).
+
+Drei Details sind dabei wichtig:
+
+1. **Alle Tasks eines Laufs teilen sich einen Zeitstempel.** Der Zykluszeitpunkt
+   wird einmal am Beginn von `runDueTasks()` erfasst und für jeden in diesem Lauf
+   ausgeführten Task gespeichert. Ein langsamer Vorgänger-Task (z. B.
+   `pt_refresh_stale_legs` mit Batch-Pausen) verschiebt dadurch nicht den Takt
+   der nachfolgenden Tasks — insbesondere bleibt `refresh_game_stats` auf der
+   vollen Stunde, auch wenn davor Sekunden oder Minuten vergehen.
+2. **Die Toleranz von 2 Sekunden** fängt den Millisekunden-Versatz zwischen
+   Cron-Start und PHP-Ausführung ab. Ohne sie würde ein Start um `10:00:00.037`
+   beim Tick `11:00:00.005` noch als „nicht fällig“ gelten und der Task würde
+   dauerhaft um 10 Minuten versetzt laufen.
+3. **Verzögert sich der System-Cron selbst** (Serverlast, Wartung), läuft der
+   Task beim nächsten tatsächlichen Tick. Das Intervall ist dann um die
+   Verzögerung größer, das Intervall selbst wird nicht verkürzt.
+
+Damit verlängert ein langer Lauf das Intervall nicht künstlich: Startet
+`refresh_game_stats` z. B. um 10:00 und läuft bis 10:12, ist der nächste Lauf
+um 11:00 fällig — nicht erst um 11:12. `lastDurationMs` dokumentiert die
+tatsächliche Laufzeit separat. Voraussetzung für den exakten Takt: das
+Task-Intervall ist ein Vielfaches des System-Cron-Takts (1 h / 24 h bei einem
+10-Minuten-Takt).
 
 ## CLI-Ausgabe
 
