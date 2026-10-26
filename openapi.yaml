@@ -7097,6 +7097,14 @@ components:
         subrank:
           type: integer
           description: Sub-Rang innerhalb des Tiers
+        name:
+          type: string
+          nullable: true
+          description: Anzeigename des Rang-Tiers (aus `/v1/assets/ranks`); `null`, wenn die Assets nicht verfügbar sind
+        iconUrl:
+          type: string
+          nullable: true
+          description: Bild-URL des Rang-Tiers; `null`, wenn die Assets nicht verfügbar sind
         lastMatch:
           oneOf:
             - $ref: '#/components/schemas/GameRankLastMatch'
@@ -7107,6 +7115,14 @@ components:
       properties:
         heroId:
           type: integer
+        heroName:
+          type: string
+          nullable: true
+          description: Heldenname (aus `/v1/assets/heroes`); `null`, wenn die Assets nicht verfügbar sind
+        heroIconUrl:
+          type: string
+          nullable: true
+          description: Helden-Icon (aus `/v1/assets/heroes`); `null`, wenn die Assets nicht verfügbar sind
         matchesPlayed:
           type: integer
         wins:
@@ -7179,6 +7195,14 @@ components:
           description: Match-ID als String (int64)
         heroId:
           type: integer
+        heroName:
+          type: string
+          nullable: true
+          description: Heldenname (aus `/v1/assets/heroes`); `null`, wenn die Assets nicht verfügbar sind
+        heroIconUrl:
+          type: string
+          nullable: true
+          description: Helden-Icon (aus `/v1/assets/heroes`); `null`, wenn die Assets nicht verfügbar sind
         heroLevel:
           type: integer
         startTime:

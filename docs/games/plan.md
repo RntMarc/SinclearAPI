@@ -25,7 +25,8 @@ ergänzt werden können, ohne die gemeinsame Struktur zu ändern.
 | Deadlock-Zugriff | Eigener schlanker Guzzle-8-Client (kein Composer-Paket) |
 | Identifier | `SteamID3`/Account-ID (z. B. `179673173`); `SteamID64` wird beim Verknüpfen abgeleitet |
 | Statistiken-Cache | Dateisystem `var/cache/game-stats/` (Muster: `NominatimCache`) |
-| Umfang v1 | Rang/Badge, Helden-Statistiken, letzte Matches |
+| Umfang v1 | Rang/Badge (inkl. Name/Icon), Helden-Statistiken (inkl. Name/Icon), letzte Matches (inkl. Held) |
+| Asset-Anreicherung | Helden-/Rang-Assets aus `/v1/assets/...`, Aux-Cache 24 h, graceful Fallback (`null`) |
 | Steam-Profil (Name/Avatar) | In der DB persistiert (Teil der Profilverwaltung) |
 | Datenmodell | Tabelle `GameAccount` |
 | API-Key | Optional und konfigurierbar (Default: ohne Key) |
@@ -110,6 +111,8 @@ Ein neues Spiel ergänzt nur eine neue Integration und einen
 | `rankBatch($accountIds)` | `GET /v1/players/rank` | Rang/Badge (Batch) |
 | `heroStats($accountIds)` | `GET /v1/players/hero-stats` | Helden-Statistiken (Batch) |
 | `matchHistory($accountId)` | `GET /v1/players/{id}/match-history` | Letzte Matches |
+| `heroAssets()` | `GET /v1/assets/heroes` | Helden-Namen und Bild-URLs (Aux-Cache, 24 h) |
+| `rankAssets()` | `GET /v1/assets/ranks` | Rang-Namen und Bild-URLs (Aux-Cache, 24 h) |
 | `steamProfiles($accountIds)` | `GET /v1/players/steam` | Name/Avatar (beim Verknüpfen mit `refresh=true`) |
 
 Der Client nutzt Guzzle 8, einen eigenen User-Agent
@@ -124,11 +127,19 @@ wiederholt.
 var/cache/game-stats/
   deadlock/
     _meta.json              // { lastRefreshedAt, nextRefreshAt, intervalSeconds }
+    _heroes.json            // { "7": { name, iconUrl }, … }  (TTL 24 h)
+    _ranks.json             // { "1": { name, iconUrl }, … }  (TTL 24 h)
     {accountId}.json        // normalisierte Statistiken (rank, heroStats, matchHistory)
 ```
 
 - TTL 3600 Sekunden; der Cronjob überschreibt den Cache stündlich.
 - `_meta.json` speist den Cache-Meta-Endpoint.
+- `_heroes.json`/`_ranks.json` cachen die Stammdaten (Helden-Antwort ~2 MB)
+  mit eigener TTL von 24 Stunden; `clean()` lässt `_`-Dateien unangetastet.
+- Normalisierte Einträge enthalten zusätzlich `rank.name`/`rank.iconUrl` sowie
+  `heroName`/`heroIconUrl` in `heroStats` und `matchHistory`. Bei einem
+  Asset-Fehler bleiben diese Felder `null`, die Statistiken werden dennoch
+  geschrieben.
 - `var/` liegt außerhalb von `public/` und ist damit nicht öffentlich erreichbar.
 
 ## Endpoints
@@ -191,10 +202,13 @@ Hinweise:
 registriert in `bin/cron.php`:
 
 1. Alle `GameAccount`-Einträge je Spiel laden.
-2. Für Deadlock: Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
-3. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
+2. Für Deadlock: Helden-/Rang-Assets cache-first laden (TTL 24 h) und
+   Anzeigenamen/Bild-URLs aufbauen.
+3. Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
+4. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
    schreiben; `_meta.json` aktualisieren.
-4. Bei `503` (Load Shedding) abbrechen und beim nächsten Lauf wiederholen.
+5. Bei `503` (Load Shedding) abbrechen und beim nächsten Lauf wiederholen.
+   Asset-Fehler führen zu `null`-Feldern, nicht zum Abbruch.
 
 Siehe auch [CRON.md](../CRON.md).
 
@@ -249,3 +263,5 @@ unverändert.
 5. Cron-Task und Registrierung.
 6. `openapi.yaml`, `docs/`, `docs/CRON.md`, Konfiguration.
 7. Tests (Unit ohne DB; Integration erst auf dem Server).
+8. Asset-Anreicherung: Helden-/Rang-Assets (`/v1/assets/...`) mit Aux-Cache
+   (24 h) und graceful Fallback (`null`-Felder).

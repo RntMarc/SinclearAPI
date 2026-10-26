@@ -60,6 +60,22 @@ final class DeadlockClientTest extends TestCase
         self::assertSame([], $this->deadlockClient($client)->steamProfiles(['42'], true));
     }
 
+    public function testAssetEndpoints(): void
+    {
+        $history = [];
+        $client = $this->client([
+            new Response(200, [], json_encode([['id' => 1, 'name' => 'Infernus']])),
+            new Response(200, [], json_encode([['tier' => 0, 'name' => 'Obscurus']])),
+        ], $history);
+
+        $deadlock = $this->deadlockClient($client);
+
+        self::assertSame([['id' => 1, 'name' => 'Infernus']], $deadlock->heroAssets());
+        self::assertSame([['tier' => 0, 'name' => 'Obscurus']], $deadlock->rankAssets());
+        self::assertSame('/v1/assets/heroes', $history[0]['request']->getUri()->getPath());
+        self::assertSame('/v1/assets/ranks', $history[1]['request']->getUri()->getPath());
+    }
+
     public function testServiceUnavailableExposesRetryAfter(): void
     {
         $client = $this->client([

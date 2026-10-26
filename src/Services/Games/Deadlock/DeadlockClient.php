@@ -75,6 +75,29 @@ final readonly class DeadlockClient
     }
 
     /**
+     * Helden-Stammdaten (Name und Bild-URLs) fuer die Normalisierung.
+     *
+     * Die Antwort ist knapp 2 MB gross und wird deshalb nur selten (siehe
+     * DeadlockIntegration) abgerufen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function heroAssets(): array
+    {
+        return $this->request('/v1/assets/heroes');
+    }
+
+    /**
+     * Rang-Stammdaten (Tier, Name und Bild-URLs) fuer die Normalisierung.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function rankAssets(): array
+    {
+        return $this->request('/v1/assets/ranks');
+    }
+
+    /**
      * @param list<string> $accountIds
      * @return list<array<string, mixed>>
      */

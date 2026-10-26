@@ -17,15 +17,21 @@ use Sinclear\Api\Services\Games\GameStatsIntegrationInterface;
  * Normalisierte Cache-Struktur pro Account:
  * {
  *   "accountId": "179673173",
- *   "rank": { "badge": 0, "rank": 0, "subrank": 0, "lastMatch": null },
+ *   "rank": { "badge": 0, "rank": 0, "subrank": 0, "name": "Obscurus", "iconUrl": "...", "lastMatch": null },
  *   "heroStats": [
- *     { "heroId": 2, "matchesPlayed": 2, "wins": 0, "losses": 2, "winRate": 0.0, ... }
+ *     { "heroId": 2, "heroName": "Seven", "heroIconUrl": "...", "matchesPlayed": 2, ... }
  *   ],
  *   "matchHistory": [
- *     { "matchId": 124029819, "heroId": 87, "startTime": "2026-...", ... }
+ *     { "matchId": 124029819, "heroId": 87, "heroName": "Nurse Harrow", "heroIconUrl": "...", ... }
  *   ],
  *   "syncedAt": "2026-10-25T14:00:00Z"
  * }
+ *
+ * Die Anzeigenamen und Bild-URLs stammen aus den Asset-Endpunkten der
+ * Deadlock API. Sie werden in `_heroes.json`/`_ranks.json` (TTL 24 h) gecacht,
+ * damit die rund 2 MB grosse Helden-Antwort nicht stuendlich geladen wird.
+ * Ist der Asset-Abruf nicht verfuegbar, werden die Statistiken trotzdem
+ * geschrieben; die Asset-Felder bleiben dann `null`.
  */
 final readonly class DeadlockIntegration implements GameStatsIntegrationInterface
 {
@@ -33,6 +39,7 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
 
     private const string STEAM_ID64_OFFSET = '76561197960265728';
     private const int MAX_MATCHES = 20;
+    private const int ASSET_TTL = 86400;
 
     public function __construct(
         private DeadlockClient $client,
@@ -47,6 +54,9 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
             static fn (array $account): string => (string) $account['accountId'],
             $accounts,
         )));
+
+        $heroAssets = $accounts === [] ? [] : $this->heroAssets();
+        $rankAssets = $accounts === [] ? [] : $this->rankAssets();
 
         $ranks = [];
         $heroStats = [];
@@ -107,12 +117,12 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
 
             $this->cache->write(self::SLUG, $accountId, [
                 'accountId' => $accountId,
-                'rank' => $this->normalizeRank($ranks[$accountId] ?? null),
+                'rank' => $this->normalizeRank($ranks[$accountId] ?? null, $rankAssets),
                 'heroStats' => array_map(
-                    $this->normalizeHeroStats(...),
+                    fn (array $row): array => $this->normalizeHeroStats($row, $heroAssets),
                     $heroStats[$accountId] ?? [],
                 ),
-                'matchHistory' => $this->normalizeMatchHistory($matches),
+                'matchHistory' => $this->normalizeMatchHistory($matches, $heroAssets),
                 'syncedAt' => self::isoUtc($now),
             ]);
         }
@@ -171,21 +181,162 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
     }
 
     /**
+     * @return array<int, array{name: string|null, iconUrl: string|null}>
+     */
+    private function heroAssets(): array
+    {
+        $cached = $this->readAuxAssets('heroes');
+        if ($cached !== []) {
+            return $cached;
+        }
+
+        try {
+            $rows = $this->client->heroAssets();
+        } catch (DeadlockApiException $e) {
+            $this->logger->warning('Deadlock hero assets unavailable', [
+                'status' => $e->status,
+            ]);
+
+            return [];
+        }
+
+        $assets = [];
+        foreach ($rows as $row) {
+            $heroId = (int) ($row['id'] ?? 0);
+            if ($heroId <= 0) {
+                continue;
+            }
+
+            $images = is_array($row['images'] ?? null) ? $row['images'] : [];
+            $assets[$heroId] = [
+                'name' => is_string($row['name'] ?? null) ? $row['name'] : null,
+                'iconUrl' => self::firstString($images, ['icon_image_small', 'icon_hero_card']),
+            ];
+        }
+
+        if ($assets === []) {
+            $this->logger->warning('Deadlock hero assets empty');
+
+            return [];
+        }
+
+        $this->cache->writeAux(self::SLUG, 'heroes', $assets);
+
+        return $assets;
+    }
+
+    /**
+     * @return array<int, array{name: string|null, iconUrl: string|null}>
+     */
+    private function rankAssets(): array
+    {
+        $cached = $this->readAuxAssets('ranks');
+        if ($cached !== []) {
+            return $cached;
+        }
+
+        try {
+            $rows = $this->client->rankAssets();
+        } catch (DeadlockApiException $e) {
+            $this->logger->warning('Deadlock rank assets unavailable', [
+                'status' => $e->status,
+            ]);
+
+            return [];
+        }
+
+        $assets = [];
+        foreach ($rows as $row) {
+            $tier = (int) ($row['tier'] ?? -1);
+            if ($tier < 0) {
+                continue;
+            }
+
+            $images = is_array($row['images'] ?? null) ? $row['images'] : [];
+            $assets[$tier] = [
+                'name' => is_string($row['name'] ?? null) ? $row['name'] : null,
+                'iconUrl' => self::firstString($images, ['large', 'small']),
+            ];
+        }
+
+        if ($assets === []) {
+            $this->logger->warning('Deadlock rank assets empty');
+
+            return [];
+        }
+
+        $this->cache->writeAux(self::SLUG, 'ranks', $assets);
+
+        return $assets;
+    }
+
+    /**
+     * @return array<int, array{name: string|null, iconUrl: string|null}>
+     */
+    private function readAuxAssets(string $name): array
+    {
+        $cached = $this->cache->readAux(self::SLUG, $name, self::ASSET_TTL);
+        if ($cached === null) {
+            return [];
+        }
+
+        $assets = [];
+        foreach ($cached as $key => $asset) {
+            if (!is_array($asset)) {
+                continue;
+            }
+
+            $id = (int) $key;
+            if ($id < 0) {
+                continue;
+            }
+
+            $assets[$id] = [
+                'name' => is_string($asset['name'] ?? null) ? $asset['name'] : null,
+                'iconUrl' => is_string($asset['iconUrl'] ?? null) ? $asset['iconUrl'] : null,
+            ];
+        }
+
+        return $assets;
+    }
+
+    /**
+     * @param array<string, mixed> $values
+     * @param list<string> $keys
+     */
+    private static function firstString(array $values, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            $value = $values[$key] ?? null;
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<string, mixed>|null $row
+     * @param array<int, array{name: string|null, iconUrl: string|null}> $rankAssets
      * @return array<string, mixed>|null
      */
-    private function normalizeRank(?array $row): ?array
+    private function normalizeRank(?array $row, array $rankAssets): ?array
     {
         if ($row === null) {
             return null;
         }
 
         $lastMatch = $row['last_match'] ?? null;
+        $tier = (int) ($row['rank'] ?? 0);
+        $asset = $rankAssets[$tier] ?? null;
 
         return [
             'badge' => (int) ($row['badge'] ?? 0),
-            'rank' => (int) ($row['rank'] ?? 0),
+            'rank' => $tier,
             'subrank' => (int) ($row['subrank'] ?? 0),
+            'name' => $asset['name'] ?? null,
+            'iconUrl' => $asset['iconUrl'] ?? null,
             'lastMatch' => is_array($lastMatch) ? [
                 'matchId' => isset($lastMatch['match_id']) ? (string) $lastMatch['match_id'] : null,
                 'startTime' => isset($lastMatch['start_time']) && (int) $lastMatch['start_time'] > 0
@@ -197,15 +348,20 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
 
     /**
      * @param array<string, mixed> $row
+     * @param array<int, array{name: string|null, iconUrl: string|null}> $heroAssets
      * @return array<string, mixed>
      */
-    private function normalizeHeroStats(array $row): array
+    private function normalizeHeroStats(array $row, array $heroAssets): array
     {
         $matchesPlayed = (int) ($row['matches_played'] ?? 0);
         $wins = (int) ($row['wins'] ?? 0);
+        $heroId = (int) ($row['hero_id'] ?? 0);
+        $asset = $heroAssets[$heroId] ?? null;
 
         return [
-            'heroId' => (int) ($row['hero_id'] ?? 0),
+            'heroId' => $heroId,
+            'heroName' => $asset['name'] ?? null,
+            'heroIconUrl' => $asset['iconUrl'] ?? null,
             'matchesPlayed' => $matchesPlayed,
             'wins' => $wins,
             'losses' => max(0, $matchesPlayed - $wins),
@@ -232,9 +388,10 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
 
     /**
      * @param list<array<string, mixed>> $matches
+     * @param array<int, array{name: string|null, iconUrl: string|null}> $heroAssets
      * @return list<array<string, mixed>>
      */
-    private function normalizeMatchHistory(array $matches): array
+    private function normalizeMatchHistory(array $matches, array $heroAssets): array
     {
         usort(
             $matches,
@@ -243,12 +400,16 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
 
         $matches = array_slice($matches, 0, self::MAX_MATCHES);
 
-        return array_map(static function (array $match): array {
+        return array_map(static function (array $match) use ($heroAssets): array {
             $startTime = (int) ($match['start_time'] ?? 0);
+            $heroId = (int) ($match['hero_id'] ?? 0);
+            $asset = $heroAssets[$heroId] ?? null;
 
             return [
                 'matchId' => isset($match['match_id']) ? (string) $match['match_id'] : null,
-                'heroId' => (int) ($match['hero_id'] ?? 0),
+                'heroId' => $heroId,
+                'heroName' => $asset['name'] ?? null,
+                'heroIconUrl' => $asset['iconUrl'] ?? null,
                 'heroLevel' => (int) ($match['hero_level'] ?? 0),
                 'startTime' => $startTime > 0
                     ? self::isoUtc((new DateTimeImmutable('@' . $startTime))->setTimezone(new DateTimeZone('UTC')))

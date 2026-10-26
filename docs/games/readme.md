@@ -129,7 +129,7 @@ werden nicht in der DB gespeichert, sondern im Dateisystem gecacht.
 src/Services/Games/
   GameStatsIntegrationInterface.php   // Vertrag für Spiele-Integrationen
   GameRegistry.php                    // game-Slug → Integration
-  GameStatsCache.php                  // Dateisystem-Cache
+  GameStatsCache.php                  // Dateisystem-Cache (Statistiken + Aux-Assets)
   Deadlock/
     DeadlockClient.php                // schlanker Guzzle-8-HTTP-Client
     DeadlockIntegration.php           // implementiert GameStatsIntegrationInterface
@@ -161,6 +161,8 @@ Ein neues Spiel ergänzt nur eine neue Integration und einen
 | `rankBatch($accountIds)` | `GET /v1/players/rank` | Rang/Badge (Batch) |
 | `heroStats($accountIds)` | `GET /v1/players/hero-stats` | Helden-Statistiken (Batch) |
 | `matchHistory($accountId)` | `GET /v1/players/{id}/match-history` | Letzte Matches |
+| `heroAssets()` | `GET /v1/assets/heroes` | Helden-Namen und Bild-URLs (Aux-Cache, 24 h) |
+| `rankAssets()` | `GET /v1/assets/ranks` | Rang-Namen und Bild-URLs (Aux-Cache, 24 h) |
 | `steamProfiles($accountIds)` | `GET /v1/players/steam` | Name/Avatar (beim Verknüpfen mit `refresh=true`) |
 
 Der Client nutzt Guzzle 8, den User-Agent `SinclearBeyondAPI/2.0`, ein Timeout
@@ -176,10 +178,19 @@ Pro Account wird folgende Struktur gecacht:
 ```json
 {
   "accountId": "179673173",
-  "rank": { "badge": 12, "rank": 1, "subrank": 2, "lastMatch": { "matchId": "…", "startTime": "…" } },
+  "rank": {
+    "badge": 12,
+    "rank": 1,
+    "subrank": 2,
+    "name": "Initiate",
+    "iconUrl": "https://assets-bucket.deadlock-api.com/assets-api-res/images/ranks/rank01_lg.png",
+    "lastMatch": { "matchId": "…", "startTime": "…" }
+  },
   "heroStats": [
     {
       "heroId": 2,
+      "heroName": "Seven",
+      "heroIconUrl": "https://assets-bucket.deadlock-api.com/assets-api-res/images/heroes/gigawatt_sm.png",
       "matchesPlayed": 2,
       "wins": 0,
       "losses": 2,
@@ -205,6 +216,8 @@ Pro Account wird folgende Struktur gecacht:
     {
       "matchId": "124029819",
       "heroId": 87,
+      "heroName": "Nurse Harrow",
+      "heroIconUrl": "https://assets-bucket.deadlock-api.com/assets-api-res/images/heroes/nurse_sm.png",
       "heroLevel": 36,
       "startTime": "2026-10-24T20:02:14Z",
       "gameMode": 1,
@@ -228,12 +241,20 @@ Pro Account wird folgende Struktur gecacht:
 
 `matchHistory` enthält maximal 20 Matches, absteigend nach `startTime`.
 
+`rank.name`/`rank.iconUrl` sowie `heroName`/`heroIconUrl` werden aus den
+Asset-Endpunkten der Deadlock API angereichert (Rang-Tier bzw. Helden-ID).
+Ist der Asset-Abruf nicht verfügbar, werden die Statistiken trotzdem
+geschrieben und die Asset-Felder bleiben `null`; Clients können dann auf
+lokale Fallback-Namen (z. B. `Held #87`) zurückgreifen.
+
 ## Caching
 
 ```
 var/cache/game-stats/
   deadlock/
     _meta.json              // { lastRefreshedAt, nextRefreshAt, intervalSeconds }
+    _heroes.json            // { "7": { name, iconUrl }, … }  (TTL 24 h)
+    _ranks.json             // { "1": { name, iconUrl }, … }  (TTL 24 h)
     {accountId}.json        // normalisierte Statistiken (rank, heroStats, matchHistory)
 ```
 
@@ -241,6 +262,10 @@ var/cache/game-stats/
   den Cache im selben Intervall, damit `nextRefreshAt` und der Cron-Takt
   übereinstimmen.
 - `_meta.json` speist den Cache-Meta-Endpoint.
+- `_heroes.json` und `_ranks.json` sind Aux-Caches für Stammdaten mit eigener
+  TTL von 24 Stunden. Die Helden-Antwort ist rund 2 MB groß und wird deshalb
+  nicht stündlich geladen. `clean()` lässt Dateien mit führendem Unterstrich
+  unangetastet.
 - Einträge, die älter als die TTL sind, werden nicht mehr ausgeliefert; die
   Cache-Metadaten zeigen den Zeitpunkt der letzten Erneuerung.
 - `var/` liegt außerhalb von `public/` und ist damit nicht öffentlich erreichbar
@@ -252,12 +277,15 @@ var/cache/game-stats/
 Default 3600 Sekunden), registriert in `bin/cron.php`:
 
 1. Alle `GameAccount`-Einträge je Spiel laden.
-2. Für Deadlock: Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
-3. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
+2. Für Deadlock: Helden- und Rang-Assets cache-first laden (Aux-Cache, TTL 24 h)
+   und daraus die Anzeigenamen/Bild-URLs aufbauen.
+3. Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
+4. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
    schreiben; `_meta.json` aktualisieren.
-4. Bei `503` (Load Shedding) abbrechen und beim nächsten Lauf wiederholen.
+5. Bei `503` (Load Shedding) abbrechen und beim nächsten Lauf wiederholen.
    Andere Fehler der Rang-/Helden-Batches werden protokolliert, ohne die übrigen
-   Daten zu verwerfen.
+   Daten zu verwerfen. Schlägt der Asset-Abruf fehl, werden die Statistiken
+   trotzdem geschrieben (Asset-Felder `null`).
 
 Siehe auch [CRON.md](../CRON.md).
 

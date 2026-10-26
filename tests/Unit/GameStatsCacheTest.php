@@ -72,18 +72,33 @@ final class GameStatsCacheTest extends TestCase
         ], $cache->meta('deadlock'));
     }
 
-    public function testCleanRemovesOldStatsButKeepsMeta(): void
+    public function testAuxCacheRoundTripAndExpiry(): void
+    {
+        $cache = new GameStatsCache($this->dir, 3600);
+        $cache->writeAux('deadlock', 'heroes', [7 => ['name' => 'Wraith', 'iconUrl' => 'icon']]);
+
+        self::assertSame([7 => ['name' => 'Wraith', 'iconUrl' => 'icon']], $cache->readAux('deadlock', 'heroes', 86400));
+
+        touch($this->dir . '/deadlock/_heroes.json', time() - 90000);
+
+        self::assertNull($cache->readAux('deadlock', 'heroes', 86400));
+    }
+
+    public function testCleanRemovesOldStatsButKeepsMetaAndAuxCaches(): void
     {
         $cache = new GameStatsCache($this->dir, 3600);
         $cache->write('deadlock', '1', ['accountId' => '1']);
         $cache->writeMeta('deadlock', '2026-10-25T14:00:00Z', '2026-10-25T15:00:00Z');
+        $cache->writeAux('deadlock', 'heroes', [7 => ['name' => 'Wraith', 'iconUrl' => null]]);
 
         $statsFile = $this->dir . '/deadlock/1.json';
         touch($statsFile, time() - 7200);
+        touch($this->dir . '/deadlock/_heroes.json', time() - 7200);
 
         self::assertSame(1, $cache->clean('deadlock'));
         self::assertNull($cache->read('deadlock', '1'));
         self::assertNotNull($cache->meta('deadlock')['lastRefreshedAt']);
+        self::assertNotNull($cache->readAux('deadlock', 'heroes', 86400));
     }
 
     private function removeDirectory(string $dir): void

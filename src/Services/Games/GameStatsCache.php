@@ -10,13 +10,21 @@ namespace Sinclear\Api\Services\Games;
  * Struktur:
  *   var/cache/game-stats/{game}/_meta.json
  *   var/cache/game-stats/{game}/{accountId}.json
+ *   var/cache/game-stats/{game}/_heroes.json   (optionaler Aux-Cache)
+ *   var/cache/game-stats/{game}/_ranks.json    (optionaler Aux-Cache)
  *
  * Der Cache wird ausschliesslich vom Cronjob geschrieben. Eintraege, die
  * aelter als die konfigurierte TTL sind, werden nicht mehr ausgeliefert.
  * Die Cache-Metadaten zeigen den Zeitpunkt der letzten Erneuerung.
+ *
+ * Aux-Caches (Dateien mit fuehrendem Unterstrich) speichern langjaehrige
+ * Stammdaten wie Helden- und Rang-Assets und haben eine eigene, deutlich
+ * laengere TTL. Sie werden von `clean()` nicht entfernt.
  */
 final readonly class GameStatsCache
 {
+    private const int DEFAULT_AUX_TTL = 86400;
+
     public function __construct(
         private string $cacheDir = __DIR__ . '/../../../var/cache/game-stats',
         private int $ttl = 3600,
@@ -113,6 +121,46 @@ final readonly class GameStatsCache
     }
 
     /**
+     * Liest einen Aux-Cache (z. B. `heroes` aus `_heroes.json`).
+     *
+     * @return array<array-key, mixed>|null
+     */
+    public function readAux(string $game, string $name, ?int $maxAge = null): ?array
+    {
+        $maxAge ??= self::DEFAULT_AUX_TTL;
+        $path = $this->auxPath($game, $name);
+        if (!is_file($path)) {
+            return null;
+        }
+
+        if (time() - filemtime($path) > $maxAge) {
+            return null;
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return null;
+        }
+
+        $data = json_decode($content, true);
+
+        return is_array($data) ? $data : null;
+    }
+
+    /** @param array<array-key, mixed> $data */
+    public function writeAux(string $game, string $name, array $data): void
+    {
+        $path = $this->auxPath($game, $name);
+        $this->ensureDirectory(dirname($path));
+
+        file_put_contents(
+            $path,
+            json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            LOCK_EX,
+        );
+    }
+
+    /**
      * Entfernt Cache-Dateien, die aelter als die angegebene Zeitspanne sind.
      */
     public function clean(string $game, ?int $maxAge = null): int
@@ -130,7 +178,9 @@ final readonly class GameStatsCache
 
         $deleted = 0;
         foreach ($files as $file) {
-            if (basename($file) === '_meta.json') {
+            // Metadaten und Aux-Caches (_meta, _heroes, _ranks, ...) haben
+            // eigene Aktualisierungszyklen und bleiben erhalten.
+            if (str_starts_with(basename($file), '_')) {
                 continue;
             }
 
@@ -146,6 +196,11 @@ final readonly class GameStatsCache
     private function statsPath(string $game, string $accountId): string
     {
         return $this->gameDir($game) . '/' . $this->sanitize($accountId) . '.json';
+    }
+
+    private function auxPath(string $game, string $name): string
+    {
+        return $this->gameDir($game) . '/_' . $this->sanitize(ltrim($name, '_')) . '.json';
     }
 
     private function metaPath(string $game): string

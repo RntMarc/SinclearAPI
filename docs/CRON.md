@@ -90,13 +90,16 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Intervall:** `GAMES_CACHE_TTL` (Default 3600 Sekunden / 1 Stunde) — das Intervall folgt der Cache-TTL, damit `nextRefreshAt` in `_meta.json` und der tatsächliche Cron-Takt übereinstimmen.
 - **Aktion:**
   1. Alle `GameAccount`-Einträge je Spiel laden.
-  2. Für Deadlock: Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
-  3. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
+  2. Für Deadlock: Helden-/Rang-Assets cache-first laden (Aux-Cache `_heroes.json`/`_ranks.json`, TTL 24 h) und Anzeigenamen/Bild-URLs aufbauen.
+  3. Batch-Rang, Batch-Helden-Statistiken und Match-History abrufen.
+  4. Normalisieren und pro Account nach `var/cache/game-stats/{game}/{accountId}.json`
      schreiben; `_meta.json` mit `lastRefreshedAt`, `nextRefreshAt` und
      `intervalSeconds` aktualisieren.
-  4. Bei `503` (Load Shedding) der Spiele-API abbrechen und beim nächsten Lauf
+  5. Bei `503` (Load Shedding) der Spiele-API abbrechen und beim nächsten Lauf
      wiederholen. Andere Fehler der Rang-/Helden-Batches werden protokolliert,
      ohne die übrigen Daten (Match-History, Cache-Write) zu verhindern.
+     Schlägt der Asset-Abruf fehl, werden die Statistiken trotzdem geschrieben
+     (Asset-Felder `null`).
 - **Datei:** `src/Services/Cron/Tasks/GameStatsRefreshTask.php`
 - **Hintergrund:** Siehe [games/readme.md](./games/readme.md).
 

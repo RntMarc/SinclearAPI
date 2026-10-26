@@ -56,6 +56,23 @@ final class DeadlockIntegrationTest extends TestCase
         }
 
         $client = $this->client([
+            new Response(200, [], json_encode([
+                [
+                    'id' => 7,
+                    'name' => 'Wraith',
+                    'images' => [
+                        'icon_image_small' => 'https://example.test/wraith_sm.png',
+                        'icon_hero_card' => 'https://example.test/wraith_card.png',
+                    ],
+                ],
+            ])),
+            new Response(200, [], json_encode([
+                [
+                    'tier' => 1,
+                    'name' => 'Initiate',
+                    'images' => ['large' => 'https://example.test/rank01_lg.png'],
+                ],
+            ])),
             new Response(200, [], json_encode([[
                 'account_id' => 42,
                 'badge' => 12,
@@ -86,18 +103,105 @@ final class DeadlockIntegrationTest extends TestCase
         self::assertNotNull($stats);
         self::assertSame('42', $stats['accountId']);
         self::assertSame(12, $stats['rank']['badge']);
+        self::assertSame('Initiate', $stats['rank']['name']);
+        self::assertSame('https://example.test/rank01_lg.png', $stats['rank']['iconUrl']);
         self::assertSame('999', $stats['rank']['lastMatch']['matchId']);
         self::assertSame(4, $stats['heroStats'][0]['matchesPlayed']);
+        self::assertSame('Wraith', $stats['heroStats'][0]['heroName']);
+        self::assertSame('https://example.test/wraith_sm.png', $stats['heroStats'][0]['heroIconUrl']);
         self::assertSame(3, $stats['heroStats'][0]['wins']);
         self::assertSame(1, $stats['heroStats'][0]['losses']);
         self::assertSame(0.75, $stats['heroStats'][0]['winRate']);
         self::assertCount(20, $stats['matchHistory']);
         self::assertSame('1024', $stats['matchHistory'][0]['matchId']);
+        self::assertSame('Wraith', $stats['matchHistory'][0]['heroName']);
+        self::assertSame('https://example.test/wraith_sm.png', $stats['matchHistory'][0]['heroIconUrl']);
+
+        self::assertNotNull($cache->readAux('deadlock', 'heroes', 86400));
+        self::assertNotNull($cache->readAux('deadlock', 'ranks', 86400));
 
         $meta = $cache->meta('deadlock');
         self::assertNotNull($meta['lastRefreshedAt']);
         self::assertNotNull($meta['nextRefreshAt']);
         self::assertSame(3600, $meta['intervalSeconds']);
+    }
+
+    public function testRefreshAllUsesCachedAssetsWithoutRequestingThemAgain(): void
+    {
+        $cache = new GameStatsCache($this->dir, 3600);
+        $cache->writeAux('deadlock', 'heroes', [7 => ['name' => 'Wraith', 'iconUrl' => 'hero-icon']]);
+        $cache->writeAux('deadlock', 'ranks', [1 => ['name' => 'Initiate', 'iconUrl' => 'rank-icon']]);
+
+        $client = $this->client([
+            new Response(200, [], json_encode([[
+                'account_id' => 42,
+                'badge' => 12,
+                'rank' => 1,
+                'subrank' => 2,
+            ]])),
+            new Response(200, [], json_encode([[
+                'account_id' => 42,
+                'hero_id' => 7,
+                'matches_played' => 1,
+                'wins' => 1,
+            ]])),
+            new Response(200, [], json_encode([[
+                'match_id' => 1,
+                'hero_id' => 7,
+                'start_time' => 10,
+            ]])),
+        ]);
+
+        $integration = new DeadlockIntegration($this->deadlockClient($client), $cache, new NullLogger());
+        $integration->refreshAll([['accountId' => '42']]);
+
+        $stats = $cache->read('deadlock', '42');
+        self::assertNotNull($stats);
+        self::assertSame('Initiate', $stats['rank']['name']);
+        self::assertSame('rank-icon', $stats['rank']['iconUrl']);
+        self::assertSame('Wraith', $stats['heroStats'][0]['heroName']);
+        self::assertSame('hero-icon', $stats['heroStats'][0]['heroIconUrl']);
+    }
+
+    public function testRefreshAllWritesStatsWithNullAssetFieldsWhenAssetsFail(): void
+    {
+        $client = $this->client([
+            new Response(500, [], ''),
+            new Response(500, [], ''),
+            new Response(200, [], json_encode([[
+                'account_id' => 42,
+                'badge' => 12,
+                'rank' => 1,
+                'subrank' => 2,
+            ]])),
+            new Response(200, [], json_encode([[
+                'account_id' => 42,
+                'hero_id' => 7,
+                'matches_played' => 2,
+                'wins' => 1,
+            ]])),
+            new Response(200, [], json_encode([[
+                'match_id' => 1,
+                'hero_id' => 7,
+                'start_time' => 10,
+            ]])),
+        ]);
+
+        $cache = new GameStatsCache($this->dir, 3600);
+        $integration = new DeadlockIntegration($this->deadlockClient($client), $cache, new NullLogger());
+
+        $integration->refreshAll([['accountId' => '42']]);
+
+        $stats = $cache->read('deadlock', '42');
+        self::assertNotNull($stats);
+        self::assertNull($stats['rank']['name']);
+        self::assertNull($stats['rank']['iconUrl']);
+        self::assertNull($stats['heroStats'][0]['heroName']);
+        self::assertNull($stats['heroStats'][0]['heroIconUrl']);
+        self::assertNull($stats['matchHistory'][0]['heroName']);
+        self::assertNull($stats['matchHistory'][0]['heroIconUrl']);
+        self::assertNull($cache->readAux('deadlock', 'heroes', 86400));
+        self::assertNull($cache->readAux('deadlock', 'ranks', 86400));
     }
 
     public function testResolveProfileDerivesSteamId64(): void
