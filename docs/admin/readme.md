@@ -92,6 +92,15 @@ Nicht-Admins erhalten einen 403-Fehler.
   Optionen, Einladungen, Antworten und Stimmen)
 - JSON-Liste für Auswahllisten (`GET /admin/polls/json`)
 
+### Arcade-Spiele (`/arcade`) – **voll implementiert**
+- Listet alle Arcade-Spiele (auch inaktive) mit Slug, Score-Richtung, Status
+  und Play-URL
+- CRUD für Spiele: Slug, Titel, Beschreibung, Thumbnail-URL,
+  `scoreDirection` (`asc`/`desc`), `isActive`, `sortOrder`
+- Beim Löschen werden zugehörige Sessions und Score-Historien mitgelöscht;
+  die statischen Spiel-Dateien unter `public/arcade/<slug>/` bleiben bestehen
+- JSON-Liste für Auswahllisten (`GET /admin/arcade/json`)
+
 ### Benachrichtigungen (`/notifications`) – **voll implementiert**
 - Sendet Test-Benachrichtigungen an beliebige Nutzer
 - Benachrichtigungen sind exakt identisch mit echten Benachrichtigungen (gleiches Schema, Push-Zustellung)
@@ -153,6 +162,11 @@ Nicht-Admins erhalten einen 403-Fehler.
 | GET | `/admin/notifications` | Benachrichtigungs-Testseite (geschützt) |
 | GET | `/admin/notifications/json` | Entitäten als JSON für Dropdowns (geschützt) |
 | POST | `/admin/notifications/send` | Test-Benachrichtigung senden (geschützt) |
+| GET | `/admin/arcade` | Arcade-Spiele-Übersicht (geschützt) |
+| GET | `/admin/arcade/json` | Arcade-Spiele als JSON-Liste (geschützt) |
+| POST | `/admin/arcade` | Arcade-Spiel anlegen (geschützt) |
+| PUT | `/admin/arcade/{id}` | Arcade-Spiel bearbeiten (geschützt) |
+| DELETE | `/admin/arcade/{id}` | Arcade-Spiel inkl. Sessions/Scores löschen (geschützt) |
 
 ## Responsive Layout
 

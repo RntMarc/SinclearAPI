@@ -23,6 +23,12 @@
     RewriteRule ^favicon\.ico$ public/favicon.ico [L]
     RewriteRule ^robots\.txt$ public/robots.txt [L]
 
+    # Arcade-Spiele statisch aus public/arcade/<slug>/ ausliefern.
+    # Nur harmlose Pfadzeichen; Segmente duerfen nicht mit "." beginnen
+    # (blockiert Dotfiles wie .env innerhalb eines Spielordners).
+    RewriteRule ^arcade/([A-Za-z0-9_-]+)/?$ public/arcade/$1/index.html [L]
+    RewriteRule ^arcade/([A-Za-z0-9_-]+)/((?:[A-Za-z0-9_-][A-Za-z0-9_.-]*)(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)$ public/arcade/$1/$2 [L]
+
     # .well-known (z.B. ACME-Challenge) nicht an PHP weiterleiten
     RewriteRule ^\.well-known/ - [L]
 

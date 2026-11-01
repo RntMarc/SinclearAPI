@@ -35,6 +35,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 6 | `cleanup_stale_push_subscriptions` | 24 Stunden | Löscht tote Push-Subscriptions (10+ Fehlversuche oder 90 Tage ohne Lebenszeichen) |
 | 7 | `polls_deadline` | 1 Stunde | Schließt abgelaufene Umfragen und erinnert Teilnehmer vor der Deadline |
 | 8 | `refresh_game_stats` | `GAMES_CACHE_TTL` (Default 1 Stunde) | Aktualisiert den Cache der Spiele-Statistiken (Deadlock) |
+| 9 | `cleanup_arcade_sessions` | 1 Stunde | Löscht abgelaufene und widerrufene Arcade-Sessions |
 
 ## Details
 
@@ -103,6 +104,13 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
      (Asset-Felder `null`).
 - **Datei:** `src/Services/Cron/Tasks/GameStatsRefreshTask.php`
 - **Hintergrund:** Siehe [games/readme.md](./games/readme.md).
+
+### Arcade Session Cleanup
+- **Task-Name:** `cleanup_arcade_sessions`
+- **Intervall:** 3600 Sekunden (1 Stunde)
+- **Aktion:** `DELETE FROM ArcadeSession WHERE expiresAt < NOW(3) OR revokedAt IS NOT NULL` — entfernt abgelaufene und widerrufene Spiel-Session-Token.
+- **Datei:** `src/Services/Cron/Tasks/CleanupArcadeSessionsTask.php`
+- **Hintergrund:** Siehe [arcade/readme.md](./arcade/readme.md).
 
 ## CronSchedule-Tabelle
 

@@ -5,6 +5,7 @@ namespace Sinclear\Api\Controllers;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
+use InvalidArgumentException;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\EventRelationRepository;
 use Sinclear\Api\Repository\ForumMemberRepository;
@@ -33,6 +34,7 @@ use Sinclear\Api\Repository\DirectMessageRepository;
 use Sinclear\Api\Repository\TravelChatRepository;
 use Sinclear\Api\Services\TravelChatService;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\ArcadeGameService;
 use Sinclear\Api\Services\TravelService;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
 use Sinclear\Api\Support\DateTimeValue;
@@ -71,6 +73,7 @@ final readonly class AdminController
         private ImageService $imageService,
         private TravelService $travelService,
         private ExternalDataCacheRepository $externalDataCacheRepo,
+        private ArcadeGameService $arcadeGameService,
         private PDO $pdo,
         private LoggerInterface $logger,
     ) {}
@@ -1789,6 +1792,143 @@ ROW;
 
         $this->forumRepo->delete($id);
         return ResponseFactory::noContent($response);
+    }
+
+    public function arcade(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $games = $this->arcadeGameService->listAllForAdmin();
+
+        $rows = '';
+        foreach ($games as $game) {
+            $id = htmlspecialchars((string) $game['id'], ENT_QUOTES);
+            $slug = htmlspecialchars((string) $game['slug'], ENT_QUOTES);
+            $title = htmlspecialchars((string) $game['title'], ENT_QUOTES);
+            $description = htmlspecialchars((string) ($game['description'] ?? ''), ENT_QUOTES);
+            $thumbnail = $game['thumbnailUrl'] !== null && $game['thumbnailUrl'] !== ''
+                ? htmlspecialchars((string) $game['thumbnailUrl'], ENT_QUOTES)
+                : '–';
+            $direction = $game['scoreDirection'] === 'asc'
+                ? 'asc (kleiner ist besser)'
+                : 'desc (größer ist besser)';
+            $status = $game['isActive']
+                ? '<span class="badge badge-admin">Aktiv</span>'
+                : '<span class="badge">Inaktiv</span>';
+            $sortOrder = (int) $game['sortOrder'];
+            $createdAt = $game['createdAt'] !== null
+                ? htmlspecialchars((string) $game['createdAt'], ENT_QUOTES)
+                : '–';
+            $playUrl = htmlspecialchars((string) $game['playUrl'], ENT_QUOTES);
+
+            $rows .= <<<ROW
+            <tr>
+                <td>{$title}</td>
+                <td><code>{$slug}</code></td>
+                <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$description}">{$description}</td>
+                <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$thumbnail}">{$thumbnail}</td>
+                <td>{$direction}</td>
+                <td>{$status}</td>
+                <td>{$sortOrder}</td>
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{$playUrl}">{$playUrl}</td>
+                <td>{$createdAt}</td>
+                <td class="flex" style="gap:0.4rem;">
+                    <button class="btn btn-sm btn-primary" onclick="editArcadeGame('{$id}')">Bearbeiten</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteArcadeGame('{$id}')">Löschen</button>
+                </td>
+            </tr>
+ROW;
+        }
+
+        $gamesJson = json_encode(
+            $games,
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+                | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        ) ?: '[]';
+
+        $contentHtml = $this->renderTemplate('arcade.php', [
+            'rows' => $rows,
+            'gamesJson' => $gamesJson,
+        ]);
+        $html = $this->renderLayout('Arcade-Spiele', $contentHtml, $user->email);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function adminArcadeJson(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        return ResponseFactory::json(
+            ['data' => $this->arcadeGameService->listAllForAdmin()],
+            200,
+            $response,
+        );
+    }
+
+    public function createArcadeGame(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        try {
+            $game = $this->arcadeGameService->create($this->parsedBody($request));
+        } catch (InvalidArgumentException $e) {
+            return $this->arcadeErrorResponse($e->getMessage(), $response);
+        }
+
+        return ResponseFactory::json(['data' => $game], 201, $response);
+    }
+
+    /** @param array<string, string> $args */
+    public function updateArcadeGame(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $this->requireUser($request);
+
+        try {
+            $game = $this->arcadeGameService->update($args['id'], $this->parsedBody($request));
+        } catch (InvalidArgumentException $e) {
+            return $this->arcadeErrorResponse($e->getMessage(), $response);
+        }
+
+        return ResponseFactory::json(['data' => $game], 200, $response);
+    }
+
+    /** @param array<string, string> $args */
+    public function deleteArcadeGame(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+        array $args,
+    ): ResponseInterface {
+        $this->requireUser($request);
+
+        if (!$this->arcadeGameService->delete($args['id'])) {
+            return ResponseFactory::json(['error' => 'game_not_found'], 404, $response);
+        }
+
+        return ResponseFactory::noContent($response);
+    }
+
+    private function arcadeErrorResponse(string $error, ResponseInterface $response): ResponseInterface
+    {
+        $status = match ($error) {
+            'game_not_found' => 404,
+            'slug_required',
+            'invalid_slug',
+            'slug_taken',
+            'title_required',
+            'title_too_long',
+            'thumbnail_url_too_long',
+            'invalid_score_direction',
+            'invalid_is_active',
+            'invalid_sort_order',
+            'no_fields_to_update' => 400,
+            default => 500,
+        };
+
+        return ResponseFactory::json(['error' => $error], $status, $response);
     }
 
     public function subscriptions(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface

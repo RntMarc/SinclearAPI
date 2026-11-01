@@ -1,3 +1,7 @@
+# Härtung für direkt ausgelieferte Dateien unter public/ (inkl. public/arcade/).
+# Verhindert den Abruf von Dotfiles und typischen Secret-/Quelltext-Dateien,
+# auch wenn sie versehentlich in einem Spielordner liegen.
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
@@ -5,3 +9,15 @@
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [QSA,L]
 </IfModule>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "\.(env|log|sql|yaml|yml|md|lock|dist|sh|ini|bak)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^(composer\.json|composer\.lock|\.gitignore|\.gitmodules|AGENTS\.md|update\.sh|generate_keys\.sh)$">
+    Require all denied
+</FilesMatch>

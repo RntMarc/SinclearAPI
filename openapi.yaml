@@ -27,6 +27,19 @@ components:
       description: >-
         Persönlicher LaMetric-Token (64 Hex-Zeichen), gültig 1 Jahr. Wird von der
         LaMetric Time als Query-Parameter an den Poll-Endpunkt gesendet.
+    ArcadeSessionToken:
+      type: http
+      scheme: bearer
+      description: >-
+        Kurzlebiges, spiel-internes Arcade-Session-Token. Wird von
+        `POST /arcade/games/{slug}/session` ausgestellt und bevorzugt im
+        `Authorization: Bearer <token>`-Header gesendet; alternativ als
+        Body-Feld `token`.
+    AdminSession:
+      type: apiKey
+      in: cookie
+      name: PHPSESSID
+      description: PHP-Session-Cookie des Admin-Dashboards (nach OTP-Login).
 
   parameters:
     PollId:
@@ -37,6 +50,38 @@ components:
       schema:
         type: string
         format: uuid
+
+    ArcadeSlug:
+      name: slug
+      in: path
+      required: true
+      description: Arcade-Spiel-Slug
+      schema:
+        type: string
+        maxLength: 50
+        pattern: '^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$'
+        example: snake
+
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Seitennummer (1-basiert)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Einträge pro Seite (max. 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
 
   schemas:
     Error:
@@ -7288,6 +7333,216 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    ArcadeGame:
+      type: object
+      required: [id, slug, title, scoreDirection, isActive, sortOrder, playUrl, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          maxLength: 50
+          pattern: '^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$'
+          example: snake
+          description: Verzeichnisname unter `public/arcade/<slug>/`
+        title:
+          type: string
+          maxLength: 191
+        description:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          maxLength: 1024
+          nullable: true
+        scoreDirection:
+          type: string
+          enum: [asc, desc]
+          description: '`desc` = größer ist besser, `asc` = kleiner ist besser'
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+        playUrl:
+          type: string
+          description: Basis-Play-URL ohne Token (`<APP_URL>/arcade/<slug>/index.html`)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ArcadeSession:
+      type: object
+      required: [token, expiresAt, playUrl]
+      properties:
+        token:
+          type: string
+          description: Klartext-Session-Token (128 Hex-Zeichen); nur hier sichtbar
+        expiresAt:
+          type: string
+          format: date-time
+        playUrl:
+          type: string
+          description: Play-URL inklusive `#arcade_token=<token>` im URL-Fragment
+
+    ArcadeScore:
+      type: object
+      required: [id, userId, gameId, score, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        gameId:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Spielspezifische Zusatzdaten (z. B. Level, Zeit)
+        createdAt:
+          type: string
+          format: date-time
+
+    ArcadeScoreSubmit:
+      type: object
+      required: [score]
+      properties:
+        token:
+          type: string
+          description: >-
+            Optionales Session-Token. Bevorzugt wird der
+            `Authorization: Bearer <token>`-Header.
+        score:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    ArcadeScoreSubmitResponse:
+      type: object
+      required: [score, bestScore, isPersonalBest]
+      properties:
+        score:
+          $ref: '#/components/schemas/ArcadeScore'
+        bestScore:
+          type: integer
+          format: int64
+        isPersonalBest:
+          type: boolean
+
+    ArcadeLeaderboardEntry:
+      type: object
+      required: [rank, userId, score, achievedAt]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        score:
+          type: integer
+          format: int64
+        meta:
+          type: object
+          nullable: true
+          additionalProperties: true
+        achievedAt:
+          type: string
+          format: date-time
+          description: Zeitpunkt des Bestwerts
+
+    ArcadeLeaderboardMeta:
+      allOf:
+        - $ref: '#/components/schemas/PaginationMeta'
+        - type: object
+          required: [scoreDirection]
+          properties:
+            scoreDirection:
+              type: string
+              enum: [asc, desc]
+
+    ArcadeSessionRenewRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          description: >-
+            Optionales Session-Token. Bevorzugt wird der
+            `Authorization: Bearer <token>`-Header.
+
+    ArcadeGameCreateRequest:
+      type: object
+      required: [slug, title]
+      properties:
+        slug:
+          type: string
+          maxLength: 50
+          pattern: '^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$'
+        title:
+          type: string
+          maxLength: 191
+        description:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          maxLength: 1024
+          nullable: true
+        scoreDirection:
+          type: string
+          enum: [asc, desc]
+          default: desc
+        isActive:
+          type: boolean
+          default: true
+        sortOrder:
+          type: integer
+          default: 0
+
+    ArcadeGameUpdateRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+          maxLength: 50
+          pattern: '^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$'
+        title:
+          type: string
+          maxLength: 191
+        description:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          maxLength: 1024
+          nullable: true
+        scoreDirection:
+          type: string
+          enum: [asc, desc]
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
 
 paths:
   /lametric/token:
@@ -22338,6 +22593,468 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Unbekanntes Spiel oder kein verknüpfter Account (`unknown_game`, `game_account_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/games:
+    get:
+      summary: Aktive Arcade-Spiele auflisten
+      description: >
+        Katalog der aktiven, selbst gehosteten Browser-Spiele, sortiert nach
+        `sortOrder` und Titel. `playUrl` ist die Basis-URL ohne Session-Token;
+        ein spielbares Token wird über `POST /arcade/games/{slug}/session`
+        ausgestellt.
+      tags: [Arcade]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Aktive Spiele
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ArcadeGame'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/games/{slug}:
+    get:
+      summary: Detail eines Arcade-Spiels
+      description: Liefert ein aktives Spiel anhand seines Slugs.
+      tags: [Arcade]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArcadeSlug'
+      responses:
+        '200':
+          description: Spieldetail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ArcadeGame'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes oder inaktives Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/games/{slug}/leaderboard:
+    get:
+      summary: Leaderboard eines Arcade-Spiels
+      description: >
+        Bestwert je Nutzer (nur Nutzer, die noch in der DB existieren),
+        sortiert nach `ArcadeGame.scoreDirection`. Bei Gleichstand zählt der
+        früher erreichte Bestwert. Die Antwort enthält zusätzlich den Eintrag
+        des anfragenden Nutzers (`me`) inklusive Rang oder `null`.
+      tags: [Arcade]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArcadeSlug'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, me]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ArcadeLeaderboardEntry'
+                  meta:
+                    $ref: '#/components/schemas/ArcadeLeaderboardMeta'
+                  me:
+                    oneOf:
+                      - $ref: '#/components/schemas/ArcadeLeaderboardEntry'
+                      - type: 'null'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes oder inaktives Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/games/{slug}/scores/{userId}:
+    get:
+      summary: Score-Historie eines Nutzers
+      description: >
+        Alle Versuche eines Nutzers für ein Spiel, absteigend nach `createdAt`,
+        paginiert, plus Bestwert und Score-Richtung des Spiels.
+      tags: [Arcade]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArcadeSlug'
+        - name: userId
+          in: path
+          required: true
+          description: Beyond-Nutzer-ID
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Score-Historie
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta, bestScore, scoreDirection, userId]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ArcadeScore'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  bestScore:
+                    type: integer
+                    format: int64
+                  scoreDirection:
+                    type: string
+                    enum: [asc, desc]
+                  userId:
+                    type: string
+                    format: uuid
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 'Unbekanntes Spiel, unbekannter Nutzer oder keine Scores (`unknown_game`, `user_not_found`, `score_not_found`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/games/{slug}/session:
+    post:
+      summary: Arcade-Session-Token ausstellen
+      description: >
+        Erzeugt ein kurzlebiges Session-Token für den eingeloggten Nutzer und
+        das Spiel. Die `playUrl` enthält das Token im URL-Fragment
+        (`#arcade_token=…`), damit es nicht in Logs oder Referrern landet.
+      tags: [Arcade]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArcadeSlug'
+      responses:
+        '201':
+          description: Session erstellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArcadeSession'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes oder inaktives Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Alle Arcade-Sessions des Nutzers für ein Spiel widerrufen
+      description: Entwertet alle aktiven Sessions des eingeloggten Nutzers für dieses Spiel.
+      tags: [Arcade]
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ArcadeSlug'
+      responses:
+        '204':
+          description: Sessions widerrufen
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Unbekanntes Spiel (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/session/renew:
+    post:
+      summary: Arcade-Session-Token rotieren und verlängern
+      description: >
+        Entwertet das übergebene Token und stellt ein neues mit frischer
+        Laufzeit für denselben Nutzer und dasselbe Spiel aus. Das Token wird
+        bevorzugt im `Authorization: Bearer <token>`-Header, alternativ im
+        Body-Feld `token` übergeben.
+      tags: [Arcade]
+      security:
+        - ArcadeSessionToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArcadeSessionRenewRequest'
+      responses:
+        '200':
+          description: Neues Session-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArcadeSession'
+        '401':
+          description: Fehlendes, abgelaufenes oder widerrufenes Token (`unauthorized`, `invalid_session`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Spiel nicht gefunden (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /arcade/scores:
+    post:
+      summary: Arcade-Score abgeben
+      description: >
+        Speichert einen Versuch für das Spiel, an das das Session-Token
+        gebunden ist. Jeder Aufruf erzeugt einen neuen Eintrag in der Historie;
+        der Bestwert wird daraus abgeleitet. Das Token wird bevorzugt im
+        `Authorization: Bearer <token>`-Header, alternativ im Body-Feld
+        `token` übergeben.
+      tags: [Arcade]
+      security:
+        - ArcadeSessionToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArcadeScoreSubmit'
+      responses:
+        '201':
+          description: Score gespeichert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArcadeScoreSubmitResponse'
+        '400':
+          description: Ungültiger Score oder ungültige Meta-Daten (`invalid_score`, `invalid_meta`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Fehlendes, abgelaufenes oder widerrufenes Token (`unauthorized`, `invalid_session`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Spiel nicht gefunden (`unknown_game`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/arcade:
+    get:
+      summary: Arcade-Verwaltung (Admin-Dashboard)
+      description: HTML-Seite mit Übersicht und Formularen für Arcade-Spiele.
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      responses:
+        '200':
+          description: HTML-Seite
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Weiterleitung zum Admin-Login
+    post:
+      summary: Arcade-Spiel anlegen (Admin)
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArcadeGameCreateRequest'
+      responses:
+        '201':
+          description: Spiel erstellt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ArcadeGame'
+        '400':
+          description: Validierungsfehler (`slug_required`, `invalid_slug`, `slug_taken`, `title_required`, `invalid_score_direction`, …)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/arcade/json:
+    get:
+      summary: Arcade-Spiele als JSON (Admin)
+      description: Liste aller Spiele (auch inaktive) für Auswahllisten und Skripte.
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      responses:
+        '200':
+          description: Spieleliste
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ArcadeGame'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/arcade/{id}:
+    put:
+      summary: Arcade-Spiel bearbeiten (Admin)
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArcadeGameUpdateRequest'
+      responses:
+        '200':
+          description: Spiel aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ArcadeGame'
+        '400':
+          description: Validierungsfehler oder keine Felder (`no_fields_to_update`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Spiel nicht gefunden (`game_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Arcade-Spiel löschen (Admin)
+      description: >
+        Löscht das Spiel sowie zugehörige Sessions und Score-Historie. Die
+        statischen Spiel-Dateien unter `public/arcade/<slug>/` müssen separat
+        entfernt werden.
+      tags: [Admin]
+      security:
+        - AdminSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Spiel gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Spiel nicht gefunden (`game_not_found`)
           content:
             application/json:
               schema:

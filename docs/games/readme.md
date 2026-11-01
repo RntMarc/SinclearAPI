@@ -6,6 +6,11 @@ inoffizielle [Deadlock API](https://api.deadlock-api.com/docs). Das Grundgerüst
 ist so aufgebaut, dass weitere Spiele mit eigenen APIs und eigenen Statistiken
 ergänzt werden können, ohne die gemeinsame Struktur zu ändern.
 
+> **Abgrenzung:** Selbst gehostete Browser-Spiele mit Highscores laufen unter
+> `/arcade` und sind in [arcade/readme.md](../arcade/readme.md) dokumentiert.
+> Dieses Dokument beschreibt ausschließlich extern verknüpfte Spiele-Accounts
+> und deren Statistiken.
+
 ## Überblick
 
 | Aspekt | Verhalten |

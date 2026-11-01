@@ -42,6 +42,10 @@ use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Controllers\GameAccountController;
 use Sinclear\Api\Controllers\GameStatsController;
+use Sinclear\Api\Controllers\ArcadeGameController;
+use Sinclear\Api\Controllers\ArcadeSessionController;
+use Sinclear\Api\Controllers\ArcadeScoreController;
+use Sinclear\Api\Middleware\ArcadeSessionMiddleware;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
@@ -142,6 +146,9 @@ use Sinclear\Api\Repository\LaMetricTokenRepository;
 use Sinclear\Api\Repository\DavTokenRepository;
 use Sinclear\Api\Repository\ExternalDataCacheRepository;
 use Sinclear\Api\Repository\GameAccountRepository;
+use Sinclear\Api\Repository\ArcadeGameRepository;
+use Sinclear\Api\Repository\ArcadeSessionRepository;
+use Sinclear\Api\Repository\ArcadeScoreRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
@@ -195,6 +202,10 @@ use Sinclear\Api\Services\Games\Deadlock\DeadlockIntegration;
 use Sinclear\Api\Services\Games\GameRegistry;
 use Sinclear\Api\Services\Games\GameStatsCache;
 use Sinclear\Api\Security\Policy\GameAccountPolicy;
+use Sinclear\Api\Security\Policy\ArcadePolicy;
+use Sinclear\Api\Services\ArcadeGameService;
+use Sinclear\Api\Services\ArcadeSessionService;
+use Sinclear\Api\Services\ArcadeScoreService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
@@ -660,6 +671,18 @@ return [
     GameAccountService::class => autowire(),
     GameAccountPolicy::class => autowire(),
     GameAccountController::class => autowire(),
+
+    ArcadeGameRepository::class => autowire(),
+    ArcadeSessionRepository::class => autowire(),
+    ArcadeScoreRepository::class => autowire(),
+    ArcadeGameService::class => autowire(),
+    ArcadeSessionService::class => autowire(),
+    ArcadeScoreService::class => autowire(),
+    ArcadePolicy::class => autowire(),
+    ArcadeSessionMiddleware::class => autowire(),
+    ArcadeGameController::class => autowire(),
+    ArcadeSessionController::class => autowire(),
+    ArcadeScoreController::class => autowire(),
 
     GameStatsCache::class => function (ContainerInterface $c): GameStatsCache {
         $settings = $c->get(Settings::class);

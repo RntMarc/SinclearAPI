@@ -38,6 +38,10 @@ use Sinclear\Api\Controllers\DavTokenController;
 use Sinclear\Api\Controllers\ExternalDataController;
 use Sinclear\Api\Controllers\GameAccountController;
 use Sinclear\Api\Controllers\GameStatsController;
+use Sinclear\Api\Controllers\ArcadeGameController;
+use Sinclear\Api\Controllers\ArcadeSessionController;
+use Sinclear\Api\Controllers\ArcadeScoreController;
+use Sinclear\Api\Middleware\ArcadeSessionMiddleware;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
@@ -539,6 +543,22 @@ return function (App $app): void {
         $group->get('/{game}/stats/{userId}', [GameStatsController::class, 'single']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    // Arcade — selbst gehostete Browser-Spiele (Katalog/Leaderboard/Historie mit JWT)
+    $app->group('/arcade', function (RouteCollectorProxy $group) {
+        $group->get('/games', [ArcadeGameController::class, 'listGames']);
+        $group->get('/games/{slug}/leaderboard', [ArcadeGameController::class, 'leaderboard']);
+        $group->get('/games/{slug}/scores/{userId}', [ArcadeGameController::class, 'history']);
+        $group->get('/games/{slug}', [ArcadeGameController::class, 'getGame']);
+        $group->post('/games/{slug}/session', [ArcadeSessionController::class, 'create']);
+        $group->delete('/games/{slug}/session', [ArcadeSessionController::class, 'revoke']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    // Arcade — spiel-interne Endpunkte (Session-Token statt JWT)
+    $app->post('/arcade/session/renew', [ArcadeSessionController::class, 'renew'])
+        ->add($container->get(ArcadeSessionMiddleware::class));
+    $app->post('/arcade/scores', [ArcadeScoreController::class, 'submit'])
+        ->add($container->get(ArcadeSessionMiddleware::class));
+
     // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);
     $app->post('/admin/login/otp/request', [AdminController::class, 'loginOtpRequest']);
@@ -555,6 +575,11 @@ return function (App $app): void {
         $group->post('/forums', [AdminController::class, 'createForum']);
         $group->put('/forums/{id}', [AdminController::class, 'updateForum']);
         $group->delete('/forums/{id}', [AdminController::class, 'deleteForum']);
+        $group->get('/arcade', [AdminController::class, 'arcade']);
+        $group->get('/arcade/json', [AdminController::class, 'adminArcadeJson']);
+        $group->post('/arcade', [AdminController::class, 'createArcadeGame']);
+        $group->put('/arcade/{id}', [AdminController::class, 'updateArcadeGame']);
+        $group->delete('/arcade/{id}', [AdminController::class, 'deleteArcadeGame']);
         $group->get('/recipes', [AdminController::class, 'recipes']);
         $group->delete('/recipes/{id}', [AdminController::class, 'deleteRecipe']);
         $group->get('/polls', [AdminController::class, 'polls']);

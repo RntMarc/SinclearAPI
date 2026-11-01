@@ -20,5 +20,6 @@ final readonly class Settings
         public array $centrifugo = [],
         public array $polls = [],
         public array $games = [],
+        public array $arcade = [],
     ) {}
 }
