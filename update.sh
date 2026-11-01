@@ -5,6 +5,13 @@ SERVER="mmrtk@mmrtk.lima-ssh.de"
 SSH_KEY="$HOME/.ssh/id_ed25519"    # Pfad zu deinem privaten SSH-Key
 TARGET_DIR="sinclear.de/api"   # Zielverzeichnis auf dem Server
 
+# Arcade-Spiele werden lokal gebaut (der Server hat kein Go) und nach dem
+# git pull per scp in das jeweilige Spielverzeichnis hochgeladen.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ARCADE_BUILD_SCRIPT="$SCRIPT_DIR/arcade-src/rocket-boost/build.sh"
+ARCADE_OUT_DIR="$SCRIPT_DIR/public/arcade/rocket-boost"
+ARCADE_UPLOAD_FILES=("rocket.wasm" "wasm_exec.js")
+
 # 🎨 Farben
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -50,18 +57,37 @@ handle_error() {
 print_header
 
 # 1️⃣  Schritt 1: SSH-Verbindung testen (mit LogLevel=QUIET, um Willkommensnachricht zu unterdrücken)
-print_step "1/5: Verbinde mit Server ($SERVER)..."
+print_step "1/7: Verbinde mit Server ($SERVER)..."
 # Kein BatchMode: Ein passwortgeschützter Key soll nach der Passphrase fragen dürfen.
 if ! ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no -o LogLevel=QUIET -o ConnectTimeout=15 "$SERVER" "echo SSH_OK" >/dev/null; then
     handle_error "SSH-Verbindung fehlgeschlagen! Überprüfe Server, Benutzer und SSH-Key."
 fi
 print_success "SSH-Verbindung erfolgreich"
 
-# 2️⃣  Alle Befehle in EINER SSH-Sitzung ausführen (vermeidet wiederholte Willkommensnachrichten)
-print_step "2/5: Prüfe Branch (main) und starte git pull..."
-print_step "3/5: Führe composer install (mit Dev-Dependencies) aus..."
-print_step "4/5: Führe PHPUnit-Tests aus..."
-print_step "5/5: Führe composer install --no-dev aus (Bereinigung)..."
+# 2️⃣  Arcade-WASM lokal bauen (Go wird nur auf dem Entwicklungsrechner benötigt)
+print_step "2/7: Baue Arcade-WASM lokal..."
+if [ ! -x "$ARCADE_BUILD_SCRIPT" ]; then
+    handle_error "Arcade-Build-Skript nicht gefunden: $ARCADE_BUILD_SCRIPT"
+fi
+if ! "$ARCADE_BUILD_SCRIPT"; then
+    handle_error "Arcade-Build fehlgeschlagen (Go >= 1.24 installiert?)"
+fi
+print_success "Arcade-WASM gebaut"
+
+# Der Server zieht main; lokale, uncommittete Arcade-Quellen würden ein WASM
+# erzeugen, das nicht zum deployten Commit passt.
+if command -v git >/dev/null 2>&1 && git -C "$SCRIPT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain -- arcade-src/rocket-boost)" ]; then
+        print_warning "Arcade-Quellen haben uncommittete Änderungen – WASM passt evtl. nicht zum deployten Commit."
+    fi
+fi
+
+# 3️⃣  Alle Befehle in EINER SSH-Sitzung ausführen (vermeidet wiederholte Willkommensnachrichten)
+print_step "3/7: Prüfe Branch (main) und starte git pull..."
+print_step "4/7: Führe composer install (mit Dev-Dependencies) aus..."
+print_step "5/7: Führe PHPUnit-Tests aus..."
+print_step "6/7: Führe composer install --no-dev aus (Bereinigung)..."
+print_step "7/7: Lade Arcade-Build auf den Server..."
 print_info "Hinweis: Ist der SSH-Key auf dem Server passwortgeschützt, wirst du hier nach der Passphrase gefragt."
 
 # TTY erzwingen (-t), damit Passphrase-Abfragen (z. B. beim 'git pull' auf dem Server)
@@ -280,6 +306,36 @@ if [ -n "$TEST_EXIT_CODE" ]; then
     fi
 else
     print_warning "Kein Testergebnis vom Server empfangen"
+fi
+
+# 🎮 Arcade-Build auf den Server übertragen (nur wenn der Deploy sauber war).
+# Die WASM-Artefakte sind bewusst nicht im Repo, weil der Server kein Go hat.
+if [ $SSH_EXIT -eq 0 ] && [ $HAS_ERRORS -eq 0 ]; then
+    UPLOAD_OK=1
+    UPLOAD_PATHS=()
+    for FILE in "${ARCADE_UPLOAD_FILES[@]}"; do
+        if [ ! -f "$ARCADE_OUT_DIR/$FILE" ]; then
+            print_error "Arcade-Datei fehlt: $ARCADE_OUT_DIR/$FILE"
+            UPLOAD_OK=0
+            break
+        fi
+        UPLOAD_PATHS+=("$ARCADE_OUT_DIR/$FILE")
+    done
+
+    # Beide Dateien in einem Aufruf: wasm_exec.js und Binary gehören zusammen.
+    if [ $UPLOAD_OK -eq 1 ]; then
+        if ! scp -i "$SSH_KEY" -o StrictHostKeyChecking=no -o LogLevel=QUIET \
+            "${UPLOAD_PATHS[@]}" "$SERVER:$TARGET_DIR/public/arcade/rocket-boost/"; then
+            print_error "Upload des Arcade-Builds fehlgeschlagen"
+            UPLOAD_OK=0
+        fi
+    fi
+
+    if [ $UPLOAD_OK -eq 1 ]; then
+        print_success "Arcade-Build hochgeladen (${ARCADE_UPLOAD_FILES[*]})"
+    else
+        HAS_ERRORS=1
+    fi
 fi
 
 # ✅ Erfolgsmeldungen (nur wenn keine Fehler aufgetreten sind)

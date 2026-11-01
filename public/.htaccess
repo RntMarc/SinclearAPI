@@ -10,6 +10,33 @@
     RewriteRule ^ index.php [QSA,L]
 </IfModule>
 
+# WASM-Spiele: korrekter MIME-Type und Kompression.
+# Ältere Apache-Installationen liefern für .wasm sonst application/octet-stream;
+# das Spiel hat dafür einen arrayBuffer-Fallback, instantiateStreaming ist aber
+# schneller und vermeidet den doppelten Download.
+<IfModule mod_mime.c>
+    AddType application/wasm .wasm
+</IfModule>
+
+<IfModule mod_deflate.c>
+    # AddOutputFilterByType gehört seit Apache 2.4 zu mod_filter. Ohne diese
+    # Prüfung würde eine Installation mit mod_deflate, aber ohne mod_filter,
+    # mit 500 antworten.
+    <IfModule mod_filter.c>
+        AddOutputFilterByType DEFLATE application/wasm application/javascript text/css text/html
+    </IfModule>
+</IfModule>
+
+<IfModule mod_headers.c>
+    # Spieldateien werden ohne Versionspfad ausgeliefert. "no-cache" erzwingt
+    # eine Revalidierung (ETag/304) und verhindert, dass eine alte WASM-Version
+    # im WebView-Cache hängen bleibt.
+    <FilesMatch "\.(html|js|wasm)$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+    Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>

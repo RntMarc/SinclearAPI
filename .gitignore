@@ -14,6 +14,10 @@ app_version.json
 # dependencies
 /vendor/
 
+# arcade build artifacts (built locally, uploaded during deploy)
+/public/arcade/*/*.wasm
+/public/arcade/*/wasm_exec.js
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -21,6 +21,18 @@ keine Vermischung mit `GameAccount`, `GameStats` oder der `GameRegistry`.
 | Sichtbarkeit | JWT für alle Katalog-/Leaderboard-/Historien-Endpunkte |
 | Pagination | Projekt-Standard `page` + `limit` mit `meta { page, limit, total, totalPages }` |
 
+## Spiele
+
+| Slug | Titel | Technik | Details |
+|------|-------|---------|---------|
+| `rocket-boost` | Rocket Boost | Go/WASM + JS-Schale | [Rocket Boost](games/rocket-boost.md) |
+
+`rocket-boost` ist das Referenzspiel: klein, ohne externe Assets, mit
+Session-Token, automatischer Score-Abgabe und Debug-Modus. Es zeigt, wie ein
+Spiel mit Build-Schritt (Go → WASM) in die Arcade-Auslieferung passt. Der
+Katalog-Eintrag wird von
+`database/migrations/20261101180000_seed_rocket_boost_game.sql` angelegt.
+
 ## Datenmodell
 
 Migration: `database/migrations/20261101160000_create_arcade.sql` (rerun-sicher
@@ -109,7 +121,7 @@ Antwort auf die Ausstellung:
 {
   "token": "…",
   "expiresAt": "2026-11-01T16:15:00Z",
-  "playUrl": "https://api.example.com/arcade/snake/index.html#arcade_token=…"
+  "playUrl": "https://api.example.com/arcade/rocket-boost/index.html#arcade_token=…"
 }
 ```
 
@@ -128,8 +140,8 @@ Score-Body:
 
 ```json
 {
-  "score": 1234,
-  "meta": { "level": 7, "timeMs": 42310 }
+  "score": 42,
+  "meta": { "durationMs": 61230 }
 }
 ```
 
@@ -137,14 +149,15 @@ Antwort (`201`):
 
 ```json
 {
-  "score": { "id": "…", "userId": "…", "gameId": "…", "score": 1234, "meta": { "level": 7 }, "createdAt": "…" },
-  "bestScore": 1234,
+  "score": { "id": "…", "userId": "…", "gameId": "…", "score": 42, "meta": { "durationMs": 61230 }, "createdAt": "…" },
+  "bestScore": 42,
   "isPersonalBest": true
 }
 ```
 
 `score` muss eine ganze JSON-Zahl sein. `meta` muss ein JSON-Objekt (oder
-`null`/leer) sein; Arrays werden mit `400 invalid_meta` abgelehnt.
+`null`/leer) sein; Arrays werden mit `400 invalid_meta` abgelehnt. Die Felder
+in `meta` sind spielspezifisch; `rocket-boost` sendet `durationMs`.
 
 ## Session-Token-Lebenszyklus
 
@@ -205,6 +218,36 @@ Token über `location.hash`.
    Die Antwort enthält ein neues `token` und eine neue `playUrl`. Das alte
    Token ist danach ungültig.
 
+### Asset-Regeln
+
+- **Keine `.json`-Dateien:** Die Root-`.htaccess` blockiert `.json` global
+  (`<FilesMatch "\.json$">`), auch unter `public/arcade/`. Spieldaten gehören
+  inline ins JS/HTML oder werden über die API geladen.
+- Ebenfalls blockiert: `.md`, `.yaml`, `.yml`, `.sql`, `.sh`, `.log`, `.lock`,
+  `.dist`, `.ini`, `.bak`, `.go`, `.mod`, `.sum` sowie alle Dotfiles.
+- `.wasm` ist erlaubt, braucht aber `Content-Type: application/wasm`.
+  `public/.htaccess` setzt das per `AddType`; Clients sollten zusätzlich einen
+  `arrayBuffer`-Fallback für `WebAssembly.instantiateStreaming` haben.
+- Statische Dateien durchlaufen keine PHP-Middleware und erhalten damit auch
+  keine Security-Header der API. `public/.htaccess` setzt lediglich
+  `X-Content-Type-Options: nosniff`. Spiele müssen selbst auf sichere Inhalte
+  achten (keine externen Skripte, kein `eval`).
+
+### Build & Deployment
+
+Spiele mit Build-Schritt (z. B. Go/WASM) legen ihre Quellen unter
+`arcade-src/<slug>/` ab. Das Verzeichnis ist per `.htaccess` gesperrt und wird
+nie ausgeliefert. Build-Artefakte gehören **nicht** ins Repository, weil auf
+dem Server keine Go-Toolchain installiert ist: `update.sh` baut lokal und
+überträgt die Artefakte nach erfolgreichem Deploy per `scp`.
+
+```bash
+./arcade-src/rocket-boost/build.sh   # baut rocket.wasm + kopiert wasm_exec.js
+```
+
+Die Artefakte sind in `.gitignore` eingetragen. `wasm_exec.js` und das
+WASM-Binary müssen aus derselben Go-Version stammen.
+
 ## Auslieferung & Webserver
 
 - Die Root-`.htaccess` leitet `^arcade/<slug>/…` auf
@@ -213,6 +256,13 @@ Token über `location.hash`.
 - `public/.htaccess` blockiert zusätzlich Dotfiles und typische Secret-/Quell-
   text-Dateien (`.env`, `.log`, `.sql`, `.md`, `.sh`, …) auch beim direkten
   Abruf unter `/public/…`.
+- `public/.htaccess` setzt `AddType application/wasm .wasm`, komprimiert
+  `.wasm`/`.js`/`.css`/`.html` per `mod_deflate` und liefert diese Dateien mit
+  `Cache-Control: no-cache` aus. Die Revalidierung per ETag/304 verhindert
+  veraltete Builds im WebView-Cache, ohne Cache-Busting-Query.
+- Quellen von Build-Spielen liegen unter `arcade-src/`; das Verzeichnis wird
+  von der Root-`.htaccess` gesperrt. `.go` ist zusätzlich als sensible Endung
+  blockiert.
 - `Options -Indexes` bleibt aktiv. Die bestehenden Blockierungen für `src/`,
   `config/`, `vendor/`, `docs/`, `.env`, `.sql`, `.md` usw. bleiben unverändert.
 - `APP_URL` muss auf den Host zeigen, unter dem `/arcade/...` erreichbar ist
