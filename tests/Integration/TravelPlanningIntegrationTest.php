@@ -394,6 +394,7 @@ final class TravelPlanningIntegrationTest extends TestCase
             conversationRepo: new ChatConversationRepository($this->db),
             participantRepo: new ChatParticipantRepository($this->db),
             centrifugoClient: new FakeCentrifugoClient(),
+            pdo: $this->db,
         );
 
         $notificationService = new NotificationService(

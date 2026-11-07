@@ -171,6 +171,8 @@ final readonly class TravelPlanningService
             throw $e;
         }
 
+        $this->flushChatUnsubscribesSafely();
+
         return $this->getPlan($id, $user);
     }
 
@@ -805,6 +807,12 @@ final readonly class TravelPlanningService
             $this->transferAccommodation($tripId, $user);
             $this->transferEvents($tripId);
 
+            // DB-Schreibvorgaenge des Chat-Syncs bleiben in der Transaktion
+            // (ein Fehler rollt die Aktivierung vollstaendig zurueck). Nur die
+            // externen Centrifugo-Aufrufe werden gepuffert und nach dem Commit
+            // ausgefuehrt.
+            $this->chatService->syncTripMembers($tripId);
+
             // Invariante: die operative Reise braucht mindestens eine Leitung.
             if ($this->relationRepo->countLeaders($tripId) < 1) {
                 throw new \RuntimeException('Inconsistent planning data');
@@ -821,11 +829,9 @@ final readonly class TravelPlanningService
             throw $e;
         }
 
-        // Chat-Mitgliedschaft NACH dem Commit abgleichen: reconcileParticipants()
-        // kann Centrifugo-Aufrufe machen, die sonst die Zeilensperre der Reise
-        // waehrend der gesamten Transaktion halten und andere Requests (z. B.
-        // Event-INSERTs oder die Reisen-Liste anderer Nutzer) blockieren wuerden.
-        $this->syncTripMembersSafely($tripId);
+        // Aufgeschobene Centrifugo-Unsubscribes erst nach dem Commit ausfuehren,
+        // damit der externe HTTP-Aufruf nicht die Zeilensperre der Reise haelt.
+        $this->flushChatUnsubscribesSafely();
 
         // Best-effort: eine fehlgeschlagene Benachrichtigung darf eine
         // erfolgreiche Aktivierung nicht als Fehler erscheinen lassen.
@@ -1067,16 +1073,16 @@ final readonly class TravelPlanningService
     }
 
     /**
-     * Best-effort-Chat-Sync nach dem Commit: darf den Erfolg der Aktivierung
-     * nicht als Fehler erscheinen lassen.
+     * Fuehrt nach dem Commit die aufgeschobenen Centrifugo-Unsubscribes aus.
+     * Best-effort: der Centrifugo-Client schluckt Fehler ohnehin, ein Fehler
+     * darf eine erfolgreiche Aktivierung nicht als Fehler erscheinen lassen.
      */
-    private function syncTripMembersSafely(string $tripId): void
+    private function flushChatUnsubscribesSafely(): void
     {
         try {
-            $this->chatService->syncTripMembers($tripId);
+            $this->chatService->flushPendingUnsubscribes();
         } catch (\Throwable $e) {
-            $this->logger->error('Travel planning activation chat sync failed', [
-                'tripId' => $tripId,
+            $this->logger->error('Travel chat unsubscribe flush failed', [
                 'message' => $e->getMessage(),
             ]);
         }

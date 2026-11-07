@@ -2,6 +2,7 @@
 
 namespace Sinclear\Api\Services;
 
+use PDO;
 use Sinclear\Api\Repository\ChatConversationRepository;
 use Sinclear\Api\Repository\ChatParticipantRepository;
 use Sinclear\Api\Repository\EventRelationRepository;
@@ -12,8 +13,17 @@ use Sinclear\Api\Repository\TravelRelationRepository;
 use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Services\Centrifugo\CentrifugoClientInterface;
 
-final readonly class TravelChatService
+final class TravelChatService
 {
+    /**
+     * Externe Centrifugo-Unsubscribes, die erst nach dem Commit ausgefuehrt
+     * werden. Innerhalb einer DB-Transaktion wuerde der HTTP-Aufruf sonst die
+     * Zeilensperren ueber die gesamte Dauer blockieren.
+     *
+     * @var list<array{channel: string, userId: string}>
+     */
+    private array $pendingUnsubscribes = [];
+
     public function __construct(
         private TravelChatRepository $travelChatRepo,
         private TravelTripRepository $tripRepo,
@@ -24,6 +34,7 @@ final readonly class TravelChatService
         private ChatConversationRepository $conversationRepo,
         private ChatParticipantRepository $participantRepo,
         private CentrifugoClientInterface $centrifugoClient,
+        private PDO $pdo,
     ) {}
 
     /**
@@ -204,14 +215,37 @@ final readonly class TravelChatService
             $this->participantRepo->add($conversationId, $userId);
         }
 
-        // Remove stale participants and unsubscribe from Centrifugo
+        // Remove stale participants and collect the Centrifugo unsubscribe.
         $existing = $this->participantRepo->findByConversation($conversationId);
         foreach ($existing as $existingParticipant) {
             if (!in_array($existingParticipant['userId'], $currentIds, true)) {
                 $this->participantRepo->remove($conversationId, $existingParticipant['userId']);
-                // Unsubscribe removed participant from Centrifugo channel
-                $this->centrifugoClient->unsubscribe("chat:{$conversationId}", $existingParticipant['userId']);
+                $this->pendingUnsubscribes[] = [
+                    'channel' => "chat:{$conversationId}",
+                    'userId' => $existingParticipant['userId'],
+                ];
             }
+        }
+
+        // Ausserhalb einer Transaktion koennen die externen Aufrufe sofort
+        // erfolgen; innerhalb werden sie bis nach dem Commit aufgeschoben.
+        if (!$this->pdo->inTransaction()) {
+            $this->flushPendingUnsubscribes();
+        }
+    }
+
+    /**
+     * Fuehrt die aufgeschobenen Centrifugo-Unsubscribes aus. Muss nach einem
+     * Commit aufgerufen werden, wenn zuvor innerhalb einer Transaktion
+     * synchronisiert wurde.
+     */
+    public function flushPendingUnsubscribes(): void
+    {
+        $pending = $this->pendingUnsubscribes;
+        $this->pendingUnsubscribes = [];
+
+        foreach ($pending as $item) {
+            $this->centrifugoClient->unsubscribe($item['channel'], $item['userId']);
         }
     }
 }

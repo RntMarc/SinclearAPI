@@ -270,6 +270,7 @@ final class TravelCascadeDeleteIntegrationTest extends TestCase
             conversationRepo: new ChatConversationRepository($this->db),
             participantRepo: new ChatParticipantRepository($this->db),
             centrifugoClient: new FakeCentrifugoClient(),
+            pdo: $this->db,
         );
     }
 
