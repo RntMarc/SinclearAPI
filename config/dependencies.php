@@ -74,7 +74,6 @@ use Sinclear\Api\Services\UserActivityService;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CorsMiddleware;
 use Sinclear\Api\Middleware\LoginThrottleMiddleware;
-use Sinclear\Api\Middleware\RateLimitMiddleware;
 use Sinclear\Api\Middleware\RequireHttpsMiddleware;
 use Sinclear\Api\Middleware\SecurityHeadersMiddleware;
 use Sinclear\Api\Middleware\LaMetricTokenMiddleware;
@@ -576,15 +575,6 @@ return [
         return new CorsMiddleware(
             allowedOrigins: $settings->cors['allowed_origins'],
             logger: $c->get(LoggerInterface::class),
-        );
-    },
-
-    RateLimitMiddleware::class => function (ContainerInterface $c): RateLimitMiddleware {
-        $settings = $c->get(Settings::class);
-        return new RateLimitMiddleware(
-            rateLimiter: $c->get(RateLimiter::class),
-            maxRequests: $settings->rate_limit['requests'],
-            windowSeconds: $settings->rate_limit['window'],
         );
     },
 

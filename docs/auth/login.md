@@ -327,7 +327,7 @@ Registration trotzdem ohne Bild abgeschlossen.
 | Mechanismus | Beschreibung |
 |-------------|-------------|
 | **HTTPS erforderlich** | Nicht-TLS-Verbindungen werden mit 403 abgewiesen |
-| **Rate-Limiting** | 100 req/60s global, 10 req/60s auf Login/OTP-Endpunkten (nicht auf `/auth/refresh`) |
+| **Rate-Limiting** | Kein globales Limit in der API; 10 req/60s auf Login/OTP-Endpunkten (nicht auf `/auth/refresh`). Globale Limits ggf. auf Infrastruktur-Ebene (Reverse Proxy/WAF) |
 | **OTP-Einschränkung** | Max. 3 Code-Anfragen pro E-Mail pro 60 Sekunden |
 | **Code-Gültigkeit** | E-Mail-OTP: 10 Min, Discord-Pairing: 2 Min (einmalig) |
 | **Refresh-Rotation** | Jeder Refresh wird rotiert; alte Tokens werden ungültig |

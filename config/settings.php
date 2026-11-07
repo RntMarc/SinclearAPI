@@ -46,9 +46,11 @@ $settings['cors'] = [
     'allowed_origins' => explode(',', $_ENV['CORS_ALLOWED_ORIGINS'] ?? ''),
 ];
 
+// Rate-Limits sind bewusst pro Endpunkt umgesetzt (OTP-Login, Chat/Centrifugo).
+// Ein globaler, IP-basierter Limiter ist NICHT aktiv: hinter einem Reverse
+// Proxy wuerde REMOTE_ADDR alle Nutzer gemeinsam treffen und so selbst
+// Blockaden erzeugen. Globale Limits gehoeren auf die Infrastruktur-Ebene.
 $settings['rate_limit'] = [
-    'requests' => (int)($_ENV['RATE_LIMIT_REQUESTS'] ?? 100),
-    'window' => (int)($_ENV['RATE_LIMIT_WINDOW'] ?? 60),
     'auth_requests' => (int)($_ENV['AUTH_RATE_LIMIT_REQUESTS'] ?? 10),
     'auth_window' => (int)($_ENV['AUTH_RATE_LIMIT_WINDOW'] ?? 60),
 ];

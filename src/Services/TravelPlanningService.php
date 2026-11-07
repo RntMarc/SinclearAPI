@@ -805,8 +805,6 @@ final readonly class TravelPlanningService
             $this->transferAccommodation($tripId, $user);
             $this->transferEvents($tripId);
 
-            $this->chatService->syncTripMembers($tripId);
-
             // Invariante: die operative Reise braucht mindestens eine Leitung.
             if ($this->relationRepo->countLeaders($tripId) < 1) {
                 throw new \RuntimeException('Inconsistent planning data');
@@ -822,6 +820,12 @@ final readonly class TravelPlanningService
             $this->rollBackQuietly();
             throw $e;
         }
+
+        // Chat-Mitgliedschaft NACH dem Commit abgleichen: reconcileParticipants()
+        // kann Centrifugo-Aufrufe machen, die sonst die Zeilensperre der Reise
+        // waehrend der gesamten Transaktion halten und andere Requests (z. B.
+        // Event-INSERTs oder die Reisen-Liste anderer Nutzer) blockieren wuerden.
+        $this->syncTripMembersSafely($tripId);
 
         // Best-effort: eine fehlgeschlagene Benachrichtigung darf eine
         // erfolgreiche Aktivierung nicht als Fehler erscheinen lassen.
@@ -1057,6 +1061,22 @@ final readonly class TravelPlanningService
             }
         } catch (\Throwable $e) {
             $this->logger->error('Travel planning rollback failed', [
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Best-effort-Chat-Sync nach dem Commit: darf den Erfolg der Aktivierung
+     * nicht als Fehler erscheinen lassen.
+     */
+    private function syncTripMembersSafely(string $tripId): void
+    {
+        try {
+            $this->chatService->syncTripMembers($tripId);
+        } catch (\Throwable $e) {
+            $this->logger->error('Travel planning activation chat sync failed', [
+                'tripId' => $tripId,
                 'message' => $e->getMessage(),
             ]);
         }
