@@ -120,7 +120,7 @@ final readonly class ArcadeGameService
     public function buildPlayUrl(string $slug, ?string $token = null): string
     {
         $base = rtrim((string) ($this->settings->app['url'] ?? ''), '/');
-        $url = $base . '/arcade/' . rawurlencode($slug) . '/index.html';
+        $url = $base . '/api/arcade/' . rawurlencode($slug) . '/index.html';
 
         if ($token !== null && $token !== '') {
             $url .= '#arcade_token=' . rawurlencode($token);

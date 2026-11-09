@@ -112,7 +112,7 @@ unverändert). Alternativ manuell im Admin-Dashboard unter `/admin/arcade`:
 | Slug | `rocket-boost` |
 | Titel | `Rocket Boost` |
 | Beschreibung | `Flieg die Rakete durch die Korridore der Raumstation.` |
-| Thumbnail-URL | `/arcade/rocket-boost/thumbnail.png` |
+| Thumbnail-URL | `/api/arcade/rocket-boost/thumbnail.png` |
 | Score-Richtung | `desc` |
 | Aktiv | ja |
 

@@ -88,7 +88,7 @@ mitgelöscht.
 ## API-Endpoints
 
 Alle folgenden Pfade sind relativ zum API-Basispfad `/api/v2` (die statische
-Play-URL liegt dagegen unter `<APP_URL>/arcade/<slug>/index.html`).
+Play-URL liegt dagegen unter `<APP_URL>/api/arcade/<slug>/index.html`).
 
 Alle `/arcade/games/...`-Endpoints erfordern ein gültiges JWT im
 `Authorization: Bearer <token>`-Header. Die spiel-internen Endpoints
@@ -121,7 +121,7 @@ Antwort auf die Ausstellung:
 {
   "token": "…",
   "expiresAt": "2026-11-01T16:15:00Z",
-  "playUrl": "https://api.example.com/arcade/rocket-boost/index.html#arcade_token=…"
+  "playUrl": "https://api.example.com/api/arcade/rocket-boost/index.html#arcade_token=…"
 }
 ```
 
@@ -250,8 +250,9 @@ WASM-Binary müssen aus derselben Go-Version stammen.
 
 ## Auslieferung & Webserver
 
-- Die Root-`.htaccess` leitet `^arcade/<slug>/…` auf
-  `public/arcade/<slug>/…` um. Nur harmlose Pfadzeichen sind erlaubt; Segmente
+- Die `.htaccess` der API (deployt unter `/api/`) leitet `^arcade/<slug>/…`
+  auf `public/arcade/<slug>/…` um; öffentlich erreichbar sind die Spiele damit
+  unter `/api/arcade/<slug>/…`. Nur harmlose Pfadzeichen sind erlaubt; Segmente
   dürfen nicht mit `.` beginnen (keine Dotfiles/Secrets).
 - `public/.htaccess` blockiert zusätzlich Dotfiles und typische Secret-/Quell-
   text-Dateien (`.env`, `.log`, `.sql`, `.md`, `.sh`, …) auch beim direkten
@@ -265,7 +266,7 @@ WASM-Binary müssen aus derselben Go-Version stammen.
   blockiert.
 - `Options -Indexes` bleibt aktiv. Die bestehenden Blockierungen für `src/`,
   `config/`, `vendor/`, `docs/`, `.env`, `.sql`, `.md` usw. bleiben unverändert.
-- `APP_URL` muss auf den Host zeigen, unter dem `/arcade/...` erreichbar ist
+- `APP_URL` muss auf den Host zeigen, unter dem `/api/arcade/...` erreichbar ist
   (üblicherweise derselbe API-Host).
 
 ## Admin-Dashboard

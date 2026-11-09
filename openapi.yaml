@@ -7367,7 +7367,7 @@ components:
           type: integer
         playUrl:
           type: string
-          description: Basis-Play-URL ohne Token (`<APP_URL>/arcade/<slug>/index.html`)
+          description: Basis-Play-URL ohne Token (`<APP_URL>/api/arcade/<slug>/index.html`)
         createdAt:
           type: string
           format: date-time

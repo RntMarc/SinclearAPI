@@ -15,7 +15,7 @@ VALUES
     'rocket-boost',
     'Rocket Boost',
     'Flieg die Rakete durch die Korridore der Raumstation.',
-    '/arcade/rocket-boost/thumbnail.png',
+    '/api/arcade/rocket-boost/thumbnail.png',
     'desc',
     1,
     0,
