@@ -11,6 +11,10 @@ use Sinclear\Api\Security\Auth\AuthenticatedUser;
 
 final readonly class TokenService
 {
+    public const string ADMIN_SCOPE = 'admin';
+
+    private const int ADMIN_ACCESS_TTL = 1200;
+
     public function __construct(
         private Settings $settings,
         private RefreshTokenRepository $refreshTokenRepo,
@@ -31,6 +35,34 @@ final readonly class TokenService
         ];
 
         return $this->encodeJwt($payload);
+    }
+
+    /**
+     * Stellt einen kurzlebigen, nicht-refreshbaren Admin-Token aus. Wird nach
+     * erfolgreichem Step-up-OTP (erneute Admin-Bestätigung) verwendet und
+     * traegt einen eigenen `scope`-Claim, damit er klar vom normalen
+     * Access-Token unterscheidbar ist.
+     */
+    public function createAdminAccessToken(AuthenticatedUser $user): string
+    {
+        $now = time();
+        $payload = [
+            'iss' => $this->settings->jwt['issuer'],
+            'sub' => $user->id,
+            'email' => $user->email,
+            'isAdmin' => true,
+            'scope' => self::ADMIN_SCOPE,
+            'jti' => $user->jti,
+            'iat' => $now,
+            'exp' => $now + self::ADMIN_ACCESS_TTL,
+        ];
+
+        return $this->encodeJwt($payload);
+    }
+
+    public function getAdminAccessTtl(): int
+    {
+        return self::ADMIN_ACCESS_TTL;
     }
 
     public function validateAccessToken(string $token): ?object

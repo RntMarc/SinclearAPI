@@ -54,10 +54,27 @@ final readonly class OtpService
         $this->mailer->send($emailMessage);
     }
 
-    public function storeCode(string $email, string $code): void
+    public function sendAdminOtpEmail(string $email, string $code): void
+    {
+        $emailMessage = (new Email())
+            ->from($this->fromAddress)
+            ->to($email)
+            ->subject('Dein Admin-Bestätigungscode für Sinclear Beyond')
+            ->html(
+                strtr(
+                    file_get_contents(__DIR__ . '/../../../templates/otp-email.php') ?: '',
+                    ['{{code}}' => $code],
+                )
+            )
+            ->text("Dein Admin-Bestätigungscode für Sinclear Beyond: $code\n\nDer Code ist 10 Minuten gültig.");
+
+        $this->mailer->send($emailMessage);
+    }
+
+    public function storeCode(string $email, string $code, string $type = OtpTokenRepository::TYPE_EMAIL_OTP): void
     {
         $expiresAt = new DateTimeImmutable('+' . self::CODE_TTL . ' seconds');
-        $this->otpTokenRepo->create($email, $code, $expiresAt, OtpTokenRepository::TYPE_EMAIL_OTP);
+        $this->otpTokenRepo->create($email, $code, $expiresAt, $type);
     }
 
     public function isCodeExpired(\DateTimeInterface $expiresAt): bool

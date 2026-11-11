@@ -6,6 +6,10 @@ Das Admin-Dashboard ist ein einfaches Web-Interface unter `/api/v2/admin/*`,
 das ausschließlich für Administratoren zugänglich ist. Es dient zu Test- und
 Verwaltungszwecken und verwendet PHP-Sessions für die Authentifizierung.
 
+> **Hinweis:** Für den Flutter-Client existiert zusätzlich eine
+> JWT-basierte JSON-API unter `/api/v2/admin-api/*` mit Step-up-OTP für
+> Schreibzugriffe. Siehe [Admin-JSON-API](api.md).
+
 ## Authentifizierung
 
 1. Admin ruft `/api/v2/admin/login` auf

@@ -2,6 +2,19 @@
 
 use Psr\Container\ContainerInterface;
 use Sinclear\Api\Controllers\AdminController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiArcadeController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiAuthController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiDashboardController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiExternalDataCacheController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiForumController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiModerationRequestController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiNotificationController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiPollController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiRecipeController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiSubmissionController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiSubscriptionController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiTravelController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiUserController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
@@ -43,6 +56,7 @@ use Sinclear\Api\Controllers\ArcadeSessionController;
 use Sinclear\Api\Controllers\ArcadeScoreController;
 use Sinclear\Api\Middleware\ArcadeSessionMiddleware;
 use Sinclear\Api\Middleware\AdminMiddleware;
+use Sinclear\Api\Middleware\AdminApiMiddleware;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
 use Sinclear\Api\Middleware\LaMetricTokenMiddleware;
@@ -644,4 +658,113 @@ return function (App $app): void {
         $group->delete('/external-data-cache/{id}', [AdminController::class, 'deleteExternalDataCacheEntry']);
         $group->delete('/external-data-cache', [AdminController::class, 'clearExternalDataCache']);
     })->add($container->get(AdminMiddleware::class));
+
+    // Admin-JSON-API fuer den Flutter-Client (`/admin-api/*`).
+    //
+    // Lese-Zugriffe + Step-up-Auth verlangen einen normalen Access-Token mit
+    // isAdmin=true; Schreibzugriffe verlangen einen kurzlebigen
+    // Step-up-Admin-Token (scope='admin'). HTTPS wird erzwungen.
+
+    $adminApiRead = $container->get('admin.api.read');
+    $adminApiWrite = $container->get('admin.api.write');
+    $requireHttps = $container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class);
+
+    $app->group('/admin-api', function (RouteCollectorProxy $group) {
+        // Step-up-Authentifizierung
+        $group->post('/auth/otp/request', [AdminApiAuthController::class, 'otpRequest']);
+        $group->post('/auth/otp/verify', [AdminApiAuthController::class, 'otpVerify']);
+
+        // Lesen
+        $group->get('/dashboard', [AdminApiDashboardController::class, 'dashboard']);
+        $group->get('/users', [AdminApiUserController::class, 'index']);
+        $group->get('/forums', [AdminApiForumController::class, 'index']);
+        $group->get('/arcade', [AdminApiArcadeController::class, 'index']);
+        $group->get('/recipes', [AdminApiRecipeController::class, 'index']);
+        $group->get('/polls', [AdminApiPollController::class, 'index']);
+        $group->get('/polls/{id}', [AdminApiPollController::class, 'detail']);
+        $group->get('/travel', [AdminApiTravelController::class, 'travel']);
+        $group->get('/travel/trips/{id}', [AdminApiTravelController::class, 'tripDetail']);
+        $group->get('/travel/events/{id}', [AdminApiTravelController::class, 'eventDetail']);
+        $group->get('/explore/submissions', [AdminApiSubmissionController::class, 'index']);
+        $group->get('/explore/submissions/{id}', [AdminApiSubmissionController::class, 'detail']);
+        $group->get('/subscriptions', [AdminApiSubscriptionController::class, 'index']);
+        $group->get('/subscriptions/{id}', [AdminApiSubscriptionController::class, 'detail']);
+        $group->get('/moderation-requests', [AdminApiModerationRequestController::class, 'index']);
+        $group->get('/moderation-requests/{id}', [AdminApiModerationRequestController::class, 'detail']);
+        $group->get('/notifications', [AdminApiNotificationController::class, 'index']);
+        $group->get('/external-data-cache', [AdminApiExternalDataCacheController::class, 'index']);
+    })->add($adminApiRead)->add($requireHttps);
+
+    $app->group('/admin-api', function (RouteCollectorProxy $group) {
+        // Reisen & Events
+        $group->post('/travel/trips', [AdminApiTravelController::class, 'createTrip']);
+        $group->put('/travel/trips/{id}', [AdminApiTravelController::class, 'updateTrip']);
+        $group->delete('/travel/trips/{id}', [AdminApiTravelController::class, 'deleteTrip']);
+        $group->post('/travel/trips/{id}/chat', [AdminApiTravelController::class, 'createTripChat']);
+        $group->delete('/travel/trips/{id}/chat', [AdminApiTravelController::class, 'deleteTripChat']);
+        $group->patch('/travel/trips/{id}/chat', [AdminApiTravelController::class, 'updateTripChatImage']);
+        $group->post('/travel/trips/{id}/participants', [AdminApiTravelController::class, 'addTripParticipant']);
+        $group->delete('/travel/trips/{id}/participants/{userId}', [AdminApiTravelController::class, 'removeTripParticipant']);
+        $group->put('/travel/trips/{id}/participants/{userId}/role', [AdminApiTravelController::class, 'setTripParticipantRole']);
+        $group->put('/travel/trips/{id}/participants/{userId}/accommodation', [AdminApiTravelController::class, 'updateParticipantAccommodation']);
+        $group->put('/travel/trips/{id}/forum', [AdminApiTravelController::class, 'linkTripForum']);
+        $group->post('/travel/trips/{id}/subscriptions', [AdminApiTravelController::class, 'linkTripSubscription']);
+        $group->delete('/travel/trips/{id}/subscriptions/{subscriptionId}', [AdminApiTravelController::class, 'unlinkTripSubscription']);
+        $group->post('/travel/trips/{id}/accommodations', [AdminApiTravelController::class, 'createTripAccommodation']);
+        $group->put('/travel/trips/{id}/accommodations/{accId}', [AdminApiTravelController::class, 'updateTripAccommodation']);
+        $group->delete('/travel/trips/{id}/accommodations/{accId}', [AdminApiTravelController::class, 'deleteTripAccommodation']);
+        $group->delete('/travel/accommodations/{id}', [AdminApiTravelController::class, 'deleteAccommodationGlobally']);
+        $group->post('/travel/events', [AdminApiTravelController::class, 'createEvent']);
+        $group->put('/travel/events/{id}', [AdminApiTravelController::class, 'updateEvent']);
+        $group->delete('/travel/events/{id}', [AdminApiTravelController::class, 'deleteEvent']);
+        $group->post('/travel/events/{id}/chat', [AdminApiTravelController::class, 'createEventChat']);
+        $group->delete('/travel/events/{id}/chat', [AdminApiTravelController::class, 'deleteEventChat']);
+        $group->patch('/travel/events/{id}/chat', [AdminApiTravelController::class, 'updateEventChatImage']);
+        $group->post('/travel/events/{id}/participants', [AdminApiTravelController::class, 'addEventParticipant']);
+        $group->delete('/travel/events/{id}/participants/{userId}', [AdminApiTravelController::class, 'removeEventParticipant']);
+        $group->put('/travel/events/{id}/participants/{userId}/role', [AdminApiTravelController::class, 'setEventParticipantRole']);
+        $group->patch('/travel/events/{id}/trip', [AdminApiTravelController::class, 'convertEventTrip']);
+        $group->post('/travel/tickets', [AdminApiTravelController::class, 'createTicket']);
+        $group->put('/travel/tickets/{id}', [AdminApiTravelController::class, 'updateTicket']);
+        $group->delete('/travel/tickets/{id}', [AdminApiTravelController::class, 'deleteTicket']);
+
+        // Foren
+        $group->post('/forums', [AdminApiForumController::class, 'create']);
+        $group->put('/forums/{id}', [AdminApiForumController::class, 'update']);
+        $group->delete('/forums/{id}', [AdminApiForumController::class, 'delete']);
+
+        // Subscriptions
+        $group->post('/subscriptions', [AdminApiSubscriptionController::class, 'create']);
+        $group->put('/subscriptions/{id}', [AdminApiSubscriptionController::class, 'update']);
+        $group->delete('/subscriptions/{id}', [AdminApiSubscriptionController::class, 'delete']);
+        $group->post('/subscriptions/{id}/participants', [AdminApiSubscriptionController::class, 'addParticipant']);
+        $group->put('/subscriptions/{id}/participants/{participantId}', [AdminApiSubscriptionController::class, 'updateParticipant']);
+        $group->delete('/subscriptions/{id}/participants/{participantId}', [AdminApiSubscriptionController::class, 'removeParticipant']);
+
+        // Polls
+        $group->post('/polls/{id}/close', [AdminApiPollController::class, 'close']);
+        $group->delete('/polls/{id}', [AdminApiPollController::class, 'delete']);
+
+        // Einreichungen
+        $group->post('/explore/submissions/{id}/approve', [AdminApiSubmissionController::class, 'approve']);
+        $group->post('/explore/submissions/{id}/reject', [AdminApiSubmissionController::class, 'reject']);
+
+        // Moderation
+        $group->post('/moderation-requests/{id}/update', [AdminApiModerationRequestController::class, 'update']);
+
+        // Notifications
+        $group->post('/notifications/send', [AdminApiNotificationController::class, 'send']);
+
+        // Arcade
+        $group->post('/arcade', [AdminApiArcadeController::class, 'create']);
+        $group->put('/arcade/{id}', [AdminApiArcadeController::class, 'update']);
+        $group->delete('/arcade/{id}', [AdminApiArcadeController::class, 'delete']);
+
+        // Rezepte
+        $group->delete('/recipes/{id}', [AdminApiRecipeController::class, 'delete']);
+
+        // Externe Daten – Cache
+        $group->delete('/external-data-cache/{id}', [AdminApiExternalDataCacheController::class, 'deleteEntry']);
+        $group->delete('/external-data-cache', [AdminApiExternalDataCacheController::class, 'clear']);
+    })->add($adminApiWrite)->add($requireHttps);
 };

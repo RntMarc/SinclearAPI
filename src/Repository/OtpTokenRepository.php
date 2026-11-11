@@ -11,6 +11,7 @@ final readonly class OtpTokenRepository
     public const TYPE_EMAIL_OTP = 'email_otp';
     public const TYPE_DISCORD_PAIRING = 'discord_pairing';
     public const TYPE_DISCORD_RELINK = 'discord_relink';
+    public const TYPE_ADMIN_STEPUP = 'admin_stepup';
 
     public function __construct(
         private PDO $pdo,
@@ -40,6 +41,11 @@ final readonly class OtpTokenRepository
     public function findValidDiscordRelink(string $code): ?array
     {
         return $this->findValidByCodeAndType($code, self::TYPE_DISCORD_RELINK);
+    }
+
+    public function findValidAdminStepup(string $email, string $code): ?array
+    {
+        return $this->findValidByCodeAndType($code, self::TYPE_ADMIN_STEPUP, $email);
     }
 
     private function findValidByCodeAndType(string $code, string $type, ?string $email = null): ?array

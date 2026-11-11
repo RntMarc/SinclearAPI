@@ -12,6 +12,19 @@ use PDO;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Sinclear\Api\Controllers\AdminController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiArcadeController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiAuthController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiDashboardController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiExternalDataCacheController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiForumController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiModerationRequestController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiNotificationController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiPollController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiRecipeController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiSubmissionController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiSubscriptionController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiTravelController;
+use Sinclear\Api\Controllers\AdminApi\AdminApiUserController;
 use Sinclear\Api\Controllers\AppController;
 use Sinclear\Api\Controllers\AuthController;
 use Sinclear\Api\Controllers\CalendarEventController;
@@ -47,6 +60,7 @@ use Sinclear\Api\Controllers\ArcadeSessionController;
 use Sinclear\Api\Controllers\ArcadeScoreController;
 use Sinclear\Api\Middleware\ArcadeSessionMiddleware;
 use Sinclear\Api\Middleware\AdminMiddleware;
+use Sinclear\Api\Middleware\AdminApiMiddleware;
 use Sinclear\Api\Middleware\CentrifugoProxyMiddleware;
 use Sinclear\Api\Repository\CalendarEventRepository;
 use Sinclear\Api\Repository\ChatConversationRepository;
@@ -68,7 +82,9 @@ use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Repository\UserActivityRepository;
 use Sinclear\Api\Repository\UserUpdateRepository;
 use Sinclear\Api\Security\Policy\UserPolicy;
+use Sinclear\Api\Security\Policy\AdminPolicy;
 use Sinclear\Api\Services\UserService;
+use Sinclear\Api\Services\AdminAuditService;
 use Sinclear\Api\Services\UserPreferenceService;
 use Sinclear\Api\Services\UserActivityService;
 use Sinclear\Api\Middleware\AuthenticationMiddleware;
@@ -148,6 +164,7 @@ use Sinclear\Api\Repository\GameAccountRepository;
 use Sinclear\Api\Repository\ArcadeGameRepository;
 use Sinclear\Api\Repository\ArcadeSessionRepository;
 use Sinclear\Api\Repository\ArcadeScoreRepository;
+use Sinclear\Api\Repository\AdminAuditLogRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Services\CalendarEventService;
 use Sinclear\Api\Services\CalendarFeedService;
@@ -607,6 +624,40 @@ return [
     AdminMiddleware::class => create(),
 
     AdminController::class => autowire(),
+
+    // Admin-JSON-API (`/admin-api/*`) — JWT-basiert, getrennt vom session-basierten
+    // HTML-Dashboard. Lesen = normaler Access-Token mit isAdmin; Schreiben =
+    // kurzlebiger Step-up-Admin-Token (scope='admin').
+    'admin.api.read' => function (ContainerInterface $c): AdminApiMiddleware {
+        return new AdminApiMiddleware(
+            tokenService: $c->get(TokenService::class),
+            requireElevated: false,
+        );
+    },
+    'admin.api.write' => function (ContainerInterface $c): AdminApiMiddleware {
+        return new AdminApiMiddleware(
+            tokenService: $c->get(TokenService::class),
+            requireElevated: true,
+        );
+    },
+
+    AdminPolicy::class => autowire(),
+    AdminAuditLogRepository::class => autowire(),
+    AdminAuditService::class => autowire(),
+
+    AdminApiAuthController::class => autowire(),
+    AdminApiDashboardController::class => autowire(),
+    AdminApiUserController::class => autowire(),
+    AdminApiTravelController::class => autowire(),
+    AdminApiForumController::class => autowire(),
+    AdminApiSubscriptionController::class => autowire(),
+    AdminApiPollController::class => autowire(),
+    AdminApiSubmissionController::class => autowire(),
+    AdminApiModerationRequestController::class => autowire(),
+    AdminApiNotificationController::class => autowire(),
+    AdminApiArcadeController::class => autowire(),
+    AdminApiRecipeController::class => autowire(),
+    AdminApiExternalDataCacheController::class => autowire(),
 
     UserActivityRepository::class => autowire(),
     UserActivityService::class => autowire(),

@@ -40,6 +40,16 @@ components:
       in: cookie
       name: PHPSESSID
       description: PHP-Session-Cookie des Admin-Dashboards (nach OTP-Login).
+    AdminStepUpToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Kurzlebiger Step-up-Admin-Token (scope='admin', 20 Minuten,
+        nicht-refreshbar). Wird nach erneuter OTP-Bestätigung über
+        `POST /admin-api/auth/otp/verify` ausgestellt und für mutierende
+        `/admin-api/*`-Endpoints benötigt. Lese-Endpoints akzeptieren den
+        normalen Access-Token (BearerAuth) mit isAdmin=true.
 
   parameters:
     PollId:
@@ -582,6 +592,739 @@ components:
         image:
           type: string
           nullable: true
+
+    AdminStepUpVerifyRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: 6-stelliger Code aus der Admin-Bestätigungs-E-Mail
+          example: '482731'
+
+    AdminStepUpTokenResponse:
+      type: object
+      required: [access_token, expires_in, token_type]
+      properties:
+        access_token:
+          type: string
+          description: Kurzlebiger Step-up-Admin-Token (JWT, scope='admin')
+        expires_in:
+          type: integer
+          description: Gültigkeitsdauer in Sekunden
+          example: 1200
+        token_type:
+          type: string
+          enum: [Bearer]
+
+    AdminDashboardResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [userCount, tripCount, openModerationCount, externalDataCacheCount]
+          properties:
+            userCount:
+              type: integer
+            tripCount:
+              type: integer
+            openModerationCount:
+              type: integer
+            externalDataCacheCount:
+              type: integer
+
+    AdminForum:
+      type: object
+      required: [id, name, memberCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminRecipe:
+      type: object
+      required: [id, title, category, isDraft]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          type: string
+        creatorDisplayName:
+          type: string
+          nullable: true
+        avgRating:
+          type: number
+          format: float
+          nullable: true
+        ratingCount:
+          type: integer
+        isDraft:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminArcadeGame:
+      type: object
+      required: [id, slug, title, scoreDirection, isActive, sortOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+        scoreDirection:
+          type: string
+          enum: [asc, desc]
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+        playUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminPoll:
+      type: object
+      required: [id, type, title, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        accessMode:
+          type: string
+        closesAt:
+          type: string
+          format: date-time
+          nullable: true
+        creatorDisplayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminPollQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        isRequired:
+          type: boolean
+
+    AdminPollOption:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+          nullable: true
+        allDay:
+          type: boolean
+        startDate:
+          type: string
+          nullable: true
+        endDate:
+          type: string
+          nullable: true
+        startAt:
+          type: string
+          nullable: true
+        endAt:
+          type: string
+          nullable: true
+        isCounterProposal:
+          type: boolean
+        votes:
+          type: integer
+
+    AdminPollDetail:
+      type: object
+      required: [id, type, title, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+        accessMode:
+          type: string
+        closesAt:
+          type: string
+          format: date-time
+          nullable: true
+        creatorDisplayName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminPollQuestion'
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminPollOption'
+        invites:
+          type: array
+          items:
+            type: object
+        responses:
+          type: array
+          items:
+            type: object
+        availabilityCount:
+          type: integer
+
+    AdminSubscription:
+      type: object
+      required: [id, name, basePrice]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        billingPeriodStart:
+          type: string
+          nullable: true
+        billingPeriodEnd:
+          type: string
+          nullable: true
+        basePrice:
+          type: number
+          format: float
+        participantCount:
+          type: integer
+
+    AdminSubscriptionParticipant:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+          nullable: true
+        isUser:
+          type: boolean
+        userName:
+          type: string
+          nullable: true
+        userDisplayName:
+          type: string
+          nullable: true
+        hasPaid:
+          type: boolean
+
+    AdminSubscriptionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        billingPeriodStart:
+          type: string
+          nullable: true
+        billingPeriodEnd:
+          type: string
+          nullable: true
+        basePrice:
+          type: number
+          format: float
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminSubscriptionParticipant'
+
+    AdminSubmission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          format: float
+        longitude:
+          type: number
+          format: float
+        photo:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Bild
+        mapLink:
+          type: string
+          nullable: true
+        website:
+          type: string
+          nullable: true
+        rating:
+          type: integer
+          nullable: true
+        comment:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        status:
+          type: string
+        adminNote:
+          type: string
+          nullable: true
+        targetPlaceId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminModerationRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        userDisplayName:
+          type: string
+          nullable: true
+        userImage:
+          type: string
+          nullable: true
+        requestType:
+          type: string
+        objectType:
+          type: string
+        objectId:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+        adminComment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AdminTrip:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        allDay:
+          type: boolean
+        timezone:
+          type: string
+        startDate:
+          type: string
+          nullable: true
+        endDate:
+          type: string
+          nullable: true
+        startAtLocal:
+          type: string
+          nullable: true
+        endAtLocal:
+          type: string
+          nullable: true
+        hastickets:
+          type: string
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          nullable: true
+
+    AdminEvent:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+        allDay:
+          type: boolean
+        timezone:
+          type: string
+        startDate:
+          type: string
+          nullable: true
+        endDate:
+          type: string
+          nullable: true
+        startAtLocal:
+          type: string
+          nullable: true
+        endAtLocal:
+          type: string
+          nullable: true
+        hastickets:
+          type: string
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        organizer:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: string
+          nullable: true
+        longitude:
+          type: string
+          nullable: true
+        OSMID:
+          type: string
+          nullable: true
+        citySlug:
+          type: string
+          nullable: true
+
+    AdminTripParticipant:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [leader, participant]
+        accommodation:
+          type: string
+          nullable: true
+
+    AdminEventParticipant:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [leader, participant]
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminChatInfo:
+      type: object
+      properties:
+        active:
+          type: boolean
+        conversationId:
+          type: string
+          nullable: true
+        memberCount:
+          type: integer
+          nullable: true
+        image:
+          type: string
+          nullable: true
+
+    AdminTripDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        allDay:
+          type: boolean
+        timezone:
+          type: string
+        startDate:
+          type: string
+          nullable: true
+        endDate:
+          type: string
+          nullable: true
+        startAtLocal:
+          type: string
+          nullable: true
+        endAtLocal:
+          type: string
+          nullable: true
+        hastickets:
+          type: string
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          nullable: true
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminTripParticipant'
+        accommodations:
+          type: array
+          items:
+            $ref: '#/components/schemas/TravelAccommodation'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminEvent'
+        forum:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        subscriptions:
+          type: array
+          items:
+            type: object
+        chat:
+          $ref: '#/components/schemas/AdminChatInfo'
+
+    AdminEventDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        trip:
+          type: string
+          format: uuid
+          nullable: true
+        isStandalone:
+          type: boolean
+        allDay:
+          type: boolean
+        timezone:
+          type: string
+        startDate:
+          type: string
+          nullable: true
+        endDate:
+          type: string
+          nullable: true
+        startAtLocal:
+          type: string
+          nullable: true
+        endAtLocal:
+          type: string
+          nullable: true
+        hastickets:
+          type: string
+        ticket:
+          type: string
+          nullable: true
+        ticketUrl:
+          type: string
+          nullable: true
+        url:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        organizer:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        latitude:
+          type: string
+          nullable: true
+        longitude:
+          type: string
+          nullable: true
+        OSMID:
+          type: string
+          nullable: true
+        citySlug:
+          type: string
+          nullable: true
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminEventParticipant'
+        chat:
+          $ref: '#/components/schemas/AdminChatInfo'
+
+    AdminAuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        adminId:
+          type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+          nullable: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminNotificationEntities:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            type: object
+        trips:
+          type: array
+          items:
+            type: object
+        events:
+          type: array
+          items:
+            type: object
+        subscriptions:
+          type: array
+          items:
+            type: object
+        feedback:
+          type: array
+          items:
+            type: object
+        calendarEvents:
+          type: array
+          items:
+            type: object
+        forumPosts:
+          type: array
+          items:
+            type: object
+        polls:
+          type: array
+          items:
+            type: object
 
     RefreshRequest:
       type: object
@@ -23055,6 +23798,1795 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Spiel nicht gefunden (`game_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/auth/otp/request:
+    post:
+      summary: Admin-Step-up-OTP anfordern
+      description: >
+        Fordert einen OTP-Code für die erneute Admin-Bestätigung an. Der Code
+        wird an die E-Mail des angemeldeten Admins gesendet (aus dem JWT
+        ermittelt, kein freies E-Mail-Feld). Erfordert einen normalen
+        Access-Token mit isAdmin=true.
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OTP gesendet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpSentResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Zu viele Anfragen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/auth/otp/verify:
+    post:
+      summary: Admin-Step-up-OTP verifizieren
+      description: >
+        Verifiziert den OTP-Code und stellt einen kurzlebigen Admin-Token
+        (scope='admin', 20 Minuten, nicht-refreshbar) aus. Erfordert einen
+        normalen Access-Token mit isAdmin=true.
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminStepUpVerifyRequest'
+      responses:
+        '200':
+          description: Admin-Token ausgestellt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStepUpTokenResponse'
+        '400':
+          description: Ungültiger oder abgelaufener Code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/dashboard:
+    get:
+      summary: Admin-Dashboard-Kennzahlen
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Kennzahlen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/users:
+    get:
+      summary: Nutzerliste
+      description: Alle Nutzer, optional per `q` nach Name oder E-Mail gefiltert.
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Nutzerliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminUser'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/forums:
+    get:
+      summary: Forenliste
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Forenliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminForum'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Forum anlegen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Forum angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Name fehlt (`name_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/forums/{id}:
+    put:
+      summary: Forum bearbeiten
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Forum aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '404':
+          description: Forum nicht gefunden (`forum_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Forum löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Forum gelöscht
+        '404':
+          description: Forum nicht gefunden (`forum_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/arcade:
+    get:
+      summary: Arcade-Spiele (inkl. inaktive)
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Arcade-Spiele
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminArcadeGame'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Arcade-Spiel anlegen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [slug, title]
+              properties:
+                slug:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                  nullable: true
+                thumbnailUrl:
+                  type: string
+                  nullable: true
+                scoreDirection:
+                  type: string
+                  enum: [asc, desc]
+                isActive:
+                  type: boolean
+                sortOrder:
+                  type: integer
+      responses:
+        '201':
+          description: Spiel angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminArcadeGame'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/arcade/{id}:
+    put:
+      summary: Arcade-Spiel bearbeiten
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Spiel aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminArcadeGame'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Arcade-Spiel löschen (inkl. Sessions/Scores)
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Spiel gelöscht
+        '404':
+          description: Spiel nicht gefunden (`game_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/recipes:
+    get:
+      summary: Rezeptliste (inkl. Entwürfe)
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Rezeptliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminRecipe'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/recipes/{id}:
+    delete:
+      summary: Rezept löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Rezept gelöscht
+        '404':
+          description: Rezept nicht gefunden (`recipe_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/polls:
+    get:
+      summary: Umfragen-Übersicht
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Umfragenliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminPoll'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/polls/{id}:
+    get:
+      summary: Umfrage-Details
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Umfrage-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminPollDetail'
+        '404':
+          description: Umfrage nicht gefunden (`poll_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Umfrage löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Umfrage gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/polls/{id}/close:
+    post:
+      summary: Umfrage schließen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Umfrage geschlossen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/travel:
+    get:
+      summary: Reisen & Events (JSON)
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Reisen und Events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trips:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminTrip'
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminEvent'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/travel/trips:
+    post:
+      summary: Reise anlegen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateTripRequest'
+      responses:
+        '201':
+          description: Reise angelegt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTripResponse'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/travel/trips/{id}:
+    get:
+      summary: Reise-Details
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Reise-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminTripDetail'
+        '404':
+          description: Reise nicht gefunden (`trip_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Reise bearbeiten
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateTripRequest'
+      responses:
+        '200':
+          description: Reise aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminTripResponse'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Reise löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Reise gelöscht
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/travel/events:
+    post:
+      summary: Event anlegen (Reise- oder Standalone-Event)
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateEventRequest'
+      responses:
+        '201':
+          description: Event angelegt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEventResponse'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/travel/events/{id}:
+    get:
+      summary: Event-Details
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminEventDetail'
+        '404':
+          description: Event nicht gefunden (`event_not_found`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Event bearbeiten
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateEventRequest'
+      responses:
+        '200':
+          description: Event aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEventResponse'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Event löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Event gelöscht
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/explore/submissions:
+    get:
+      summary: Orte-Einreichungen
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Einreichungen mit Zählern
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminSubmission'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  counts:
+                    type: object
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/explore/submissions/{id}:
+    get:
+      summary: Einreichungs-Details
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Einreichung
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminSubmission'
+        '404':
+          description: Einreichung nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/explore/submissions/{id}/approve:
+    post:
+      summary: Einreichung freigeben (zu Ort überführen)
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [osmId, osmType]
+              properties:
+                osmId:
+                  type: integer
+                osmType:
+                  type: string
+                  enum: [N, W, R]
+                adminNote:
+                  type: string
+      responses:
+        '200':
+          description: Einreichung freigegeben
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/explore/submissions/{id}/reject:
+    post:
+      summary: Einreichung ablehnen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adminNote]
+              properties:
+                adminNote:
+                  type: string
+      responses:
+        '200':
+          description: Einreichung abgelehnt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminSubmission'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/subscriptions:
+    get:
+      summary: Abo-Liste
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Abo-Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminSubscription'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Abo anlegen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, billingPeriodStart, billingPeriodEnd, basePrice]
+              properties:
+                name:
+                  type: string
+                billingPeriodStart:
+                  type: string
+                billingPeriodEnd:
+                  type: string
+                basePrice:
+                  type: number
+                  format: float
+      responses:
+        '201':
+          description: Abo angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminSubscription'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/subscriptions/{id}:
+    get:
+      summary: Abo-Details
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Abo-Details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminSubscriptionDetail'
+        '404':
+          description: Abo nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Abo bearbeiten
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                billingPeriodStart:
+                  type: string
+                billingPeriodEnd:
+                  type: string
+                basePrice:
+                  type: number
+                  format: float
+      responses:
+        '200':
+          description: Abo aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminSubscription'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Abo löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Abo gelöscht
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/moderation-requests:
+    get:
+      summary: Moderations-Anfragen
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: objectType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: requestType
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Anfragen mit Zählern
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminModerationRequest'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  counts:
+                    type: object
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/moderation-requests/{id}:
+    get:
+      summary: Moderations-Anfrage Details
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Anfrage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminModerationRequest'
+        '404':
+          description: Anfrage nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/moderation-requests/{id}/update:
+    post:
+      summary: Status + Admin-Kommentar setzen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                adminComment:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Anfrage aktualisiert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AdminModerationRequest'
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/notifications:
+    get:
+      summary: Entitäten für Benachrichtigungs-Vorlagen
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Entitäten
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminNotificationEntities'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/notifications/send:
+    post:
+      summary: Test-/Rundschreiben-Benachrichtigung senden
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, type]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+                type:
+                  type: string
+                title:
+                  type: string
+                body:
+                  type: string
+                data:
+                  type: array
+      responses:
+        '201':
+          description: Benachrichtigung gesendet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  notificationId:
+                    type: string
+                  sentTo:
+                    type: string
+        '400':
+          description: Validierungsfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/external-data-cache:
+    get:
+      summary: External-Data-Cache-Einträge
+      tags: [Admin API]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: data_type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cache-Einträge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Kein Admin-Zugriff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: External-Data-Cache leeren (optional per data_type)
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: data_type
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cache geleert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  deleted:
+                    type: integer
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin-api/external-data-cache/{id}:
+    delete:
+      summary: Einzelnen Cache-Eintrag löschen
+      tags: [Admin API]
+      security:
+        - AdminStepUpToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Eintrag gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          description: Eintrag nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Step-up-Token fehlt
           content:
             application/json:
               schema:
