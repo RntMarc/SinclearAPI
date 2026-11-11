@@ -76,6 +76,47 @@ final readonly class UserController
         return ResponseFactory::json(['data' => $this->userService->formatContactInfo($user->id, $contact)], 200, $response);
     }
 
+    public function listCloseFriends(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $requester = $this->requireUser($request);
+        $friends = $this->userService->listCloseFriends($requester);
+        return ResponseFactory::json(['data' => $friends], 200, $response);
+    }
+
+    /** @param array<string, string> $args */
+    public function addCloseFriend(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $requester = $this->requireUser($request);
+        $friendId = (string) $args['userId'];
+
+        if ($friendId === $requester->id) {
+            return ResponseFactory::json(['error' => 'cannot_add_self'], 400, $response);
+        }
+
+        if ($this->userService->getUser($friendId) === null) {
+            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
+        }
+
+        $this->userService->addCloseFriend($requester->id, $friendId);
+
+        return ResponseFactory::json(['data' => ['userId' => $friendId, 'isCloseFriend' => true]], 200, $response);
+    }
+
+    /** @param array<string, string> $args */
+    public function removeCloseFriend(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $requester = $this->requireUser($request);
+        $friendId = (string) $args['userId'];
+
+        if ($this->userService->getUser($friendId) === null) {
+            return ResponseFactory::json(['error' => 'user_not_found'], 404, $response);
+        }
+
+        $this->userService->removeCloseFriend($requester->id, $friendId);
+
+        return ResponseFactory::noContent($response);
+    }
+
     /** @param array<string, string> $args */
     public function get(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {

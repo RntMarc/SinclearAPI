@@ -2,6 +2,7 @@
 
 namespace Sinclear\Api\Services;
 
+use Sinclear\Api\Repository\CloseFriendRepository;
 use Sinclear\Api\Repository\ContactInfoRepository;
 use Sinclear\Api\Repository\SocialInfoRepository;
 use Sinclear\Api\Repository\UserRepository;
@@ -36,14 +37,16 @@ final readonly class UserService
         private SocialInfoRepository $socialInfoRepo,
         private UserPreferenceService $preferenceService,
         private UserPolicy $policy,
+        private CloseFriendRepository $closeFriendRepo,
     ) {}
 
     /** @return list<array<string, mixed>> */
     public function listAll(AuthenticatedUser $requester): array
     {
         $users = $this->userRepo->findAll();
+        $closeFriendIds = $this->closeFriendRepo->listFriendIdsFor($requester->id);
         return array_map(
-            fn(array $user) => $this->formatUserBaseFiltered($user, $requester),
+            fn(array $user) => $this->formatUserBaseFiltered($user, $requester, $closeFriendIds),
             $users,
         );
     }
@@ -64,6 +67,38 @@ final readonly class UserService
     public function getSocialInfo(string $userId): ?array
     {
         return $this->socialInfoRepo->findByUserId($userId);
+    }
+
+    /**
+     * Liste der vom anfragenden Nutzer markierten engen Freunde (ausgehende
+     * Richtung). Jeder Eintrag entspricht formatUserBaseFiltered (mit
+     * isCloseFriend = true).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listCloseFriends(AuthenticatedUser $requester): array
+    {
+        $friendIds = $this->closeFriendRepo->listFriendIdsFor($requester->id);
+
+        $friends = [];
+        foreach ($friendIds as $friendId) {
+            $user = $this->userRepo->findById($friendId);
+            if ($user !== null) {
+                $friends[] = $this->formatUserBaseFiltered($user, $requester, $friendIds);
+            }
+        }
+
+        return $friends;
+    }
+
+    public function addCloseFriend(string $userId, string $friendId): void
+    {
+        $this->closeFriendRepo->add($userId, $friendId);
+    }
+
+    public function removeCloseFriend(string $userId, string $friendId): void
+    {
+        $this->closeFriendRepo->remove($userId, $friendId);
     }
 
     /** @param array<string, mixed> $user */
@@ -88,10 +123,16 @@ final readonly class UserService
         ];
     }
 
-    /** @param array<string, mixed> $user */
-    public function formatUserBaseFiltered(array $user, AuthenticatedUser $requester): array
+    /**
+     * @param array<string, mixed> $user
+     * @param list<string>|null $closeFriendIds Vorab geladenes Friend-ID-Set des
+     *                                         Requesters (ausgehende Richtung).
+     *                                         Wird bei null intern geladen.
+     */
+    public function formatUserBaseFiltered(array $user, AuthenticatedUser $requester, ?array $closeFriendIds = null): array
     {
         $prefs = $this->preferenceService->getAll($user['id']);
+        $closeFriendIds ??= $this->closeFriendRepo->listFriendIdsFor($requester->id);
 
         $result = [
             'id' => $user['id'],
@@ -102,6 +143,9 @@ final readonly class UserService
             'isAdmin' => (bool) $user['isAdmin'],
             'createdAt' => $user['createdAt'],
             'onboardingCompleted' => (bool) ($prefs['onboardingCompleted'] ?? 0),
+            // Ausgehende Richtung: hat der anfragende Nutzer diesen Nutzer
+            // als engen Freund markiert (CloseFriend { userId: requester, friendId: target }).
+            'isCloseFriend' => in_array((string) $user['id'], $closeFriendIds, true),
         ];
 
         if ($this->policy->canView($requester, (string) $user['id'], (int) ($prefs['emailVisibility'] ?? 1))) {

@@ -152,6 +152,9 @@ return function (App $app): void {
         $group->get('/me/base', [UserController::class, 'meBase']);
         $group->get('/me/social', [UserController::class, 'meSocial']);
         $group->get('/me/contact', [UserController::class, 'meContact']);
+        $group->get('/me/close-friends', [UserController::class, 'listCloseFriends']);
+        $group->put('/me/close-friends/{userId}', [UserController::class, 'addCloseFriend']);
+        $group->delete('/me/close-friends/{userId}', [UserController::class, 'removeCloseFriend']);
         $group->put('/me/profile', [ProfileController::class, 'update']);
         $group->post('/me/email/request', [ProfileController::class, 'requestEmailChange']);
         $group->post('/me/email/verify', [ProfileController::class, 'verifyEmailChange']);

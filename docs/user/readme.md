@@ -23,7 +23,8 @@ Authorization: Bearer <access_token>
 
 Gibt ein Array aller Benutzer zurück. Jeder Eintrag enthält die Basis-Profildaten,
 gefiltert nach den Sichtbarkeitseinstellungen des jeweiligen Benutzers
-(siehe [Sichtbarkeitssystem](#sichtbarkeitssystem)).
+(siehe [Sichtbarkeitssystem](#sichtbarkeitssystem)), sowie das Feld `isCloseFriend`
+(ausgehende Richtung, siehe [Enge-Freunde-Beziehung](#enge-freunde-beziehung-closefriend)).
 
 ### Eigene Profildaten (`/me`)
 
@@ -110,6 +111,31 @@ Details, Statistiken und Cache-Verhalten siehe [Spiele-Statistiken](../games/rea
 
 Diese Endpunkte beachten die **Sichtbarkeitseinstellungen** des angefragten Nutzers.
 Nicht sichtbare Felder werden komplett weggelassen (nicht als `null` gesendet).
+
+### Enge Freunde verwalten (`/me/close-friends`)
+
+| Methode | Pfad | Beschreibung |
+|---------|------|-------------|
+| `GET` | `/user/me/close-friends` | Liste der von mir markierten Nutzer (ausgehend) |
+| `PUT` | `/user/me/close-friends/{userId}` | Nutzer als engen Freund markieren (idempotent) |
+| `DELETE` | `/user/me/close-friends/{userId}` | Markierung entfernen (idempotent) |
+
+Alle drei Endpunkte arbeiten in **ausgehender** Richtung:
+`PUT /user/me/close-friends/{userId}` legt `CloseFriend { userId: ich, friendId: userId }` an,
+d. h. **ich** markiere den Zielnutzer. Dadurch erhält der Zielnutzer erweiterten
+Zugriff auf meine Level-2-Daten (siehe [Enge-Freunde-Beziehung](#enge-freunde-beziehung-closefriend)).
+
+**Antwortformate:**
+- `GET` → `200` mit `{ "data": [ ...gefiltertes Basis-Profil..., ... ] }`, jeder Eintrag mit `isCloseFriend: true`.
+- `PUT` → `200` mit `{ "data": { "userId": "…", "isCloseFriend": true } }`.
+- `DELETE` → `204 No Content`.
+
+**Fehlercodes:**
+
+| Code | Status | Beschreibung |
+|------|--------|-------------|
+| `user_not_found` | 404 | Zielnutzer existiert nicht |
+| `cannot_add_self` | 400 | Sich selbst als engen Freund markieren ist nicht erlaubt (nur `PUT`) |
 
 ## Endpunkte – DAV-Tokens (CalDAV/CardDAV)
 
@@ -323,6 +349,22 @@ Dadurch darf **B** die auf Sichtbarkeit `2` gestellten Informationen von **A** s
 Die Beziehung ist **nicht gegenseitig**: Nur weil A den B hinzugefügt hat, hat A keine
 erweiterten Rechte an Bs Informationen. B muss A ebenfalls hinzufügen, damit A Bs
 level-2-Daten sehen kann.
+
+### Feld `isCloseFriend` (ausgehende Richtung)
+
+`GET /user` und `GET /user/{userId}` (bzw. `/user/{userId}/base`) liefern pro Eintrag das
+Feld `isCloseFriend` (bool). Es beschreibt die **ausgehende** Richtung:
+
+> `isCloseFriend: true` ⇔ der **anfragende Nutzer** hat den Zielnutzer markiert
+> (`CloseFriend { userId: Anfragender, friendId: Zielnutzer }`).
+
+Das Feld sagt also: „habe **ich** diesen Nutzer als engen Freund markiert?".
+
+**Nicht verwechseln:** Die Sichtbarkeitsprüfung (Level 2) und die interne
+Geburtstagslogik (`UserRepository::findBirthdayCandidates()`) nutzen die
+**eingehende** Richtung (`CloseFriend { userId: Zielnutzer, friendId: Anfragender }`,
+d. h. „hat der Zielnutzer mich markiert?"). Das öffentliche `isCloseFriend`-Feld
+ist bewusst die Gegenrichtung und bleibt von dieser internen Logik unabhängig.
 
 ## Datenbanktabellen
 

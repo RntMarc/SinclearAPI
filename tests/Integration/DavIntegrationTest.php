@@ -316,6 +316,7 @@ class DavIntegrationTest extends TestCase
             new SocialInfoRepository($this->db),
             $preferenceService,
             new UserPolicy(new CloseFriendRepository($this->db)),
+            new CloseFriendRepository($this->db),
         );
 
         $icsFactory = new IcsFactory();

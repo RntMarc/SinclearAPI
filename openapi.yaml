@@ -3180,6 +3180,13 @@ components:
           description: Erstellungszeitpunkt (UTC)
         onboardingCompleted:
           type: boolean
+        isCloseFriend:
+          type: boolean
+          description: >
+            Ausgehende Richtung: true, wenn der anfragende Nutzer diesen Nutzer
+            als engen Freund markiert hat (CloseFriend { userId: anfragender,
+            friendId: dieser Nutzer }). Nicht zu verwechseln mit der eingehenden
+            Richtung der Sichtbarkeitsprüfung (Level 2).
         birthday:
           type: string
           format: date
@@ -8937,6 +8944,110 @@ paths:
                     $ref: '#/components/schemas/UserContactInfo'
         '401':
           description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/close-friends:
+    get:
+      summary: Eigene enge Freunde auflisten (ausgehend)
+      description: >
+        Gibt die Nutzer zurück, die der angemeldete Nutzer als engen Freund
+        markiert hat (ausgehende Richtung: CloseFriend { userId: anfragender,
+        friendId: Zielnutzer }). Jeder Eintrag ist ein gefiltertes Basis-Profil
+        mit isCloseFriend = true.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste der markierten Nutzer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/me/close-friends/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ID des zu markierenden/zu entfernenden Nutzers
+    put:
+      summary: Nutzer als engen Freund markieren (ausgehend, idempotent)
+      description: >
+        Markiert den Zielnutzer als engen Freund des angemeldeten Nutzers
+        (CloseFriend { userId: anfragender, friendId: userId }). Idempotent:
+        bei bereits vorhandener Markierung wird kein Fehler erzeugt.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Markierung gesetzt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [userId, isCloseFriend]
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      isCloseFriend:
+                        type: boolean
+                        enum: [true]
+        '400':
+          description: Sich selbst markieren ist nicht erlaubt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Markierung entfernen (idempotent)
+      description: >
+        Entfernt die Markierung des Zielnutzers. Idempotent: bei nicht
+        vorhandener Markierung wird kein Fehler erzeugt.
+      tags: [User]
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Markierung entfernt
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Nutzer nicht gefunden
           content:
             application/json:
               schema:
