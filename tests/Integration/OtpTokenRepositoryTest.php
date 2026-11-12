@@ -44,7 +44,9 @@ final class OtpTokenRepositoryTest extends TestCase
                 id varchar(191) NOT NULL PRIMARY KEY,
                 email varchar(191) NOT NULL,
                 code varchar(6) NOT NULL,
+                attempts int NOT NULL DEFAULT 0,
                 type varchar(20) NOT NULL DEFAULT 'email_otp',
+                sessionId varchar(191) DEFAULT NULL,
                 expiresAt datetime(3) NOT NULL,
                 usedAt datetime(3) DEFAULT NULL,
                 createdAt datetime(3) NOT NULL
@@ -59,9 +61,14 @@ final class OtpTokenRepositoryTest extends TestCase
         $this->db->exec("DROP TABLE IF EXISTS OtpToken");
     }
 
-    private function createToken(string $type, string $code, string $email, DateTimeImmutable $expiresAt): string
-    {
-        return $this->repo->create($email, $code, $expiresAt, $type);
+    private function createToken(
+        string $type,
+        string $code,
+        string $email,
+        DateTimeImmutable $expiresAt,
+        ?string $sessionId = null,
+    ): string {
+        return $this->repo->create($email, $code, $expiresAt, $type, $sessionId);
     }
 
     public function testEmailOtpCannotBeRedeemedAsDiscordPairing(): void
@@ -130,6 +137,68 @@ final class OtpTokenRepositoryTest extends TestCase
         $this->assertNull(
             $this->repo->findValidDiscordPairing('111222'),
             'relink code must not resolve as a plain Discord pairing code',
+        );
+    }
+
+    public function testDiscordPairingCodeIsBoundToItsSession(): void
+    {
+        $expiresAt = new DateTimeImmutable('+2 minutes', new DateTimeZone('UTC'));
+        $this->createToken(
+            OtpTokenRepository::TYPE_DISCORD_PAIRING,
+            '333444',
+            'user@example.com',
+            $expiresAt,
+            'session-a',
+        );
+
+        $this->assertNotNull(
+            $this->repo->findValidDiscordPairing('333444', 'session-a'),
+            'pairing code must resolve for the session that started the flow',
+        );
+        $this->assertNull(
+            $this->repo->findValidDiscordPairing('333444', 'session-b'),
+            'pairing code must not resolve for a different session',
+        );
+    }
+
+    public function testEmailTokenBecomesInvalidAfterMaxAttempts(): void
+    {
+        $expiresAt = new DateTimeImmutable('+10 minutes', new DateTimeZone('UTC'));
+        $this->createToken(
+            OtpTokenRepository::TYPE_EMAIL_OTP,
+            '555666',
+            'user@example.com',
+            $expiresAt,
+        );
+
+        for ($i = 0; $i < OtpTokenRepository::MAX_ATTEMPTS; $i++) {
+            $this->repo->incrementAttemptsForEmail('user@example.com', OtpTokenRepository::TYPE_EMAIL_OTP);
+        }
+
+        $this->assertNull(
+            $this->repo->findValidEmailOtp('user@example.com', '555666'),
+            'token must be invalid after MAX_ATTEMPTS failed verifications',
+        );
+    }
+
+    public function testDiscordPairingBecomesInvalidAfterMaxAttempts(): void
+    {
+        $expiresAt = new DateTimeImmutable('+2 minutes', new DateTimeZone('UTC'));
+        $this->createToken(
+            OtpTokenRepository::TYPE_DISCORD_PAIRING,
+            '777999',
+            'user@example.com',
+            $expiresAt,
+            'session-a',
+        );
+
+        for ($i = 0; $i < OtpTokenRepository::MAX_ATTEMPTS; $i++) {
+            $this->repo->incrementAttemptsForSession('session-a', OtpTokenRepository::TYPE_DISCORD_PAIRING);
+        }
+
+        $this->assertNull(
+            $this->repo->findValidDiscordPairing('777999', 'session-a'),
+            'pairing code must be invalid after MAX_ATTEMPTS failed verifications',
         );
     }
 
