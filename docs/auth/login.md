@@ -15,8 +15,12 @@ Für die **Registrierung** neuer Konten wird ebenfalls Discord OAuth2 verwendet 
 | **Access-Token** (JWT) | 15 Minuten | Authentifiziert API-Anfragen (Bearer Token) |
 | **Refresh-Token** | 90 Tage | Ausstellung neuer Access-Tokens (Rotation) |
 
-Jeder Refresh-Token gehört zu einer **Familie**. Wird ein bereits rotierter Token
-erneut verwendet, wird die gesamte Familie widerrufen (Reuse-Detection).
+Jeder Refresh-Token gehört zu einer **Familie**. Jede Rotation erzeugt einen
+neuen Token in derselben Familie und widerruft den alten. Ein bereits rotierter
+Token wird innerhalb der **Grace-Periode** (`JWT_REFRESH_REUSE_GRACE`, Default
+60 s) noch toleriert (benigner Replay, z. B. verlorene Antwort oder paralleler
+Request). Wird ein bereits rotierter Token nach Ablauf der Grace-Periode erneut
+verwendet, wird die gesamte Familie widerrufen (**Reuse-Detection**).
 
 ## E-Mail OTP Flow
 
@@ -242,10 +246,12 @@ eingelöst werden.
 
 **Request (Discord-Pairing):**
 ```json
-{ "code": "482731" }
+{ "code": "482731", "session_id": "0196f1c3-8f2e-7a4b-9c5d-123456789abc" }
 ```
 Bei Discord-Pairing-Codes (2 Minuten gültig) darf `email` weggelassen werden.
-Ohne `email` akzeptiert der Endpunkt ausschließlich Discord-Pairing-Codes.
+Ohne `email` akzeptiert der Endpunkt ausschließlich Discord-Pairing-Codes und
+verlangt zusätzlich die `session_id` aus `/auth/login/discord/start` bzw.
+`/auth/register/discord/start` (Session-Bindung).
 
 **Response (200):**
 ```json
@@ -262,9 +268,13 @@ Ohne `email` akzeptiert der Endpunkt ausschließlich Discord-Pairing-Codes.
 **Response (200):**
 ```json
 {
-    "url": "https://discord.com/api/oauth2/authorize?response_type=code&client_id=..."
+    "url": "https://discord.com/api/oauth2/authorize?response_type=code&client_id=...",
+    "session_id": "0196f1c3-8f2e-7a4b-9c5d-123456789abc"
 }
 ```
+
+`session_id` (entspricht dem PKCE-State) muss beim Einlösen des Pairing-Codes an
+`/auth/login/otp/verify` mitgesendet werden.
 
 ### GET /api/v2/auth/login/discord/callback
 
@@ -283,9 +293,13 @@ deaktiviert, bleibt das Profilbild unverändert.
 **Response (200):**
 ```json
 {
-    "url": "https://discord.com/api/oauth2/authorize?response_type=code&client_id=..."
+    "url": "https://discord.com/api/oauth2/authorize?response_type=code&client_id=...",
+    "session_id": "0196f1c3-8f2e-7a4b-9c5d-123456789abc"
 }
 ```
+
+`session_id` (entspricht dem PKCE-State) muss beim Einlösen des Pairing-Codes an
+`/auth/login/otp/verify` mitgesendet werden.
 
 ### GET /api/v2/auth/register/discord/callback
 
@@ -316,22 +330,40 @@ Registration trotzdem ohne Bild abgeschlossen.
     "access_token": "eyJhbGciOiJSUzI1NiIsInR5...",
     "expires_in": 900,
     "refresh_token": "x7y8z9...",
+    "expires_at": 1747353600,
     "token_type": "Bearer"
 }
 ```
 
 **Fehler:** `400 missing_refresh_token`, `401 invalid_refresh_token`, `404 user_not_found`
 
+### POST /api/v2/auth/logout
+
+**Beschreibung:** Meldet eine Sitzung serverseitig ab. Widerruft den
+mitgelieferten Refresh-Token und setzt die JTI des aktuellen Access-Tokens auf
+die Blacklist. Als optionale Authentifizierung (`auth.optional`) registriert,
+damit auch mit bereits abgelaufenem Access-Token aufgeräumt werden kann.
+
+**Request (optionaler Body):**
+```json
+{ "refresh_token": "a1b2c3d4e5f6..." }
+```
+
+**Header:** `Authorization: Bearer <access_token>` (optional)
+
+**Response (204):** Kein Inhalt.
+
 ## Sicherheitsmechanismen
 
 | Mechanismus | Beschreibung |
 |-------------|-------------|
 | **HTTPS erforderlich** | Nicht-TLS-Verbindungen werden mit 403 abgewiesen |
-| **Rate-Limiting** | Kein globales Limit in der API; 10 req/60s auf Login/OTP-Endpunkten (nicht auf `/auth/refresh`). Globale Limits ggf. auf Infrastruktur-Ebene (Reverse Proxy/WAF) |
-| **OTP-Einschränkung** | Max. 3 Code-Anfragen pro E-Mail pro 60 Sekunden |
+| **Rate-Limiting** | Kein globales Limit in der API; 10 req/60s auf allen Login/OTP-Endpunkten (inkl. Admin-Login, Admin-Step-up, E-Mail-/Discord-Verify; nicht auf `/auth/refresh`). Globale Limits ggf. auf Infrastruktur-Ebene (Reverse Proxy/WAF) |
+| **OTP-Einschränkung** | Max. 3 Code-Anfragen pro E-Mail pro 60 Sekunden; max. 5 Fehlversuche pro Code, danach wird der Code ungültig |
 | **Code-Gültigkeit** | E-Mail-OTP: 10 Min, Discord-Pairing: 2 Min (einmalig) |
-| **Refresh-Rotation** | Jeder Refresh wird rotiert; alte Tokens werden ungültig |
-| **Reuse-Detection** | Bei Wiederverwendung eines alten Refresh-Tokens → gesamte Familie gesperrt |
+| **Refresh-Rotation** | Jeder Refresh wird rotiert; alte Tokens werden ungültig. Bereits rotierte Tokens bleiben für die Grace-Periode tolerierbar |
+| **Reuse-Detection** | Wiederverwendung eines alten Refresh-Tokens nach der Grace-Periode → gesamte Familie gesperrt |
+| **Session-Bindung** | Discord-Pairing-Codes sind an die Session-ID aus `/auth/*/discord/start` gebunden und ohne sie nicht einlösbar |
 | **Discord PKCE** | code_verifier + state verhindern CSRF/Callback-Faking |
 | **Guild-Prüfung** | Nur Mitglieder der konfigurierten Discord-Guild können sich anmelden oder registrieren |
 | **Registrierungsprüfung** | Discord-ID darf noch nicht verknüpft sein, E-Mail darf noch nicht registriert sein |
@@ -351,7 +383,8 @@ Registration trotzdem ohne Bild abgeschlossen.
 ## Client-Implementierungshinweise
 
 1. **Token-Speicherung:** Refresh-Token sicher speichern (iOS Keychain, Android EncryptedSharedPreferences, Flutter: flutter_secure_storage).
-2. **Access-Token-Erneuerung:** Vor jeder API-Anfrage prüfen, ob der Access-Token abgelaufen ist und ggf. über `/auth/refresh` erneuern.
-3. **401-Handling:** Bei einer 401-Antwort den Refresh-Token erneuern versuchen; schlägt auch das fehl, den Nutzer ausloggen.
-4. **Discord-Login:** Den Discord-OAuth-URL in einem System-Browser öffnen (nicht WebView), da Discord sonst den Login blockieren kann.
-5. **Fehlerbehandlung:** Auf `429`-Antworten mit exponentiellem Backoff reagieren.
+2. **Access-Token-Erneuerung:** Vor jeder API-Anfrage prüfen, ob der Access-Token abgelaufen ist und ggf. über `/auth/refresh` erneuern. Den Access-Token zwischencachen, damit nicht bei jeder Hintergrund-Anfrage rotiert wird.
+3. **Genau ein Refresh-Pfad:** `/auth/refresh` darf nur von einer zentralen Stelle aufgerufen werden. Hintergrund-Prozesse (Foreground-Service, WorkManager, Widget-Sync) müssen denselben gecachten Access-Token verwenden und sich über einen Lock koordinieren — sonst verursachen parallele Rotationen den Eindruck eines plötzlichen Logouts.
+4. **401-Handling:** Bei einer 401-Antwort den Refresh-Token erneuern versuchen; schlägt auch das fehl, den Nutzer ausloggen. Beim Logout zusätzlich `POST /auth/logout` aufrufen, um die Sitzung serverseitig zu beenden.
+5. **Discord-Login:** Den Discord-OAuth-URL in einem System-Browser öffnen (nicht WebView), da Discord sonst den Login blockieren kann. Die `session_id` aus `/auth/*/discord/start` merken und beim Einlösen des Pairing-Codes an `/auth/login/otp/verify` mitsenden.
+6. **Fehlerbehandlung:** Auf `429`-Antworten mit exponentiellem Backoff reagieren.

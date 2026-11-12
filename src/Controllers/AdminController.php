@@ -131,6 +131,7 @@ final readonly class AdminController
 
         $otpToken = $this->otpTokenRepo->findValidEmailOtp($email, $code);
         if ($otpToken === null) {
+            $this->otpTokenRepo->incrementAttemptsForEmail($email, OtpTokenRepository::TYPE_EMAIL_OTP);
             return ResponseFactory::json(['error' => 'invalid_or_expired_code'], 400, $response);
         }
 

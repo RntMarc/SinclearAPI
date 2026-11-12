@@ -148,16 +148,29 @@ components:
           pattern: '^\d{6}$'
           description: 6-stelliger Code aus E-Mail oder Discord-Callback
           example: '482731'
+        session_id:
+          type: string
+          description: >
+            Pflicht bei Discord-Pairing-Codes (ohne `email`): die Session-ID,
+            die `/auth/login/discord/start` zurückgeliefert hat. Bindet den
+            Pairing-Code an die auslösende Session.
+          example: 0196f1c3-8f2e-7a4b-9c5d-123456789abc
 
     DiscordStartResponse:
       type: object
-      required: [url]
+      required: [url, session_id]
       properties:
         url:
           type: string
           format: uri
           description: Discord OAuth2 Authorize-URL mit PKCE
           example: https://discord.com/api/oauth2/authorize?response_type=code&client_id=...
+        session_id:
+          type: string
+          description: >
+            Session-ID (entspricht dem PKCE-State). Muss beim Einlösen des
+            Pairing-Codes an `/auth/login/otp/verify` mitgesendet werden.
+          example: 0196f1c3-8f2e-7a4b-9c5d-123456789abc
 
     OtpSentResponse:
       type: object
@@ -170,7 +183,7 @@ components:
 
     TokenResponse:
       type: object
-      required: [access_token, expires_in, refresh_token, token_type]
+      required: [access_token, expires_in, refresh_token, expires_at, token_type]
       properties:
         access_token:
           type: string
@@ -182,6 +195,9 @@ components:
         refresh_token:
           type: string
           description: Refresh-Token für Token-Erneuerung
+        expires_at:
+          type: integer
+          description: Unix-Timestamp, wann der Refresh-Token abläuft
         token_type:
           type: string
           enum: [Bearer]
@@ -1333,6 +1349,16 @@ components:
         refresh_token:
           type: string
           description: Refresh-Token aus vorherigem Login
+
+    LogoutRequest:
+      type: object
+      properties:
+        refresh_token:
+          type: string
+          description: >
+            Optionaler Refresh-Token, der serverseitig widerrufen werden soll.
+            Wird der aktuelle Access-Token (Bearer) mitgesendet, wird zusätzlich
+            dessen JTI auf die Blacklist gesetzt.
 
     RefreshTokenResponse:
       type: object
@@ -8626,7 +8652,9 @@ paths:
         Der Code darf nicht älter als 10 Minuten (E-Mail-OTP) bzw.
         2 Minuten (Discord-Pairing) sein und kann nur einmal verwendet werden.
         E-Mail-OTPs erfordern zwingend das Feld `email`; ohne `email` werden
-        ausschließlich Discord-Pairing-Codes akzeptiert.
+        ausschließlich Discord-Pairing-Codes akzeptiert und zusätzlich die
+        `session_id` aus `/auth/login/discord/start` verlangt (Session-Bindung).
+        Nach 5 Fehlversuchen wird ein Code ungültig.
       tags: [Authentication]
       requestBody:
         required: true
@@ -8774,8 +8802,9 @@ paths:
       description: >
         Tauscht einen gültigen Refresh-Token gegen einen neuen
         Access-Token (JWT) und einen neuen Refresh-Token
-        (Token-Rotation). Bei Wiederverwendung eines bereits
-        rotierten Tokens wird die gesamte Token-Familie widerrufen.
+        (Token-Rotation). Ein bereits rotierter Token wird innerhalb der
+        Grace-Periode (JWT_REFRESH_REUSE_GRACE) toleriert; danach wird die
+        gesamte Token-Familie widerrufen (Reuse-Detection).
       tags: [Authentication]
       requestBody:
         required: true
@@ -8810,6 +8839,33 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           description: Zu viele Versuche
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      summary: Sitzung serverseitig abmelden
+      description: >
+        Widerruft den mitgelieferten Refresh-Token und setzt die JTI des
+        aktuellen Access-Tokens auf die Blacklist. Als optionale
+        Authentifizierung registriert, damit auch mit bereits abgelaufenem
+        Access-Token serverseitig aufgeräumt werden kann.
+      tags: [Authentication]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Sitzung wurde abgemeldet
+        '400':
+          description: Fehlerhafte Anfrage
           content:
             application/json:
               schema:

@@ -2,9 +2,18 @@
 
 namespace Sinclear\Api\Services;
 
-final readonly class RateLimiter
+final class RateLimiter
 {
     private string $storageDir;
+
+    /**
+     * Letzter Zeitpunkt eines `cleanExpired`-Laufs. Das Aufräumen per `glob()`
+     * über alle Rate-Limit-Dateien ist teuer und darf nicht bei jedem Request
+     * laufen — daher nur einmal pro Intervall.
+     */
+    private int $lastCleanupAt = 0;
+
+    private const int CLEANUP_INTERVAL_SECONDS = 60;
 
     public function __construct(
         ?string $storageDir = null,
@@ -20,32 +29,68 @@ final readonly class RateLimiter
         $this->cleanExpired($windowSeconds);
 
         $file = $this->getFilePath($key);
-        $data = $this->readFile($file);
-
         $now = time();
         $cutoff = $now - $windowSeconds;
 
-        $requests = array_values(array_filter($data, fn(int $timestamp) => $timestamp > $cutoff));
-
-        if (count($requests) >= $maxRequests) {
-            $this->writeFile($file, $requests);
-            return false;
+        // Atomarer Read-Modify-Write: flock um Lesen UND Schreiben, damit
+        // parallele Requests sich nicht gegenseitig den Zähler überschreiben
+        // (TOCTOU-Race-Condition der vorherigen Implementierung).
+        $handle = @fopen($file, 'c+');
+        if ($handle === false) {
+            // Fail-open: Bei Dateisystemfehlern nicht versehentlich blockieren.
+            return true;
         }
 
-        $requests[] = $now;
-        $this->writeFile($file, $requests);
+        try {
+            flock($handle, LOCK_EX);
 
-        return true;
+            $content = stream_get_contents($handle);
+            $data = [];
+            if ($content !== false && $content !== '') {
+                $decoded = json_decode($content, true);
+                if (is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+
+            $requests = array_values(array_filter($data, fn(int $timestamp) => $timestamp > $cutoff));
+
+            if (count($requests) >= $maxRequests) {
+                $this->writeHandle($handle, $requests);
+                return false;
+            }
+
+            $requests[] = $now;
+            $this->writeHandle($handle, $requests);
+
+            return true;
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
+    }
+
+    private function writeHandle($handle, array $data): void
+    {
+        ftruncate($handle, 0);
+        rewind($handle);
+        fwrite($handle, json_encode($data));
     }
 
     private function cleanExpired(int $windowSeconds): void
     {
+        $now = time();
+        if ($now - $this->lastCleanupAt < self::CLEANUP_INTERVAL_SECONDS) {
+            return;
+        }
+        $this->lastCleanupAt = $now;
+
         $files = glob($this->storageDir . '/ratelimit_*.json');
         if ($files === false) {
             return;
         }
 
-        $cutoff = time() - $windowSeconds * 2;
+        $cutoff = $now - $windowSeconds * 2;
 
         foreach ($files as $file) {
             $mtime = @filemtime($file);
@@ -58,25 +103,5 @@ final readonly class RateLimiter
     private function getFilePath(string $key): string
     {
         return $this->storageDir . '/ratelimit_' . md5($key) . '.json';
-    }
-
-    private function readFile(string $file): array
-    {
-        if (!file_exists($file)) {
-            return [];
-        }
-
-        $content = @file_get_contents($file);
-        if ($content === false) {
-            return [];
-        }
-
-        $data = json_decode($content, true);
-        return is_array($data) ? $data : [];
-    }
-
-    private function writeFile(string $file, array $data): void
-    {
-        file_put_contents($file, json_encode($data), LOCK_EX);
     }
 }

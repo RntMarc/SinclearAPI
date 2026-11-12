@@ -3,6 +3,7 @@
 namespace Sinclear\Api\Services\Auth;
 
 use DateTimeImmutable;
+use PDO;
 use Ramsey\Uuid\Uuid;
 use Sinclear\Api\Application\Settings;
 use Sinclear\Api\Repository\JtiBlacklistRepository;
@@ -17,6 +18,7 @@ final readonly class TokenService
 
     public function __construct(
         private Settings $settings,
+        private PDO $pdo,
         private RefreshTokenRepository $refreshTokenRepo,
         private JtiBlacklistRepository $jtiBlacklistRepo,
     ) {}
@@ -114,27 +116,77 @@ final readonly class TokenService
         ];
     }
 
+    /**
+     * Rotiert einen Refresh-Token mit Grace-Period und Reuse-Detection.
+     *
+     * Ablauf (atomar, Transaktion + Row-Lock):
+     *  1. Gültiger Token → normal rotieren (alten revoken, neuen anlegen).
+     *  2. Bereits rotierter Token innerhalb der Grace-Periode → benigner
+     *     Replay: der gültige Nachfolger wird re-rotatiert, die Familie bleibt
+     *     bestehen (toleriert verlorene Antworten / parallele Requests).
+     *  3. Bekannter, aber abgelaufener Token (oder Replay nach Grace-Periode)
+     *     → echte Reuse-Detection: gesamte Familie sperren, null zurückgeben.
+     */
     public function rotateRefreshToken(string $oldTokenHash): ?array
     {
-        $token = $this->refreshTokenRepo->findValidToken($oldTokenHash);
-        if ($token === null) {
-            return null;
-        }
-
+        $graceSeconds = (int) ($this->settings->jwt['refresh_reuse_grace'] ?? 60);
         $now = new DateTimeImmutable();
 
+        $this->pdo->beginTransaction();
+        try {
+            $token = $this->refreshTokenRepo->findValidToken($oldTokenHash, forUpdate: true);
+            if ($token !== null) {
+                return $this->rotate($token, $now, $graceSeconds);
+            }
+
+            $successor = $this->refreshTokenRepo->findGraceEligibleSuccessor($oldTokenHash, forUpdate: true);
+            if ($successor !== null) {
+                return $this->rotate($successor, $now, $graceSeconds);
+            }
+
+            // Echte Reuse-Detection: Token bekannt, aber nicht mehr tolerierbar.
+            $reused = $this->refreshTokenRepo->findAnyByHash($oldTokenHash);
+            if ($reused !== null) {
+                $this->refreshTokenRepo->revokeFamily($reused['familyId'], $now);
+            }
+
+            $this->pdo->commit();
+            return null;
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Führt die eigentliche Rotation für einen (gültigen) Token durch und
+     * committet die laufende Transaktion.
+     *
+     * @param array<string, mixed> $token
+     * @return array{refresh_token: string, expires_at: int, user_id: string}
+     */
+    private function rotate(array $token, DateTimeImmutable $now, int $graceSeconds): array
+    {
         $this->refreshTokenRepo->revokeToken($token['id'], $now);
 
         $newRefreshToken = $this->generateRefreshToken();
         $newTokenHash = $this->hashRefreshToken($newRefreshToken);
 
         $expiresAt = new DateTimeImmutable('+' . $this->settings->jwt['refresh_ttl'] . ' seconds');
+        $graceUntil = $now->modify('+' . $graceSeconds . ' seconds');
+
         $this->refreshTokenRepo->createToken(
             $token['familyId'],
             $token['userId'],
             $newTokenHash,
             $expiresAt,
+            previousTokenHash: $token['tokenHash'],
+            graceUntil: $graceUntil,
         );
+
+        $this->pdo->commit();
 
         return [
             'refresh_token' => $newRefreshToken,
@@ -154,6 +206,16 @@ final readonly class TokenService
         if ($token !== null) {
             $this->refreshTokenRepo->revokeToken($token['id'], new DateTimeImmutable());
         }
+    }
+
+    /**
+     * Setzt die JTI eines Access-Tokens auf die Blacklist, sodass der Token
+     * bis zu seinem regulären Ablauf ungültig ist (Logout).
+     */
+    public function blacklistJti(string $jti): void
+    {
+        $expiresAt = new DateTimeImmutable('+' . $this->settings->jwt['access_ttl'] . ' seconds');
+        $this->jtiBlacklistRepo->add($jti, $expiresAt);
     }
 
     private function encodeJwt(array $payload): string

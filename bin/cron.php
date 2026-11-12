@@ -6,6 +6,8 @@ declare(strict_types=1);
 use DI\ContainerBuilder;
 use Sinclear\Api\Services\Cron\CronScheduler;
 use Sinclear\Api\Services\Cron\Tasks\CleanupExpiredOtpTokensTask;
+use Sinclear\Api\Services\Cron\Tasks\CleanupExpiredRefreshTokensTask;
+use Sinclear\Api\Services\Cron\Tasks\CleanupExpiredJtiBlacklistTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupArcadeSessionsTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupOldDirectMessagesTask;
 use Sinclear\Api\Services\Cron\Tasks\CleanupOldLocationSharingTask;
@@ -39,6 +41,8 @@ $settings = $container->get(\Sinclear\Api\Application\Settings::class);
 
 // Tasks registrieren
 $scheduler->register(new CleanupExpiredOtpTokensTask());
+$scheduler->register(new CleanupExpiredRefreshTokensTask());
+$scheduler->register(new CleanupExpiredJtiBlacklistTask());
 $scheduler->register(new CleanupArcadeSessionsTask());
 $scheduler->register(new CleanupOldLocationSharingTask());
 $scheduler->register(new CleanupOldDirectMessagesTask());

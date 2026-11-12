@@ -234,6 +234,7 @@ final readonly class ProfileService
 
         $otpToken = $this->otpTokenRepo->findValidEmailOtp($newEmail, $code);
         if ($otpToken === null) {
+            $this->otpTokenRepo->incrementAttemptsForEmail($newEmail, OtpTokenRepository::TYPE_EMAIL_OTP);
             throw new \InvalidArgumentException('invalid_or_expired_code');
         }
 

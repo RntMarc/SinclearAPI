@@ -42,6 +42,7 @@ final class AuthControllerTest extends TestCase
                 'issuer' => 'test',
                 'access_ttl' => 3600,
                 'refresh_ttl' => 86400,
+                'refresh_reuse_grace' => 60,
                 'private_key' => 'test',
                 'public_key' => 'test',
             ],
@@ -59,7 +60,7 @@ final class AuthControllerTest extends TestCase
 
         $refreshTokenRepo = new RefreshTokenRepository($this->pdo);
         $jtiRepo = new JtiBlacklistRepository($this->pdo);
-        $this->tokenService = new TokenService($settings, $refreshTokenRepo, $jtiRepo);
+        $this->tokenService = new TokenService($settings, $this->pdo, $refreshTokenRepo, $jtiRepo);
 
         $mailer = $this->createStub(MailerInterface::class);
         $otpService = new OtpService($this->otpTokenRepo, $mailer, 'noreply@example.com');
@@ -102,24 +103,15 @@ final class AuthControllerTest extends TestCase
         $this->assertSame('invalid_email', $body['error'] ?? null);
     }
 
-    public function testLoginOtpVerifyRejectsEmailOtpWhenEmailOmitted(): void
+    public function testLoginOtpVerifyRejectsDiscordPairingWhenSessionIdOmitted(): void
     {
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn([
             'code' => '123456',
         ]);
 
-        // The no-email path MUST only search for Discord pairing tokens, never
-        // for email OTP tokens. The repository scopes the query by type, so a
-        // matching email OTP row can never be redeemed without the email.
-        $stmt = $this->createMock(PDOStatement::class);
-        $stmt->method('fetch')->willReturn(false);
-        $stmt->expects($this->once())
-            ->method('execute')
-            ->with([OtpTokenRepository::TYPE_DISCORD_PAIRING, '123456']);
-
-        $this->pdo->method('prepare')->willReturn($stmt);
-
+        // Ohne session_id wird ein Discord-Pairing-Code nicht gesucht, sondern
+        // sofort abgelehnt (Session-Bindung). Es darf kein DB-Zugriff erfolgen.
         $response = new Response();
         $result = $this->controller->loginOtpVerify($request, $response);
 
@@ -128,11 +120,12 @@ final class AuthControllerTest extends TestCase
         $this->assertSame('invalid_or_expired_code', $body['error'] ?? null);
     }
 
-    public function testLoginOtpVerifyAllowsDiscordPairingCodeWhenEmailOmitted(): void
+    public function testLoginOtpVerifyAllowsDiscordPairingCodeWithSessionId(): void
     {
         $request = $this->createStub(ServerRequestInterface::class);
         $request->method('getParsedBody')->willReturn([
             'code' => '123456',
+            'session_id' => 'session-1',
         ]);
 
         $stmt1 = $this->createMock(PDOStatement::class);
@@ -147,7 +140,7 @@ final class AuthControllerTest extends TestCase
         ]);
         $stmt1->expects($this->once())
             ->method('execute')
-            ->with([OtpTokenRepository::TYPE_DISCORD_PAIRING, '123456']);
+            ->with([OtpTokenRepository::TYPE_DISCORD_PAIRING, '123456', OtpTokenRepository::MAX_ATTEMPTS, 'session-1']);
 
         $stmt2 = $this->createStub(PDOStatement::class);
         $stmt2->method('fetch')->willReturn([
@@ -191,7 +184,7 @@ final class AuthControllerTest extends TestCase
         ]);
         $stmt1->expects($this->once())
             ->method('execute')
-            ->with([OtpTokenRepository::TYPE_EMAIL_OTP, '123456', 'user@example.com']);
+            ->with([OtpTokenRepository::TYPE_EMAIL_OTP, '123456', OtpTokenRepository::MAX_ATTEMPTS, 'user@example.com']);
 
         $stmt2 = $this->createStub(PDOStatement::class);
         $stmt2->method('fetch')->willReturn([

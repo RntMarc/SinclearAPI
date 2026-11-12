@@ -28,4 +28,10 @@ final readonly class JtiBlacklistRepository
         );
         $stmt->execute([$id, $jti, $expiresAt->format('Y-m-d H:i:s')]);
     }
+
+    public function deleteExpired(): int
+    {
+        $stmt = $this->pdo->query('DELETE FROM JtiBlacklist WHERE expiresAt < NOW()');
+        return $stmt->rowCount();
+    }
 }

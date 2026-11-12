@@ -112,6 +112,12 @@ return function (App $app): void {
 
         $group->post('/refresh', [AuthController::class, 'refresh']);
 
+        // Logout widerruft Refresh-Token + Access-Token (JTI-Blacklist). Als
+        // auth.optional registriert, damit auch mit abgelaufenem Access-Token
+        // serverseitig aufgeräumt werden kann.
+        $group->post('/logout', [AuthController::class, 'logout'])
+            ->add($container->get('auth.optional'));
+
         $group->group('/register', function (RouteCollectorProxy $register) use ($container) {
             $register->post('/discord/start', [AuthController::class, 'registerDiscordStart']);
             $register->get('/discord/callback', [AuthController::class, 'registerDiscordCallback']);
@@ -146,7 +152,7 @@ return function (App $app): void {
         $group->delete('/{id}/bookmark', [ExploreController::class, 'removeBookmark']);
     })->add($container->get(AuthenticationMiddleware::class));
 
-    $app->group('/user', function (RouteCollectorProxy $group) {
+    $app->group('/user', function (RouteCollectorProxy $group) use ($container) {
         $group->get('', [UserController::class, 'list']);
         $group->get('/me', [UserController::class, 'me']);
         $group->get('/me/base', [UserController::class, 'meBase']);
@@ -157,10 +163,12 @@ return function (App $app): void {
         $group->delete('/me/close-friends/{userId}', [UserController::class, 'removeCloseFriend']);
         $group->put('/me/profile', [ProfileController::class, 'update']);
         $group->post('/me/email/request', [ProfileController::class, 'requestEmailChange']);
-        $group->post('/me/email/verify', [ProfileController::class, 'verifyEmailChange']);
+        $group->post('/me/email/verify', [ProfileController::class, 'verifyEmailChange'])
+            ->add($container->get(LoginThrottleMiddleware::class));
         $group->post('/me/discord/start', [ProfileController::class, 'startDiscordRelink']);
         $group->get('/me/discord/callback', [ProfileController::class, 'discordCallback']);
-        $group->post('/me/discord/verify', [ProfileController::class, 'verifyDiscordRelink']);
+        $group->post('/me/discord/verify', [ProfileController::class, 'verifyDiscordRelink'])
+            ->add($container->get(LoginThrottleMiddleware::class));
         // @deprecated since 2026-07-19 — use PUT /user/me/preferences instead. Remove until 2026-09-19.
         $group->put('/me/discord/sync-avatar', [ProfileController::class, 'updateDiscordSyncAvatar']);
         $group->put('/me/visibility', [ProfileController::class, 'updateVisibility']);
@@ -578,8 +586,10 @@ return function (App $app): void {
 
     // Admin routes (unprotected login/logout)
     $app->get('/admin/login', [AdminController::class, 'loginPage']);
-    $app->post('/admin/login/otp/request', [AdminController::class, 'loginOtpRequest']);
-    $app->post('/admin/login/otp/verify', [AdminController::class, 'loginOtpVerify']);
+    $app->post('/admin/login/otp/request', [AdminController::class, 'loginOtpRequest'])
+        ->add($container->get(LoginThrottleMiddleware::class));
+    $app->post('/admin/login/otp/verify', [AdminController::class, 'loginOtpVerify'])
+        ->add($container->get(LoginThrottleMiddleware::class));
     $app->get('/admin/logout', [AdminController::class, 'logout']);
 
     // Admin routes (protected)
@@ -672,10 +682,12 @@ return function (App $app): void {
     $adminApiWrite = $container->get('admin.api.write');
     $requireHttps = $container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class);
 
-    $app->group('/admin-api', function (RouteCollectorProxy $group) {
+    $app->group('/admin-api', function (RouteCollectorProxy $group) use ($container) {
         // Step-up-Authentifizierung
-        $group->post('/auth/otp/request', [AdminApiAuthController::class, 'otpRequest']);
-        $group->post('/auth/otp/verify', [AdminApiAuthController::class, 'otpVerify']);
+        $group->post('/auth/otp/request', [AdminApiAuthController::class, 'otpRequest'])
+            ->add($container->get(LoginThrottleMiddleware::class));
+        $group->post('/auth/otp/verify', [AdminApiAuthController::class, 'otpVerify'])
+            ->add($container->get(LoginThrottleMiddleware::class));
 
         // Lesen
         $group->get('/dashboard', [AdminApiDashboardController::class, 'dashboard']);

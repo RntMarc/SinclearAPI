@@ -22,6 +22,9 @@ $settings['jwt'] = [
     'issuer' => $_ENV['JWT_ISSUER'] ?? 'sinclear-api',
     'access_ttl' => (int)($_ENV['JWT_ACCESS_TTL'] ?? 900),
     'refresh_ttl' => (int)($_ENV['JWT_REFRESH_TTL'] ?? 7776000),
+    // Kulanzfenster (Sekunden), in dem ein bereits rotierter Refresh-Token
+    // noch einmal akzeptiert wird, bevor die Familie als kompromittiert gilt.
+    'refresh_reuse_grace' => (int)($_ENV['JWT_REFRESH_REUSE_GRACE'] ?? 60),
 ];
 
 $settings['discord'] = [

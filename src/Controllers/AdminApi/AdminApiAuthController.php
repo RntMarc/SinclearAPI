@@ -71,6 +71,7 @@ final readonly class AdminApiAuthController
         $email = (string) $user['email'];
         $otpToken = $this->otpTokenRepo->findValidAdminStepup($email, $code);
         if ($otpToken === null) {
+            $this->otpTokenRepo->incrementAttemptsForEmail($email, OtpTokenRepository::TYPE_ADMIN_STEPUP);
             return ResponseFactory::json(['error' => 'invalid_or_expired_code'], 400, $response);
         }
 

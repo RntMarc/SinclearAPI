@@ -57,6 +57,7 @@ final readonly class AuthController
         $body = (array) ($request->getParsedBody() ?? []);
         $email = trim($body['email'] ?? '');
         $code = trim($body['code'] ?? '');
+        $sessionId = trim($body['session_id'] ?? '');
 
         if (empty($code) || !preg_match('/^\d{6}$/', $code)) {
             return ResponseFactory::json(['error' => 'invalid_code'], 400, $response);
@@ -69,8 +70,20 @@ final readonly class AuthController
                 return ResponseFactory::json(['error' => 'invalid_email'], 400, $response);
             }
             $otpToken = $this->otpTokenRepo->findValidEmailOtp($email, $code);
+            if ($otpToken === null) {
+                $this->otpTokenRepo->incrementAttemptsForEmail($email, OtpTokenRepository::TYPE_EMAIL_OTP);
+            }
         } else {
-            $otpToken = $this->otpTokenRepo->findValidDiscordPairing($code);
+            // Discord-Pairing-Codes sind an die Session gebunden, die
+            // /auth/login/discord/start ausgelöst hat. Ohne session_id ist der
+            // Code nicht einlösbar (verhindert Session-Hijacking per Ratecode).
+            if ($sessionId === '') {
+                return ResponseFactory::json(['error' => 'invalid_or_expired_code'], 400, $response);
+            }
+            $otpToken = $this->otpTokenRepo->findValidDiscordPairing($code, $sessionId);
+            if ($otpToken === null) {
+                $this->otpTokenRepo->incrementAttemptsForSession($sessionId, OtpTokenRepository::TYPE_DISCORD_PAIRING);
+            }
         }
 
         if ($otpToken === null) {
@@ -102,6 +115,7 @@ final readonly class AuthController
 
         return ResponseFactory::json([
             'url' => $result['url'],
+            'session_id' => $result['state'],
         ], 200, $response);
     }
 
@@ -146,6 +160,7 @@ final readonly class AuthController
 
         return ResponseFactory::json([
             'url' => $result['url'],
+            'session_id' => $result['state'],
         ], 200, $response);
     }
 
@@ -218,7 +233,34 @@ final readonly class AuthController
             'access_token' => $accessToken,
             'expires_in' => $this->tokenService->getAccessTtl(),
             'refresh_token' => $result['refresh_token'],
+            'expires_at' => $result['expires_at'],
             'token_type' => 'Bearer',
         ], 200, $response);
+    }
+
+    /**
+     * Meldet eine Sitzung serverseitig ab: widerruft den mitgelieferten
+     * Refresh-Token und setzt die JTI des aktuellen Access-Tokens auf die
+     * Blacklist. Der Endpunkt ist als `auth.optional` registriert, damit auch
+     * mit bereits abgelaufenem Access-Token aufgeräumt werden kann.
+     */
+    public function logout(
+        ServerRequestInterface $request,
+        ResponseInterface $response,
+    ): ResponseInterface {
+        $body = (array) ($request->getParsedBody() ?? []);
+        $refreshToken = trim($body['refresh_token'] ?? '');
+
+        if (!empty($refreshToken)) {
+            $tokenHash = $this->tokenService->hashRefreshToken($refreshToken);
+            $this->tokenService->revokeRefreshToken($tokenHash);
+        }
+
+        $user = $request->getAttribute(AuthenticatedUser::class);
+        if ($user instanceof AuthenticatedUser && !empty($user->jti)) {
+            $this->tokenService->blacklistJti($user->jti);
+        }
+
+        return ResponseFactory::noContent($response);
     }
 }

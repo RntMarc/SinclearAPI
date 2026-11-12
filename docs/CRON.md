@@ -36,6 +36,8 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 7 | `polls_deadline` | 1 Stunde | Schließt abgelaufene Umfragen und erinnert Teilnehmer vor der Deadline |
 | 8 | `refresh_game_stats` | `GAMES_CACHE_TTL` (Default 1 Stunde) | Aktualisiert den Cache der Spiele-Statistiken (Deadlock) |
 | 9 | `cleanup_arcade_sessions` | 1 Stunde | Löscht abgelaufene und widerrufene Arcade-Sessions |
+| 10 | `cleanup_refresh_tokens` | 24 Stunden | Löscht abgelaufene/widerrufene Refresh-Tokens und verwaiste Familien |
+| 11 | `cleanup_jti_blacklist` | 1 Stunde | Löscht abgelaufene JTI-Blacklist-Einträge |
 
 ## Details
 
@@ -111,6 +113,20 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Aktion:** `DELETE FROM ArcadeSession WHERE expiresAt < NOW(3) OR revokedAt IS NOT NULL` — entfernt abgelaufene und widerrufene Spiel-Session-Token.
 - **Datei:** `src/Services/Cron/Tasks/CleanupArcadeSessionsTask.php`
 - **Hintergrund:** Siehe [arcade/readme.md](./arcade/readme.md).
+
+### Refresh Token Cleanup
+- **Task-Name:** `cleanup_refresh_tokens`
+- **Intervall:** 86400 Sekunden (24 Stunden)
+- **Aktion:** Löscht `RefreshToken`-Einträge, deren `expiresAt` oder `revokedAt` älter als 30 Tage ist, und anschließend verwaiste `RefreshTokenFamily`-Einträge (ohne verbleibende Tokens). Hält die Tabellen klein — der Client rotiert den Refresh-Token bei jedem Hintergrund-Poll.
+- **Datei:** `src/Services/Cron/Tasks/CleanupExpiredRefreshTokensTask.php`
+- **Hintergrund:** Siehe [auth/login.md](./auth/login.md).
+
+### JTI Blacklist Cleanup
+- **Task-Name:** `cleanup_jti_blacklist`
+- **Intervall:** 3600 Sekunden (1 Stunde)
+- **Aktion:** `DELETE FROM JtiBlacklist WHERE expiresAt < NOW()` — entfernt abgelaufene Access-Token-JTIs (Logout-Blacklist).
+- **Datei:** `src/Services/Cron/Tasks/CleanupExpiredJtiBlacklistTask.php`
+- **Hintergrund:** Siehe [auth/login.md](./auth/login.md).
 
 ## CronSchedule-Tabelle
 
