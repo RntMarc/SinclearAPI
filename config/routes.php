@@ -491,6 +491,12 @@ return function (App $app): void {
         $group->delete('/journeys/{id}/participants/{userId}', [PtController::class, 'removeParticipant']);
     })->add($container->get(AuthenticationMiddleware::class));
 
+    // Notifications (public — no auth required)
+    // Muss VOR der Variablen-Route `/notifications/{id}` registriert werden:
+    // FastRoute lehnt eine statische Route ab, die von einer zuvor definierten
+    // Variablen-Route überdeckt würde ("Static route ... is shadowed ...").
+    $app->get('/notifications/vapid-public-key', [NotificationController::class, 'vapidPublicKey']);
+
     // Notifications (authenticated)
     $app->group('/notifications', function (RouteCollectorProxy $group) {
         $group->get('', [NotificationController::class, 'index']);
@@ -501,9 +507,6 @@ return function (App $app): void {
         $group->put('/preferences', [NotificationController::class, 'updatePreferences']);
         $group->get('/{id}', [NotificationController::class, 'get']);
     })->add($container->get(AuthenticationMiddleware::class));
-
-    // Notifications (public — no auth required)
-    $app->get('/notifications/vapid-public-key', [NotificationController::class, 'vapidPublicKey']);
 
     // External Data (weather, air quality, pollen, etc.)
     $app->group('/external-data', function (RouteCollectorProxy $group) {
