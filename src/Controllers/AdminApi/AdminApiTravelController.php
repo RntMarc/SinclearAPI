@@ -22,6 +22,7 @@ use Sinclear\Api\Services\AdminAuditService;
 use Sinclear\Api\Services\ImageService;
 use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\TravelChatService;
+use Sinclear\Api\Services\TravelNotificationService;
 use Sinclear\Api\Services\TravelService;
 
 final readonly class AdminApiTravelController
@@ -45,6 +46,7 @@ final readonly class AdminApiTravelController
         private ChatConversationRepository $conversationRepo,
         private ImageService $imageService,
         private NotificationService $notificationService,
+        private TravelNotificationService $travelNotifications,
         private AdminAuditService $auditService,
         private LoggerInterface $logger,
     ) {}
@@ -910,94 +912,16 @@ final readonly class AdminApiTravelController
         }
 
         $uploadedBy = $this->requireUser($request);
-
-        if ($ticket['type'] === 'trip' && $ticket['trip'] !== null) {
-            $participants = $this->travelRelationRepo->findParticipantsByTrip($ticket['trip']);
-            foreach ($participants as $participant) {
-                if ($participant['id'] === $uploadedBy->id) {
-                    continue;
-                }
-                $this->notificationService->create(
-                    userId: $participant['id'],
-                    type: 'trip_ticket_added',
-                    title: '',
-                    body: '',
-                    data: [
-                        ['relation' => 'ticket', 'object' => 'Ticket', 'identifier' => $ticket['ID']],
-                        ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $ticket['trip']],
-                        ['relation' => 'uploaded_by', 'object' => 'User', 'identifier' => $uploadedBy->id],
-                    ],
-                );
-            }
-        } elseif ($ticket['type'] === 'event' && $ticket['event'] !== null) {
-            $event = $this->eventRepo->findById($ticket['event']);
-            if ($event === null) {
-                return;
-            }
-
-            $isTripEvent = $event['trip'] !== null;
-            $type = $isTripEvent ? 'trip_event_ticket_added' : 'standalone_event_ticket_added';
-
-            $participants = $this->eventRelationRepo->findByEvent($ticket['event']);
-            foreach ($participants as $participant) {
-                if ($participant['userId'] === $uploadedBy->id) {
-                    continue;
-                }
-                $data = [
-                    ['relation' => 'ticket', 'object' => 'Ticket', 'identifier' => $ticket['ID']],
-                    ['relation' => 'event', 'object' => 'Event', 'identifier' => $ticket['event']],
-                    ['relation' => 'uploaded_by', 'object' => 'User', 'identifier' => $uploadedBy->id],
-                ];
-                $this->notificationService->create(
-                    userId: $participant['userId'],
-                    type: $type,
-                    title: '',
-                    body: '',
-                    data: $data,
-                );
-            }
-        }
+        $this->travelNotifications->notifyTicketAdded($ticket, $uploadedBy->id);
     }
 
     private function notifyTripAccommodationAdded(string $tripId, string $userId, string $accommodationId): void
     {
-        $trip = $this->tripRepo->findById($tripId);
-        if ($trip === null) {
-            return;
-        }
-
-        $accommodation = $this->accommodationRepo->findById($accommodationId);
-        if ($accommodation === null) {
-            return;
-        }
-
-        $this->notificationService->create(
-            userId: $userId,
-            type: 'trip_accommodation_added',
-            title: '',
-            body: '',
-            data: [
-                ['relation' => 'accommodation', 'object' => 'Accommodation', 'identifier' => $accommodationId],
-                ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
-                ['relation' => 'user', 'object' => 'User', 'identifier' => $userId],
-            ],
-        );
+        $this->travelNotifications->notifyTripAccommodationAdded($tripId, $userId, $accommodationId);
     }
 
     private function notifyTripSubscriptionAdded(string $tripId, string $subscriptionId): void
     {
-        $participants = $this->travelRelationRepo->findParticipantsByTrip($tripId);
-        foreach ($participants as $participant) {
-            $this->notificationService->create(
-                userId: $participant['id'],
-                type: 'trip_subscription_added',
-                title: '',
-                body: '',
-                data: [
-                    ['relation' => 'subscription', 'object' => 'Subscription', 'identifier' => $subscriptionId],
-                    ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
-                ],
-            );
-        }
+        $this->travelNotifications->notifyTripSubscriptionAdded($tripId, $subscriptionId);
     }
 }

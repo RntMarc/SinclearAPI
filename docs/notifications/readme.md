@@ -1,8 +1,8 @@
 # Notifications API
 
-> **Wichtige Datenschutzregel:** Google FCM (Firebase Cloud Messaging) darf nicht verwendet oder integriert werden. Push-Benachrichtigungen laufen ausschließlich über Web Push (VAPID) und UnifiedPush.
+> **Wichtige Datenschutzregel zu Google FCM:** Nutzer von Google Firebase Cloud Messaging (FCM) erhalten über Google-Server **niemals** personalisierte Inhalte (keine Namen, keine Titel/Texte, keine Chatnachrichten, keine Relationsdaten). FCM überträgt ausschließlich ein anonymes Data-Only Wake-up-Signal (`wakeup = "1"`, `notificationId`), das die Android-App weckt, damit sie den eigentlichen Inhalt direkt und verschlüsselt von der Sinclear-API abruft. Vollständige Push-Payloads mit Inhalt werden ausschließlich über die datenschutzfreundlichen Kanäle **Web Push (VAPID, Ende-zu-Ende-verschlüsselt)** und **UnifiedPush** (sowie beim direkten API-Polling) übertragen.
 
-Benachrichtigungs-System für Sinclear Beyond. Ermöglicht In-App-Benachrichtigungen via Polling sowie Push-Benachrichtigungen via Web Push (VAPID) und UnifiedPush.
+Benachrichtigungs-System für Sinclear Beyond. Ermöglicht In-App-Benachrichtigungen via Polling sowie Push-Benachrichtigungen via Web Push (VAPID), UnifiedPush und anonymem FCM-Wakeup.
 
 ## Endpunkte
 
@@ -46,7 +46,38 @@ Gibt alle ungelesenen Benachrichtigungen des eingeloggten Nutzers zurück (max. 
 }
 ```
 
-Die API liefert auf Benachrichtigungs-Endpunkten und in Push-Payloads keine Client-Routen aus. `title` und `text` werden von der API aus dem Benachrichtigungstyp generiert; Clients interpretieren `type` und `data`, laden bei Bedarf die referenzierten Ressourcen nach und erzeugen das Routing lokal.
+Die API liefert auf Benachrichtigungs-Endpunkten und in Push-Payloads keine Client-Routen aus. `title` und `text` werden von der API aus dem Benachrichtigungstyp und den beteiligten Entitäten (z. B. Anzeigename des Auslösers, Titel von Reise/Event/Umfrage) generiert; Clients interpretieren `type` und `data`, laden bei Bedarf die referenzierten Ressourcen nach und erzeugen das Routing lokal.
+
+### Einzelne Benachrichtigung abrufen
+
+```
+GET /notifications/{id}
+```
+
+Gibt eine einzelne Benachrichtigung des eingeloggten Nutzers anhand ihrer ID zurück (z. B. nach einem anonymen FCM-Wake-up-Signal).
+
+**Authentifizierung:** Erforderlich (Bearer Token)
+
+**Response 200:**
+```json
+{
+  "data": {
+    "id": "01923456-7890-7abc-def0-123456789012",
+    "userId": "user-id",
+    "type": "story_post",
+    "title": "Neue Story",
+    "text": "James hat eine neue Story veröffentlicht.",
+    "data": [
+      { "relation": "story_author", "object": "User", "identifier": "user-story" },
+      { "relation": "story", "object": "Story", "identifier": "story-id" }
+    ],
+    "isRead": false,
+    "createdAt": "2026-08-10 14:30:00.123"
+  }
+}
+```
+
+**Response 404:** `notification_not_found` (existiert nicht oder gehört einem anderen Nutzer).
 
 ### Benachrichtigungen als gelesen markieren
 
@@ -102,6 +133,14 @@ Speichert oder aktualisiert eine Web Push- oder UnifiedPush-Subscription für de
 }
 ```
 
+**Request Body (FCM – nur Android):**
+```json
+{
+  "endpoint": "<fcm-registration-token>",
+  "type": "fcm"
+}
+```
+
 **Response 201:**
 ```json
 { "ok": true }
@@ -109,7 +148,7 @@ Speichert oder aktualisiert eine Web Push- oder UnifiedPush-Subscription für de
 
 **Response 400:**
 - `endpoint_required`: Endpoint fehlt oder ist ungültig
-- `type_invalid`: Type ist nicht `webpush` oder `unifiedpush`
+- `type_invalid`: Type ist nicht `webpush`, `unifiedpush` oder `fcm`
 - `webpush_keys_required`: Bei Web Push fehlen `p256dh` oder `auth`
 
 ### Push-Subscription löschen
@@ -302,7 +341,7 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 |------|-----|-------------|
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Eigentümer (FK zu User) |
-| `type` | varchar(20) | `webpush` oder `unifiedpush` |
+| `type` | varchar(20) | `webpush`, `unifiedpush` oder `fcm` |
 | `endpoint` | text | Push-Endpoint-URL |
 | `p256dh` | text | Web Push Public Key (nullable) |
 | `auth` | text | Web Push Auth Secret (nullable) |
@@ -556,7 +595,33 @@ UnifiedPush-Endpoints werden per HTTP POST mit JSON-Body bedient. Der Distributo
 
 HTTP 410 vom Distributor → Subscription wird automatisch gelöscht.
 
-> Der Push-Payload entspricht dem reduzierten Benachrichtigungsobjekt aus `GET /notifications` ohne `userId` und `isRead`: `id`, `type`, `title`, `text`, `data`, `createdAt`. Er enthält keine Routen; Titel und Texte sind API-generiert.
+> Der Push-Payload für Web Push und UnifiedPush entspricht dem reduzierten Benachrichtigungsobjekt aus `GET /notifications` ohne `userId` und `isRead`: `id`, `type`, `title`, `text`, `data`, `createdAt`. Er enthält keine Routen; Titel und Texte sind API-generiert.
+
+### Google FCM (Firebase Cloud Messaging – strikt anonymes Wake-up)
+
+Für Android-Clients, die FCM als Zustellmethode gewählt haben, sendet die API über die FCM HTTP v1 API **ausschließlich ein inhaltsloses Data-Only Wake-up-Signal**:
+
+**Payload an Google FCM:**
+```json
+{
+  "message": {
+    "token": "<fcm-registration-token>",
+    "data": {
+      "wakeup": "1",
+      "notificationId": "01923456-7890-7abc-def0-123456789012"
+    },
+    "android": {
+      "priority": "high"
+    }
+  }
+}
+```
+
+**Datenschutz-Garantie:**
+- Es wird **niemals** ein `notification`-Objekt (`title`/`body`) an FCM übergeben.
+- Es werden **keine** Namen, **keine** Nachrichtentexte, **kein** `type` und **keine** `data`-Relationen an Google übermittelt.
+- Die Android-App empfängt das `wakeup`-Signal im Hintergrund und ruft den eigentlichen Inhalt direkt und authentifiziert über `GET /notifications` bzw. `GET /notifications/{id}` vom Sinclear-Server ab.
+- Antwortet FCM mit HTTP 404/410 bzw. `UNREGISTERED` / `NOT_FOUND`, wird das Token sofort aus `PushSubscription` gelöscht.
 
 ### Bereinigung toter Subscriptions
 
@@ -601,6 +666,10 @@ Sind `title`/`body` leer, generiert die API sie automatisch aus dem Typ (siehe [
 VAPID_PUBLIC_KEY=<base64url-encoded-public-key>
 VAPID_PRIVATE_KEY=<base64url-encoded-private-key>
 VAPID_SUBJECT=mailto:contact@sinclear.de
+
+FCM_PROJECT_ID=<firebase-project-id>
+FCM_CLIENT_EMAIL=<service-account-email>
+FCM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 Schlüsselpaar generieren mit:

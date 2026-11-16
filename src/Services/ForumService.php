@@ -456,13 +456,23 @@ final readonly class ForumService
             ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $post['forumId']],
         ];
 
+        $author = $this->userRepo->findById($commentAuthorId);
+        $authorName = isset($author['displayName']) ? trim((string) $author['displayName']) : '';
+        $postContent = isset($post['content']) && is_string($post['content'])
+            ? json_decode($post['content'], true)
+            : null;
+        $postPreview = $this->extractPostPreview(is_array($postContent) ? $postContent : null);
+
         if ($parent === null) {
             if ($post['userId'] !== $commentAuthorId) {
+                $body = $authorName !== ''
+                    ? $authorName . ' hat deinen Beitrag kommentiert.'
+                    : '';
                 $this->notificationService->create(
                     userId: $post['userId'],
                     type: 'forum_comment',
                     title: '',
-                    body: '',
+                    body: $body,
                     data: $baseRelations,
                 );
             }
@@ -473,11 +483,18 @@ final readonly class ForumService
             return;
         }
 
+        $replyBody = '';
+        if ($authorName !== '' || $postPreview !== '') {
+            $who = $authorName !== '' ? $authorName : 'Jemand';
+            $postPart = $postPreview !== '' ? ' unter dem Post „' . $postPreview . '“' : '';
+            $replyBody = $who . ' hat auf deinen Kommentar' . $postPart . ' geantwortet.';
+        }
+
         $this->notificationService->create(
             userId: $parent['userId'],
             type: 'forum_reply',
             title: '',
-            body: '',
+            body: $replyBody,
             data: [
                 ['relation' => 'reply_author', 'object' => 'User', 'identifier' => $commentAuthorId],
                 ['relation' => 'comment_author', 'object' => 'User', 'identifier' => $parent['userId']],
@@ -498,6 +515,12 @@ final readonly class ForumService
             ['relation' => 'parent_forum', 'object' => 'Forum', 'identifier' => $forumId],
         ];
 
+        $author = $this->userRepo->findById($authorId);
+        $authorName = isset($author['displayName']) ? trim((string) $author['displayName']) : '';
+        $body = $authorName !== ''
+            ? $authorName . ' hat einen neuen Beitrag im Forum veröffentlicht.'
+            : '';
+
         foreach ($members as $member) {
             if ($member['userId'] === $authorId) {
                 continue;
@@ -507,7 +530,7 @@ final readonly class ForumService
                 userId: $member['userId'],
                 type: 'forum_post',
                 title: '',
-                body: '',
+                body: $body,
                 data: $relations,
                 dedupeKey: 'post:' . $post['id'] . ':user:' . $member['userId'],
             );

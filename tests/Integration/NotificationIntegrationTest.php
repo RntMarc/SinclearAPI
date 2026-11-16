@@ -304,6 +304,22 @@ class NotificationIntegrationTest extends TestCase
         $this->assertCount(1, $subs);
     }
 
+    public function testSavePushSubscriptionFcm(): void
+    {
+        $request = $this->requestWithUser('POST', '/notifications/push-subscription', [
+            'endpoint' => 'fcm-device-registration-token-xyz',
+            'type' => 'fcm',
+        ]);
+
+        $response = $this->controller->savePushSubscription($request, new Response());
+
+        $this->assertSame(201, $response->getStatusCode());
+
+        $subs = $this->pushSubRepo->findByUserId('user-1', 'fcm');
+        $this->assertCount(1, $subs);
+        $this->assertSame('fcm-device-registration-token-xyz', $subs[0]['endpoint']);
+    }
+
     public function testSavePushSubscriptionMissingEndpointReturns400(): void
     {
         $request = $this->requestWithUser('POST', '/notifications/push-subscription', [

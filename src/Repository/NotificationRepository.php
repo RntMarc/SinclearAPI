@@ -110,13 +110,33 @@ final readonly class NotificationRepository
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return array_map(function (array $row): array {
-            $row['data'] = $row['data'] !== null ? json_decode($row['data'], true) : null;
-            $row['isRead'] = (bool) $row['isRead'];
-            $row['text'] = $row['body'];
-            unset($row['body']);
-            return $row;
-        }, $rows);
+        return array_map([$this, 'formatRow'], $rows);
+    }
+
+    public function findByIdForUser(string $userId, string $id): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT * FROM Notification WHERE id = ? AND userId = ? LIMIT 1'
+        );
+        $stmt->execute([$id, $userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return null;
+        }
+        return $this->formatRow($row);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function formatRow(array $row): array
+    {
+        $row['data'] = $row['data'] !== null ? json_decode($row['data'], true) : null;
+        $row['isRead'] = (bool) $row['isRead'];
+        $row['text'] = $row['body'];
+        unset($row['body']);
+        return $row;
     }
 
     /**

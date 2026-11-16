@@ -93,6 +93,12 @@ $settings['vapid'] = [
     'subject' => $_ENV['VAPID_SUBJECT'] ?? 'mailto:contact@sinclear.de',
 ];
 
+$settings['fcm'] = [
+    'project_id' => $_ENV['FCM_PROJECT_ID'] ?? '',
+    'client_email' => $_ENV['FCM_CLIENT_EMAIL'] ?? '',
+    'private_key' => $_ENV['FCM_PRIVATE_KEY'] ?? '',
+];
+
 $settings['polls'] = [
     'anonymity_secret' => $_ENV['POLL_ANONYMITY_SECRET'] ?? '',
 ];

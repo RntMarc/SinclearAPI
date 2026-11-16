@@ -29,6 +29,19 @@ final readonly class NotificationController
         return ResponseFactory::json(['notifications' => $notifications], 200, $response);
     }
 
+    public function get(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+        $id = (string) ($args['id'] ?? '');
+
+        $notification = $this->notificationService->getById($user->id, $id);
+        if ($notification === null) {
+            return ResponseFactory::json(['error' => 'notification_not_found'], 404, $response);
+        }
+
+        return ResponseFactory::json(['data' => $notification], 200, $response);
+    }
+
     public function markRead(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
         $user = $this->requireUser($request);
@@ -55,7 +68,7 @@ final readonly class NotificationController
             return ResponseFactory::json(['error' => 'endpoint_required'], 400, $response);
         }
 
-        if (!in_array($type, ['webpush', 'unifiedpush'], true)) {
+        if (!in_array($type, ['webpush', 'unifiedpush', 'fcm'], true)) {
             return ResponseFactory::json(['error' => 'type_invalid'], 400, $response);
         }
 

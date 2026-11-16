@@ -15,6 +15,7 @@ final readonly class Settings
         public array $pagination,
         public array $downloads = [],
         public array $vapid = [],
+        public array $fcm = [],
         public array $external_data = [],
         public array $unsplash = [],
         public array $centrifugo = [],

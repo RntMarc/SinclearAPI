@@ -10,11 +10,11 @@ Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihr
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `forum_comment` | Neuer Top-Level-Kommentar (ohne `parentId`) auf einen Forum-Post | Autor des Posts, außer bei eigenem Kommentar (kein Self-Trigger) | `comment_author` (User, Autor des Kommentars), `post_author` (User), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neuer Kommentar zu deinem Beitrag` | `Jemand hat deinen Beitrag kommentiert.` |
-| `forum_reply` | Neue Antwort (mit `parentId`) auf einen bestehenden Forum-Kommentar | Autor des beantworteten Kommentars, außer bei eigener Antwort (kein Self-Trigger) | `reply_author` (User, Autor der Antwort), `comment_author` (User, Autor des beantworteten Kommentars), `post_author` (User), `parent_comment` (ForumPostComment), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neue Antwort auf deinen Kommentar` | `Jemand hat auf deinen Kommentar geantwortet.` |
-| `forum_post` | Neuer Post in einem Forum | Alle anderen Mitglieder desselben Forums (kein Self-Trigger). Dedupliziert pro Post und Empfänger (`dedupeKey = "post:<postId>:user:<userId>"`). | `post_author` (User, Autor des Posts), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neuer Beitrag im Forum` | `Jemand hat einen neuen Beitrag im Forum veröffentlicht.` |
+| `forum_comment` | Neuer Top-Level-Kommentar (ohne `parentId`) auf einen Forum-Post | Autor des Posts, außer bei eigenem Kommentar (kein Self-Trigger) | `comment_author` (User, Autor des Kommentars), `post_author` (User), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neuer Kommentar zu deinem Beitrag` | Dynamisch: `{comment_author.displayName} hat deinen Beitrag kommentiert.` Fallback: `Jemand hat deinen Beitrag kommentiert.` |
+| `forum_reply` | Neue Antwort (mit `parentId`) auf einen bestehenden Forum-Kommentar | Autor des beantworteten Kommentars, außer bei eigener Antwort (kein Self-Trigger) | `reply_author` (User, Autor der Antwort), `comment_author` (User, Autor des beantworteten Kommentars), `post_author` (User), `parent_comment` (ForumPostComment), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neue Antwort auf deinen Kommentar` | Dynamisch: `{reply_author.displayName} hat auf deinen Kommentar unter dem Post „{Vorschau}“ geantwortet.` Fallback: `Jemand hat auf deinen Kommentar geantwortet.` |
+| `forum_post` | Neuer Post in einem Forum | Alle anderen Mitglieder desselben Forums (kein Self-Trigger). Dedupliziert pro Post und Empfänger (`dedupeKey = "post:<postId>:user:<userId>"`). | `post_author` (User, Autor des Posts), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neuer Beitrag im Forum` | Dynamisch: `{post_author.displayName} hat einen neuen Beitrag im Forum veröffentlicht.` Fallback: `Jemand hat einen neuen Beitrag im Forum veröffentlicht.` |
 | `forum_upvote` | Jemand gibt ein Upvote auf einen Forum-Post | Ersteller des Posts, außer bei eigenem Upvote (kein Self-Trigger) | `voter` (User, hat gevoted), `post_author` (User, Ersteller des Posts), `parent_post` (ForumPost), `parent_forum` (Forum) | `Neue Bewertung` | Dynamisch: `{voter.displayName} hat deinen Beitrag „{Vorschau}“ positiv bewertet.`. Fallback: `Jemand hat deinen Beitrag positiv bewertet.` |
-| `story_post` | Neue Story wird veröffentlicht | Alle Nutzer außer dem Autor (kein Self-Trigger) | `story_author` (User, Autor der Story), `story` (Story) | `Neue Story` | `Jemand hat eine neue Story veröffentlicht.` |
+| `story_post` | Neue Story wird veröffentlicht | Alle Nutzer außer dem Autor (kein Self-Trigger) | `story_author` (User, Autor der Story), `story` (Story) | `Neue Story` | Dynamisch: `{story_author.displayName} hat eine neue Story veröffentlicht.` Fallback: `Jemand hat eine neue Story veröffentlicht.` |
 
 ## Direktnachrichten
 
@@ -88,26 +88,26 @@ Diese Datei listet ausschließlich die existierenden Benachrichtigungstypen, ihr
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `trip_leader_appointed` | Ein Reise-Teilnehmer wird zum Reiseleiter ernannt | Der ernannte Nutzer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Du bist jetzt Reiseleiter` | `''` |
-| `trip_leader_appointed_others` | Ein Reise-Teilnehmer wird zum Reiseleiter ernannt | Alle anderen Reise-Teilnehmer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Neuer Reiseleiter auf der Reise` | `''` |
-| `trip_leader_removed` | Die Reiseleiter-Rolle eines Teilnehmers wird entzogen | Der betroffene Nutzer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Du bist nicht mehr Reiseleiter` | `''` |
-| `trip_leader_removed_others` | Die Reiseleiter-Rolle eines Teilnehmers wird entzogen | Alle anderen Reise-Teilnehmer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Reiseleiter geändert` | `''` |
+| `trip_leader_appointed` | Ein Reise-Teilnehmer wird zum Reiseleiter ernannt | Der ernannte Nutzer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Du bist jetzt Reiseleiter` | `Du bist jetzt Reiseleiter der Reise.` |
+| `trip_leader_appointed_others` | Ein Reise-Teilnehmer wird zum Reiseleiter ernannt | Alle anderen Reise-Teilnehmer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Neuer Reiseleiter auf der Reise` | Dynamisch: `{changed_user.displayName} wurde zum Reiseleiter ernannt.` |
+| `trip_leader_removed` | Die Reiseleiter-Rolle eines Teilnehmers wird entzogen | Der betroffene Nutzer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Du bist nicht mehr Reiseleiter` | `Du bist nicht mehr Reiseleiter der Reise.` |
+| `trip_leader_removed_others` | Die Reiseleiter-Rolle eines Teilnehmers wird entzogen | Alle anderen Reise-Teilnehmer | `trip` (Trip), `changed_user` (User), `changed_by` (User) | `Reiseleiter geändert` | Dynamisch: `{changed_user.displayName} ist nicht mehr Reiseleiter.` |
 
 ## Event-Rollen (Veranstalter, nur Standalone-Events)
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `standalone_event_leader_appointed` | Ein Event-Teilnehmer wird zum Veranstalter ernannt | Der ernannte Nutzer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Du bist jetzt Veranstalter` | `''` |
-| `standalone_event_leader_appointed_others` | Ein Event-Teilnehmer wird zum Veranstalter ernannt | Alle anderen Event-Teilnehmer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Neuer Veranstalter beim Event` | `''` |
-| `standalone_event_leader_removed` | Die Veranstalter-Rolle eines Teilnehmers wird entzogen | Der betroffene Nutzer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Du bist nicht mehr Veranstalter` | `''` |
-| `standalone_event_leader_removed_others` | Die Veranstalter-Rolle eines Teilnehmers wird entzogen | Alle anderen Event-Teilnehmer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Veranstalter geändert` | `''` |
+| `standalone_event_leader_appointed` | Ein Event-Teilnehmer wird zum Veranstalter ernannt | Der ernannte Nutzer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Du bist jetzt Veranstalter` | `Du bist jetzt Veranstalter des Events.` |
+| `standalone_event_leader_appointed_others` | Ein Event-Teilnehmer wird zum Veranstalter ernannt | Alle anderen Event-Teilnehmer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Neuer Veranstalter beim Event` | Dynamisch: `{changed_user.displayName} wurde zum Veranstalter ernannt.` |
+| `standalone_event_leader_removed` | Die Veranstalter-Rolle eines Teilnehmers wird entzogen | Der betroffene Nutzer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Du bist nicht mehr Veranstalter` | `Du bist nicht mehr Veranstalter des Events.` |
+| `standalone_event_leader_removed_others` | Die Veranstalter-Rolle eines Teilnehmers wird entzogen | Alle anderen Event-Teilnehmer | `event` (Event), `changed_user` (User), `changed_by` (User) | `Veranstalter geändert` | Dynamisch: `{changed_user.displayName} ist nicht mehr Veranstalter.` |
 
 ## Event-Konversion (Reise ⇄ Standalone)
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `standalone_event_converted_to_trip` | Ein Standalone-Event wird an eine Reise angehängt | Event-Teilnehmer und Teilnehmer der Ziel-Reise (außer Auslöser) | `event` (Event), `trip` (Trip), `converted_by` (User) | `Event wurde zu einer Reise hinzugefügt` | `''` |
-| `trip_event_converted_to_standalone` | Ein Reise-Event wird zu einem Standalone-Event gelöst | Event-Teilnehmer und Teilnehmer der bisherigen Reise (außer Auslöser) | `event` (Event), `converted_by` (User) | `Event wurde von der Reise gelöst` | `''` |
+| `standalone_event_converted_to_trip` | Ein Standalone-Event wird an eine Reise angehängt | Event-Teilnehmer und Teilnehmer der Ziel-Reise (außer Auslöser) | `event` (Event), `trip` (Trip), `converted_by` (User) | `Event wurde zu einer Reise hinzugefügt` | Dynamisch: `{converted_by.displayName} hat ein Event zu einer Reise hinzugefügt.` |
+| `trip_event_converted_to_standalone` | Ein Reise-Event wird zu einem Standalone-Event gelöst | Event-Teilnehmer und Teilnehmer der bisherigen Reise (außer Auslöser) | `event` (Event), `converted_by` (User) | `Event wurde von der Reise gelöst` | Dynamisch: `{converted_by.displayName} hat ein Event von der Reise gelöst.` |
 
 **Präferenzen:** Diese Typen werden auf die vereinheitlichten Schlüssel
 `trip_leader_changed`, `trip_leader_changed_others`, `event_leader_changed`,
@@ -123,10 +123,10 @@ ableiten. Die Empfängerlogik liegt zentral in `PollNotificationService`.
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `poll_invite` | Nutzer wird zu einer Umfrage eingeladen | Der eingeladene Nutzer (kein Self-Trigger) | `poll` (Poll), `inviter` (User) | `Neue Umfrage-Einladung` | `''` |
-| `poll_counter_proposal` | Bei einer Terminfindung wird ein Gegenvorschlag angelegt | Ersteller plus übrige Teilnehmer (außer dem Vorschlagenden) | `poll` (Poll), `proposer` (User), `option` (PollOption) | `Neuer Gegenvorschlag` | `''` |
-| `poll_finalized` | Termin wird festgelegt **oder** Umfrage manuell/automatisch geschlossen | Alle Teilnehmer (Einladungen, Formular-Antworten, Verfügbarkeitsstimmen; außer dem Auslöser) | `poll` (Poll), `finalized_option` (PollOption, optional) | `Umfrage aktualisiert` | `''` |
-| `poll_deadline_reminder` | Cron `polls_deadline`: offene Umfrage kurz vor `closesAt` | Teilnehmer ohne Antwort/Verfügbarkeit/Stimme (`vote` via HMAC-Hash) | `poll` (Poll) | `Erinnerung: Umfrage endet bald` | `''` |
+| `poll_invite` | Nutzer wird zu einer Umfrage eingeladen | Der eingeladene Nutzer (kein Self-Trigger) | `poll` (Poll), `inviter` (User) | `Neue Umfrage-Einladung` | Dynamisch: `{inviter.displayName} hat dich zur Umfrage „{poll.title}“ eingeladen.` |
+| `poll_counter_proposal` | Bei einer Terminfindung wird ein Gegenvorschlag angelegt | Ersteller plus übrige Teilnehmer (außer dem Vorschlagenden) | `poll` (Poll), `proposer` (User), `option` (PollOption) | `Neuer Gegenvorschlag` | Dynamisch: `{proposer.displayName} hat einen Gegenvorschlag zur Umfrage „{poll.title}“ gemacht.` |
+| `poll_finalized` | Termin wird festgelegt **oder** Umfrage manuell/automatisch geschlossen | Alle Teilnehmer (Einladungen, Formular-Antworten, Verfügbarkeitsstimmen; außer dem Auslöser) | `poll` (Poll), `finalized_option` (PollOption, optional) | `Umfrage aktualisiert` | Dynamisch: `Der Termin für „{poll.title}“ steht fest: {option.label}` bzw. `Die Umfrage „{poll.title}“ wurde abgeschlossen.` |
+| `poll_deadline_reminder` | Cron `polls_deadline`: offene Umfrage kurz vor `closesAt` | Teilnehmer ohne Antwort/Verfügbarkeit/Stimme (`vote` via HMAC-Hash) | `poll` (Poll) | `Erinnerung: Umfrage endet bald` | Dynamisch: `Die Umfrage „{poll.title}“ endet bald.` |
 
 **Hinweis:** `poll_deadline_reminder` wird pro Umfrage und Empfänger
 dedupliziert (`dedupeKey = "poll:<pollId>:deadline"`). Bei anonymen
@@ -144,10 +144,10 @@ unterstützen kein `custom` (keine Denylist).
 
 | Type | Trigger | Empfänger | Relations (`data`) | Titel (API-generiert) | Text (API-generiert) |
 |------|---------|-----------|--------------------|-----------------------|----------------------|
-| `trip_planning_invite` | Ein Nutzer wird zu einer Planungsreise eingeladen | Der eingeladene Nutzer | `trip` (Trip), `inviter` (User) | `Einladung zur Reiseplanung` | `''` |
-| `trip_planning_response` | Ein Planungsmitglied meldet sich zurück (`accepted`/`declined`) | Die Leitung der Planung (außer der antwortenden Person) | `trip` (Trip), `responder` (User) | `Rückmeldung zur Reiseplanung` | `''` |
-| `trip_planning_finalized` | Die Leitung legt einen Termin, eine Unterkunft oder ein Event verbindlich fest | Alle aktiven Planungsmitglieder (außer Auslöser) | `trip` (Trip), optional `date_option` (TravelPlanDateOption) **oder** `accommodation_option` (TravelPlanAccommodationOption) **oder** `event` (TravelPlanEvent) | `Festlegung in der Reiseplanung` | `''` |
-| `trip_planning_activated` | Die Planung wird abgeschlossen und die Reise aktiviert | Alle aktiven Planungsmitglieder (außer Auslöser) | `trip` (Trip) | `Reiseplanung abgeschlossen` | `''` |
+| `trip_planning_invite` | Ein Nutzer wird zu einer Planungsreise eingeladen | Der eingeladene Nutzer | `trip` (Trip), `inviter` (User) | `Einladung zur Reiseplanung` | Dynamisch: `{inviter.displayName} hat dich zur Reiseplanung „{trip.name}“ eingeladen.` |
+| `trip_planning_response` | Ein Planungsmitglied meldet sich zurück (`accepted`/`declined`) | Die Leitung der Planung (außer der antwortenden Person) | `trip` (Trip), `responder` (User) | `Rückmeldung zur Reiseplanung` | Dynamisch: `{responder.displayName} hat sich zur Reiseplanung „{trip.name}“ zurückgemeldet.` |
+| `trip_planning_finalized` | Die Leitung legt einen Termin, eine Unterkunft oder ein Event verbindlich fest | Alle aktiven Planungsmitglieder (außer Auslöser) | `trip` (Trip), optional `date_option` (TravelPlanDateOption) **oder** `accommodation_option` (TravelPlanAccommodationOption) **oder** `event` (TravelPlanEvent) | `Festlegung in der Reiseplanung` | Dynamisch: `Der Zeitraum / Die Unterkunft / Ein Programmpunkt für die Reiseplanung „{trip.name}“ wurde festgelegt.` |
+| `trip_planning_activated` | Die Planung wird abgeschlossen und die Reise aktiviert | Alle aktiven Planungsmitglieder (außer Auslöser) | `trip` (Trip) | `Reiseplanung abgeschlossen` | Dynamisch: `Die Planung für „{trip.name}“ wurde abgeschlossen und die Reise aktiviert.` |
 
 **Data-Format (Beispiel `trip_planning_finalized`):**
 ```json

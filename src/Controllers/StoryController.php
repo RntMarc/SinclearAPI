@@ -208,12 +208,18 @@ final readonly class StoryController
             fn(string $id): bool => $id !== $authorId,
         );
 
+        $author = $this->userRepo->findById($authorId);
+        $authorName = isset($author['displayName']) ? trim((string) $author['displayName']) : '';
+        $body = $authorName !== ''
+            ? $authorName . ' hat eine neue Story veröffentlicht.'
+            : '';
+
         foreach ($recipientIds as $recipientId) {
             $this->notificationService->create(
                 userId: $recipientId,
                 type: 'story_post',
                 title: '',
-                body: '',
+                body: $body,
                 data: [
                     ['relation' => 'story_author', 'object' => 'User', 'identifier' => $authorId],
                     ['relation' => 'story', 'object' => 'Story', 'identifier' => $storyId],

@@ -178,6 +178,7 @@ final readonly class NotificationService
         private ?WebPush $webPush = null,
         private ?Client $httpClient = null,
         private ?LoggerInterface $logger = null,
+        private ?FcmPushService $fcmPush = null,
     ) {}
 
     public function create(string $userId, string $type, string $title, string $body, ?array $data = null, bool $respectPreferences = true, ?string $dedupeKey = null, bool $suppressPush = false): ?string
@@ -231,6 +232,7 @@ final readonly class NotificationService
         if (!$suppressPush) {
             $this->sendWebPush($userId, $notification);
             $this->sendUnifiedPush($userId, $notification);
+            $this->fcmPush?->sendWakeupToUser($userId, $record['id']);
         }
 
         return $record['id'];
@@ -1381,6 +1383,18 @@ final readonly class NotificationService
     public function getUnread(string $userId, ?string $since = null): array
     {
         return $this->notificationRepo->getUnread($userId, $since);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getById(string $userId, string $id): ?array
+    {
+        $id = trim($id);
+        if ($id === '') {
+            return null;
+        }
+        return $this->notificationRepo->findByIdForUser($userId, $id);
     }
 
     public function markRead(string $userId, array $ids): void

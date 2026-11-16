@@ -499,6 +499,7 @@ return function (App $app): void {
         $group->delete('/push-subscription', [NotificationController::class, 'deletePushSubscription']);
         $group->get('/preferences', [NotificationController::class, 'getPreferences']);
         $group->put('/preferences', [NotificationController::class, 'updatePreferences']);
+        $group->get('/{id}', [NotificationController::class, 'get']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Notifications (public — no auth required)

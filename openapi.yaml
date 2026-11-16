@@ -6114,12 +6114,11 @@ components:
       properties:
         endpoint:
           type: string
-          format: uri
-          description: Push-Endpoint-URL des Clients
+          description: Push-Endpoint-URL (WebPush/UnifiedPush) oder FCM-Registration-Token
         type:
           type: string
-          enum: [webpush, unifiedpush]
-          description: Push-Dienst-Typ
+          enum: [webpush, unifiedpush, fcm]
+          description: Push-Dienst-Typ (`fcm` sendet ausschließlich anonyme Wake-up-Signale ohne Inhalt)
         keys:
           type: object
           required: [p256dh, auth]
@@ -22281,6 +22280,47 @@ paths:
                 $ref: '#/components/schemas/NotificationListResponse'
         '401':
           description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications/{id}:
+    get:
+      summary: Einzelne Benachrichtigung abrufen
+      description: >
+        Gibt eine einzelne Benachrichtigung des aktuellen Nutzers anhand ihrer ID
+        zurück (z.B. zum Abrufen des Inhalts nach einem anonymen FCM-Wake-up).
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID der Benachrichtigung
+      responses:
+        '200':
+          description: Die angeforderte Benachrichtigung
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Notification'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Benachrichtigung nicht gefunden
           content:
             application/json:
               schema:

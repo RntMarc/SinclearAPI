@@ -445,6 +445,20 @@ return [
         );
     },
 
+    \Sinclear\Api\Services\FcmPushService::class => function (ContainerInterface $c): \Sinclear\Api\Services\FcmPushService {
+        $settings = $c->get(Settings::class);
+        $fcm = $settings->fcm;
+
+        return new \Sinclear\Api\Services\FcmPushService(
+            pushSubRepo: $c->get(\Sinclear\Api\Repository\PushSubscriptionRepository::class),
+            logger: $c->get(\Psr\Log\LoggerInterface::class),
+            projectId: (string) ($fcm['project_id'] ?? ''),
+            clientEmail: (string) ($fcm['client_email'] ?? ''),
+            privateKey: (string) ($fcm['private_key'] ?? ''),
+            httpClient: $c->get(\GuzzleHttp\Client::class),
+        );
+    },
+
     \Sinclear\Api\Services\NotificationService::class => function (ContainerInterface $c): \Sinclear\Api\Services\NotificationService {
         $settings = $c->get(Settings::class);
         $vapid = $settings->vapid;
@@ -461,6 +475,7 @@ return [
             webPush: $webPush,
             httpClient: $c->get(\GuzzleHttp\Client::class),
             logger: $c->get(\Psr\Log\LoggerInterface::class),
+            fcmPush: $c->get(\Sinclear\Api\Services\FcmPushService::class),
         );
     },
 

@@ -6,6 +6,7 @@ use Sinclear\Api\Repository\PollAvailabilityVoteRepository;
 use Sinclear\Api\Repository\PollInviteRepository;
 use Sinclear\Api\Repository\PollResponseRepository;
 use Sinclear\Api\Repository\PollVoteRepository;
+use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Support\PollAnonymity;
 
 /**
@@ -20,6 +21,7 @@ final readonly class PollNotificationService
         private PollAvailabilityVoteRepository $availabilityRepo,
         private PollVoteRepository $voteRepo,
         private PollAnonymity $anonymity,
+        private ?UserRepository $userRepo = null,
     ) {}
 
     /** @param array<string, mixed> $poll */
@@ -29,11 +31,23 @@ final readonly class PollNotificationService
             return;
         }
 
+        $pollTitle = trim((string) ($poll['title'] ?? ''));
+        $inviter = $this->userRepo?->findById($inviterId);
+        $inviterName = trim((string) ($inviter['displayName'] ?? ''));
+
+        $body = match (true) {
+            $pollTitle !== '' && $inviterName !== '' =>
+                $inviterName . ' hat dich zur Umfrage „' . $pollTitle . '“ eingeladen.',
+            $pollTitle !== '' =>
+                'Du wurdest zur Umfrage „' . $pollTitle . '“ eingeladen.',
+            default => '',
+        };
+
         $this->notificationService->create(
             userId: $inviteeId,
             type: 'poll_invite',
             title: '',
-            body: '',
+            body: $body,
             data: [
                 ['relation' => 'poll', 'object' => 'Poll', 'identifier' => (string) $poll['id']],
                 ['relation' => 'inviter', 'object' => 'User', 'identifier' => $inviterId],
@@ -51,6 +65,18 @@ final readonly class PollNotificationService
     {
         $recipients = array_unique([...$this->participantIds($poll), (string) $poll['creatorId']]);
 
+        $pollTitle = trim((string) ($poll['title'] ?? ''));
+        $proposer = $this->userRepo?->findById($proposerId);
+        $proposerName = trim((string) ($proposer['displayName'] ?? ''));
+
+        $body = match (true) {
+            $pollTitle !== '' && $proposerName !== '' =>
+                $proposerName . ' hat einen Gegenvorschlag zur Umfrage „' . $pollTitle . '“ gemacht.',
+            $pollTitle !== '' =>
+                'Neuer Gegenvorschlag zur Umfrage „' . $pollTitle . '“.',
+            default => '',
+        };
+
         foreach ($recipients as $recipientId) {
             if ($recipientId === $proposerId) {
                 continue;
@@ -59,7 +85,7 @@ final readonly class PollNotificationService
                 userId: $recipientId,
                 type: 'poll_counter_proposal',
                 title: '',
-                body: '',
+                body: $body,
                 data: [
                     ['relation' => 'poll', 'object' => 'Poll', 'identifier' => (string) $poll['id']],
                     ['relation' => 'proposer', 'object' => 'User', 'identifier' => $proposerId],
@@ -82,6 +108,17 @@ final readonly class PollNotificationService
             $data[] = ['relation' => 'finalized_option', 'object' => 'PollOption', 'identifier' => (string) $option['id']];
         }
 
+        $pollTitle = trim((string) ($poll['title'] ?? ''));
+        $optionLabel = $option !== null ? trim((string) ($option['label'] ?? '')) : '';
+
+        $body = match (true) {
+            $pollTitle !== '' && $optionLabel !== '' =>
+                'Der Termin für „' . $pollTitle . '“ steht fest: ' . $optionLabel,
+            $pollTitle !== '' =>
+                'Die Umfrage „' . $pollTitle . '“ wurde abgeschlossen.',
+            default => '',
+        };
+
         foreach ($this->participantIds($poll) as $recipientId) {
             if ($recipientId === ($actorId ?? (string) $poll['creatorId'])) {
                 continue;
@@ -90,7 +127,7 @@ final readonly class PollNotificationService
                 userId: $recipientId,
                 type: 'poll_finalized',
                 title: '',
-                body: '',
+                body: $body,
                 data: $data,
             );
         }
@@ -111,6 +148,10 @@ final readonly class PollNotificationService
     {
         $pollId = (string) $poll['id'];
         $type = (string) $poll['type'];
+        $pollTitle = trim((string) ($poll['title'] ?? ''));
+        $body = $pollTitle !== ''
+            ? 'Die Umfrage „' . $pollTitle . '“ endet bald.'
+            : '';
 
         foreach ($this->participantIds($poll) as $recipientId) {
             if ($recipientId === (string) $poll['creatorId']) {
@@ -124,7 +165,7 @@ final readonly class PollNotificationService
                 userId: $recipientId,
                 type: 'poll_deadline_reminder',
                 title: '',
-                body: '',
+                body: $body,
                 data: [['relation' => 'poll', 'object' => 'Poll', 'identifier' => $pollId]],
                 dedupeKey: 'poll:' . $pollId . ':deadline',
             );

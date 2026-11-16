@@ -25,7 +25,8 @@ final readonly class TravelPlanningNotificationService
 
     public function notifyInvite(string $tripId, string $invitedUserId, string $actorUserId): void
     {
-        if ($this->tripRepo->findById($tripId) === null) {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
             return;
         }
 
@@ -33,11 +34,23 @@ final readonly class TravelPlanningNotificationService
             return;
         }
 
+        $tripName = trim((string) ($trip['name'] ?? ''));
+        $inviter = $this->userRepo->findById($actorUserId);
+        $inviterName = trim((string) ($inviter['displayName'] ?? ''));
+
+        $body = match (true) {
+            $inviterName !== '' && $tripName !== '' =>
+                $inviterName . ' hat dich zur Reiseplanung „' . $tripName . '“ eingeladen.',
+            $tripName !== '' =>
+                'Du wurdest zur Reiseplanung „' . $tripName . '“ eingeladen.',
+            default => '',
+        };
+
         $this->notificationService->create(
             userId: $invitedUserId,
             type: 'trip_planning_invite',
             title: '',
-            body: '',
+            body: $body,
             data: [
                 ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
                 ['relation' => 'inviter', 'object' => 'User', 'identifier' => $actorUserId],
@@ -47,9 +60,24 @@ final readonly class TravelPlanningNotificationService
 
     public function notifyResponse(string $tripId, string $responderUserId, string $actorUserId): void
     {
-        if ($this->tripRepo->findById($tripId) === null) {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
             return;
         }
+
+        $tripName = trim((string) ($trip['name'] ?? ''));
+        $responder = $this->userRepo->findById($responderUserId);
+        $responderName = trim((string) ($responder['displayName'] ?? ''));
+
+        $body = match (true) {
+            $responderName !== '' && $tripName !== '' =>
+                $responderName . ' hat sich zur Reiseplanung „' . $tripName . '“ zurückgemeldet.',
+            $responderName !== '' =>
+                $responderName . ' hat sich zur Reiseplanung zurückgemeldet.',
+            $tripName !== '' =>
+                'Neue Rückmeldung in der Reiseplanung „' . $tripName . '“.',
+            default => '',
+        };
 
         foreach ($this->memberRepo->findActiveByTrip($tripId) as $member) {
             if (($member['role'] ?? null) !== 'leader') {
@@ -63,7 +91,7 @@ final readonly class TravelPlanningNotificationService
                 userId: $member['userId'],
                 type: 'trip_planning_response',
                 title: '',
-                body: '',
+                body: $body,
                 data: [
                     ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
                     ['relation' => 'responder', 'object' => 'User', 'identifier' => $responderUserId],
@@ -77,7 +105,8 @@ final readonly class TravelPlanningNotificationService
      */
     public function notifyFinalized(string $tripId, ?array $finalizedRelation, string $actorUserId): void
     {
-        if ($this->tripRepo->findById($tripId) === null) {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
             return;
         }
 
@@ -88,12 +117,23 @@ final readonly class TravelPlanningNotificationService
             $data[] = $finalizedRelation;
         }
 
+        $tripName = trim((string) ($trip['name'] ?? ''));
+        $what = match ($finalizedRelation['relation'] ?? null) {
+            'date_option' => 'Der Zeitraum',
+            'accommodation_option' => 'Die Unterkunft',
+            'event' => 'Ein Programmpunkt',
+            default => 'Eine Entscheidung',
+        };
+        $body = $tripName !== ''
+            ? $what . ' für die Reiseplanung „' . $tripName . '“ wurde festgelegt.'
+            : $what . ' in der Reiseplanung wurde festgelegt.';
+
         foreach ($this->activeMemberIds($tripId, $actorUserId) as $userId) {
             $this->notificationService->create(
                 userId: $userId,
                 type: 'trip_planning_finalized',
                 title: '',
-                body: '',
+                body: $body,
                 data: $data,
             );
         }
@@ -101,16 +141,22 @@ final readonly class TravelPlanningNotificationService
 
     public function notifyActivated(string $tripId, string $actorUserId): void
     {
-        if ($this->tripRepo->findById($tripId) === null) {
+        $trip = $this->tripRepo->findById($tripId);
+        if ($trip === null) {
             return;
         }
+
+        $tripName = trim((string) ($trip['name'] ?? ''));
+        $body = $tripName !== ''
+            ? 'Die Planung für „' . $tripName . '“ wurde abgeschlossen und die Reise aktiviert.'
+            : '';
 
         foreach ($this->activeMemberIds($tripId, $actorUserId) as $userId) {
             $this->notificationService->create(
                 userId: $userId,
                 type: 'trip_planning_activated',
                 title: '',
-                body: '',
+                body: $body,
                 data: [
                     ['relation' => 'trip', 'object' => 'Trip', 'identifier' => $tripId],
                 ],
