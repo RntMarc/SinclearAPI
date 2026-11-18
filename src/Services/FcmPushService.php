@@ -36,6 +36,7 @@ final class FcmPushService
         private readonly string $clientEmail = '',
         private readonly string $privateKey = '',
         ?Client $httpClient = null,
+        private readonly string $cacheFile = __DIR__ . '/../../var/cache/fcm-token.json',
     ) {
         $this->httpClient = $httpClient ?? new Client(['timeout' => 10]);
     }
@@ -76,6 +77,7 @@ final class FcmPushService
     public function sendWakeupToUser(string $userId, string $notificationId): void
     {
         if (!$this->isConfigured()) {
+            $this->logger?->warning('FCM wakeup skipped: FCM is not configured');
             return;
         }
 
@@ -171,6 +173,13 @@ final class FcmPushService
             return $this->cachedAccessToken;
         }
 
+        $cached = self::readCachedToken($this->cacheFile, $this->clientEmail);
+        if ($cached !== null) {
+            $this->cachedAccessToken = $cached['token'];
+            $this->tokenExpiresAt = $cached['expiresAt'];
+            return $this->cachedAccessToken;
+        }
+
         $now = time();
 
         try {
@@ -197,11 +206,86 @@ final class FcmPushService
             $this->cachedAccessToken = $data['access_token'];
             $expiresIn = isset($data['expires_in']) ? (int) $data['expires_in'] : self::TOKEN_LIFETIME;
             $this->tokenExpiresAt = $now + $expiresIn - 60;
+            self::writeCachedToken(
+                $this->cacheFile,
+                $this->cachedAccessToken,
+                $this->tokenExpiresAt,
+                $this->clientEmail,
+            );
 
             return $this->cachedAccessToken;
         } catch (\Throwable $e) {
             $this->logger?->error('FCM token exchange error', ['error' => $e->getMessage()]);
             return null;
+        }
+    }
+
+    /**
+     * Liest ein zwischen Requests geteiltes OAuth-Token aus dem Dateisystem.
+     *
+     * PHP-FPM erzeugt pro Request eine neue Service-Instanz; ohne Dateicache
+     * würde jede Benachrichtigung einen neuen JWT signieren und einen
+     * blockierenden Token-Request zu Google auslösen.
+     *
+     * @return array{token: string, expiresAt: int}|null
+     */
+    private static function readCachedToken(string $cacheFile, string $clientEmail): ?array
+    {
+        if (!is_file($cacheFile)) {
+            return null;
+        }
+
+        try {
+            $raw = file_get_contents($cacheFile);
+            if ($raw === false) {
+                return null;
+            }
+            $data = json_decode($raw, true);
+            $cachedToken = is_array($data) ? ($data['token'] ?? null) : null;
+            $expiresAt = is_array($data) ? ($data['expiresAt'] ?? null) : null;
+            $cachedClientEmail = is_array($data) ? ($data['clientEmail'] ?? null) : null;
+            if (
+                !is_string($cachedToken)
+                || !is_int($expiresAt)
+                || !is_string($cachedClientEmail)
+                || $cachedClientEmail !== $clientEmail
+                || time() >= $expiresAt
+            ) {
+                return null;
+            }
+            return ['token' => $cachedToken, 'expiresAt' => $expiresAt];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function writeCachedToken(
+        string $cacheFile,
+        string $token,
+        int $expiresAt,
+        string $clientEmail,
+    ): void {
+        $payload = json_encode([
+            'token' => $token,
+            'expiresAt' => $expiresAt,
+            'clientEmail' => $clientEmail,
+        ]);
+        if ($payload === false) {
+            return;
+        }
+
+        $dir = dirname($cacheFile);
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            return;
+        }
+
+        $tmp = $cacheFile . '.' . bin2hex(random_bytes(4));
+        if (@file_put_contents($tmp, $payload) === false) {
+            return;
+        }
+        @chmod($tmp, 0660);
+        if (!@rename($tmp, $cacheFile)) {
+            @unlink($tmp);
         }
     }
 

@@ -18,15 +18,19 @@ final readonly class PushSubscriptionRepository
         if ($existing !== null) {
             // Re-registration proves the client is alive again: refresh
             // lastSeenAt and reset the failure tracking (heals long-offline
-            // devices before the stale sweep removes them).
+            // devices before the stale sweep removes them). userId is updated
+            // too: the endpoint now belongs to the current account, so a
+            // device handed to another user no longer receives the previous
+            // user's wakeups.
             $stmt = $this->pdo->prepare(
                 'UPDATE PushSubscription
-                 SET type = ?, p256dh = ?, auth = ?, userAgent = ?,
+                 SET userId = ?, type = ?, p256dh = ?, auth = ?, userAgent = ?,
                      lastSeenAt = NOW(3), consecutiveFailures = 0,
                      lastErrorAt = NULL, lastError = NULL
                  WHERE id = ?'
             );
             $stmt->execute([
+                $data['userId'],
                 $data['type'],
                 $data['p256dh'] ?? null,
                 $data['auth'] ?? null,

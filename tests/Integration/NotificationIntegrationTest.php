@@ -92,6 +92,8 @@ class NotificationIntegrationTest extends TestCase
                 userId varchar(191) NOT NULL,
                 type varchar(20) NOT NULL,
                 endpoint text NOT NULL,
+                endpointHash char(64) CHARACTER SET ascii COLLATE ascii_bin
+                    GENERATED ALWAYS AS (SHA2(endpoint, 256)) STORED,
                 p256dh text DEFAULT NULL,
                 auth text DEFAULT NULL,
                 userAgent varchar(255) DEFAULT NULL,
@@ -102,7 +104,7 @@ class NotificationIntegrationTest extends TestCase
                 lastError varchar(255) DEFAULT NULL,
                 consecutiveFailures int NOT NULL DEFAULT 0,
                 PRIMARY KEY (id),
-                UNIQUE KEY idx_pushsub_endpoint (endpoint(255)),
+                UNIQUE KEY idx_pushsub_endpoint_hash (endpointHash),
                 KEY idx_pushsub_user (userId),
                 KEY idx_pushsub_last_seen (lastSeenAt),
                 KEY idx_pushsub_failures (consecutiveFailures)
@@ -139,6 +141,12 @@ class NotificationIntegrationTest extends TestCase
             notificationService: $this->service,
             pushSubscriptionRepo: $this->pushSubRepo,
             preferenceService: $prefService,
+            fcmPush: new \Sinclear\Api\Services\FcmPushService(
+                pushSubRepo: $this->pushSubRepo,
+                projectId: 'test-project',
+                clientEmail: 'test@example.com',
+                privateKey: 'test-key',
+            ),
         );
     }
 

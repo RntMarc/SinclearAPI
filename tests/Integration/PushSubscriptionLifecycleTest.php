@@ -60,6 +60,8 @@ class PushSubscriptionLifecycleTest extends TestCase
                 userId varchar(191) NOT NULL,
                 type varchar(20) NOT NULL,
                 endpoint text NOT NULL,
+                endpointHash char(64) CHARACTER SET ascii COLLATE ascii_bin
+                    GENERATED ALWAYS AS (SHA2(endpoint, 256)) STORED,
                 p256dh text DEFAULT NULL,
                 auth text DEFAULT NULL,
                 userAgent varchar(255) DEFAULT NULL,
@@ -70,7 +72,7 @@ class PushSubscriptionLifecycleTest extends TestCase
                 lastError varchar(255) DEFAULT NULL,
                 consecutiveFailures int NOT NULL DEFAULT 0,
                 PRIMARY KEY (id),
-                UNIQUE KEY idx_pushsub_endpoint (endpoint(255)),
+                UNIQUE KEY idx_pushsub_endpoint_hash (endpointHash),
                 KEY idx_pushsub_user (userId),
                 KEY idx_pushsub_last_seen (lastSeenAt),
                 KEY idx_pushsub_failures (consecutiveFailures)
@@ -137,6 +139,33 @@ class PushSubscriptionLifecycleTest extends TestCase
         };
 
         (new CleanupStalePushSubscriptionsTask())->execute($container, new NullLogger());
+    }
+
+    public function testUpsertAcceptsLongEndpointsWithSharedPrefix(): void
+    {
+        $prefix = 'https://push.example/' . str_repeat('a', 300);
+        $idA = $this->insert($prefix . 'a');
+        $idB = $this->insert($prefix . 'b');
+
+        $this->assertNotSame($idA, $idB);
+        $this->assertSame($prefix . 'b', $this->get($idB)['endpoint']);
+    }
+
+    public function testUpsertMovesEndpointToCurrentUser(): void
+    {
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName) VALUES ('user-2', 'b@test.com', 'hash', 'Bob')");
+        $id = $this->insert('https://ntfy.example/handover');
+
+        $id2 = $this->repo->upsert([
+            'userId' => 'user-2',
+            'type' => 'fcm',
+            'endpoint' => 'https://ntfy.example/handover',
+        ]);
+
+        $this->assertSame($id, $id2);
+        $row = $this->get($id);
+        $this->assertSame('user-2', $row['userId']);
+        $this->assertSame('fcm', $row['type']);
     }
 
     public function testUpsertRefreshesLastSeenAndResetsFailures(): void

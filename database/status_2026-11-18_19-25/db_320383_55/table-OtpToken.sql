@@ -14,19 +14,18 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
--- Exportiere Struktur von Tabelle db_320383_55.RefreshToken
-CREATE TABLE IF NOT EXISTS `RefreshToken` (
+-- Exportiere Struktur von Tabelle db_320383_55.OtpToken
+CREATE TABLE IF NOT EXISTS `OtpToken` (
   `id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `familyId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `userId` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `tokenHash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `expiresAt` datetime NOT NULL,
-  `revokedAt` datetime DEFAULT NULL,
-  `createdAt` datetime NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `idx_rt_hash` (`tokenHash`),
-  KEY `idx_rt_family` (`familyId`),
-  KEY `idx_rt_user` (`userId`)
+  `email` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `code` varchar(6) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `attempts` int NOT NULL DEFAULT '0',
+  `type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'email_otp',
+  `sessionId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `expiresAt` datetime(3) NOT NULL,
+  `usedAt` datetime(3) DEFAULT NULL,
+  `createdAt` datetime(3) NOT NULL,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Daten-Export vom Benutzer nicht ausgewählt

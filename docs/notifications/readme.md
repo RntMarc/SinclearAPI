@@ -342,7 +342,8 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Eigentümer (FK zu User) |
 | `type` | varchar(20) | `webpush`, `unifiedpush` oder `fcm` |
-| `endpoint` | text | Push-Endpoint-URL |
+| `endpoint` | text | Push-Endpoint-URL oder FCM-Registration-Token (beliebige Länge) |
+| `endpointHash` | char(64) | Generierte SHA-256-Prüfsumme über `endpoint` (nur DB-intern) |
 | `p256dh` | text | Web Push Public Key (nullable) |
 | `auth` | text | Web Push Auth Secret (nullable) |
 | `userAgent` | varchar(255) | User-Agent des Clients (nullable) |
@@ -353,10 +354,10 @@ aller Autoren (entspricht `enabled`, erleichtert aber dem Client die UI-Logik).
 | `lastError` | varchar(255) | Fehlerursache des letzten Fehlschlags (nullable) |
 | `consecutiveFailures` | int | Anzahl aufeinanderfolgender fehlgeschlagener Push-Versuche (Default 0) |
 
-**Unique:** `endpoint` (Duplikate verhindern)
+**Unique:** `endpointHash` (SHA-256 über den vollständigen `endpoint`; verhindert Duplikate auch bei Tokens, die sich erst nach 255 Zeichen unterscheiden)
 **Index:** `lastSeenAt` (Stale-Sweep), `consecutiveFailures` (Failure-Sweep)
 
-Ein erfolgreicher Push setzt `consecutiveFailures` auf 0 und `lastSuccessAt` auf jetzt. Ein fehlgeschlagener Versuch (alles außer 410/404) erhöht `consecutiveFailures` und setzt `lastErrorAt`/`lastError`. Eine erneute Registrierung desselben Endpoints (Upsert) setzt `lastSeenAt` auf jetzt und setzt das Failure-Tracking zurück — so heilt ein Client, der lange offline war, automatisch durch Re-Registrierung.
+Ein erfolgreicher Push setzt `consecutiveFailures` auf 0 und `lastSuccessAt` auf jetzt. Ein fehlgeschlagener Versuch (alles außer 410/404) erhöht `consecutiveFailures` und setzt `lastErrorAt`/`lastError`. Eine erneute Registrierung desselben Endpoints (Upsert) setzt `lastSeenAt` auf jetzt, setzt das Failure-Tracking zurück und übernimmt `userId` des aktuellen Kontos — so heilt ein Client, der lange offline war, automatisch durch Re-Registrierung, und ein Gerätewechsel zwischen Accounts hinterlässt keine fremde Subscription.
 
 ### Tabelle `NotificationPreference`
 
@@ -620,8 +621,10 @@ Für Android-Clients, die FCM als Zustellmethode gewählt haben, sendet die API 
 **Datenschutz-Garantie:**
 - Es wird **niemals** ein `notification`-Objekt (`title`/`body`) an FCM übergeben.
 - Es werden **keine** Namen, **keine** Nachrichtentexte, **kein** `type` und **keine** `data`-Relationen an Google übermittelt.
-- Die Android-App empfängt das `wakeup`-Signal im Hintergrund und ruft den eigentlichen Inhalt direkt und authentifiziert über `GET /notifications` bzw. `GET /notifications/{id}` vom Sinclear-Server ab.
+- Die Android-App empfängt das `wakeup`-Signal im Hintergrund und ruft den eigentlichen Inhalt direkt und authentifiziert über `GET /notifications` vom Sinclear-Server ab. Kann ein Tap nur die anonyme Fallback-ID auflösen, lädt der Client die echte Benachrichtigung über `GET /notifications/{id}` nach.
 - Antwortet FCM mit HTTP 404/410 bzw. `UNREGISTERED` / `NOT_FOUND`, wird das Token sofort aus `PushSubscription` gelöscht.
+- `POST /notifications/push-subscription` mit `type: fcm` antwortet mit `503 fcm_not_configured`, solange `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL` oder `FCM_PRIVATE_KEY` fehlen. So erfährt der Client sofort, dass die Registrierung serverseitig nicht greifen kann.
+- Das Google-OAuth-Access-Token (1 Stunde gültig) wird in `var/cache/fcm-token.json` zwischengespeichert, damit nicht jeder Request einen neuen JWT signiert und einen blockierenden Token-Request auslöst. Der Cache wird nur verwendet, solange `clientEmail` übereinstimmt und das Token nicht abgelaufen ist.
 
 ### Bereinigung toter Subscriptions
 
@@ -671,6 +674,12 @@ FCM_PROJECT_ID=<firebase-project-id>
 FCM_CLIENT_EMAIL=<service-account-email>
 FCM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
+
+`FCM_PROJECT_ID` muss dem Firebase-Projekt der Android-App entsprechen
+(`sinclearbeyond`, siehe `SinclearApp/android/app/google-services.json` und
+`SinclearApp/lib/firebase_options.dart`). Weicht es ab, lehnt FCM die
+Zustellung mit `SENDER_ID_MISMATCH` ab. Der Service-Account muss zum selben
+Projekt gehören und die Rolle „Firebase Cloud Messaging API“ besitzen.
 
 Schlüsselpaar generieren mit:
 ```bash

@@ -7,6 +7,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Sinclear\Api\Application\ResponseFactory;
 use Sinclear\Api\Repository\PushSubscriptionRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
+use Sinclear\Api\Services\FcmPushService;
 use Sinclear\Api\Services\NotificationPreferenceService;
 use Sinclear\Api\Services\NotificationService;
 
@@ -16,6 +17,7 @@ final readonly class NotificationController
         private NotificationService $notificationService,
         private PushSubscriptionRepository $pushSubscriptionRepo,
         private NotificationPreferenceService $preferenceService,
+        private FcmPushService $fcmPush,
     ) {}
 
     public function index(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -70,6 +72,10 @@ final readonly class NotificationController
 
         if (!in_array($type, ['webpush', 'unifiedpush', 'fcm'], true)) {
             return ResponseFactory::json(['error' => 'type_invalid'], 400, $response);
+        }
+
+        if ($type === 'fcm' && !$this->fcmPush->isConfigured()) {
+            return ResponseFactory::json(['error' => 'fcm_not_configured'], 503, $response);
         }
 
         if ($type === 'webpush') {

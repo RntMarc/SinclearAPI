@@ -22373,7 +22373,11 @@ paths:
       summary: Push-Subscription speichern oder aktualisieren
       description: >
         Speichert oder aktualisiert die Push-Subscription des aktuellen Nutzers.
-        Überschreibt eine bestehende Subscription mit derselben Endpoint-URL.
+        Überschreibt eine bestehende Subscription mit derselben Endpoint-URL;
+        dabei wird auch `userId` auf den aktuellen Nutzer gesetzt (Gerätewechsel
+        zwischen Accounts). Der Typ `fcm` wird nur akzeptiert, wenn der Server
+        vollständig konfiguriert ist (`FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`,
+        `FCM_PRIVATE_KEY`), sonst antwortet der Endpoint mit `503`.
       tags: [Notifications]
       security:
         - BearerAuth: []
@@ -22401,6 +22405,14 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: >
+            FCM ist auf dem Server nicht konfiguriert
+            (`error: fcm_not_configured`).
           content:
             application/json:
               schema:
