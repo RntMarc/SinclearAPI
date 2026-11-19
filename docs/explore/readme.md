@@ -226,7 +226,21 @@ Clients sind verpflichtet, diesen Quellennachweis in ihrer UI anzuzeigen
 
 ## API-Endpunkte
 
-Alle Endpunkte erfordern Authentifizierung (JWT), sofern nicht anders angegeben.
+### Öffentliche Endpunkte (ohne Authentifizierung)
+
+Lesende Grunddaten sind über dedizierte öffentliche Endpunkte ohne Login
+erreichbar. Sie nutzen die `auth.optional`-Middleware: Wird ein gültiges JWT
+mitgesendet, werden alle Felder geliefert. Ohne Token wird bei Orten das Feld
+`creatorId` ausgeblendet.
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|-------------|
+| `GET` | `/public/explore` | Optional | Paginierte Liste (optional mit `sort`, `cuisine`) — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore/search` | Optional | Suche + Umkreissuche — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore/random` | Optional | Zufällige Orte (optional nach Kategorie) — ohne Auth: `creatorId` ausgeblendet |
+| `GET` | `/public/explore/{id}` | Optional | Detailansicht — ohne Auth: `creatorId` ausgeblendet |
+
+### Private Endpunkte (JWT erforderlich)
 
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|-------------|
