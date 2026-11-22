@@ -11,6 +11,7 @@ use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\StoryPolicy;
 use Sinclear\Api\Services\ImageService;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\StoryReactionService;
 
 final readonly class StoryController
 {
@@ -26,6 +27,7 @@ final readonly class StoryController
         'unsupported_image_format' => ['error' => 'unsupported_image_format', 'status' => 400],
         'image_dimensions_too_large' => ['error' => 'image_dimensions_too_large', 'status' => 400],
         'invalid_caption' => ['error' => 'invalid_caption', 'status' => 400],
+        'invalid_emoji' => ['error' => 'invalid_emoji', 'status' => 400],
         'story_not_found' => ['error' => 'story_not_found', 'status' => 404],
         'forbidden' => ['error' => 'forbidden', 'status' => 403],
     ];
@@ -36,6 +38,7 @@ final readonly class StoryController
         private ImageService $imageService,
         private UserRepository $userRepo,
         private NotificationService $notificationService,
+        private StoryReactionService $reactionService,
     ) {}
 
     public function feed(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
@@ -199,6 +202,65 @@ final readonly class StoryController
         }, $viewers);
 
         return ResponseFactory::json(['data' => $formatted], 200, $response);
+    }
+
+    public function getReactions(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $this->requireUser($request);
+
+        $story = $this->storyRepo->findById($args['id']);
+        if ($story === null) {
+            return ResponseFactory::json(['error' => 'story_not_found'], 404, $response);
+        }
+
+        return ResponseFactory::json(
+            ['data' => $this->reactionService->forStory($story['id'])],
+            200,
+            $response,
+        );
+    }
+
+    public function react(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        $story = $this->storyRepo->findById($args['id']);
+        if ($story === null) {
+            return ResponseFactory::json(['error' => 'story_not_found'], 404, $response);
+        }
+
+        if (!$this->policy->canReact($user, $story['userId'])) {
+            return ResponseFactory::json(['error' => 'forbidden'], 403, $response);
+        }
+
+        $body = $request->getParsedBody();
+        $emoji = is_array($body) && isset($body['emoji']) && is_string($body['emoji'])
+            ? $body['emoji']
+            : '';
+
+        try {
+            $reactions = $this->reactionService->react($story['id'], $user->id, $emoji);
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), $response);
+        }
+
+        return ResponseFactory::json(['data' => $reactions], 200, $response);
+    }
+
+    public function unreact(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $user = $this->requireUser($request);
+
+        $story = $this->storyRepo->findById($args['id']);
+        if ($story === null) {
+            return ResponseFactory::json(['error' => 'story_not_found'], 404, $response);
+        }
+
+        return ResponseFactory::json(
+            ['data' => $this->reactionService->unreact($story['id'], $user->id)],
+            200,
+            $response,
+        );
     }
 
     private function notifyOnStoryCreated(string $authorId, string $storyId): void

@@ -13,11 +13,13 @@ use Sinclear\Api\Controllers\StoryController;
 use Sinclear\Api\Repository\NotificationRepository;
 use Sinclear\Api\Repository\PushSubscriptionRepository;
 use Sinclear\Api\Repository\StoryRepository;
+use Sinclear\Api\Repository\StoryReactionRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\StoryPolicy;
 use Sinclear\Api\Services\ImageService;
 use Sinclear\Api\Services\NotificationService;
+use Sinclear\Api\Services\StoryReactionService;
 
 class StoryTest extends TestCase
 {
@@ -46,6 +48,7 @@ class StoryTest extends TestCase
         $this->db->exec("SET time_zone = '+00:00'");
 
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $this->db->exec("DROP TABLE IF EXISTS StoryReaction");
         $this->db->exec("DROP TABLE IF EXISTS StoryView");
         $this->db->exec("DROP TABLE IF EXISTS Story");
         $this->db->exec("DROP TABLE IF EXISTS Notification");
@@ -100,6 +103,21 @@ class StoryTest extends TestCase
         ");
 
         $this->db->exec("
+            CREATE TABLE StoryReaction (
+                id varchar(191) NOT NULL,
+                storyId varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                emoji varchar(32) NOT NULL,
+                createdAt datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+                PRIMARY KEY (id),
+                UNIQUE KEY uk_story_reaction_user (storyId, userId),
+                KEY idx_story_reaction_story (storyId),
+                CONSTRAINT fk_story_reaction_story FOREIGN KEY (storyId) REFERENCES Story (id) ON DELETE CASCADE,
+                CONSTRAINT fk_story_reaction_user FOREIGN KEY (userId) REFERENCES User (id) ON DELETE CASCADE
+            )
+        ");
+
+        $this->db->exec("
             CREATE TABLE Notification (
                 id varchar(191) NOT NULL,
                 userId varchar(191) NOT NULL,
@@ -149,12 +167,16 @@ class StoryTest extends TestCase
             imageService: new ImageService($logger),
             userRepo: new UserRepository($this->db),
             notificationService: $notificationService,
+            reactionService: new StoryReactionService(
+                new StoryReactionRepository($this->db),
+            ),
         );
     }
 
     protected function tearDown(): void
     {
         $this->db->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $this->db->exec("DROP TABLE IF EXISTS StoryReaction");
         $this->db->exec("DROP TABLE IF EXISTS StoryView");
         $this->db->exec("DROP TABLE IF EXISTS Story");
         $this->db->exec("DROP TABLE IF EXISTS Notification");
@@ -555,5 +577,130 @@ class StoryTest extends TestCase
         $this->assertSame(200, $response->getStatusCode());
         $data = json_decode((string) $response->getBody(), true);
         $this->assertCount(1, $data['data']);
+    }
+
+    // ── PUT /stories/{id}/reaction ────────────────────────
+
+    public function testReactSetsReaction(): void
+    {
+        $storyId = $this->createStory('user-1');
+
+        $request = $this->requestWithUser('PUT', '/stories/' . $storyId . '/reaction', ['emoji' => '🔥'], userId: 'user-2');
+        $response = $this->controller->react($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(1, $data['data']);
+        $this->assertSame('user-2', $data['data'][0]['userId']);
+        $this->assertSame('Bob', $data['data'][0]['displayName']);
+        $this->assertSame('🔥', $data['data'][0]['emoji']);
+        $this->assertNotNull($data['data'][0]['createdAt']);
+    }
+
+    public function testReactReplacesPreviousEmoji(): void
+    {
+        $storyId = $this->createStory('user-1');
+
+        $request = $this->requestWithUser('PUT', '/stories/' . $storyId . '/reaction', ['emoji' => '🔥'], userId: 'user-2');
+        $this->controller->react($request, new Response(), ['id' => $storyId]);
+
+        $request = $this->requestWithUser('PUT', '/stories/' . $storyId . '/reaction', ['emoji' => '❤'], userId: 'user-2');
+        $response = $this->controller->react($request, new Response(), ['id' => $storyId]);
+
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(1, $data['data']);
+        $this->assertSame('❤', $data['data'][0]['emoji']);
+    }
+
+    public function testAuthorCannotReactToOwnStory(): void
+    {
+        $storyId = $this->createStory('user-1');
+
+        $request = $this->requestWithUser('PUT', '/stories/' . $storyId . '/reaction', ['emoji' => '🔥'], userId: 'user-1');
+        $response = $this->controller->react($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(403, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertSame('forbidden', $data['error']);
+    }
+
+    public function testReactWithInvalidEmojiReturns400(): void
+    {
+        $storyId = $this->createStory('user-1');
+
+        $request = $this->requestWithUser('PUT', '/stories/' . $storyId . '/reaction', ['emoji' => '🦄'], userId: 'user-2');
+        $response = $this->controller->react($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(400, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertSame('invalid_emoji', $data['error']);
+    }
+
+    public function testReactUnknownStoryReturns404(): void
+    {
+        $request = $this->requestWithUser('PUT', '/stories/unknown/reaction', ['emoji' => '🔥'], userId: 'user-2');
+        $response = $this->controller->react($request, new Response(), ['id' => 'unknown']);
+
+        $this->assertSame(404, $response->getStatusCode());
+    }
+
+    // ── DELETE /stories/{id}/reaction ─────────────────────
+
+    public function testUnreactRemovesReaction(): void
+    {
+        $storyId = $this->createStory('user-1');
+        $this->db->prepare('INSERT INTO StoryReaction (id, storyId, userId, emoji) VALUES (?, ?, ?, ?)')
+            ->execute(['r1', $storyId, 'user-2', '🔥']);
+
+        $request = $this->requestWithUser('DELETE', '/stories/' . $storyId . '/reaction', userId: 'user-2');
+        $response = $this->controller->unreact($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(0, $data['data']);
+    }
+
+    // ── GET /stories/{id}/reactions ───────────────────────
+
+    public function testGetReactionsReturnsNewestFirst(): void
+    {
+        $this->db->exec("INSERT INTO User (id, email, passwordHash, displayName, createdAt) VALUES ('user-3', 'c@test.com', 'hash', 'Charlie', NOW(3))");
+        $storyId = $this->createStory('user-1');
+
+        $this->db->prepare('INSERT INTO StoryReaction (id, storyId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)')
+            ->execute(['r1', $storyId, 'user-2', '🔥', '2026-09-01 10:00:00.000']);
+        $this->db->prepare('INSERT INTO StoryReaction (id, storyId, userId, emoji, createdAt) VALUES (?, ?, ?, ?, ?)')
+            ->execute(['r2', $storyId, 'user-3', '❤', '2026-09-01 12:00:00.000']);
+
+        $request = $this->requestWithUser('GET', '/stories/' . $storyId . '/reactions');
+        $response = $this->controller->getReactions($request, new Response(), ['id' => $storyId]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getBody(), true);
+        $this->assertCount(2, $data['data']);
+        $this->assertSame('user-3', $data['data'][0]['userId']);
+        $this->assertSame('user-2', $data['data'][1]['userId']);
+    }
+
+    public function testGetReactionsUnknownStoryReturns404(): void
+    {
+        $request = $this->requestWithUser('GET', '/stories/unknown/reactions');
+        $response = $this->controller->getReactions($request, new Response(), ['id' => 'unknown']);
+
+        $this->assertSame(404, $response->getStatusCode());
+    }
+
+    public function testDeleteStoryRemovesReactions(): void
+    {
+        $storyId = $this->createStory('user-1');
+        $this->db->prepare('INSERT INTO StoryReaction (id, storyId, userId, emoji) VALUES (?, ?, ?, ?)')
+            ->execute(['r1', $storyId, 'user-2', '🔥']);
+
+        $request = $this->requestWithUser('DELETE', '/stories/' . $storyId);
+        $this->controller->delete($request, new Response(), ['id' => $storyId]);
+
+        $stmt = $this->db->prepare('SELECT COUNT(*) FROM StoryReaction WHERE storyId = ?');
+        $stmt->execute([$storyId]);
+        $this->assertSame(0, (int) $stmt->fetchColumn());
     }
 }

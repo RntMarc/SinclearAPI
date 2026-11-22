@@ -146,6 +146,7 @@ use Sinclear\Api\Repository\PtStationRepository;
 use Sinclear\Api\Repository\PtJourneyRepository;
 use Sinclear\Api\Repository\SubscriptionRepository;
 use Sinclear\Api\Repository\StoryRepository;
+use Sinclear\Api\Repository\StoryReactionRepository;
 use Sinclear\Api\Repository\PhotoRepository;
 use Sinclear\Api\Repository\TravelTripSubscriptionRepository;
 use Sinclear\Api\Repository\TravelPlanMemberRepository;
@@ -197,6 +198,7 @@ use Sinclear\Api\Services\ExploreService;
 use Sinclear\Api\Services\FeedbackService;
 use Sinclear\Api\Services\ModerationRequestService;
 use Sinclear\Api\Services\PlaceSubmissionService;
+use Sinclear\Api\Services\StoryReactionService;
 use Sinclear\Api\Services\ForumService;
 use Sinclear\Api\Services\NominatimCache;
 use Sinclear\Api\Services\NominatimRateLimiter;
@@ -685,6 +687,8 @@ return [
     SubscriptionPolicy::class => autowire(),
 
     StoryRepository::class => autowire(),
+    StoryReactionRepository::class => autowire(),
+    StoryReactionService::class => autowire(),
     StoryPolicy::class => autowire(),
     StoryController::class => autowire(),
 

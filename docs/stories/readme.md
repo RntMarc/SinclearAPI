@@ -12,9 +12,11 @@ Nutzer sichtbar und laufen danach automatisch ab (`expiresAt = createdAt + 7 Tag
 |---------|-------------|
 | `Story` | Eine Story (Bild + optionale Caption) mit `createdAt` und `expiresAt` (7 Tage) |
 | `StoryView` | Gesehen-Status: welcher Nutzer hat welche Story wann gesehen (Unique `storyId` + `userId`) |
+| `StoryReaction` | Emoji-Reaktion: genau eine pro Nutzer und Story (Unique `storyId` + `userId`) |
 
-Migrationen: `database/migrations/create_stories_table.sql` und
-`database/migrations/create_story_views_table.sql`.
+Migrationen: `database/migrations/create_stories_table.sql`,
+`database/migrations/create_story_views_table.sql` und
+`database/migrations/20261122000000_create_story_reactions.sql`.
 
 ## Endpunkte (alle authentifiziert, Basis `/api/v2`)
 
@@ -26,6 +28,9 @@ Migrationen: `database/migrations/create_stories_table.sql` und
 | `DELETE` | `/stories/{id}` | Eigene Story löschen (nur Ersteller oder Admin) |
 | `POST` | `/stories/{id}/view` | Story für den aktuellen Nutzer als gesehen markieren (idempotent) |
 | `GET` | `/stories/{id}/viewers` | Liste der Nutzer, die die Story gesehen haben (nur Ersteller oder Admin) |
+| `GET` | `/stories/{id}/reactions` | Alle Emoji-Reaktionen der Story (neueste zuerst) |
+| `PUT` | `/stories/{id}/reaction` | Eigene Reaktion setzen oder ersetzen (Ersteller ausgeschlossen) |
+| `DELETE` | `/stories/{id}/reaction` | Eigene Reaktion entfernen (idempotent) |
 
 ### Story erstellen (`POST /stories`)
 
@@ -110,12 +115,55 @@ Fehlerantworten:
 - `403` (`forbidden`): Der anfragende Nutzer ist weder Ersteller noch Admin.
 - `404` (`story_not_found`): Die Story existiert nicht.
 
+### Reaktionen (`/stories/{id}/reaction(s)`)
+
+Nutzer können auf fremde Stories mit genau einem Emoji reagieren. Die
+Allowlist ist eigenständig (unabhängig von Chat-Reaktionen) und wird
+normalisiert gespeichert (Unicode-Variation-Selectoren entfernt):
+`👍 ❤ 😂 😮 😢 🎉 🔥 👏`.
+
+Semantik:
+- Genau **eine** Reaktion pro Nutzer und Story. Ein anderes Emoji ersetzt die
+  bisherige Reaktion.
+- Der **Ersteller** der Story darf nicht auf die eigene Story reagieren
+  (`403 forbidden`).
+- `PUT` und `DELETE` sind idempotent (kein Toggle-Retry-Problem).
+- `GET` ist für alle authentifizierten Nutzer erlaubt.
+
+Reaktion setzen/ersetzen (`PUT /stories/{id}/reaction`):
+
+```json
+{ "emoji": "🔥" }
+```
+
+Antwort von `GET`, `PUT` und `DELETE` (neueste zuerst):
+
+```json
+{
+  "data": [
+    {
+      "userId": "550e8400-e29b-41d4-a716-446655440002",
+      "displayName": "Bob",
+      "avatar": "<base64 Profilbild>",
+      "emoji": "🔥",
+      "createdAt": "2026-08-16 10:30:00"
+    }
+  ]
+}
+```
+
+Fehlerantworten:
+- `400` (`invalid_emoji`): Emoji fehlt oder ist nicht in der Allowlist.
+- `403` (`forbidden`): Der Ersteller versucht, auf die eigene Story zu reagieren.
+- `404` (`story_not_found`): Die Story existiert nicht.
+
 ## Berechtigungen
 
 - Alle authentifizierten Nutzer dürfen Stories **erstellen, lesen und als gesehen markieren**.
 - Nur der **Ersteller** (oder ein Admin) darf eine Story **löschen**.
 - Nur der **Ersteller** (oder ein Admin) darf die **Viewer-Liste** einer Story abrufen (`GET /stories/{id}/viewers`).
-- `StoryView`-Einträge werden beim Löschen der Story automatisch entfernt (FK `ON DELETE CASCADE`).
+- Alle authentifizierten Nutzer dürfen auf fremde Stories **reagieren** (der Ersteller nicht auf die eigene).
+- `StoryView`- und `StoryReaction`-Einträge werden beim Löschen der Story automatisch entfernt (FK `ON DELETE CASCADE`).
 
 ## Melden & Anmerken von Stories
 

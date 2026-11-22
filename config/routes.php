@@ -535,6 +535,9 @@ return function (App $app): void {
         $group->delete('/{id}', [StoryController::class, 'delete']);
         $group->post('/{id}/view', [StoryController::class, 'markViewed']);
         $group->get('/{id}/viewers', [StoryController::class, 'getViewers']);
+        $group->get('/{id}/reactions', [StoryController::class, 'getReactions']);
+        $group->put('/{id}/reaction', [StoryController::class, 'react']);
+        $group->delete('/{id}/reaction', [StoryController::class, 'unreact']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Photos — Unsplash-Fotos verlinkter Nutzer (authenticated)

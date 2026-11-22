@@ -38,4 +38,12 @@ final readonly class StoryPolicy
 
         return $user->id === $creatorId;
     }
+
+    /**
+     * Every authenticated user may react to a story except its creator.
+     */
+    public function canReact(AuthenticatedUser $user, string $creatorId): bool
+    {
+        return $user->id !== $creatorId;
+    }
 }

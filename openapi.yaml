@@ -6490,6 +6490,41 @@ components:
             $ref: '#/components/schemas/StoryViewer'
           description: Liste der Nutzer, die die Story gesehen haben
 
+    StoryReaction:
+      type: object
+      required: [userId, emoji, createdAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: ID des reagierenden Nutzers
+        displayName:
+          type: string
+          nullable: true
+          description: Anzeigename des reagierenden Nutzers
+        avatar:
+          type: string
+          nullable: true
+          description: Base64-kodiertes Profilbild des reagierenden Nutzers
+        emoji:
+          type: string
+          description: >
+            Normalisiertes Emoji aus der festen Allowlist (Unicode-Variation-
+            Selectoren entfernt). Siehe docs/stories/readme.md.
+        createdAt:
+          type: string
+          description: Zeitpunkt der Reaktion (UTC), Format `YYYY-MM-DD HH:MM:SS`
+
+    StoryReactionsResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryReaction'
+          description: Reaktionen der Story, neueste zuerst
+
     PhotoPhotographer:
       type: object
       properties:
@@ -22937,6 +22972,142 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StoryViewedResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /stories/{id}/reactions:
+    get:
+      summary: Reaktionen einer Story abrufen
+      description: >
+        Gibt alle Emoji-Reaktionen der Story zurück, neueste zuerst. Jede
+        Person hat genau eine Reaktion pro Story. Für alle authentifizierten
+        Nutzer abrufbar.
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      responses:
+        '200':
+          description: Liste der Reaktionen (neueste zuerst)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryReactionsResponse'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /stories/{id}/reaction:
+    put:
+      summary: Eigene Story-Reaktion setzen oder ersetzen
+      description: >
+        Setzt die Emoji-Reaktion des aktuellen Nutzers auf der Story. Ein
+        bereits gesetztes anderes Emoji wird ersetzt (genau eine Reaktion pro
+        Nutzer). Der Ersteller der Story darf nicht reagieren (`forbidden`).
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [emoji]
+              properties:
+                emoji:
+                  type: string
+                  description: >
+                    Emoji aus der festen Allowlist
+                    (👍 ❤ 😂 😮 😢 🎉 🔥 👏)
+      responses:
+        '200':
+          description: Aktualisierte Reaktionsliste (neueste zuerst)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryReactionsResponse'
+        '400':
+          description: Ungültiges Emoji (`invalid_emoji`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Der Ersteller darf nicht auf die eigene Story reagieren
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Eigene Story-Reaktion entfernen
+      description: >
+        Entfernt die Emoji-Reaktion des aktuellen Nutzers von der Story.
+        Idempotent: Ohne vorhandene Reaktion passiert nichts.
+      tags: [Stories]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Story-ID
+      responses:
+        '200':
+          description: Aktualisierte Reaktionsliste (neueste zuerst)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoryReactionsResponse'
         '401':
           description: Nicht autorisiert
           content:
