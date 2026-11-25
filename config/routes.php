@@ -29,6 +29,7 @@ use Sinclear\Api\Controllers\ProfileController;
 use Sinclear\Api\Controllers\LocationSharingController;
 use Sinclear\Api\Controllers\LocationSharingIngressController;
 use Sinclear\Api\Controllers\LaMetricController;
+use Sinclear\Api\Controllers\MediaController;
 use Sinclear\Api\Controllers\McpController;
 use Sinclear\Api\Controllers\ModerationRequestController;
 use Sinclear\Api\Controllers\NotificationController;
@@ -544,6 +545,13 @@ return function (App $app): void {
     $app->group('/photos', function (RouteCollectorProxy $group) {
         $group->get('', [PhotoController::class, 'feed']);
         $group->get('/user/{id}', [PhotoController::class, 'userPhotos']);
+    })->add($container->get(AuthenticationMiddleware::class));
+
+    // Medien — volle Qualität eines als Vorschaubild ausgelieferten Bildes
+    // nachladen (authenticated). Der Hash ist content-addressed und stammt aus
+    // dem `hash=`-Parameter des Vorschau-`data:`-URIs.
+    $app->group('/media', function (RouteCollectorProxy $group) {
+        $group->get('/{hash}', [MediaController::class, 'get']);
     })->add($container->get(AuthenticationMiddleware::class));
 
     // Chat / Direktnachrichten (authenticated)

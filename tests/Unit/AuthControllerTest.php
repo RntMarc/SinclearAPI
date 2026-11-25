@@ -18,6 +18,7 @@ use Sinclear\Api\Services\Auth\DiscordOAuthService;
 use Sinclear\Api\Services\Auth\OtpService;
 use Sinclear\Api\Services\Auth\TokenService;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MediaService;
 use Slim\Psr7\Response;
 use Symfony\Component\Mailer\MailerInterface;
 
@@ -67,7 +68,7 @@ final class AuthControllerTest extends TestCase
 
         $userPrefRepo = new UserPreferenceRepository($this->pdo);
         $logger = new NullLogger();
-        $imageService = new ImageService($logger);
+        $imageService = new ImageService($logger, new MediaService($logger));
 
         $discordService = new DiscordOAuthService(
             $settings,

@@ -24,6 +24,7 @@ use Sinclear\Api\Repository\TravelTripRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Services\ForumService;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MediaService;
 use Sinclear\Api\Services\NotificationPreferenceService;
 use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\TravelChatService;
@@ -250,7 +251,7 @@ final class TravelCascadeDeleteIntegrationTest extends TestCase
             postRepo: new FeedPostRepository($this->db),
             voteRepo: new FeedPostVoteRepository($this->db),
             commentRepo: new FeedPostCommentRepository($this->db),
-            imageService: new ImageService(new NullLogger()),
+            imageService: new ImageService(new NullLogger(), new MediaService(new NullLogger())),
             travelRelationRepo: new TravelRelationRepository($this->db),
             notificationService: new NotificationService(
                 notificationRepo: new NotificationRepository($this->db),

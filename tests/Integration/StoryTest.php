@@ -18,6 +18,7 @@ use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Security\Auth\AuthenticatedUser;
 use Sinclear\Api\Security\Policy\StoryPolicy;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MediaService;
 use Sinclear\Api\Services\NotificationService;
 use Sinclear\Api\Services\StoryReactionService;
 
@@ -164,7 +165,7 @@ class StoryTest extends TestCase
         $this->controller = new StoryController(
             storyRepo: $this->repo,
             policy: new StoryPolicy(),
-            imageService: new ImageService($logger),
+            imageService: new ImageService($logger, new MediaService($logger)),
             userRepo: new UserRepository($this->db),
             notificationService: $notificationService,
             reactionService: new StoryReactionService(

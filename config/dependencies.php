@@ -227,6 +227,9 @@ use Sinclear\Api\Services\ArcadeScoreService;
 use Sinclear\Api\Services\ReviewService;
 use Sinclear\Api\Services\RateLimiter;
 use Sinclear\Api\Services\ImageService;
+use Sinclear\Api\Services\MediaService;
+use Sinclear\Api\Controllers\MediaController;
+use Sinclear\Api\Middleware\MediaQualityMiddleware;
 use Sinclear\Api\Services\Centrifugo\CentrifugoClient;
 use Sinclear\Api\Services\Centrifugo\CentrifugoTokenService;
 use Sinclear\Api\Services\Centrifugo\ChatEventPublisher;
@@ -305,6 +308,9 @@ return [
 
     RateLimiter::class => autowire(),
     ImageService::class => autowire(),
+    MediaService::class => autowire(),
+    MediaController::class => autowire(),
+    MediaQualityMiddleware::class => autowire(),
 
     UserRepository::class => autowire(),
     OtpTokenRepository::class => autowire(),

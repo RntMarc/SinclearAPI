@@ -38,6 +38,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 9 | `cleanup_arcade_sessions` | 1 Stunde | Löscht abgelaufene und widerrufene Arcade-Sessions |
 | 10 | `cleanup_refresh_tokens` | 24 Stunden | Löscht abgelaufene/widerrufene Refresh-Tokens und verwaiste Familien |
 | 11 | `cleanup_jti_blacklist` | 1 Stunde | Löscht abgelaufene JTI-Blacklist-Einträge |
+| 12 | `cleanup_media_thumbnails` | 24 Stunden | Entfernt ungenutzte Medien-Thumbnails/-Originale aus dem Disk-Cache |
 
 ## Details
 
@@ -127,6 +128,13 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 - **Aktion:** `DELETE FROM JtiBlacklist WHERE expiresAt < NOW()` — entfernt abgelaufene Access-Token-JTIs (Logout-Blacklist).
 - **Datei:** `src/Services/Cron/Tasks/CleanupExpiredJtiBlacklistTask.php`
 - **Hintergrund:** Siehe [auth/login.md](./auth/login.md).
+
+### Media Thumbnail Cleanup
+- **Task-Name:** `cleanup_media_thumbnails`
+- **Intervall:** 86400 Sekunden (24 Stunden)
+- **Aktion:** Entfernt Dateien aus `var/cache/media/`, die länger als 30 Tage nicht mehr benutzt wurden (anhand `mtime`, die bei jedem Zugriff via `touch` aktualisiert wird). Verhindert unbegrenztes Wachstum auf Shared Hosting, wenn Nutzer Bilder ändern oder löschen.
+- **Datei:** `src/Services/Cron/Tasks/CleanupMediaThumbnailsTask.php`
+- **Hintergrund:** Siehe [media/readme.md](./media/readme.md).
 
 ## CronSchedule-Tabelle
 

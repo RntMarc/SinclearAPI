@@ -11,6 +11,12 @@ $app = AppFactory::createFromContainer($container);
 
 $app->addBodyParsingMiddleware();
 
+// Antwort-Transformation für Low-Data: ersetzt Base64-Bilder durch
+// Vorschaubilder, wenn der Client `X-Media-Quality: low` sendet. Muss
+// möglichst innen liegen (nah am Routing), damit sie die finale Response
+// sieht — deshalb als erste Middleware registriert.
+$app->add($container->get(\Sinclear\Api\Middleware\MediaQualityMiddleware::class));
+
 $app->add($container->get(\Sinclear\Api\Middleware\SecurityHeadersMiddleware::class));
 $app->add($container->get(\Sinclear\Api\Middleware\CorsMiddleware::class));
 $app->add($container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class));

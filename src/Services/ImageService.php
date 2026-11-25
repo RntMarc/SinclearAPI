@@ -13,6 +13,7 @@ final readonly class ImageService
 
     public function __construct(
         private LoggerInterface $logger,
+        private MediaService $media,
     ) {}
 
     /**
@@ -109,6 +110,16 @@ final readonly class ImageService
         }
 
         $this->logger->debug('ImageService: validation passed');
+
+        // Vorschaubild bereits beim Upload einmalig erzeugen, damit der erste
+        // Low-Data-Request nicht live skalieren muss. Fehler sind unkritisch
+        // (das Thumbnail wird dann lazily nachgeholt).
+        try {
+            $this->media->thumbnail($imageData);
+        } catch (\Throwable $e) {
+            $this->logger->debug('ImageService: thumbnail generation failed: ' . $e->getMessage());
+        }
+
         return $imageData;
     }
 }

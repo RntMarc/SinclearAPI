@@ -93,6 +93,18 @@ components:
         maximum: 100
         default: 20
 
+    MediaQuality:
+      name: X-Media-Quality
+      in: header
+      required: false
+      description: >-
+        Bei `low` werden Base64-Bilder in JSON-Responses durch kleine
+        Vorschaubilder (inkl. Inhalts-Hash) ersetzt; die volle Qualität lädt
+        `GET /media/{hash}` nach. Alternativ `Save-Data: on` oder `?media=low`.
+      schema:
+        type: string
+        enum: [low]
+
   schemas:
     Error:
       type: object
@@ -23116,6 +23128,55 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Story nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /media/{hash}:
+    get:
+      summary: Volle Qualität eines Vorschaubildes nachladen
+      description: >
+        Liefert das Original-Base64 eines zuvor als Vorschaubild ausgelieferten
+        Bildes. Der Hash ist content-addressed (xxh128 des Original-Base64) und
+        stammt aus dem `hash=`-Parameter des Vorschau-`data:`-URIs, den die API
+        im Low-Data-Modus (`X-Media-Quality: low`) ausliefert. Die Antwort ist
+        unveränderlich und wird dauerhaft privat gecacht.
+      tags: [Media]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-fA-F]{32}$'
+          description: Inhalts-Hash des Bildes
+      responses:
+        '200':
+          description: Original-Bild als Base64
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [image]
+                    properties:
+                      image:
+                        type: string
+                        description: Base64-kodiertes Originalbild
+        '401':
+          description: Nicht autorisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Hash unbekannt
           content:
             application/json:
               schema:
