@@ -28,6 +28,8 @@ final class FcmPushService
     private Client $httpClient;
     private ?string $cachedAccessToken = null;
     private int $tokenExpiresAt = 0;
+    private ?bool $credentialsValid = null;
+    private ?string $credentialsHash = null;
 
     public function __construct(
         private readonly PushSubscriptionRepository $pushSubRepo,
@@ -43,7 +45,44 @@ final class FcmPushService
 
     public function isConfigured(): bool
     {
-        return $this->projectId !== '' && $this->clientEmail !== '' && $this->privateKey !== '';
+        if ($this->projectId === '' || $this->clientEmail === '' || $this->privateKey === '') {
+            return false;
+        }
+
+        return $this->credentialsValid ??= @openssl_pkey_get_private(self::normalizePrivateKey($this->privateKey)) !== false;
+    }
+
+    /**
+     * Normalisiert den Private Key aus der `.env`.
+     *
+     * Je nach Quoting liefert phpdotenv echte Zeilenumbrüche oder literale
+     * `\n`-Escapes (z. B. beim Kopieren aus einem Service-Account-JSON).
+     * Umschließende Anführungszeichen werden entfernt.
+     */
+    public static function normalizePrivateKey(string $key): string
+    {
+        $key = trim($key);
+        $key = trim($key, "\"'");
+        $key = str_replace(['\\r\\n', '\\n', '\\r'], "\n", $key);
+        $key = str_replace("\r\n", "\n", $key);
+
+        // Escapes können erst jetzt zu echten Zeilenumbrüchen geworden sein.
+        return trim($key);
+    }
+
+    /**
+     * Fingerprint der Zugangsdaten für den Token-Dateicache.
+     *
+     * Enthält den Private Key: Nach einer Key-Rotation (gleiche
+     * `clientEmail`, neuer Key) wird das alte OAuth-Token verworfen statt
+     * weiterverwendet.
+     */
+    private function credentialsHash(): string
+    {
+        return $this->credentialsHash ??= hash(
+            'sha256',
+            $this->projectId . "\n" . $this->clientEmail . "\n" . self::normalizePrivateKey($this->privateKey),
+        );
     }
 
     /**
@@ -173,7 +212,7 @@ final class FcmPushService
             return $this->cachedAccessToken;
         }
 
-        $cached = self::readCachedToken($this->cacheFile, $this->clientEmail);
+        $cached = self::readCachedToken($this->cacheFile, $this->credentialsHash());
         if ($cached !== null) {
             $this->cachedAccessToken = $cached['token'];
             $this->tokenExpiresAt = $cached['expiresAt'];
@@ -210,7 +249,7 @@ final class FcmPushService
                 $this->cacheFile,
                 $this->cachedAccessToken,
                 $this->tokenExpiresAt,
-                $this->clientEmail,
+                $this->credentialsHash(),
             );
 
             return $this->cachedAccessToken;
@@ -227,9 +266,12 @@ final class FcmPushService
      * würde jede Benachrichtigung einen neuen JWT signieren und einen
      * blockierenden Token-Request zu Google auslösen.
      *
+     * Der gespeicherte Fingerprint deckt Projekt, Service-Account und Private
+     * Key ab. Nach einer Key-Rotation wird das alte Token ignoriert.
+     *
      * @return array{token: string, expiresAt: int}|null
      */
-    private static function readCachedToken(string $cacheFile, string $clientEmail): ?array
+    private static function readCachedToken(string $cacheFile, string $credentialsHash): ?array
     {
         if (!is_file($cacheFile)) {
             return null;
@@ -243,12 +285,12 @@ final class FcmPushService
             $data = json_decode($raw, true);
             $cachedToken = is_array($data) ? ($data['token'] ?? null) : null;
             $expiresAt = is_array($data) ? ($data['expiresAt'] ?? null) : null;
-            $cachedClientEmail = is_array($data) ? ($data['clientEmail'] ?? null) : null;
+            $cachedCredentialsHash = is_array($data) ? ($data['credentialsHash'] ?? null) : null;
             if (
                 !is_string($cachedToken)
                 || !is_int($expiresAt)
-                || !is_string($cachedClientEmail)
-                || $cachedClientEmail !== $clientEmail
+                || !is_string($cachedCredentialsHash)
+                || !hash_equals($credentialsHash, $cachedCredentialsHash)
                 || time() >= $expiresAt
             ) {
                 return null;
@@ -263,12 +305,12 @@ final class FcmPushService
         string $cacheFile,
         string $token,
         int $expiresAt,
-        string $clientEmail,
+        string $credentialsHash,
     ): void {
         $payload = json_encode([
             'token' => $token,
             'expiresAt' => $expiresAt,
-            'clientEmail' => $clientEmail,
+            'credentialsHash' => $credentialsHash,
         ]);
         if ($payload === false) {
             return;
@@ -301,8 +343,7 @@ final class FcmPushService
         ]));
 
         $signingInput = $header . '.' . $claimSet;
-        $normalizedKey = str_replace('\n', "\n", $this->privateKey);
-        $privateKey = openssl_pkey_get_private($normalizedKey);
+        $privateKey = @openssl_pkey_get_private(self::normalizePrivateKey($this->privateKey));
         if ($privateKey === false) {
             throw new \RuntimeException('Invalid FCM private key');
         }

@@ -41,6 +41,30 @@ class FcmPrivacyTest extends TestCase
         $this->assertCount(2, $payload['message']['data']);
     }
 
+    public function testPrivateKeyFormattingVariantsAreNormalized(): void
+    {
+        $canonical = "-----BEGIN PRIVATE KEY-----\n"
+            . "MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAUAwggE8\n"
+            . '-----END PRIVATE KEY-----';
+        $withTrailingNewline = $canonical . "\n";
+
+        $variants = [
+            'plain' => $withTrailingNewline,
+            'escaped' => str_replace("\n", '\n', $withTrailingNewline),
+            'crlf-escaped' => str_replace("\n", '\r\n', $withTrailingNewline),
+            'quoted' => '"' . $withTrailingNewline . '"',
+            'padded' => "  \n" . $withTrailingNewline . "\n  ",
+        ];
+
+        foreach ($variants as $label => $variant) {
+            $this->assertSame(
+                $canonical,
+                FcmPushService::normalizePrivateKey($variant),
+                'Variant failed: ' . $label,
+            );
+        }
+    }
+
     public function testTravelChangedFieldsTextGeneration(): void
     {
         $this->assertSame(

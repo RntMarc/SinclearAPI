@@ -22649,7 +22649,8 @@ paths:
         dabei wird auch `userId` auf den aktuellen Nutzer gesetzt (Gerätewechsel
         zwischen Accounts). Der Typ `fcm` wird nur akzeptiert, wenn der Server
         vollständig konfiguriert ist (`FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`,
-        `FCM_PRIVATE_KEY`), sonst antwortet der Endpoint mit `503`.
+        `FCM_PRIVATE_KEY`) und der Private Key als gültiger RSA-Schlüssel
+        gelesen werden kann, sonst antwortet der Endpoint mit `503`.
       tags: [Notifications]
       security:
         - BearerAuth: []
@@ -22683,8 +22684,8 @@ paths:
                 $ref: '#/components/schemas/Error'
         '503':
           description: >
-            FCM ist auf dem Server nicht konfiguriert
-            (`error: fcm_not_configured`).
+            FCM ist auf dem Server nicht konfiguriert oder der Private Key ist
+            ungültig (`error: fcm_not_configured`).
           content:
             application/json:
               schema:

@@ -145,9 +145,26 @@ class NotificationIntegrationTest extends TestCase
                 pushSubRepo: $this->pushSubRepo,
                 projectId: 'test-project',
                 clientEmail: 'test@example.com',
-                privateKey: 'test-key',
+                privateKey: self::testPrivateKey(),
             ),
         );
+    }
+
+    /**
+     * Gültiger, flüchtiger RSA-Schlüssel: `isConfigured()` prüft seit der
+     * Key-Validierung, ob der Private Key lesbar ist.
+     */
+    private static function testPrivateKey(): string
+    {
+        static $pem = null;
+        if ($pem === null) {
+            $key = openssl_pkey_new(['private_key_bits' => 2048]);
+            if ($key === false || !openssl_pkey_export($key, $pem)) {
+                throw new \RuntimeException('Could not create test RSA key');
+            }
+        }
+
+        return $pem;
     }
 
     protected function tearDown(): void

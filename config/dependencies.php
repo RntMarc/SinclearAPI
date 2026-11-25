@@ -460,9 +460,9 @@ return [
         return new \Sinclear\Api\Services\FcmPushService(
             pushSubRepo: $c->get(\Sinclear\Api\Repository\PushSubscriptionRepository::class),
             logger: $c->get(\Psr\Log\LoggerInterface::class),
-            projectId: (string) ($fcm['project_id'] ?? ''),
-            clientEmail: (string) ($fcm['client_email'] ?? ''),
-            privateKey: (string) ($fcm['private_key'] ?? ''),
+            projectId: trim((string) ($fcm['project_id'] ?? '')),
+            clientEmail: trim((string) ($fcm['client_email'] ?? '')),
+            privateKey: trim((string) ($fcm['private_key'] ?? '')),
             httpClient: $c->get(\GuzzleHttp\Client::class),
         );
     },

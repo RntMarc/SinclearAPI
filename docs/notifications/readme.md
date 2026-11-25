@@ -623,8 +623,9 @@ Für Android-Clients, die FCM als Zustellmethode gewählt haben, sendet die API 
 - Es werden **keine** Namen, **keine** Nachrichtentexte, **kein** `type` und **keine** `data`-Relationen an Google übermittelt.
 - Die Android-App empfängt das `wakeup`-Signal im Hintergrund und ruft den eigentlichen Inhalt direkt und authentifiziert über `GET /notifications` vom Sinclear-Server ab. Kann ein Tap nur die anonyme Fallback-ID auflösen, lädt der Client die echte Benachrichtigung über `GET /notifications/{id}` nach.
 - Antwortet FCM mit HTTP 404/410 bzw. `UNREGISTERED` / `NOT_FOUND`, wird das Token sofort aus `PushSubscription` gelöscht.
-- `POST /notifications/push-subscription` mit `type: fcm` antwortet mit `503 fcm_not_configured`, solange `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL` oder `FCM_PRIVATE_KEY` fehlen. So erfährt der Client sofort, dass die Registrierung serverseitig nicht greifen kann.
-- Das Google-OAuth-Access-Token (1 Stunde gültig) wird in `var/cache/fcm-token.json` zwischengespeichert, damit nicht jeder Request einen neuen JWT signiert und einen blockierenden Token-Request auslöst. Der Cache wird nur verwendet, solange `clientEmail` übereinstimmt und das Token nicht abgelaufen ist.
+- `POST /notifications/push-subscription` mit `type: fcm` antwortet mit `503 fcm_not_configured`, solange `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL` oder `FCM_PRIVATE_KEY` fehlen **oder** der Private Key nicht als gültiger RSA-Schlüssel gelesen werden kann. So erfährt der Client sofort, dass die Registrierung serverseitig nicht greifen kann.
+- Das Google-OAuth-Access-Token (1 Stunde gültig) wird in `var/cache/fcm-token.json` zwischengespeichert, damit nicht jeder Request einen neuen JWT signiert und einen blockierenden Token-Request auslöst. Der Cache ist an einen SHA-256-Fingerprint aus Projekt-ID, `clientEmail` **und Private Key** gebunden: Nach einer Key-Rotation wird das alte Token automatisch verworfen, auch wenn der Service-Account unverändert bleibt.
+- Bei jedem Deploy löscht `update.sh` `var/cache/CompiledContainer.php` und `var/cache/fcm-token.json`: Der kompilierte DI-Container darf nach Code-/Konfigurationsänderungen nicht veralten, und ein OAuth-Token aus der Zeit vor einer Key-Rotation soll nicht weiterverwendet werden.
 
 ### Bereinigung toter Subscriptions
 
@@ -680,6 +681,20 @@ FCM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 `SinclearApp/lib/firebase_options.dart`). Weicht es ab, lehnt FCM die
 Zustellung mit `SENDER_ID_MISMATCH` ab. Der Service-Account muss zum selben
 Projekt gehören und die Rolle „Firebase Cloud Messaging API“ besitzen.
+
+`FCM_PRIVATE_KEY` darf mehrzeilig oder als einzeiliger Wert mit literalen
+`\n`-Escapes eingetragen werden (z. B. direkt aus dem Service-Account-JSON
+kopiert). Der Server entfernt umschließende Anführungszeichen und normalisiert
+beide Varianten; `FCM_PROJECT_ID` und `FCM_CLIENT_EMAIL` werden getrimmt. Ist
+der Key trotzdem nicht lesbar, antwortet die Registrierung mit `503
+fcm_not_configured`.
+
+Die Client-Seite bezieht ihre Firebase-Werte ausschließlich aus
+`SinclearApp/.env` (`FIREBASE_*`): `deploy.py` erzeugt daraus vor dem APK-Build
+sowohl die `--dart-define`-Werte als auch die gitignorierte
+`android/app/google-services.json`. Beide müssen identisch bleiben, sonst
+verweigert Firebase Installations den Token-Abruf oder
+`Firebase.initializeApp` wirft `[core/duplicate-app]`.
 
 Schlüsselpaar generieren mit:
 ```bash

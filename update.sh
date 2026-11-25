@@ -121,6 +121,13 @@ ssh -t -i "$SSH_KEY" -o StrictHostKeyChecking=no -o LogLevel=QUIET "$SERVER" "
         exit 1
     fi
 
+    # Veraltete Runtime-Caches verwerfen. Der PHP-DI-Container wird nach
+    # var/cache kompiliert und kann nach Code-Änderungen veralten; der
+    # FCM-OAuth-Token-Dateicache könnte aus der Zeit vor einer Key-Rotation
+    # stammen (er ist zusätzlich an einen Zugangsdaten-Fingerprint gebunden).
+    rm -f var/cache/CompiledContainer.php var/cache/fcm-token.json
+    echo '---CACHE_CLEARED---'
+
     # Deployten Commit auslesen (ID + Commit-Message)
     echo '---COMMIT_START---'
     git log -1 --format='%h|%s'
