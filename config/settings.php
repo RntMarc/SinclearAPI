@@ -113,6 +113,15 @@ $settings['arcade'] = [
     'session_ttl' => (int)($_ENV['ARCADE_SESSION_TTL'] ?? 900),
 ];
 
+$settings['minecraft'] = [
+    'ingest_key'                       => $_ENV['MINECRAFT_INGEST_KEY'] ?? '',
+    'max_body_bytes'                   => (int)($_ENV['MINECRAFT_MAX_BODY_BYTES'] ?? 2097152),
+    'max_players'                      => (int)($_ENV['MINECRAFT_MAX_PLAYERS'] ?? 200),
+    'max_stats_per_player'             => (int)($_ENV['MINECRAFT_MAX_STATS_PER_PLAYER'] ?? 10000),
+    'rate_limit_per_minute'            => (int)($_ENV['MINECRAFT_RATE_LIMIT_PER_MINUTE'] ?? 30),
+    'invalid_key_rate_limit_per_minute' => (int)($_ENV['MINECRAFT_INVALID_KEY_RATE_LIMIT_PER_MINUTE'] ?? 10),
+];
+
 $settings['external_data'] = [
     'infranode_base_url' => $_ENV['INFRANODE_BASE_URL'] ?? 'https://infranode.dev/api/v1',
     'open_meteo_base_url' => $_ENV['OPEN_METEO_BASE_URL'] ?? 'https://api.open-meteo.com/v1',

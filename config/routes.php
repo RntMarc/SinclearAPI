@@ -55,6 +55,7 @@ use Sinclear\Api\Controllers\GameStatsController;
 use Sinclear\Api\Controllers\ArcadeGameController;
 use Sinclear\Api\Controllers\ArcadeSessionController;
 use Sinclear\Api\Controllers\ArcadeScoreController;
+use Sinclear\Api\Controllers\MinecraftIngestController;
 use Sinclear\Api\Middleware\ArcadeSessionMiddleware;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AdminApiMiddleware;
@@ -582,6 +583,11 @@ return function (App $app): void {
     })
         ->add($container->get(CentrifugoProxyMiddleware::class))
         ->add($container->get(\Sinclear\Api\Middleware\RequireHttpsMiddleware::class));
+
+    // Minecraft-Server-Ingest (no JWT — secured via shared secret Bearer-Key).
+    // Authentifizierung, Rate-Limit und Body-Limit übernimmt der globale
+    // MinecraftIngestMiddleware-Guard (registriert in public/index.php).
+    $app->post('/minecraft/stats', [MinecraftIngestController::class, 'ingest']);
 
     // Spiele-Statistiken (authenticated). Statische Route cache-meta vor den
     // parametrisierten Stats-Routen registrieren.

@@ -11,6 +11,11 @@ $app = AppFactory::createFromContainer($container);
 
 $app->addBodyParsingMiddleware();
 
+// Minecraft-Server-Ingest: Der Guard prüft den Shared-Secret-Key und die
+// Body-Größe, BEVOR der Body geparst wird. Wirkt nur auf POST /minecraft/stats
+// (pfadgebunden) und liegt daher unbedenklich vor dem BodyParsingMiddleware.
+$app->add($container->get(\Sinclear\Api\Middleware\MinecraftIngestMiddleware::class));
+
 // Antwort-Transformation für Low-Data: ersetzt Base64-Bilder durch
 // Vorschaubilder, wenn der Client `X-Media-Quality: low` sendet. Muss
 // möglichst innen liegen (nah am Routing), damit sie die finale Response

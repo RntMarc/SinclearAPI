@@ -237,6 +237,14 @@ use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mime\Email;
+use Sinclear\Api\Controllers\MinecraftIngestController;
+use Sinclear\Api\Middleware\MinecraftIngestMiddleware;
+use Sinclear\Api\Repository\MinecraftSnapshotRepository;
+use Sinclear\Api\Repository\MinecraftPlayerRepository;
+use Sinclear\Api\Repository\MinecraftStatRepository;
+use Sinclear\Api\Security\Policy\MinecraftIngestPolicy;
+use Sinclear\Api\Services\Minecraft\MinecraftIngestService;
+use Sinclear\Api\Services\Minecraft\MinecraftSnapshotValidator;
 use function DI\autowire;
 use function DI\create;
 use function DI\get;
@@ -774,6 +782,33 @@ return [
 
     GameStatsService::class => autowire(),
     GameStatsController::class => autowire(),
+
+    MinecraftSnapshotRepository::class => autowire(),
+    MinecraftPlayerRepository::class => autowire(),
+    MinecraftStatRepository::class => autowire(),
+    MinecraftIngestService::class => autowire(),
+    MinecraftIngestPolicy::class => autowire(),
+    MinecraftIngestController::class => autowire(),
+
+    MinecraftSnapshotValidator::class => function (ContainerInterface $c): MinecraftSnapshotValidator {
+        $settings = $c->get(Settings::class);
+        return new MinecraftSnapshotValidator(
+            maxPlayers: $settings->minecraft['max_players'],
+            maxStatsPerPlayer: $settings->minecraft['max_stats_per_player'],
+        );
+    },
+
+    MinecraftIngestMiddleware::class => function (ContainerInterface $c): MinecraftIngestMiddleware {
+        $settings = $c->get(Settings::class);
+        return new MinecraftIngestMiddleware(
+            ingestKey: $settings->minecraft['ingest_key'],
+            maxBodyBytes: $settings->minecraft['max_body_bytes'],
+            rateLimitPerMinute: $settings->minecraft['rate_limit_per_minute'],
+            invalidKeyRateLimitPerMinute: $settings->minecraft['invalid_key_rate_limit_per_minute'],
+            rateLimiter: $c->get(RateLimiter::class),
+            logger: $c->get(LoggerInterface::class),
+        );
+    },
 
     \Sinclear\Api\Dav\IcsFactory::class => autowire(),
     \Sinclear\Api\Dav\VcardFactory::class => autowire(),

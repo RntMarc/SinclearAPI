@@ -22,5 +22,6 @@ final readonly class Settings
         public array $polls = [],
         public array $games = [],
         public array $arcade = [],
+        public array $minecraft = [],
     ) {}
 }

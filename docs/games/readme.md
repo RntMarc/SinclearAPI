@@ -11,6 +11,10 @@ ergänzt werden können, ohne die gemeinsame Struktur zu ändern.
 > Dieses Dokument beschreibt ausschließlich extern verknüpfte Spiele-Accounts
 > und deren Statistiken.
 
+> **Minecraft:** Statistiken eines Minecraft-Servers werden nicht abgefragt, sondern vom Server-Plugin per
+> Push an die API gesendet und dauerhaft in der Datenbank gespeichert. Siehe
+> [minecraft/readme.md](../minecraft/readme.md).
+
 ## Überblick
 
 | Aspekt | Verhalten |

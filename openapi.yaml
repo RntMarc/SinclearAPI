@@ -27,6 +27,13 @@ components:
       description: >-
         Persönlicher LaMetric-Token (64 Hex-Zeichen), gültig 1 Jahr. Wird von der
         LaMetric Time als Query-Parameter an den Poll-Endpunkt gesendet.
+    MinecraftIngestKey:
+      type: http
+      scheme: bearer
+      description: >-
+        Shared Secret (64 Hex-Zeichen, `MINECRAFT_INGEST_KEY` aus der `.env`) für den
+        Minecraft-Server-Ingest. Kein JWT. Nur im `Authorization: Bearer`-Header,
+        niemals als Query-Parameter.
     ArcadeSessionToken:
       type: http
       scheme: bearer
@@ -8365,6 +8372,120 @@ components:
           type: boolean
         sortOrder:
           type: integer
+
+    MinecraftStatsRequest:
+      type: object
+      required: [schemaVersion, serverId, world, snapshotId, collectedAt, players]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        serverId:
+          type: string
+          pattern: '^[A-Za-z0-9_.-]{1,64}$'
+          example: MedionSMP
+        world:
+          type: string
+          pattern: '^[A-Za-z0-9_.-]{1,64}$'
+          example: world
+        snapshotId:
+          type: string
+          format: uuid
+          description: Idempotenz-Schlüssel; wird auf Kleinbuchstaben normalisiert.
+        collectedAt:
+          type: string
+          format: date-time
+          description: >-
+            RFC 3339 mit Offset oder `Z`. Maximal 5 Minuten in der Zukunft; die
+            Vergangenheit ist erlaubt (Wiederholungen nach Ausfällen).
+        playerCount:
+          type: integer
+          description: Wird ignoriert; maßgeblich ist die Länge von `players`.
+        players:
+          type: array
+          minItems: 1
+          maxItems: 200
+          description: >-
+            Teilmenge der Spieler mit vollständigen kumulativen Statistiken.
+            Maximal `MINECRAFT_MAX_PLAYERS` (Default 200), UUIDs eindeutig.
+          items:
+            $ref: '#/components/schemas/MinecraftPlayerStats'
+    MinecraftPlayerStats:
+      type: object
+      required: [uuid, stats]
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Minecraft-UUID (normalisiert auf Kleinbuchstaben mit Bindestrichen).
+        name:
+          type: string
+          pattern: '^[A-Za-z0-9_.\- ]{1,32}$'
+          description: Zuletzt bekannter Spielername (optional, aktualisiert den gespeicherten Namen).
+        dataVersion:
+          type: integer
+          description: Minecraft-`DataVersion` des Statistik-Files.
+        stats:
+          type: object
+          maxProperties: 10000
+          description: >-
+            Vanilla-Statistiken `{ kategorie: { statistik: wert } }`. Schlüssel
+            entsprechen `^[a-z0-9_.-]+:[a-z0-9_./-]+$` (max. 100 Zeichen), Werte
+            sind ganze Zahlen >= 0. Keine feste Whitelist; maximal
+            `MINECRAFT_MAX_STATS_PER_PLAYER` (Default 10000) Zähler je Spieler.
+            Einheiten: Ticks (`play_time`, `time_since_*`), Zentimeter (`*_one_cm`).
+          propertyNames:
+            pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+            maxLength: 100
+          additionalProperties:
+            type: object
+            propertyNames:
+              pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+              maxLength: 100
+            additionalProperties:
+              type: integer
+              minimum: 0
+          example:
+            'minecraft:custom':
+              'minecraft:play_time': 14288
+              'minecraft:walk_one_cm': 7845
+              'minecraft:deaths': 2
+    MinecraftStatsResponse:
+      type: object
+      required: [snapshotId, duplicate, accepted, changedStats]
+      properties:
+        snapshotId:
+          type: string
+          format: uuid
+        duplicate:
+          type: boolean
+          description: '`true`, wenn der Snapshot bereits bekannt war; es wurde nichts geändert.'
+        accepted:
+          type: integer
+          description: Anzahl der verarbeiteten Spieler.
+        changedStats:
+          type: integer
+          description: Anzahl der in den Verlauf geschriebenen geänderten Zähler.
+    MinecraftValidationError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [invalid_json, unsupported_schema_version, validation_failed]
+        details:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [field, error]
+            properties:
+              field:
+                type: string
+                example: players.0.uuid
+              error:
+                type: string
+                example: invalid_uuid
 
 paths:
   /lametric/token:
@@ -23869,6 +23990,106 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           description: Nutzer nicht gefunden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /minecraft/stats:
+    post:
+      summary: Minecraft-Statistiken empfangen (Server-Ingest)
+      description: >
+        **Server-zu-Server:** Wird vom Minecraft-Plugin aufgerufen und übermittelt einen
+        Snapshot mit den kumulativen Vanilla-Statistiken eines oder mehrerer Spieler.
+        Authentifizierung per Shared Secret (`Authorization: Bearer <MINECRAFT_INGEST_KEY>`,
+        kein JWT); HTTPS ist erzwungen.
+
+
+        Die API speichert pro Spieler den aktuellen Stand und den vollständigen Verlauf
+        (jede Änderung eines Zählers mit Zeitstempel). Der Snapshot wird ganz oder gar nicht
+        gespeichert. `snapshotId` ist der Idempotenz-Schlüssel: Ein erneut gesendeter Snapshot
+        liefert `200` mit `duplicate: true`. Nachzügler (`collectedAt` älter als der aktuelle
+        Stand) werden im Verlauf eingeordnet, ändern den aktuellen Stand aber nicht. Ein
+        Snapshot ist eine Teilmenge: nicht enthaltene Spieler bleiben unverändert.
+
+
+        Ist `MINECRAFT_INGEST_KEY` nicht konfiguriert, antwortet der Endpoint mit
+        `503 ingest_disabled`. Rate-Limit pro Key (Default 30/min) und pro IP bei ungültigem
+        Key (Default 10/min); Body-Limit Default 2 MB. Details: `docs/minecraft/readme.md`.
+      tags: [Minecraft]
+      security:
+        - MinecraftIngestKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MinecraftStatsRequest'
+            example:
+              schemaVersion: 1
+              serverId: MedionSMP
+              world: world
+              snapshotId: 866a12cc-4ea1-4e2b-96d1-c87094707c67
+              collectedAt: '2026-11-25T22:56:12Z'
+              playerCount: 1
+              players:
+                - uuid: f6d584ff-9577-472b-9aa2-88b7878eac37
+                  name: Notch
+                  dataVersion: 5023
+                  stats:
+                    'minecraft:custom':
+                      'minecraft:play_time': 14288
+                      'minecraft:walk_one_cm': 7845
+                      'minecraft:deaths': 2
+      responses:
+        '200':
+          description: >-
+            Snapshot verarbeitet. War er bereits bekannt, ist `duplicate` gleich `true`
+            und es wurde nichts geändert.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MinecraftStatsResponse'
+        '400':
+          description: >-
+            Ungültiges JSON (`invalid_json`), nicht unterstützte Schema-Version
+            (`unsupported_schema_version`) oder Validierungsfehler (`validation_failed`).
+            Es wird nichts gespeichert.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MinecraftValidationError'
+        '401':
+          description: Key fehlt (`unauthorized`) oder ist ungültig (`invalid_key`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request nicht über HTTPS (`ssl_required`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Body größer als das konfigurierte Limit (`payload_too_large`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Rate-Limit überschritten (`rate_limited`)
+          headers:
+            Retry-After:
+              description: Sekunden bis zum nächsten erlaubten Request
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Ingest ist nicht konfiguriert (`ingest_disabled`)
           content:
             application/json:
               schema:
