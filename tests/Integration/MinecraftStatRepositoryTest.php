@@ -7,6 +7,7 @@ namespace Sinclear\Api\Tests\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Sinclear\Api\Repository\MinecraftStatRepository;
+use Sinclear\Api\Tests\Support\MinecraftTestSchema;
 
 /**
  * Fokussierter Test der nicht-trivialen SQL-Pfade in MinecraftStatRepository:
@@ -17,16 +18,6 @@ final class MinecraftStatRepositoryTest extends TestCase
 {
     private PDO $db;
     private MinecraftStatRepository $repo;
-
-    private const array TABLES = [
-        'MinecraftStatHistory',
-        'MinecraftStatCurrent',
-        'MinecraftStatKey',
-        'MinecraftSnapshotPlayer',
-        'MinecraftSnapshot',
-        'MinecraftPlayer',
-        'MinecraftSource',
-    ];
 
     protected function setUp(): void
     {
@@ -47,28 +38,15 @@ final class MinecraftStatRepositoryTest extends TestCase
         );
         $this->db->exec("SET time_zone = '+00:00'");
 
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (self::TABLES as $table) {
-            $this->db->exec("DROP TABLE IF EXISTS `$table`");
-        }
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
-
-        $sql = file_get_contents(dirname(__DIR__, 2) . '/database/migrations/20261126000000_create_minecraft_stats.sql');
-        self::assertNotFalse($sql);
-        foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-            $this->db->exec($statement);
-        }
+        MinecraftTestSchema::drop($this->db);
+        MinecraftTestSchema::create($this->db);
 
         $this->repo = new MinecraftStatRepository($this->db);
     }
 
     protected function tearDown(): void
     {
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (self::TABLES as $table) {
-            $this->db->exec("DROP TABLE IF EXISTS `$table`");
-        }
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
+        MinecraftTestSchema::drop($this->db);
     }
 
     public function testGetOrCreateSourceIsIdempotent(): void

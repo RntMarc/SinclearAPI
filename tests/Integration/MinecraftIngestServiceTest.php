@@ -12,6 +12,7 @@ use Sinclear\Api\Repository\MinecraftPlayerRepository;
 use Sinclear\Api\Repository\MinecraftSnapshotRepository;
 use Sinclear\Api\Repository\MinecraftStatRepository;
 use Sinclear\Api\Services\Minecraft\MinecraftIngestService;
+use Sinclear\Api\Tests\Support\MinecraftTestSchema;
 
 /**
  * End-to-End-Test des Minecraft-Ingest-Service gegen MySQL:
@@ -24,17 +25,6 @@ final class MinecraftIngestServiceTest extends TestCase
 {
     private PDO $db;
     private MinecraftIngestService $service;
-
-    private const array TABLES = [
-        'MinecraftStatHistory',
-        'MinecraftStatCurrent',
-        'MinecraftStatKey',
-        'MinecraftSnapshotPlayer',
-        'MinecraftSnapshot',
-        'MinecraftPlayer',
-        'MinecraftSource',
-        'GameAccount',
-    ];
 
     private const string UUID = 'f6d584ff-9577-472b-9aa2-88b7878eac37';
     private const string T1 = '2026-11-25 22:56:12.000';
@@ -60,8 +50,8 @@ final class MinecraftIngestServiceTest extends TestCase
         );
         $this->db->exec("SET time_zone = '+00:00'");
 
-        $this->dropTables();
-        $this->runMigration();
+        MinecraftTestSchema::drop($this->db);
+        MinecraftTestSchema::create($this->db);
         $this->createGameAccountTable();
 
         $this->service = new MinecraftIngestService(
@@ -76,7 +66,7 @@ final class MinecraftIngestServiceTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->dropTables();
+        MinecraftTestSchema::drop($this->db);
     }
 
     public function testFirstSnapshotStoresCurrentAndHistory(): void
@@ -304,25 +294,6 @@ final class MinecraftIngestServiceTest extends TestCase
                 UNIQUE KEY GameAccount_game_accountId_unique (game, accountId)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
-    }
-
-    private function dropTables(): void
-    {
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (self::TABLES as $table) {
-            $this->db->exec("DROP TABLE IF EXISTS `$table`");
-        }
-        $this->db->exec('SET FOREIGN_KEY_CHECKS = 1');
-    }
-
-    private function runMigration(): void
-    {
-        $sql = file_get_contents(dirname(__DIR__, 2) . '/database/migrations/20261126000000_create_minecraft_stats.sql');
-        self::assertNotFalse($sql);
-
-        foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-            $this->db->exec($statement);
-        }
     }
 
     /**

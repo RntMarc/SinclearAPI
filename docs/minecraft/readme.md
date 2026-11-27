@@ -378,7 +378,6 @@ src/Repository/MinecraftPlayerRepository.php
 src/Repository/MinecraftStatRepository.php              // Source/StatKey/Current/History/SnapshotPlayer
 src/Security/Policy/MinecraftIngestPolicy.php           // minimale Defense-in-Depth-Policy
 src/Services/Games/Minecraft/                           // Verknüpfung + Statistik-Abruf (siehe games/readme.md)
-database/migrations/20261126000000_create_minecraft_stats.sql
 database/migrations/20261127120000_game_account_unique_account.sql
 ```
 
