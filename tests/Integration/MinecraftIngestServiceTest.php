@@ -7,6 +7,7 @@ namespace Sinclear\Api\Tests\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Sinclear\Api\Repository\GameAccountRepository;
 use Sinclear\Api\Repository\MinecraftPlayerRepository;
 use Sinclear\Api\Repository\MinecraftSnapshotRepository;
 use Sinclear\Api\Repository\MinecraftStatRepository;
@@ -32,6 +33,7 @@ final class MinecraftIngestServiceTest extends TestCase
         'MinecraftSnapshot',
         'MinecraftPlayer',
         'MinecraftSource',
+        'GameAccount',
     ];
 
     private const string UUID = 'f6d584ff-9577-472b-9aa2-88b7878eac37';
@@ -60,12 +62,14 @@ final class MinecraftIngestServiceTest extends TestCase
 
         $this->dropTables();
         $this->runMigration();
+        $this->createGameAccountTable();
 
         $this->service = new MinecraftIngestService(
             $this->db,
             new MinecraftSnapshotRepository($this->db),
             new MinecraftPlayerRepository($this->db),
             new MinecraftStatRepository($this->db),
+            new GameAccountRepository($this->db),
             new NullLogger(),
         );
     }
@@ -249,6 +253,57 @@ final class MinecraftIngestServiceTest extends TestCase
              WHERE s.world = \'world\' AND c.playerUuid = ' . $this->db->quote(self::UUID)
         );
         self::assertSame(100, (int) $stmt->fetchColumn());
+    }
+
+    public function testIngestUpdatesLinkedAccountLastSyncedAt(): void
+    {
+        // Verknuepften Minecraft-Account anlegen.
+        $this->db->prepare(
+            'INSERT INTO GameAccount (id, userId, game, accountId, displayName, avatarUrl, profile, lastSyncedAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NOW(3), NOW(3))'
+        )->execute(['ga-1', 'user-1', 'minecraft', self::UUID, 'Notch', null]);
+
+        $this->service->ingest($this->snapshot('snap-1', self::T1, [$this->player()]));
+
+        $stmt = $this->db->prepare('SELECT lastSyncedAt FROM GameAccount WHERE id = ?');
+        $stmt->execute(['ga-1']);
+        self::assertSame(self::T1, $stmt->fetchColumn());
+    }
+
+    public function testIngestDoesNotMoveLinkedAccountLastSyncedAtBackwards(): void
+    {
+        $this->db->prepare(
+            'INSERT INTO GameAccount (id, userId, game, accountId, displayName, avatarUrl, profile, lastSyncedAt, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NOW(3), NOW(3))'
+        )->execute(['ga-1', 'user-1', 'minecraft', self::UUID, 'Notch', null, self::T2]);
+
+        // Nachzuegler mit aelterem collectedAt darf lastSyncedAt nicht zuruecksetzen.
+        $this->service->ingest($this->snapshot('snap-late', self::T_LATE, [$this->player()]));
+
+        $stmt = $this->db->prepare('SELECT lastSyncedAt FROM GameAccount WHERE id = ?');
+        $stmt->execute(['ga-1']);
+        self::assertSame(self::T2, $stmt->fetchColumn());
+    }
+
+    private function createGameAccountTable(): void
+    {
+        $this->db->exec("
+            CREATE TABLE GameAccount (
+                id varchar(191) NOT NULL,
+                userId varchar(191) NOT NULL,
+                game varchar(50) NOT NULL,
+                accountId varchar(191) NOT NULL,
+                displayName varchar(191) DEFAULT NULL,
+                avatarUrl varchar(1024) DEFAULT NULL,
+                profile JSON DEFAULT NULL,
+                lastSyncedAt datetime(3) DEFAULT NULL,
+                createdAt datetime(3) NOT NULL,
+                updatedAt datetime(3) NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY GameAccount_user_game_key (userId, game),
+                UNIQUE KEY GameAccount_game_accountId_unique (game, accountId)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
     }
 
     private function dropTables(): void

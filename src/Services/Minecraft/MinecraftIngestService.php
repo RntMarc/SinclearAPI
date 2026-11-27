@@ -9,9 +9,11 @@ use DateTimeZone;
 use PDO;
 use PDOException;
 use Psr\Log\LoggerInterface;
+use Sinclear\Api\Repository\GameAccountRepository;
 use Sinclear\Api\Repository\MinecraftPlayerRepository;
 use Sinclear\Api\Repository\MinecraftSnapshotRepository;
 use Sinclear\Api\Repository\MinecraftStatRepository;
+use Sinclear\Api\Services\Games\Minecraft\MinecraftIntegration;
 
 /**
  * Speichert einen validierten Minecraft-Ingest-Snapshot.
@@ -29,6 +31,7 @@ final readonly class MinecraftIngestService
         private MinecraftSnapshotRepository $snapshotRepo,
         private MinecraftPlayerRepository $playerRepo,
         private MinecraftStatRepository $statRepo,
+        private GameAccountRepository $gameAccountRepo,
         private LoggerInterface $logger,
     ) {}
 
@@ -116,6 +119,8 @@ final readonly class MinecraftIngestService
             'playerCount' => count($players),
             'changedStats' => $changedStats,
         ]);
+
+        $this->markLinkedAccountsSynced(array_column($players, 'uuid'), $collectedAt);
 
         return [
             'snapshotId' => $snapshotId,
@@ -237,5 +242,26 @@ final readonly class MinecraftIngestService
     private function isDuplicateKey(PDOException $e): bool
     {
         return $e->getCode() === '23000' || ($e->errorInfo[1] ?? null) === 1062;
+    }
+
+    /**
+     * Aktualisiert `lastSyncedAt` fuer verknuepfte Minecraft-Accounts
+     * (best effort, ausserhalb der Snapshot-Transaktion).
+     *
+     * @param list<string> $uuids
+     */
+    private function markLinkedAccountsSynced(array $uuids, string $collectedAt): void
+    {
+        if ($uuids === []) {
+            return;
+        }
+
+        try {
+            $this->gameAccountRepo->markSyncedAt(MinecraftIntegration::SLUG, $uuids, $collectedAt);
+        } catch (\Throwable $e) {
+            $this->logger->warning('[MinecraftIngest] failed to mark linked accounts synced', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

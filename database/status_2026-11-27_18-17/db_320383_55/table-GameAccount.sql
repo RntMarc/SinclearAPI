@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS `GameAccount` (
   `updatedAt` datetime(3) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `GameAccount_user_game_key` (`userId`,`game`),
-  KEY `GameAccount_game_accountId_idx` (`game`,`accountId`)
+  UNIQUE KEY `GameAccount_game_accountId_unique` (`game`,`accountId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Daten-Export vom Benutzer nicht ausgewählt

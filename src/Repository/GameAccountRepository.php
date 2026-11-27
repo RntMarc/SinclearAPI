@@ -38,6 +38,23 @@ final readonly class GameAccountRepository
         return array_values(array_map($this->hydrate(...), $stmt->fetchAll(PDO::FETCH_ASSOC)));
     }
 
+    /**
+     * Sucht einen verknuepften Account anhand von Spiel und Account-ID
+     * (fuer die Exklusivitaetspruefung beim Verknuepfen).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByGameAndAccountId(string $game, string $accountId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM GameAccount WHERE game = ? AND accountId = ? LIMIT 1'
+        );
+        $stmt->execute([$game, $accountId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $this->hydrate($row) : null;
+    }
+
     /** @return list<array<string, mixed>> */
     public function listByGame(string $game): array
     {
@@ -142,6 +159,28 @@ final readonly class GameAccountRepository
              WHERE game = ? AND accountId IN (' . $placeholders . ')'
         );
         $stmt->execute([$game, ...$accountIds]);
+    }
+
+    /**
+     * Setzt `lastSyncedAt` auf den angegebenen Zeitpunkt (Push-Modell, z. B.
+     * Minecraft-Ingest). Nachzuegler mit aelterem `collectedAt` setzen den
+     * Wert nicht zurueck (`GREATEST`); `updatedAt` bleibt unveraendert.
+     *
+     * @param list<string> $accountIds
+     */
+    public function markSyncedAt(string $game, array $accountIds, string $collectedAt): void
+    {
+        if ($accountIds === []) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($accountIds), '?'));
+        $stmt = $this->pdo->prepare(
+            'UPDATE GameAccount
+             SET lastSyncedAt = GREATEST(COALESCE(lastSyncedAt, ?), ?)
+             WHERE game = ? AND accountId IN (' . $placeholders . ')'
+        );
+        $stmt->execute([$collectedAt, $collectedAt, $game, ...$accountIds]);
     }
 
     /**

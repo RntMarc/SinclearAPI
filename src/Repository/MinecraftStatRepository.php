@@ -222,4 +222,53 @@ final readonly class MinecraftStatRepository
             $stmt->execute([$snapshotId, $player['playerUuid'], $player['dataVersion']]);
         }
     }
+
+    /**
+     * Aktueller Stand aller Zaehler eines Spielers ueber alle Quellen hinweg.
+     *
+     * @return list<array{sourceId: int, serverId: string, world: string, category: string, stat: string, value: int, collectedAt: string}>
+     */
+    public function getCurrentStatsForPlayer(string $playerUuid): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT c.sourceId, s.serverId, s.world, k.category, k.stat, c.value, c.collectedAt
+             FROM MinecraftStatCurrent c
+             INNER JOIN MinecraftSource s ON s.id = c.sourceId
+             INNER JOIN MinecraftStatKey k ON k.id = c.statKeyId
+             WHERE c.playerUuid = ?
+             ORDER BY s.serverId ASC, s.world ASC, k.category ASC, k.stat ASC'
+        );
+        $stmt->execute([$playerUuid]);
+
+        $result = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $result[] = [
+                'sourceId' => (int) $row['sourceId'],
+                'serverId' => (string) $row['serverId'],
+                'world' => (string) $row['world'],
+                'category' => (string) $row['category'],
+                'stat' => (string) $row['stat'],
+                'value' => (int) $row['value'],
+                'collectedAt' => (string) $row['collectedAt'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Juengster `collectedAt` ueber alle aktuellen Staende (fuer die
+     * Cache-Metadaten des Push-Modells).
+     */
+    public function latestCollectedAt(): ?string
+    {
+        $stmt = $this->pdo->query('SELECT MAX(collectedAt) FROM MinecraftStatCurrent');
+        if ($stmt === false) {
+            return null;
+        }
+
+        $value = $stmt->fetchColumn();
+
+        return $value !== false && $value !== null ? (string) $value : null;
+    }
 }

@@ -47,4 +47,18 @@ final readonly class MinecraftPlayerRepository
             ]);
         }
     }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findByUuid(string $uuid): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT uuid, name, firstSeenAt, lastSeenAt FROM MinecraftPlayer WHERE uuid = ? LIMIT 1'
+        );
+        $stmt->execute([$uuid]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row !== false ? $row : null;
+    }
 }

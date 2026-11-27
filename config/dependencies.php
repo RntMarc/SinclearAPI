@@ -219,6 +219,9 @@ use Sinclear\Api\Services\Games\Deadlock\DeadlockClient;
 use Sinclear\Api\Services\Games\Deadlock\DeadlockIntegration;
 use Sinclear\Api\Services\Games\GameRegistry;
 use Sinclear\Api\Services\Games\GameStatsCache;
+use Sinclear\Api\Services\Games\Minecraft\MinecraftClient;
+use Sinclear\Api\Services\Games\Minecraft\MinecraftIntegration;
+use Sinclear\Api\Services\Games\Minecraft\MinecraftProfileResolver;
 use Sinclear\Api\Security\Policy\GameAccountPolicy;
 use Sinclear\Api\Security\Policy\ArcadePolicy;
 use Sinclear\Api\Services\ArcadeGameService;
@@ -774,9 +777,19 @@ return [
     },
     DeadlockIntegration::class => autowire(),
 
+    MinecraftClient::class => function (ContainerInterface $c): MinecraftClient {
+        return new MinecraftClient(
+            settings: $c->get(Settings::class),
+            logger: $c->get(LoggerInterface::class),
+        );
+    },
+    MinecraftProfileResolver::class => autowire(),
+    MinecraftIntegration::class => autowire(),
+
     GameRegistry::class => function (ContainerInterface $c): GameRegistry {
         return new GameRegistry([
             DeadlockIntegration::SLUG => $c->get(DeadlockIntegration::class),
+            MinecraftIntegration::SLUG => $c->get(MinecraftIntegration::class),
         ]);
     },
 

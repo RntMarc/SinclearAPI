@@ -4,9 +4,9 @@ Ein Minecraft-Server (Plugin) sendet in regelmäßigen Abständen die Vanilla-Sp
 validiert die Daten, speichert den **vollständigen Verlauf** in der Datenbank und hält den jeweils aktuellen Stand
 bereit. Auf Basis dieses Verlaufs können später Diagramme und Auswertungen erstellt werden.
 
-> **Status v1:** Umfang ist ausschließlich der **Empfang und die Speicherung** der Daten (`POST /minecraft/stats`).
-> Lese-Endpunkte, die Verknüpfung mit Beyond-Nutzern und Diagramme sind Nicht-Ziele (siehe unten), das Datenmodell
-> ist darauf aber vorbereitet.
+> **Status v1:** Umfang ist der **Empfang und die Speicherung** der Daten (`POST /minecraft/stats`) sowie die
+> **Verknüpfung von Minecraft-UUIDs mit Beyond-Nutzern** und der Abruf des aktuellen Stands über die gemeinsamen
+> Spiele-Endpoints (siehe [games/readme.md](../games/readme.md)). Zeitreihen und Diagramme bleiben Nicht-Ziele.
 
 > **Abgrenzung:** Extern verknüpfte Spiele-Accounts mit Pull-Statistiken (z. B. Deadlock) sind in
 > [games/readme.md](../games/readme.md) dokumentiert. Dort liegen Statistiken nur im Cache. Minecraft arbeitet
@@ -21,7 +21,7 @@ bereit. Auf Basis dieses Verlaufs können später Diagramme und Auswertungen ers
 | Transport | HTTPS erzwungen (`RequireHttpsMiddleware`), JSON |
 | Idempotenz | `snapshotId` (UUID); erneutes Senden desselben Snapshots ist gefahrlos |
 | Speicherung | Aktueller Stand + vollständiger Verlauf (jede Änderung eines Zählers) |
-| Zuordnung | Über die Minecraft-UUID; keine Verknüpfung mit Beyond-Nutzern in v1 |
+| Zuordnung | Über die Minecraft-UUID; Verknüpfung mit Beyond-Nutzern über `GameAccount` (`game = 'minecraft'`) |
 | Aufbewahrung | Unbegrenzt (kein automatisches Löschen) |
 
 ## Authentifizierung
@@ -146,6 +146,25 @@ Hinweise zur Strukturprüfung:
   Bei `4xx` außer `429` nicht wiederholen, der Fehler liegt im Payload bzw. Key.
 - Nicht in der Aufzählung enthaltene Spieler werden nicht verändert, ein Snapshot ist also eine **Teilmenge**.
 - Empfohlene Frequenz: alle 5 Minuten, nur wenn Spieler online sind oder sich Daten geändert haben.
+
+## Verknüpfung mit Beyond-Nutzern
+
+Nutzer verknüpfen ihren Minecraft-Account über die gemeinsamen Spiele-Endpoints
+(`PUT /user/me/games/minecraft` mit `{ "accountId": "<UUID|Username>" }`). Die
+UUID bzw. der Username wird über die Mojang-API aufgelöst und als kanonische
+UUID in `GameAccount` gespeichert. Details, Fehlercodes und das Statistik-Format
+sind in [games/readme.md](../games/readme.md) → Abschnitt „Minecraft“ dokumentiert.
+
+Wesentliche Punkte:
+
+- `accountId` = kanonische UUID (lowercase, mit Bindestrichen).
+- `displayName` = Mojang-Name, `avatarUrl` = `{MINECRAFT_AVATAR_BASE_URL}/{uuid}/64`.
+- Exklusiv: `UNIQUE (game, accountId)`; Konflikt → `409 account_already_linked`.
+- Der Name aus Mojang wird beim Verknüpfen gespeichert; der zuletzt vom Plugin
+  gemeldete Name (`MinecraftPlayer.name`) bleibt davon unabhängig und wird in der
+  Statistik-Antwort (`stats.player.name`) verwendet.
+- `GameAccount.lastSyncedAt` wird nach jedem erfolgreichen Snapshot gesetzt
+  (`GREATEST`, Nachzügler setzen ihn nicht zurück).
 
 ## Idempotenz und Reihenfolge
 
@@ -315,6 +334,9 @@ $settings['minecraft'] = [
     'max_stats_per_player'             => (int)($_ENV['MINECRAFT_MAX_STATS_PER_PLAYER'] ?? 10000),
     'rate_limit_per_minute'            => (int)($_ENV['MINECRAFT_RATE_LIMIT_PER_MINUTE'] ?? 30),
     'invalid_key_rate_limit_per_minute' => (int)($_ENV['MINECRAFT_INVALID_KEY_RATE_LIMIT_PER_MINUTE'] ?? 10),
+    'profile_api_base_url'             => $_ENV['MINECRAFT_PROFILE_API_BASE_URL'] ?? 'https://api.mojang.com',
+    'session_api_base_url'             => $_ENV['MINECRAFT_SESSION_API_BASE_URL'] ?? 'https://sessionserver.mojang.com',
+    'avatar_base_url'                  => $_ENV['MINECRAFT_AVATAR_BASE_URL'] ?? 'https://mc-heads.net/avatar',
 ];
 ```
 
@@ -332,6 +354,10 @@ MINECRAFT_MAX_PLAYERS=200
 MINECRAFT_MAX_STATS_PER_PLAYER=10000
 MINECRAFT_RATE_LIMIT_PER_MINUTE=30
 MINECRAFT_INVALID_KEY_RATE_LIMIT_PER_MINUTE=10
+# Minecraft-Account-Verknüpfung (UUID/Username-Auflösung über Mojang).
+MINECRAFT_PROFILE_API_BASE_URL=https://api.mojang.com
+MINECRAFT_SESSION_API_BASE_URL=https://sessionserver.mojang.com
+MINECRAFT_AVATAR_BASE_URL=https://mc-heads.net/avatar
 ```
 
 Hinweis: Webserver-/PHP-Limits (`post_max_size`, `upload_max_filesize`) müssen mindestens
@@ -351,7 +377,9 @@ src/Repository/MinecraftSnapshotRepository.php
 src/Repository/MinecraftPlayerRepository.php
 src/Repository/MinecraftStatRepository.php              // Source/StatKey/Current/History/SnapshotPlayer
 src/Security/Policy/MinecraftIngestPolicy.php           // minimale Defense-in-Depth-Policy
+src/Services/Games/Minecraft/                           // Verknüpfung + Statistik-Abruf (siehe games/readme.md)
 database/migrations/20261126000000_create_minecraft_stats.sql
+database/migrations/20261127120000_game_account_unique_account.sql
 ```
 
 DI-Wiring per `autowire()` in `config/dependencies.php`. Der Guard wird (wie `CentrifugoProxyMiddleware`) mit den
@@ -362,12 +390,11 @@ Settings aus `config/settings.php` konstruiert; der Validator erhält `max_playe
 - **Admin-Dashboard:** Keine Änderung in v1; es gibt keine admin-bearbeitbaren Daten (Key liegt in `.env`).
   Eine Ansicht der Daten wäre eine spätere Erweiterung.
 - **Notifications:** Keine neuen Notification-Typen.
-- **Cron:** Keine Tasks in v1.
+- **Cron:** Keine eigenen Tasks in v1. Der bestehende `refresh_game_stats` überspringt Minecraft
+  (Push-Modell, `isPushBased() === true`); `GameAccount.lastSyncedAt` wird stattdessen beim Ingest gesetzt.
 
 ## Nicht-Ziele (v1)
 
-- Lese-Endpunkte (aktueller Stand, Verlauf, Zeitreihen) und Diagramme.
-- Verknüpfung von Minecraft-UUIDs mit Beyond-Nutzern (später z. B. über `GameAccount` mit `game = 'minecraft'`).
+- Zeitreihen-/History-Endpunkte (Verlauf je Zähler) und Diagramme; ausgeliefert wird nur der aktuelle Stand.
 - Mehrere Server mit eigenen Keys (Keys in der DB inkl. Admin-Verwaltung), HMAC-Signatur der Requests.
-- Auflösung von Spielernamen über Mojang (der Name kommt vom Plugin).
 - Aufbewahrungsfristen / Löschjobs.

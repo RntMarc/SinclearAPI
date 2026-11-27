@@ -117,8 +117,16 @@ final readonly class GameStatsService
         $summary = [];
 
         foreach ($this->registry->slugs() as $game) {
+            $integration = $this->registry->get($game);
+
+            // Push-basierte Integrationen (z. B. Minecraft) haben keinen
+            // Cron-Pull; ihr letzter Sync kommt aus dem Ingest.
+            if ($integration->isPushBased()) {
+                continue;
+            }
+
             $accounts = $this->repo->listByGame($game);
-            $this->registry->get($game)->refreshAll($accounts);
+            $integration->refreshAll($accounts);
 
             $accountIds = array_map(
                 static fn (array $account): string => (string) $account['accountId'],

@@ -15,6 +15,9 @@ interface GameStatsIntegrationInterface
     /**
      * Aktualisiert den Cache fuer alle uebergebenen Accounts.
      *
+     * Bei Push-basierten Integrationen (z. B. Minecraft) ist das eine No-op;
+     * siehe {@see isPushBased()}.
+     *
      * @param list<array<string, mixed>> $accounts GameAccount-Datensaetze
      */
     public function refreshAll(array $accounts): void;
@@ -34,9 +37,17 @@ interface GameStatsIntegrationInterface
     public function getCacheMeta(): array;
 
     /**
-     * Loest das oeffentliche Profil (Anzeigename/Avatar) eines Accounts auf.
+     * Loest die Nutzereingabe spielspezifisch auf und liefert die kanonische
+     * Account-ID sowie das oeffentliche Profil (Anzeigename/Avatar).
      *
-     * @return array{displayName: string|null, avatarUrl: string|null, profile: array<string, mixed>}
+     * @return array{accountId: string, displayName: string|null, avatarUrl: string|null, profile: array<string, mixed>}
      */
-    public function resolveProfile(string $accountId): array;
+    public function resolveProfile(string $input): array;
+
+    /**
+     * Ob die Statistiken per Push angeliefert werden (kein Cron-Pull). Bei
+     * `true` ueberspringt {@see GameStatsService::refreshAll()} die Integration
+     * und `refreshAll()` ist eine No-op.
+     */
+    public function isPushBased(): bool;
 }

@@ -53,7 +53,7 @@ final class GameAccountRepositoryTest extends TestCase
                 updatedAt datetime(3) NOT NULL,
                 PRIMARY KEY (id),
                 UNIQUE KEY GameAccount_user_game_key (userId, game),
-                KEY GameAccount_game_accountId_idx (game, accountId)
+                UNIQUE KEY GameAccount_game_accountId_unique (game, accountId)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
 
@@ -131,6 +131,41 @@ final class GameAccountRepositoryTest extends TestCase
         self::assertTrue($this->repo->deleteByUserIdAndGame('user-1', 'deadlock'));
         self::assertNull($this->repo->findByUserIdAndGame('user-1', 'deadlock'));
         self::assertFalse($this->repo->deleteByUserIdAndGame('user-1', 'deadlock'));
+    }
+
+    public function testFindByGameAndAccountId(): void
+    {
+        $this->insertUser('user-1');
+        $this->repo->upsert('user-1', 'minecraft', 'ca48cfb5-bfcb-4f25-bbbf-966cb5892c80', 'Notch', null, null);
+
+        $account = $this->repo->findByGameAndAccountId('minecraft', 'ca48cfb5-bfcb-4f25-bbbf-966cb5892c80');
+
+        self::assertNotNull($account);
+        self::assertSame('user-1', $account['userId']);
+        self::assertNull($this->repo->findByGameAndAccountId('minecraft', '00000000-0000-0000-0000-000000000000'));
+    }
+
+    public function testMarkSyncedAtDoesNotMoveBackwards(): void
+    {
+        $this->insertUser('user-1');
+        $this->repo->upsert('user-1', 'minecraft', 'ca48cfb5-bfcb-4f25-bbbf-966cb5892c80', 'Notch', null, null);
+
+        $this->repo->markSyncedAt('minecraft', ['ca48cfb5-bfcb-4f25-bbbf-966cb5892c80'], '2026-11-25 23:00:00.000');
+        $this->repo->markSyncedAt('minecraft', ['ca48cfb5-bfcb-4f25-bbbf-966cb5892c80'], '2026-11-25 22:00:00.000');
+
+        $account = $this->repo->findByUserIdAndGame('user-1', 'minecraft');
+        self::assertSame('2026-11-25 23:00:00.000', $account['lastSyncedAt']);
+    }
+
+    public function testUniqueAccountIdRejectsSecondUser(): void
+    {
+        $this->insertUser('user-1');
+        $this->insertUser('user-2');
+
+        $this->repo->upsert('user-1', 'minecraft', 'ca48cfb5-bfcb-4f25-bbbf-966cb5892c80', 'Notch', null, null);
+
+        $this->expectException(\PDOException::class);
+        $this->repo->upsert('user-2', 'minecraft', 'ca48cfb5-bfcb-4f25-bbbf-966cb5892c80', 'Notch', null, null);
     }
 
     private function insertUser(string $id): void

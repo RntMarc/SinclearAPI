@@ -106,6 +106,7 @@ final readonly class GameAccountController
         $status = match ($error) {
             'unknown_game' => 404,
             'invalid_account_id', 'account_not_found' => 400,
+            'account_already_linked' => 409,
             'game_api_unavailable' => 503,
             default => 500,
         };

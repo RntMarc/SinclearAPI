@@ -145,8 +145,10 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
         return $this->cache->meta(self::SLUG);
     }
 
-    public function resolveProfile(string $accountId): array
+    public function resolveProfile(string $input): array
     {
+        $accountId = $this->validateAccountId($input);
+
         try {
             $profiles = $this->client->steamProfiles([$accountId], true);
         } catch (DeadlockApiException $e) {
@@ -166,6 +168,7 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
             }
 
             return [
+                'accountId' => $accountId,
                 'displayName' => isset($profile['personaname']) ? (string) $profile['personaname'] : null,
                 'avatarUrl' => isset($profile['avatarfull'])
                     ? (string) $profile['avatarfull']
@@ -178,6 +181,30 @@ final readonly class DeadlockIntegration implements GameStatsIntegrationInterfac
         }
 
         throw new InvalidArgumentException('account_not_found');
+    }
+
+    public function isPushBased(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Validiert und normalisiert die SteamID3/Account-ID.
+     */
+    private function validateAccountId(string $accountId): string
+    {
+        $accountId = trim($accountId);
+
+        if ($accountId === '' || !ctype_digit($accountId) || strlen($accountId) > 10) {
+            throw new InvalidArgumentException('invalid_account_id');
+        }
+
+        $value = (int) $accountId;
+        if ($value < 1 || $value > 4294967295) {
+            throw new InvalidArgumentException('invalid_account_id');
+        }
+
+        return (string) $value;
     }
 
     /**

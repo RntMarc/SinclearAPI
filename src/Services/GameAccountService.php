@@ -7,6 +7,7 @@ namespace Sinclear\Api\Services;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
+use PDOException;
 use Sinclear\Api\Repository\GameAccountRepository;
 use Sinclear\Api\Repository\UserRepository;
 use Sinclear\Api\Services\Games\GameRegistry;
@@ -47,18 +48,31 @@ final readonly class GameAccountService
     public function link(string $userId, string $game, string $accountId): array
     {
         $integration = $this->registry->get($game);
-        $accountId = $this->validateAccountId($accountId);
-
         $profile = $integration->resolveProfile($accountId);
+        $accountId = $profile['accountId'];
 
-        $id = $this->repo->upsert(
-            userId: $userId,
-            game: $game,
-            accountId: $accountId,
-            displayName: $profile['displayName'],
-            avatarUrl: $profile['avatarUrl'],
-            profile: $profile['profile'],
-        );
+        $existing = $this->repo->findByGameAndAccountId($game, $accountId);
+        if ($existing !== null && $existing['userId'] !== $userId) {
+            throw new InvalidArgumentException('account_already_linked');
+        }
+
+        try {
+            $id = $this->repo->upsert(
+                userId: $userId,
+                game: $game,
+                accountId: $accountId,
+                displayName: $profile['displayName'],
+                avatarUrl: $profile['avatarUrl'],
+                profile: $profile['profile'],
+            );
+        } catch (PDOException $e) {
+            // UNIQUE (game, accountId) — Race-Condition bei parallelen Requests.
+            if (($e->errorInfo[1] ?? null) === 1062 || $e->getCode() === '23000') {
+                throw new InvalidArgumentException('account_already_linked');
+            }
+
+            throw $e;
+        }
 
         $account = $this->repo->findByUserIdAndGame($userId, $game);
         if ($account === null || $account['id'] !== $id) {
@@ -100,22 +114,6 @@ final readonly class GameAccountService
             'createdAt' => self::formatTimestamp($account['createdAt'] ?? null),
             'updatedAt' => self::formatTimestamp($account['updatedAt'] ?? null),
         ];
-    }
-
-    private function validateAccountId(string $accountId): string
-    {
-        $accountId = trim($accountId);
-
-        if ($accountId === '' || !ctype_digit($accountId) || strlen($accountId) > 10) {
-            throw new InvalidArgumentException('invalid_account_id');
-        }
-
-        $value = (int) $accountId;
-        if ($value < 1 || $value > 4294967295) {
-            throw new InvalidArgumentException('invalid_account_id');
-        }
-
-        return (string) $value;
     }
 
     private static function formatTimestamp(?string $value): ?string

@@ -53,12 +53,18 @@ final class FakeGameStatsIntegration implements GameStatsIntegrationInterface
         ];
     }
 
-    public function resolveProfile(string $accountId): array
+    public function resolveProfile(string $input): array
     {
         return [
+            'accountId' => $input,
             'displayName' => 'Fake',
             'avatarUrl' => null,
             'profile' => [],
         ];
+    }
+
+    public function isPushBased(): bool
+    {
+        return false;
     }
 }

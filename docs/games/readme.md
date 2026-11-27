@@ -12,17 +12,18 @@ ergänzt werden können, ohne die gemeinsame Struktur zu ändern.
 > und deren Statistiken.
 
 > **Minecraft:** Statistiken eines Minecraft-Servers werden nicht abgefragt, sondern vom Server-Plugin per
-> Push an die API gesendet und dauerhaft in der Datenbank gespeichert. Siehe
-> [minecraft/readme.md](../minecraft/readme.md).
+> Push an die API gesendet und dauerhaft in der Datenbank gespeichert. Die Verknüpfung mit Beyond-Nutzern und
+> der Statistik-Abruf laufen über dieselben Endpoints wie Deadlock (siehe Abschnitt
+> [Minecraft](#minecraft)). Details: [minecraft/readme.md](../minecraft/readme.md).
 
 ## Überblick
 
 | Aspekt | Verhalten |
 |--------|-----------|
-| Verknüpfung | Nutzer hinterlegen die `SteamID3` (Account-ID) ihres Spiels |
-| Datenhaltung | Nur Profil-/Identitätsdaten in der DB; **Statistiken nur im Cache** |
-| Aktualisierung | Cronjob fragt die Spiele-API stündlich ab und überschreibt den Cache |
-| Abruf | Client liest Einzel- oder Batch-Statistiken aus dem Cache |
+| Verknüpfung | Deadlock: `SteamID3` · Minecraft: Mojang-UUID oder -Username |
+| Datenhaltung | Deadlock: nur Profildaten in der DB, Statistiken im Cache · Minecraft: Statistiken dauerhaft in der DB |
+| Aktualisierung | Deadlock: Cronjob stündlich · Minecraft: Push durch das Plugin |
+| Abruf | Client liest Einzel- oder Batch-Statistiken |
 | Cache-Meta | Endpoint liefert den Zeitpunkt der letzten/nächsten Cache-Erneuerung |
 | Vergleich/Scoreboard | Ausschließlich zwischen Beyond-Nutzern, die in der DB liegen |
 | Sichtbarkeit | Statistiken sind öffentlich (Endpoint erfordert dennoch ein JWT) |
@@ -118,19 +119,21 @@ Hinweise:
 |--------|-----|-----------|
 | `id` | varchar(191) | Primärschlüssel (UUIDv7) |
 | `userId` | varchar(191) | Beyond-Nutzer-ID |
-| `game` | varchar(50) | Spiel-Slug (z.B. `deadlock`) |
-| `accountId` | varchar(191) | Primärer Identifier der Spiele-API (Deadlock: `SteamID3`) |
-| `displayName` | varchar(191) | Steam-Anzeigename |
-| `avatarUrl` | varchar(1024) | Steam-Avatar |
-| `profile` | JSON | Spielspezifische Zusatzdaten, z.B. `{"steamId64": "…"}` |
+| `game` | varchar(50) | Spiel-Slug (z.B. `deadlock`, `minecraft`) |
+| `accountId` | varchar(191) | Primärer Identifier der Spiele-API (Deadlock: `SteamID3`, Minecraft: UUID) |
+| `displayName` | varchar(191) | Anzeigename (Steam-Persona bzw. Mojang-Name) |
+| `avatarUrl` | varchar(1024) | Avatar (Steam bzw. `{MINECRAFT_AVATAR_BASE_URL}/{uuid}/64`) |
+| `profile` | JSON | Spielspezifische Zusatzdaten, z.B. `{"steamId64": "…"}` bzw. `{"username": "…"}` |
 | `lastSyncedAt` | datetime(3) | Zeitpunkt der letzten Statistik-Synchronisierung |
 | `createdAt` / `updatedAt` | datetime(3) | Zeitstempel |
 
 `UNIQUE (userId, game)` stellt sicher, dass ein Nutzer pro Spiel genau einen
-Account verknüpft. `KEY (game, accountId)` beschleunigt die Batch-Suche.
+Account verknüpft. `UNIQUE (game, accountId)` erzwingt die exklusive Bindung
+einer Account-ID (Migration `20261127120000_game_account_unique_account.sql`).
 
-In der DB liegen ausschließlich Profil-/Identitätsdaten. Die **Statistiken**
-werden nicht in der DB gespeichert, sondern im Dateisystem gecacht.
+In der DB liegen die Profil-/Identitätsdaten. Die **Statistiken** von Deadlock
+werden im Dateisystem gecacht; die Minecraft-Statistiken liegen dauerhaft in
+den Ingest-Tabellen (siehe [minecraft/readme.md](../minecraft/readme.md)).
 
 ## Architektur
 
@@ -155,10 +158,11 @@ src/Services/Cron/Tasks/GameStatsRefreshTask.php
 
 `GameStatsIntegrationInterface` legt fest:
 
-- `refreshAll(array $accounts): void` — Cache für alle Accounts aktualisieren
-- `getCachedStats(string $accountId): ?array` — Statistiken aus dem Cache lesen
+- `refreshAll(array $accounts): void` — Cache für alle Accounts aktualisieren (No-op bei Push-Spielen)
+- `getCachedStats(string $accountId): ?array` — Statistiken aus dem Cache (bzw. der DB) lesen
 - `getCacheMeta(): array` — Zeitpunkt der letzten/nächsten Erneuerung
-- `resolveProfile(string $accountId): array` — Profil (Name/Avatar) auflösen
+- `resolveProfile(string $input): array` — Eingabe auflösen und kanonische `accountId` + Profil (Name/Avatar) liefern
+- `isPushBased(): bool` — `true`, wenn die Statistiken per Push angeliefert werden (kein Cron-Pull)
 
 Ein neues Spiel ergänzt nur eine neue Integration und einen
 `GameRegistry`-Eintrag; Controller, Cache und Endpoints bleiben unverändert.
@@ -332,6 +336,79 @@ genutzt.
 
 Die gemeinsamen Endpoints, der Cron-Rahmen und das `GameAccount`-Schema bleiben
 unverändert.
+
+## Minecraft
+
+Minecraft ist als zweite Integration (`game = 'minecraft'`) registriert und
+arbeitet im **Push-Modell**: Die Vanilla-Statistiken werden vom Plugin an
+`POST /minecraft/stats` gesendet und dauerhaft in der Datenbank gespeichert.
+Es gibt keinen Cron-Pull (`isPushBased() === true`).
+
+### Verknüpfung
+
+| Methode | Pfad | Beschreibung |
+|---------|------|--------------|
+| `PUT` | `/user/me/games/minecraft` | Account verknüpfen (Body: `{ "accountId": "<UUID|Username>" }`) |
+
+- Als `accountId` wird entweder die **Minecraft-UUID** (mit oder ohne Bindestriche,
+  Groß-/Kleinschreibung egal) oder der **Mojang-Username** (`^[A-Za-z0-9_]{3,16}$`)
+  akzeptiert.
+- Beide Varianten werden über die Mojang-API aufgelöst: Username über
+  `api.mojang.com/users/profiles/minecraft/{name}`, UUID über
+  `sessionserver.mojang.com/session/minecraft/profile/{uuid}`.
+- Gespeichert wird die kanonische UUID (lowercase, mit Bindestrichen) in
+  `accountId`, der Anzeigename aus Mojang sowie die Avatar-URL
+  `{MINECRAFT_AVATAR_BASE_URL}/{uuid}/64` (Default `https://mc-heads.net/avatar`).
+- Die UUID ist **exklusiv**: `UNIQUE (game, accountId)`. Verknüpft bereits ein
+  anderer Nutzer dieselbe UUID, antwortet der Endpoint mit
+  `409 account_already_linked`.
+- Fehler: `400 invalid_account_id` (Syntax), `400 account_not_found` (Mojang
+  204/404), `503 game_api_unavailable` (Mojang 429/5xx/Netzwerk).
+
+### Statistiken
+
+Die gemeinsamen Endpoints liefern die Daten direkt aus `MinecraftStatCurrent`,
+gruppiert je Server/Welt (Vanilla-Statistiken gelten pro Welt):
+
+```json
+{
+  "accountId": "ca48cfb5-bfcb-4f25-bbbf-966cb5892c80",
+  "player": { "uuid": "ca48cfb5-bfcb-4f25-bbbf-966cb5892c80", "name": "Notch" },
+  "sources": [
+    {
+      "serverId": "survival-1",
+      "world": "world",
+      "collectedAt": "2026-11-27T21:00:00Z",
+      "stats": {
+        "minecraft:custom": {
+          "minecraft:play_time": 14288,
+          "minecraft:walk_one_cm": 7845
+        }
+      }
+    }
+  ],
+  "syncedAt": "2026-11-27T21:00:00Z"
+}
+```
+
+- `stats` ist `null`, solange der Spieler noch in keinem Snapshot vorkam.
+- `GET /games/minecraft/cache-meta`: `lastRefreshedAt` = jüngstes `collectedAt`
+  aus `MinecraftStatCurrent`, `nextRefreshAt = null`, `intervalSeconds = 0`.
+- `GameAccount.lastSyncedAt` wird beim Ingest nach jedem erfolgreichen Snapshot
+  gesetzt (mit `GREATEST`, Nachzügler setzen ihn nicht zurück).
+
+### Architektur
+
+```
+src/Services/Games/Minecraft/
+  MinecraftClient.php           // Guzzle-Client fuer Mojang + Avatar-URL
+  MinecraftApiException.php     // Fehler inkl. Retry-After
+  MinecraftProfileResolver.php  // UUID-/Username-Aufloesung und Normalisierung
+  MinecraftIntegration.php      // implementiert GameStatsIntegrationInterface (Push)
+```
+
+Die Verarbeitung (`MinecraftIngestService`) und die Datenhaltung sind in
+[minecraft/readme.md](../minecraft/readme.md) dokumentiert.
 
 ## Nicht-Ziele (v1)
 

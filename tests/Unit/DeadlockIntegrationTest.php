@@ -224,6 +224,7 @@ final class DeadlockIntegrationTest extends TestCase
 
         $profile = $integration->resolveProfile('42');
 
+        self::assertSame('42', $profile['accountId']);
         self::assertSame('Player', $profile['displayName']);
         self::assertSame('https://example.test/avatar_full.jpg', $profile['avatarUrl']);
         self::assertSame('76561197960265770', $profile['profile']['steamId64']);

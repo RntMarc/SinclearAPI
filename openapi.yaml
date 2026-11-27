@@ -7896,7 +7896,7 @@ components:
           example: deadlock
         accountId:
           type: string
-          description: Primärer Identifier der Spiele-API (Deadlock SteamID3)
+          description: Primärer Identifier der Spiele-API (Deadlock SteamID3, Minecraft UUID)
           example: '179673173'
         displayName:
           type: string
@@ -7924,8 +7924,11 @@ components:
       properties:
         accountId:
           type: string
-          pattern: '^[0-9]{1,10}$'
-          description: SteamID3/Account-ID (z.B. 179673173)
+          description: >
+            Account-ID des Spiels. Deadlock: numerische SteamID3/Account-ID
+            (z.B. `179673173`). Minecraft: Mojang-UUID mit oder ohne Bindestriche
+            (z.B. `ca48cfb5-bfcb-4f25-bbbf-966cb5892c80`) oder Mojang-Username
+            (3–16 Zeichen, `A–Z a–z 0–9 _`).
           example: '179673173'
 
     GameStatsCacheMeta:
@@ -8150,9 +8153,12 @@ components:
           type: string
           description: Verknüpfte Account-ID des Spiels
         stats:
-          description: Normalisierte Statistiken; null, wenn der Cache noch nicht gefüllt ist
+          description: >-
+            Normalisierte Statistiken; `null`, wenn der Cache noch nicht gefüllt ist
+            (bei Deadlock) bzw. der Spieler noch in keinem Snapshot vorkam (bei Minecraft).
           oneOf:
             - $ref: '#/components/schemas/GameStats'
+            - $ref: '#/components/schemas/MinecraftStats'
             - type: 'null'
         lastRefreshedAt:
           type: string
@@ -8162,6 +8168,65 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    MinecraftStats:
+      type: object
+      description: >
+        Normalisierte Minecraft-Statistiken aus der Datenbank (Push-Modell). Die
+        Zähler werden je Server/Welt (Quelle) ausgeliefert, da Vanilla-Statistiken
+        pro Welt gelten.
+      required: [accountId, player, sources, syncedAt]
+      properties:
+        accountId:
+          type: string
+          description: Kanonische Minecraft-UUID (lowercase, mit Bindestrichen)
+        player:
+          $ref: '#/components/schemas/MinecraftStatsPlayer'
+        sources:
+          type: array
+          description: Aktueller Stand je Server/Welt, sortiert nach `serverId`/`world`
+          items:
+            $ref: '#/components/schemas/MinecraftStatsSource'
+        syncedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Jüngstes `collectedAt` über alle Quellen
+
+    MinecraftStatsPlayer:
+      type: object
+      required: [uuid, name]
+      properties:
+        uuid:
+          type: string
+          description: Kanonische Minecraft-UUID
+        name:
+          type: string
+          nullable: true
+          description: Zuletzt bekannter Spielername (aus `MinecraftPlayer`)
+
+    MinecraftStatsSource:
+      type: object
+      required: [serverId, world, collectedAt, stats]
+      properties:
+        serverId:
+          type: string
+          description: Server-Kennung aus dem Ingest-Snapshot
+        world:
+          type: string
+          description: Weltname aus dem Ingest-Snapshot
+        collectedAt:
+          type: string
+          format: date-time
+          description: Jüngstes `collectedAt` der Zähler dieser Quelle
+        stats:
+          type: object
+          description: 'Zähler gruppiert nach Kategorie und Statistik, z.B. `{ "minecraft:custom": { "minecraft:play_time": 14288 } }`'
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: integer
+              format: int64
 
     ArcadeGame:
       type: object
@@ -23868,9 +23933,13 @@ paths:
       summary: Spiele-Account verknüpfen oder ersetzen
       description: >
         Validiert die Account-ID, löst das Profil (Name/Avatar) über die
-        Spiele-API auf und speichert es in `GameAccount`. Eine ungültige oder
-        nicht auflösbare ID wird abgelehnt. Die Statistiken werden beim
-        nächsten Cron-Lauf in den Cache geschrieben.
+        Spiele-API auf und speichert es in `GameAccount`. Deadlock: numerische
+        SteamID3. Minecraft: Mojang-UUID oder -Username, aufgelöst über die
+        Mojang-API. Eine ungültige oder nicht auflösbare ID wird abgelehnt;
+        ist die Account-ID bereits mit einem anderen Nutzer verknüpft, antwortet
+        der Endpoint mit `409 account_already_linked`. Die Statistiken werden
+        beim nächsten Cron-Lauf in den Cache geschrieben (Deadlock) bzw. über
+        den Ingest in die Datenbank (Minecraft).
       tags: [User]
       security:
         - BearerAuth: []
@@ -23881,7 +23950,7 @@ paths:
           description: Spiel-Slug aus der GameRegistry
           schema:
             type: string
-            enum: [deadlock]
+            enum: [deadlock, minecraft]
       requestBody:
         required: true
         content:
@@ -23917,6 +23986,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Account bereits mit einem anderen Nutzer verknüpft (`account_already_linked`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '503':
           description: Spiele-API vorübergehend nicht verfügbar (`game_api_unavailable`)
           content:
@@ -23935,7 +24010,7 @@ paths:
           description: Spiel-Slug aus der GameRegistry
           schema:
             type: string
-            enum: [deadlock]
+            enum: [deadlock, minecraft]
       responses:
         '204':
           description: Verknüpfung gelöst
@@ -24100,7 +24175,9 @@ paths:
       summary: Cache-Metadaten eines Spiels
       description: >
         Liefert den Zeitpunkt der letzten und der nächsten Cache-Erneuerung
-        sowie das Aktualisierungsintervall.
+        sowie das Aktualisierungsintervall. Für Minecraft (Push-Modell) ist
+        `lastRefreshedAt` das jüngste `collectedAt` aus `MinecraftStatCurrent`,
+        `nextRefreshAt` gleich `null` und `intervalSeconds` gleich `0`.
       tags: [Games]
       security:
         - BearerAuth: []
@@ -24111,7 +24188,7 @@ paths:
           description: Spiel-Slug aus der GameRegistry
           schema:
             type: string
-            enum: [deadlock]
+            enum: [deadlock, minecraft]
       responses:
         '200':
           description: Cache-Metadaten
@@ -24139,7 +24216,8 @@ paths:
         Liefert Statistiken für eine kommaseparierte Liste von Beyond-Nutzer-IDs.
         Es werden ausschließlich Nutzer zurückgegeben, die in der DB existieren
         und einen verknüpften Account für das Spiel besitzen. Fremde
-        Steam-Nutzer oder Match-Teilnehmer werden nicht aufgelöst.
+        Steam-Nutzer oder Match-Teilnehmer werden nicht aufgelöst. Für
+        Minecraft stammen die Statistiken aus der Datenbank (je Server/Welt).
       tags: [Games]
       security:
         - BearerAuth: []
@@ -24150,7 +24228,7 @@ paths:
           description: Spiel-Slug aus der GameRegistry
           schema:
             type: string
-            enum: [deadlock]
+            enum: [deadlock, minecraft]
         - name: userIds
           in: query
           required: true
@@ -24194,9 +24272,11 @@ paths:
     get:
       summary: Statistiken eines Beyond-Nutzers
       description: >
-        Liest die normalisierten Statistiken aus dem Dateisystem-Cache. Die
-        Antwort enthält die Account-ID und die Statistiken; Anzeigename und
-        Avatar kommen aus `/user/{userId}/games`.
+        Liest die normalisierten Statistiken. Bei Deadlock aus dem
+        Dateisystem-Cache, bei Minecraft direkt aus der Datenbank
+        (`MinecraftStatCurrent`, je Server/Welt). Die Antwort enthält die
+        Account-ID und die Statistiken; Anzeigename und Avatar kommen aus
+        `/user/{userId}/games`.
       tags: [Games]
       security:
         - BearerAuth: []
@@ -24207,7 +24287,7 @@ paths:
           description: Spiel-Slug aus der GameRegistry
           schema:
             type: string
-            enum: [deadlock]
+            enum: [deadlock, minecraft]
         - name: userId
           in: path
           required: true

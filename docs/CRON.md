@@ -34,7 +34,7 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
 | 5 | `cleanup_external_data_cache` | 24 Stunden | Entfernt abgelaufene Cache-Einträge (ExternalDataCache) |
 | 6 | `cleanup_stale_push_subscriptions` | 24 Stunden | Löscht tote Push-Subscriptions (10+ Fehlversuche oder 90 Tage ohne Lebenszeichen) |
 | 7 | `polls_deadline` | 1 Stunde | Schließt abgelaufene Umfragen und erinnert Teilnehmer vor der Deadline |
-| 8 | `refresh_game_stats` | `GAMES_CACHE_TTL` (Default 1 Stunde) | Aktualisiert den Cache der Spiele-Statistiken (Deadlock) |
+| 8 | `refresh_game_stats` | `GAMES_CACHE_TTL` (Default 1 Stunde) | Aktualisiert den Cache der Spiele-Statistiken (Pull-Spiele, z. B. Deadlock; Minecraft wird übersprungen) |
 | 9 | `cleanup_arcade_sessions` | 1 Stunde | Löscht abgelaufene und widerrufene Arcade-Sessions |
 | 10 | `cleanup_refresh_tokens` | 24 Stunden | Löscht abgelaufene/widerrufene Refresh-Tokens und verwaiste Familien |
 | 11 | `cleanup_jti_blacklist` | 1 Stunde | Löscht abgelaufene JTI-Blacklist-Einträge |
@@ -105,6 +105,9 @@ Tasks werden in `bin/cron.php` registriert. Um einen neuen Task hinzuzufügen:
      ohne die übrigen Daten (Match-History, Cache-Write) zu verhindern.
      Schlägt der Asset-Abruf fehl, werden die Statistiken trotzdem geschrieben
      (Asset-Felder `null`).
+- **Push-Spiele:** Integrationen mit `isPushBased() === true` (Minecraft) werden komplett
+  übersprungen; ihre Statistiken kommen per Ingest in die Datenbank und
+  `GameAccount.lastSyncedAt` wird beim Ingest gesetzt.
 - **Datei:** `src/Services/Cron/Tasks/GameStatsRefreshTask.php`
 - **Hintergrund:** Siehe [games/readme.md](./games/readme.md).
 

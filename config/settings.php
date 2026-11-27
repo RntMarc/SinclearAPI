@@ -120,6 +120,9 @@ $settings['minecraft'] = [
     'max_stats_per_player'             => (int)($_ENV['MINECRAFT_MAX_STATS_PER_PLAYER'] ?? 10000),
     'rate_limit_per_minute'            => (int)($_ENV['MINECRAFT_RATE_LIMIT_PER_MINUTE'] ?? 30),
     'invalid_key_rate_limit_per_minute' => (int)($_ENV['MINECRAFT_INVALID_KEY_RATE_LIMIT_PER_MINUTE'] ?? 10),
+    'profile_api_base_url'             => $_ENV['MINECRAFT_PROFILE_API_BASE_URL'] ?? 'https://api.mojang.com',
+    'session_api_base_url'             => $_ENV['MINECRAFT_SESSION_API_BASE_URL'] ?? 'https://sessionserver.mojang.com',
+    'avatar_base_url'                  => $_ENV['MINECRAFT_AVATAR_BASE_URL'] ?? 'https://mc-heads.net/avatar',
 ];
 
 $settings['external_data'] = [
