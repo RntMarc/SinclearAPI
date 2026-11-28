@@ -6,7 +6,9 @@ bereit. Auf Basis dieses Verlaufs können später Diagramme und Auswertungen ers
 
 > **Status v1:** Umfang ist der **Empfang und die Speicherung** der Daten (`POST /minecraft/stats`) sowie die
 > **Verknüpfung von Minecraft-UUIDs mit Beyond-Nutzern** und der Abruf des aktuellen Stands über die gemeinsamen
-> Spiele-Endpoints (siehe [games/readme.md](../games/readme.md)). Zeitreihen und Diagramme bleiben Nicht-Ziele.
+> Spiele-Endpoints (siehe [games/readme.md](../games/readme.md)). Zusätzlich liefert `GET /minecraft/sources` eine
+> aggregierte Quellen-Übersicht über alle Server bzw. einen einzelnen Server. Zeitreihen und Diagramme bleiben
+> Nicht-Ziele.
 
 > **Abgrenzung:** Extern verknüpfte Spiele-Accounts mit Pull-Statistiken (z. B. Deadlock) sind in
 > [games/readme.md](../games/readme.md) dokumentiert. Dort liegen Statistiken nur im Cache. Minecraft arbeitet
@@ -55,6 +57,7 @@ Der Key wird geprüft, **bevor** der Body gelesen und geparst wird. Die Prüfung
 | Methode | Pfad | Beschreibung |
 |---------|------|--------------|
 | `POST` | `/minecraft/stats` | Snapshot mit Statistiken eines oder mehrerer Spieler übermitteln |
+| `GET` | `/minecraft/sources` | Aggregierte Quellen-Übersicht (JWT), optional per `serverId` gefiltert |
 
 ### Request
 
@@ -146,6 +149,110 @@ Hinweise zur Strukturprüfung:
   Bei `4xx` außer `429` nicht wiederholen, der Fehler liegt im Payload bzw. Key.
 - Nicht in der Aufzählung enthaltene Spieler werden nicht verändert, ein Snapshot ist also eine **Teilmenge**.
 - Empfohlene Frequenz: alle 5 Minuten, nur wenn Spieler online sind oder sich Daten geändert haben.
+
+## Lese-Endpoint: Quellen-Übersicht
+
+`GET /minecraft/sources` (JWT erforderlich) liefert die getrackten Quellen mit ihrem letzten Stand, den über alle
+Spieler summierten Vanilla-Statistiken, der Spieleranzahl und einer Rangliste der beteiligten Spieler. Der Endpoint
+ist rein lesend; er ändert keine Daten und nutzt nicht den Ingest-Key.
+
+| Aspekt | Verhalten |
+|--------|-----------|
+| Authentifizierung | JWT (`Authorization: Bearer <Access-Token>`), alle eingeloggten Nutzer (`MinecraftStatsPolicy`) |
+| Scope | ohne `serverId` → alle Server (`global`); mit `serverId` → nur dieser Server (`server`) |
+| Datenquelle | `MinecraftSource` + `MinecraftStatCurrent` (die Summen sind der aktuelle Stand je Zähler) |
+| Spieler | alle Spieler mit mindestens einem erfassten Zähler – **unabhängig** von einer Beyond-Verknüpfung |
+| Rangliste | absteigend nach dem gewählten Zähler (`sortCategory`/`sortStat`), Tie-Break Name, dann UUID |
+
+### Query-Parameter
+
+| Parameter | Default | Regel |
+|-----------|---------|-------|
+| `serverId` | – | `^[A-Za-z0-9_.-]{1,64}$`; leer/fehlend = global |
+| `sortCategory` | `minecraft:custom` | Kategorie des Zählers, nach dem geranked wird |
+| `sortStat` | `minecraft:play_time` | Statistik des Zählers, nach dem geranked wird |
+| `limit` | alle | 1–500; trimmt nur die Rangliste, `playerCount` und `totals` bleiben vollständig |
+| `includeStats` | `false` | `true` ergänzt je Ranglisteneintrag alle Einzelzähler des Spielers |
+
+Ungültige Parameter liefern `400` mit `invalid_server_id`, `invalid_sort_category`, `invalid_sort_stat`,
+`invalid_limit` oder `invalid_include_stats`.
+
+### Antwort
+
+```json
+{
+  "data": {
+    "scope": "global",
+    "serverId": null,
+    "rankedBy": { "category": "minecraft:custom", "stat": "minecraft:play_time" },
+    "sources": [
+      {
+        "sourceId": 1,
+        "serverId": "MedionSMP",
+        "world": "world",
+        "lastCollectedAt": "2026-11-28T11:55:00Z",
+        "playerCount": 2,
+        "totals": { "minecraft:custom": { "minecraft:play_time": 150, "minecraft:deaths": 3 } },
+        "ranking": [
+          {
+            "rank": 1,
+            "uuid": "f6d584ff-9577-472b-9aa2-88b7878eac37",
+            "name": "Notch",
+            "linkedUserId": "usr_123",
+            "avatarUrl": "https://mc-heads.net/avatar/f6d584ff-9577-472b-9aa2-88b7878eac37/64",
+            "value": 100
+          },
+          {
+            "rank": 2,
+            "uuid": "ca48cfb5-bfcb-4f25-bbbf-966cb5892c80",
+            "name": "Alex",
+            "linkedUserId": null,
+            "avatarUrl": null,
+            "value": 50
+          }
+        ]
+      }
+    ],
+    "servers": [
+      {
+        "serverId": "MedionSMP",
+        "worlds": ["world", "nether"],
+        "lastCollectedAt": "2026-11-28T11:55:00Z",
+        "playerCount": 3,
+        "totals": { "minecraft:custom": { "minecraft:play_time": 180 } },
+        "ranking": [
+          {
+            "rank": 1,
+            "uuid": "f6d584ff-9577-472b-9aa2-88b7878eac37",
+            "name": "Notch",
+            "linkedUserId": "usr_123",
+            "avatarUrl": "https://mc-heads.net/avatar/f6d584ff-9577-472b-9aa2-88b7878eac37/64",
+            "value": 130
+          }
+        ]
+      }
+    ],
+    "generatedAt": "2026-11-28T12:00:00Z"
+  },
+  "meta": { "sourceCount": 1, "serverCount": 1 }
+}
+```
+
+Semantik:
+
+- **`sources`** – je `(serverId, world)`: `lastCollectedAt` ist das jüngste `collectedAt` der Snapshots dieser Quelle,
+  `totals` die Summe **aller** aktuellen Zähler über alle Spieler der Quelle.
+- **`servers`** – je `serverId` über alle Welten: `totals` sind die Summen der Quellen, `playerCount` zählt jeden
+  Spieler nur einmal (`COUNT(DISTINCT)`), `worlds` listet die vorhandenen Welten.
+- **`playerCount`** – Spieler mit mindestens einem Zähler in `MinecraftStatCurrent`; Spieler ohne Zähler (z. B. nur
+  im Snapshot anwesend) zählen nicht. `limit` verändert den Wert nicht.
+- **`ranking[].value`** – Einzelwert des gewählten Zählers (Server-Rangliste: Summe über die Welten). Fehlt der
+  Zähler bei einem Spieler, taucht er nicht in dieser Rangliste auf; `totals` bleibt davon unberührt.
+- **`linkedUserId`/`avatarUrl`** – aus `GameAccount` (`game = 'minecraft'`, `accountId = UUID`); `null`, wenn keine
+  Verknüpfung besteht. Die Statistik ist unabhängig von der Verknüpfung.
+- **`includeStats`** – ergänzt `stats` (alle Einzelzähler; Server-Rangliste: über Welten summiert). Ohne Flag fehlt
+  das Feld, damit die Antwort bei vielen Zählern klein bleibt.
+- `generatedAt` und alle Zeitstempel sind UTC (RFC 3339 mit `Z`).
 
 ## Verknüpfung mit Beyond-Nutzern
 
@@ -316,6 +423,7 @@ Ein Aufräum-Job ist daher in v1 nicht vorgesehen. Falls später gewünscht, wä
 | Transport | `RequireHttpsMiddleware` (403 `ssl_required`) |
 | Authentifizierung | `MinecraftIngestMiddleware` (globaler Guard), `hash_equals`, vor dem Parsen des Bodys |
 | Autorisierung | Minimale `MinecraftIngestPolicy` als Defense-in-Depth im Controller (Key gültig = Server-Principal; keine Nutzerrechte) |
+| Lese-Endpoint | JWT über `AuthenticationMiddleware`, `MinecraftStatsPolicy` als Defense-in-Depth |
 | Missbrauchsschutz | Rate-Limit pro Key (`MINECRAFT_RATE_LIMIT_PER_MINUTE`, Default 30) und pro IP bei ungültigem Key |
 | Größenlimit | `Content-Length`-Vorabprüfung und Prüfung der tatsächlich gelesenen Bytes (`MINECRAFT_MAX_BODY_BYTES`, Default 2 MB) |
 | SQL | Ausschließlich Prepared Statements; Schlüssel/Werte nur nach Regex-/Typprüfung |
@@ -367,16 +475,22 @@ Hinweis: Webserver-/PHP-Limits (`post_max_size`, `upload_max_filesize`) müssen 
 
 ```
 public/index.php                            // globaler, pfadgebundener Ingest-Guard (vor BodyParsingMiddleware)
-config/routes.php                           // POST /minecraft/stats (kein Route-Middleware nötig)
+config/routes.php                           // POST /minecraft/stats (kein Route-Middleware nötig),
+                                            // GET /minecraft/sources (JWT)
 src/Middleware/MinecraftIngestMiddleware.php  // Shared Secret, Rate-Limit, Body-Limit
 src/Controllers/MinecraftIngestController.php
+src/Controllers/MinecraftStatsController.php            // GET /minecraft/sources (JWT)
 src/Services/Minecraft/MinecraftSnapshotValidator.php   // Struktur- und Wertprüfung, normalisiert UUIDs/Zeiten
 src/Services/Minecraft/MinecraftValidationException.php  // Fehlercode + Details (max. 20)
 src/Services/Minecraft/MinecraftIngestService.php       // Transaktion, Diff gegen Current, Idempotenz
+src/Services/Minecraft/MinecraftStatsQuery.php          // Query-Validierung (ohne DB testbar)
+src/Services/Minecraft/MinecraftOverviewService.php     // Aggregation, Ranking, Formatierung
 src/Repository/MinecraftSnapshotRepository.php
 src/Repository/MinecraftPlayerRepository.php
 src/Repository/MinecraftStatRepository.php              // Source/StatKey/Current/History/SnapshotPlayer
+src/Repository/MinecraftOverviewRepository.php          // Lese-Queries (Summen, Zählung, Ranking)
 src/Security/Policy/MinecraftIngestPolicy.php           // minimale Defense-in-Depth-Policy
+src/Security/Policy/MinecraftStatsPolicy.php            // Defense-in-Depth für den Lese-Endpoint
 src/Services/Games/Minecraft/                           // Verknüpfung + Statistik-Abruf (siehe games/readme.md)
 database/migrations/20261127120000_game_account_unique_account.sql
 ```
@@ -386,14 +500,15 @@ Settings aus `config/settings.php` konstruiert; der Validator erhält `max_playe
 
 ## Admin-Dashboard, Notifications, Cron
 
-- **Admin-Dashboard:** Keine Änderung in v1; es gibt keine admin-bearbeitbaren Daten (Key liegt in `.env`).
-  Eine Ansicht der Daten wäre eine spätere Erweiterung.
+- **Admin-Dashboard:** Es gibt keine admin-bearbeitbaren Daten (Key liegt in `.env`). Die Quellen-Übersicht ist ein
+  Lese-Endpoint für Clients; eine Admin-Ansicht der Daten wäre eine spätere Erweiterung.
 - **Notifications:** Keine neuen Notification-Typen.
 - **Cron:** Keine eigenen Tasks in v1. Der bestehende `refresh_game_stats` überspringt Minecraft
   (Push-Modell, `isPushBased() === true`); `GameAccount.lastSyncedAt` wird stattdessen beim Ingest gesetzt.
 
 ## Nicht-Ziele (v1)
 
-- Zeitreihen-/History-Endpunkte (Verlauf je Zähler) und Diagramme; ausgeliefert wird nur der aktuelle Stand.
+- Zeitreihen-/History-Endpunkte (Verlauf je Zähler) und Diagramme; ausgeliefert wird nur der aktuelle Stand –
+  als Spieler-Sicht (`/games/minecraft/stats`) und aggregiert (`GET /minecraft/sources`).
 - Mehrere Server mit eigenen Keys (Keys in der DB inkl. Admin-Verwaltung), HMAC-Signatur der Requests.
 - Aufbewahrungsfristen / Löschjobs.

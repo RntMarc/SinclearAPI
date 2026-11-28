@@ -56,6 +56,7 @@ use Sinclear\Api\Controllers\ArcadeGameController;
 use Sinclear\Api\Controllers\ArcadeSessionController;
 use Sinclear\Api\Controllers\ArcadeScoreController;
 use Sinclear\Api\Controllers\MinecraftIngestController;
+use Sinclear\Api\Controllers\MinecraftStatsController;
 use Sinclear\Api\Middleware\ArcadeSessionMiddleware;
 use Sinclear\Api\Middleware\AdminMiddleware;
 use Sinclear\Api\Middleware\AdminApiMiddleware;
@@ -588,6 +589,11 @@ return function (App $app): void {
     // Authentifizierung, Rate-Limit und Body-Limit übernimmt der globale
     // MinecraftIngestMiddleware-Guard (registriert in public/index.php).
     $app->post('/minecraft/stats', [MinecraftIngestController::class, 'ingest']);
+
+    // Minecraft-Lese-Endpoint (JWT): aggregierte Quellen-Uebersicht, optional
+    // auf einen Server gefiltert (?serverId=...).
+    $app->get('/minecraft/sources', [MinecraftStatsController::class, 'sources'])
+        ->add($container->get(AuthenticationMiddleware::class));
 
     // Spiele-Statistiken (authenticated). Statische Route cache-meta vor den
     // parametrisierten Stats-Routen registrieren.

@@ -241,12 +241,16 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mime\Email;
 use Sinclear\Api\Controllers\MinecraftIngestController;
+use Sinclear\Api\Controllers\MinecraftStatsController;
 use Sinclear\Api\Middleware\MinecraftIngestMiddleware;
-use Sinclear\Api\Repository\MinecraftSnapshotRepository;
+use Sinclear\Api\Repository\MinecraftOverviewRepository;
 use Sinclear\Api\Repository\MinecraftPlayerRepository;
+use Sinclear\Api\Repository\MinecraftSnapshotRepository;
 use Sinclear\Api\Repository\MinecraftStatRepository;
 use Sinclear\Api\Security\Policy\MinecraftIngestPolicy;
+use Sinclear\Api\Security\Policy\MinecraftStatsPolicy;
 use Sinclear\Api\Services\Minecraft\MinecraftIngestService;
+use Sinclear\Api\Services\Minecraft\MinecraftOverviewService;
 use Sinclear\Api\Services\Minecraft\MinecraftSnapshotValidator;
 use function DI\autowire;
 use function DI\create;
@@ -799,9 +803,13 @@ return [
     MinecraftSnapshotRepository::class => autowire(),
     MinecraftPlayerRepository::class => autowire(),
     MinecraftStatRepository::class => autowire(),
+    MinecraftOverviewRepository::class => autowire(),
     MinecraftIngestService::class => autowire(),
+    MinecraftOverviewService::class => autowire(),
     MinecraftIngestPolicy::class => autowire(),
+    MinecraftStatsPolicy::class => autowire(),
     MinecraftIngestController::class => autowire(),
+    MinecraftStatsController::class => autowire(),
 
     MinecraftSnapshotValidator::class => function (ContainerInterface $c): MinecraftSnapshotValidator {
         $settings = $c->get(Settings::class);

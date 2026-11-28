@@ -8551,6 +8551,158 @@ components:
               error:
                 type: string
                 example: invalid_uuid
+    MinecraftSourcesResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          required: [scope, serverId, rankedBy, sources, servers, generatedAt]
+          properties:
+            scope:
+              type: string
+              enum: [global, server]
+              description: '`global` ohne `serverId`, `server` bei gefiltertem Server.'
+            serverId:
+              type: string
+              nullable: true
+              description: Gesetzter `serverId`-Filter oder `null` (global).
+            rankedBy:
+              $ref: '#/components/schemas/MinecraftRankedBy'
+            sources:
+              type: array
+              items:
+                $ref: '#/components/schemas/MinecraftSourceStats'
+            servers:
+              type: array
+              items:
+                $ref: '#/components/schemas/MinecraftServerStats'
+            generatedAt:
+              type: string
+              format: date-time
+              description: Zeitpunkt der Antwort (UTC).
+        meta:
+          type: object
+          required: [sourceCount, serverCount]
+          properties:
+            sourceCount:
+              type: integer
+              description: Anzahl der gelieferten Quellen (Server + Welt).
+            serverCount:
+              type: integer
+              description: Anzahl der gelieferten Server.
+    MinecraftRankedBy:
+      type: object
+      required: [category, stat]
+      properties:
+        category:
+          type: string
+          pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+          example: 'minecraft:custom'
+        stat:
+          type: string
+          pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+          example: 'minecraft:play_time'
+    MinecraftStatsTotals:
+      type: object
+      description: >-
+        Summe aller Zähler einer Quelle bzw. eines Servers, gruppiert nach
+        Kategorie und Statistik. Enthält immer alle Zähler aller Spieler,
+        unabhängig von `limit`.
+      propertyNames:
+        pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+      additionalProperties:
+        type: object
+        propertyNames:
+          pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+        additionalProperties:
+          type: integer
+      example:
+        'minecraft:custom':
+          'minecraft:play_time': 45123
+          'minecraft:deaths': 12
+    MinecraftRankingEntry:
+      type: object
+      required: [rank, uuid, name, linkedUserId, avatarUrl, value]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        uuid:
+          type: string
+          format: uuid
+        name:
+          type: string
+          nullable: true
+          description: Zuletzt vom Plugin gemeldeter Name (kann `null` sein).
+        linkedUserId:
+          type: string
+          nullable: true
+          description: >-
+            Beyond-Nutzer-ID, falls die Minecraft-UUID verknüpft ist – sonst
+            `null`. Die Statistik selbst ist unabhängig von der Verknüpfung.
+        avatarUrl:
+          type: string
+          nullable: true
+        value:
+          type: integer
+          description: >-
+            Einzelwert des in `rankedBy` gewählten Zählers. In der
+            Server-Rangliste über alle Welten summiert.
+        stats:
+          $ref: '#/components/schemas/MinecraftStatsTotals'
+          description: Nur bei `includeStats=true`; vollständige Einzelzähler des Spielers.
+    MinecraftSourceStats:
+      type: object
+      required: [sourceId, serverId, world, lastCollectedAt, playerCount, totals, ranking]
+      properties:
+        sourceId:
+          type: integer
+        serverId:
+          type: string
+        world:
+          type: string
+        lastCollectedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Jüngstes `collectedAt` der Snapshots dieser Quelle.
+        playerCount:
+          type: integer
+          description: >-
+            Anzahl der Spieler mit mindestens einem erfassten Zähler in dieser
+            Quelle – unabhängig von einer Beyond-Verknüpfung und von `limit`.
+        totals:
+          $ref: '#/components/schemas/MinecraftStatsTotals'
+        ranking:
+          type: array
+          items:
+            $ref: '#/components/schemas/MinecraftRankingEntry'
+    MinecraftServerStats:
+      type: object
+      required: [serverId, worlds, lastCollectedAt, playerCount, totals, ranking]
+      properties:
+        serverId:
+          type: string
+        worlds:
+          type: array
+          items:
+            type: string
+        lastCollectedAt:
+          type: string
+          format: date-time
+          nullable: true
+        playerCount:
+          type: integer
+          description: >-
+            Anzahl eindeutiger Spieler über alle Welten des Servers (ein Spieler
+            zählt nur einmal).
+        totals:
+          $ref: '#/components/schemas/MinecraftStatsTotals'
+        ranking:
+          type: array
+          items:
+            $ref: '#/components/schemas/MinecraftRankingEntry'
 
 paths:
   /lametric/token:
@@ -24165,6 +24317,97 @@ paths:
                 $ref: '#/components/schemas/Error'
         '503':
           description: Ingest ist nicht konfiguriert (`ingest_disabled`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /minecraft/sources:
+    get:
+      summary: Aggregierte Quellen-Übersicht der Minecraft-Statistiken
+      description: >
+        Liefert alle getrackten Quellen (Server + Welt) mit zuletzt gemeldeter
+        Erhebung, der über alle Spieler summierten Vanilla-Statistik
+        (`totals`), der Spieleranzahl und einer Rangliste der beteiligten
+        Spieler. Ohne `serverId` umfasst die Antwort alle Server (Scope
+        `global`), mit `serverId` nur diesen Server (Scope `server`).
+
+
+        Die Aggregation berücksichtigt alle Spieler mit mindestens einem
+        erfassten Zähler – unabhängig davon, ob ein Beyond-Profil verknüpft
+        ist. `linkedUserId`/`avatarUrl` sind nur gesetzt, wenn die
+        Minecraft-UUID über `GameAccount` verknüpft ist.
+
+
+        Geranked wird nach `sortCategory`/`sortStat` (Default
+        `minecraft:custom` / `minecraft:play_time`). `totals` enthält immer
+        alle Zähler aller Spieler; `limit` trimmt nur die Rangliste,
+        `playerCount` bleibt vollständig. `includeStats=true` ergänzt je
+        Ranglisteneintrag die vollständigen Einzelzähler (große Antwort). Die
+        Daten stammen aus dem Push-Ingest (`POST /minecraft/stats`).
+      tags: [Minecraft]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serverId
+          in: query
+          required: false
+          description: Nur Quellen dieses Servers liefern; ohne Angabe alle Server.
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_.-]{1,64}$'
+            example: MedionSMP
+        - name: sortCategory
+          in: query
+          required: false
+          description: Kategorie des Zählers, nach dem geranked wird.
+          schema:
+            type: string
+            pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+            default: 'minecraft:custom'
+        - name: sortStat
+          in: query
+          required: false
+          description: Statistik des Zählers, nach dem geranked wird.
+          schema:
+            type: string
+            pattern: '^[a-z0-9_.-]+:[a-z0-9_./-]+$'
+            default: 'minecraft:play_time'
+        - name: limit
+          in: query
+          required: false
+          description: Maximale Anzahl Ranglisteneinträge je Quelle/Server (Default alle).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: includeStats
+          in: query
+          required: false
+          description: >-
+            Bei `true` enthält jeder Ranglisteneintrag zusätzlich alle
+            Einzelzähler des Spielers.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Aggregierte Quellen-Übersicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MinecraftSourcesResponse'
+        '400':
+          description: >-
+            Ungültige Query-Parameter (`invalid_server_id`,
+            `invalid_sort_category`, `invalid_sort_stat`, `invalid_limit`,
+            `invalid_include_stats`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Nicht autorisiert
           content:
             application/json:
               schema:

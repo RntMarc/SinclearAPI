@@ -396,6 +396,10 @@ gruppiert je Server/Welt (Vanilla-Statistiken gelten pro Welt):
   aus `MinecraftStatCurrent`, `nextRefreshAt = null`, `intervalSeconds = 0`.
 - `GameAccount.lastSyncedAt` wird beim Ingest nach jedem erfolgreichen Snapshot
   gesetzt (mit `GREATEST`, Nachzügler setzen ihn nicht zurück).
+- `GET /minecraft/sources` liefert zusätzlich eine aggregierte Quellen-Übersicht
+  (Summen aller Zähler, Spieleranzahl, Rangliste inkl. unverknüpfter Spieler),
+  optional auf einen Server gefiltert. Details:
+  [minecraft/readme.md](../minecraft/readme.md).
 
 ### Architektur
 
@@ -413,7 +417,8 @@ Die Verarbeitung (`MinecraftIngestService`) und die Datenhaltung sind in
 ## Nicht-Ziele (v1)
 
 - Keine fremden Steam-Nutzer oder Match-Teilnehmer.
-- Kein globaler öffentlicher Ranglisten-Endpoint; Vergleiche nur zwischen
-  Beyond-Nutzern.
+- Kein spielübergreifender öffentlicher Ranglisten-Endpoint; Vergleiche nur
+  zwischen Beyond-Nutzern. Die Minecraft-Quellen-Übersicht
+  (`GET /minecraft/sources`) ist JWT-geschützt und rein lesend.
 - Keine Notification-Typen und keine Admin-Bearbeitungs-UI.
 - API-Key ist vorbereitet, aber standardmäßig nicht aktiv.
